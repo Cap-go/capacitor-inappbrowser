@@ -1,0 +1,9 @@
+<resources>
+    <string name="my_string">Just a simple string</string>
+    <string name="title_activity_browser">BrowserActivity</string>
+    <string name="title_activity_basic">BasicActivity</string>
+    <string name="close_button">Close Button</string>
+    <string name="back_button">Back Button</string>
+    <string name="title">Title</string>
+    <string name="forward_button">Forward Button</string>
+</resources>

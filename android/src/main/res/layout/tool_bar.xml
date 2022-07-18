@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.v7.widget.Toolbar xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#eeeeef"
+    android:elevation="4dp"
+    app:titleTextColor="#262626">
+
+    <ImageButton
+        android:id="@+id/closeButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_clear_24px"
+        android:layout_gravity="start"
+        android:background="#eeeeef"
+        android:contentDescription="@string/close_button" />
+
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="@string/title"
+        android:maxLines="5"
+        android:ellipsize="end"
+        android:singleLine="false"
+        android:textColor="#262626" />
+
+    <ImageButton
+        android:id="@+id/forwardButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:background="#eeeeef"
+        android:contentDescription="@string/forward_button"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:src="@drawable/arrow_forward_disabled" />
+
+    <ImageButton
+        android:id="@+id/backButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:background="#eeeeef"
+        android:contentDescription="@string/back_button"
+        android:paddingRight="10dp"
+        android:src="@drawable/arrow_back_disabled" />
+</android.support.v7.widget.Toolbar>

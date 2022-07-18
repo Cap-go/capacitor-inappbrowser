@@ -13,25 +13,199 @@ npx cap sync
 
 <docgen-index>
 
-* [`echo(...)`](#echo)
+* [`open(...)`](#open)
+* [`close()`](#close)
+* [`openWebView(...)`](#openwebview)
+* [`setUrl(...)`](#seturl)
+* [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent)
+* [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked)
+* [Interfaces](#interfaces)
+* [Type Aliases](#type-aliases)
+* [Enums](#enums)
 
 </docgen-index>
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-### echo(...)
+### open(...)
 
 ```typescript
-echo(options: { value: string; }) => Promise<{ value: string; }>
+open(options: OpenOptions) => Promise<any>
 ```
 
-| Param         | Type                            |
-| ------------- | ------------------------------- |
-| **`options`** | <code>{ value: string; }</code> |
+| Param         | Type                                                |
+| ------------- | --------------------------------------------------- |
+| **`options`** | <code><a href="#openoptions">OpenOptions</a></code> |
 
-**Returns:** <code>Promise&lt;{ value: string; }&gt;</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 --------------------
+
+
+### close()
+
+```typescript
+close() => Promise<any>
+```
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+--------------------
+
+
+### openWebView(...)
+
+```typescript
+openWebView(options: OpenWebViewOptions) => Promise<any>
+```
+
+| Param         | Type                                                              |
+| ------------- | ----------------------------------------------------------------- |
+| **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+--------------------
+
+
+### setUrl(...)
+
+```typescript
+setUrl(options: { url: string; }) => Promise<any>
+```
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ url: string; }</code> |
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+--------------------
+
+
+### addListener('urlChangeEvent', ...)
+
+```typescript
+addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+Listen for url change
+
+| Param              | Type                                                            |
+| ------------------ | --------------------------------------------------------------- |
+| **`eventName`**    | <code>'urlChangeEvent'</code>                                   |
+| **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+
+**Since:** 0.0.1
+
+--------------------
+
+
+### addListener('confirmBtnClicked', ...)
+
+```typescript
+addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
+
+| Param              | Type                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| **`eventName`**    | <code>'confirmBtnClicked'</code>                                  |
+| **`listenerFunc`** | <code><a href="#confirmbtnlistener">ConfirmBtnListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+
+**Since:** 0.0.1
+
+--------------------
+
+
+### Interfaces
+
+
+#### OpenOptions
+
+| Prop                         | Type                                        |
+| ---------------------------- | ------------------------------------------- |
+| **`url`**                    | <code>string</code>                         |
+| **`headers`**                | <code><a href="#headers">Headers</a></code> |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                        |
+
+
+#### Headers
+
+
+#### OpenWebViewOptions
+
+| Prop                         | Type                                                            |
+| ---------------------------- | --------------------------------------------------------------- |
+| **`url`**                    | <code>string</code>                                             |
+| **`headers`**                | <code><a href="#headers">Headers</a></code>                     |
+| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> |
+| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             |
+| **`shareSubject`**           | <code>string</code>                                             |
+| **`title`**                  | <code>string</code>                                             |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            |
+
+
+#### DisclaimerOptions
+
+| Prop             | Type                |
+| ---------------- | ------------------- |
+| **`title`**      | <code>string</code> |
+| **`message`**    | <code>string</code> |
+| **`confirmBtn`** | <code>string</code> |
+| **`cancelBtn`**  | <code>string</code> |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
+
+#### UrlEvent
+
+| Prop      | Type                | Description               | Since |
+| --------- | ------------------- | ------------------------- | ----- |
+| **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
+
+
+#### BtnEvent
+
+| Prop      | Type                | Description                    | Since |
+| --------- | ------------------- | ------------------------------ | ----- |
+| **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
+
+### Type Aliases
+
+
+#### UrlChangeListener
+
+<code>(state: <a href="#urlevent">UrlEvent</a>): void</code>
+
+
+#### ConfirmBtnListener
+
+<code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
+
+
+### Enums
+
+
+#### ToolBarType
+
+| Members          | Value                     |
+| ---------------- | ------------------------- |
+| **`ACTIVITY`**   | <code>"activity"</code>   |
+| **`NAVIGATION`** | <code>"navigation"</code> |
+| **`BLANK`**      | <code>"blank"</code>      |
+| **`DEFAULT`**    | <code>""</code>           |
 
 </docgen-api>
