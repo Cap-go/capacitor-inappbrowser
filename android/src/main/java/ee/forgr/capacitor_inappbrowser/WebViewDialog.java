@@ -76,6 +76,22 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    public void setUrl(String url) {
+        Map<String, String> requestHeaders = new HashMap<>();
+        if(_options.getHeaders() != null) {
+            Iterator<String> keys = _options.getHeaders().keys();
+            while(keys.hasNext()) {
+            String key = keys.next();
+            if(TextUtils.equals(key, "User-Agent")) {
+                _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
+            } else {
+                requestHeaders.put(key, _options.getHeaders().getString(key));
+            }
+            }
+        }
+        _webView.loadUrl(url, requestHeaders);
+    }
+
     private void setTitle(String newTitleText) {
         TextView textView = (TextView) _toolbar.findViewById(R.id.titleText);
         textView.setText(newTitleText);

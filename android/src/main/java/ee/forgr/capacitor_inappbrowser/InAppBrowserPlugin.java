@@ -21,7 +21,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.Iterator;
 
-@CapacitorPlugin(name = "InAppBrowserPlugin")
+@CapacitorPlugin(name = "InAppBrowser")
 public class InAppBrowserPlugin extends Plugin {
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome";  // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -42,6 +42,16 @@ public class InAppBrowserPlugin extends Plugin {
 
     @PluginMethod()
     public void setUrl(PluginCall call) {
+        String url = call.getString("url");
+        if(url == null || TextUtils.isEmpty(url)) {
+            call.reject("Invalid URL");
+        }
+        getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                webViewDialog.setUrl(url);
+            }
+        });
         call.resolve();
     }
 
