@@ -4,24 +4,25 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.customtabs.CustomTabsCallback;
-import android.support.customtabs.CustomTabsClient;
-import android.support.customtabs.CustomTabsIntent;
-import android.support.customtabs.CustomTabsServiceConnection;
-import android.support.customtabs.CustomTabsSession;
 import android.text.TextUtils;
 import android.util.Log;
 
+import androidx.browser.customtabs.CustomTabsCallback;
+import androidx.browser.customtabs.CustomTabsClient;
+import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.browser.customtabs.CustomTabsServiceConnection;
+import androidx.browser.customtabs.CustomTabsSession;
+
 import com.getcapacitor.JSObject;
-import com.getcapacitor.NativePlugin;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.util.Iterator;
 
-@NativePlugin()
-public class CapBrowser extends Plugin {
+@CapacitorPlugin(name = "InAppBrowserPlugin")
+public class InAppBrowserPlugin extends Plugin {
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome";  // Change when in stable
     private CustomTabsClient customTabsClient;
     private CustomTabsSession currentSession;
@@ -41,31 +42,30 @@ public class CapBrowser extends Plugin {
 
     @PluginMethod()
     public void setUrl(PluginCall call) {
-        call.success();
+        call.resolve();
     }
 
     @PluginMethod()
     public void open(PluginCall call) {
         String url = call.getString("url");
         if(url == null || TextUtils.isEmpty(url)) {
-            call.error("Invalid URL");
+            call.reject("Invalid URL");
         }
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
-        builder.addDefaultShareMenuItem();
         CustomTabsIntent tabsIntent = builder.build();
         tabsIntent.intent.putExtra(Intent.EXTRA_REFERRER,
                 Uri.parse(Intent.URI_ANDROID_APP_SCHEME + "//" + getContext().getPackageName()));
         tabsIntent.intent.putExtra(android.provider.Browser.EXTRA_HEADERS, this.getHeaders(call));
         tabsIntent.launchUrl(getContext(), Uri.parse(url));
 
-        call.success();
+        call.resolve();
     }
 
     @PluginMethod()
     public void openWebView(PluginCall call) {
         String url = call.getString("url");
         if(url == null || TextUtils.isEmpty(url)) {
-            call.error("Invalid URL");
+            call.reject("Invalid URL");
         }
         final Options options = new Options();
         options.setUrl(url);
@@ -111,7 +111,7 @@ public class CapBrowser extends Plugin {
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             getContext().startActivity(intent);
         }
-        call.success();
+        call.resolve();
     }
 
     private Bundle getHeaders(PluginCall pluginCall) {
@@ -156,10 +156,5 @@ public class CapBrowser extends Plugin {
             });
         }
         return currentSession;
-    }
-
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
     }
 }

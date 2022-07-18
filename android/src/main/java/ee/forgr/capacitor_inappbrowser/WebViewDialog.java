@@ -3,7 +3,6 @@ package ee.forgr.capacitor_inappbrowser;
 import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -14,8 +13,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
-
-import com.cap.browser.plugin.capbrowser.R;
+import android.widget.Toolbar;
 
 import java.net.URI;
 import java.net.URISyntaxException;
