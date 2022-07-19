@@ -209,3 +209,7 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`DEFAULT`**    | <code>""</code>           |
 
 </docgen-api>
+
+**Credits**
+ - [WKWebViewController](https://github.com/Meniny/WKWebViewController) - for iOS
+ - [CapBrowser](https://github.com/gadapa-rakesh/CapBrowser) - For the base in capacitor v2
