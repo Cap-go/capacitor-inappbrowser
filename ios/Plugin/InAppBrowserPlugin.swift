@@ -51,7 +51,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         
         var disclaimerContent = call.getObject("shareDisclaimer")
-        let toolbarType = call.getString("toolbarType")
+        let toolbarType = call.getString("toolbarType", "")
         let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
         if toolbarType != "activity" {
             disclaimerContent = nil
@@ -70,12 +70,11 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
             
             self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType ?? "")
-            
+            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
             self.webViewController?.capBrowserPlugin = self
-            self.webViewController?.title = call.getString("title") ?? ""
+            self.webViewController?.title = call.getString("title", "")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
