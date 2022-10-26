@@ -20,6 +20,10 @@ export interface BtnEvent {
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 
+export enum BackgroundColor  {
+  WHITE = 'white',  
+  BLACK = 'black',
+}
 export enum ToolBarType {
   ACTIVITY = "activity",
   NAVIGATION = "navigation",
@@ -51,6 +55,7 @@ export interface OpenWebViewOptions {
   toolbarType?: ToolBarType;
   shareSubject?: string;
   title: string;
+  backgroundColor?: BackgroundColor;
   isPresentAfterPageLoad?: boolean;
 }
 

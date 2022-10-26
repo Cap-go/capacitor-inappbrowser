@@ -52,6 +52,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType")
+        let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
         if toolbarType != "activity" {
             disclaimerContent = nil
         }
@@ -80,8 +81,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
-            self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            self.navigationWebViewController?.toolbar.backgroundColor = .white
+            self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
+            self.navigationWebViewController?.toolbar.backgroundColor = backgroundColor
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
