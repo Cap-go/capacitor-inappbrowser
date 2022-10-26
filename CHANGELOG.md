@@ -1,0 +1,43 @@
+## 0.3.0 (2022-10-26)
+
+### Feat
+
+- allow choose background color
+
+## 0.2.4 (2022-08-29)
+
+### Fix
+
+- readme
+
+## 0.2.3 (2022-08-28)
+
+### Fix
+
+- description
+
+## 0.2.2 (2022-08-21)
+
+### Fix
+
+- readme
+
+## 0.2.1 (2022-07-19)
+
+### Fix
+
+- add credit
+
+## 0.2.0 (2022-07-18)
+
+### Feat
+
+- add setUrl in android
+
+### Fix
+
+- CI
+- add licence
+- android build
+- android issue
+- ios
