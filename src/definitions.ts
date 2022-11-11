@@ -20,19 +20,19 @@ export interface BtnEvent {
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 
-export enum BackgroundColor  {
-  WHITE = 'white',  
+export enum BackgroundColor {
+  WHITE = 'white',
   BLACK = 'black',
 }
 export enum ToolBarType {
-  ACTIVITY = "activity",
-  NAVIGATION = "navigation",
-  BLANK = "blank",
-  DEFAULT = ""
+  ACTIVITY = 'activity',
+  NAVIGATION = 'navigation',
+  BLANK = 'blank',
+  DEFAULT = '',
 }
 
 export interface Headers {
-  [key: string] : string;
+  [key: string]: string;
 }
 
 export interface OpenOptions {
@@ -71,15 +71,15 @@ export interface InAppBrowserPlugin {
   open(options: OpenOptions): Promise<any>;
   close(): Promise<any>;
   openWebView(options: OpenWebViewOptions): Promise<any>;
-  setUrl(options: {url: string}): Promise<any>;
+  setUrl(options: { url: string }): Promise<any>;
   /**
-   * Listen for url change 
+   * Listen for url change
    *
    * @since 0.0.1
    */
   addListener(
     eventName: 'urlChangeEvent',
-    listenerFunc: UrlChangeListener,
+    listenerFunc: UrlChangeListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
@@ -88,6 +88,6 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'confirmBtnClicked',
-    listenerFunc: ConfirmBtnListener,
+    listenerFunc: ConfirmBtnListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }

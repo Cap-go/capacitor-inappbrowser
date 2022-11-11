@@ -15,7 +15,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log('close');
     return;
   }
-  async setUrl(options: { url: string}): Promise<any> {
+  async setUrl(options: { url: string }): Promise<any> {
     console.log('setUrl', options.url);
     return;
   }

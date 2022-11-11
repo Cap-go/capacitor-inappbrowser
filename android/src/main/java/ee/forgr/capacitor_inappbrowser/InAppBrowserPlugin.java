@@ -6,24 +6,22 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
-
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-
 import java.util.Iterator;
 
 @CapacitorPlugin(name = "InAppBrowser")
 public class InAppBrowserPlugin extends Plugin {
-    public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome";  // Change when in stable
+
+    public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
     private CustomTabsSession currentSession;
     private WebViewDialog webViewDialog = null;
@@ -36,45 +34,46 @@ public class InAppBrowserPlugin extends Plugin {
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName name) {
-        }
+        public void onServiceDisconnected(ComponentName name) {}
     };
 
-    @PluginMethod()
+    @PluginMethod
     public void setUrl(PluginCall call) {
         String url = call.getString("url");
-        if(url == null || TextUtils.isEmpty(url)) {
+        if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
         }
-        getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                webViewDialog.setUrl(url);
-            }
-        });
+        getActivity()
+            .runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        webViewDialog.setUrl(url);
+                    }
+                }
+            );
         call.resolve();
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void open(PluginCall call) {
         String url = call.getString("url");
-        if(url == null || TextUtils.isEmpty(url)) {
+        if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
         }
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
         CustomTabsIntent tabsIntent = builder.build();
-        tabsIntent.intent.putExtra(Intent.EXTRA_REFERRER,
-                Uri.parse(Intent.URI_ANDROID_APP_SCHEME + "//" + getContext().getPackageName()));
+        tabsIntent.intent.putExtra(Intent.EXTRA_REFERRER, Uri.parse(Intent.URI_ANDROID_APP_SCHEME + "//" + getContext().getPackageName()));
         tabsIntent.intent.putExtra(android.provider.Browser.EXTRA_HEADERS, this.getHeaders(call));
         tabsIntent.launchUrl(getContext(), Uri.parse(url));
 
         call.resolve();
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void openWebView(PluginCall call) {
         String url = call.getString("url");
-        if(url == null || TextUtils.isEmpty(url)) {
+        if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
         }
         final Options options = new Options();
@@ -86,32 +85,37 @@ public class InAppBrowserPlugin extends Plugin {
         options.setToolbarType(call.getString("toolbarType", ""));
         options.setPresentAfterPageLoad(call.getBoolean("isPresentAfterPageLoad", false));
         options.setPluginCall(call);
-        options.setCallbacks(new WebViewCallbacks() {
-            @Override
-            public void urlChangeEvent(String url) {
-                notifyListeners("urlChangeEvent", new JSObject().put("url", url));
-            }
+        options.setCallbacks(
+            new WebViewCallbacks() {
+                @Override
+                public void urlChangeEvent(String url) {
+                    notifyListeners("urlChangeEvent", new JSObject().put("url", url));
+                }
 
-            @Override
-            public void pageLoaded() {
-                notifyListeners("browserPageLoaded", new JSObject());
-            }
+                @Override
+                public void pageLoaded() {
+                    notifyListeners("browserPageLoaded", new JSObject());
+                }
 
-            @Override
-            public void pageLoadError() {
-                notifyListeners("pageLoadError", new JSObject());
+                @Override
+                public void pageLoadError() {
+                    notifyListeners("pageLoadError", new JSObject());
+                }
             }
-        });
-        getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                webViewDialog = new WebViewDialog(getContext(), android.R.style.Theme_NoTitleBar, options);
-                webViewDialog.presentWebView();
-            }
-        });
+        );
+        getActivity()
+            .runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        webViewDialog = new WebViewDialog(getContext(), android.R.style.Theme_NoTitleBar, options);
+                        webViewDialog.presentWebView();
+                    }
+                }
+            );
     }
 
-    @PluginMethod()
+    @PluginMethod
     public void close(PluginCall call) {
         if (webViewDialog != null) {
             webViewDialog.dismiss();
@@ -127,9 +131,9 @@ public class InAppBrowserPlugin extends Plugin {
     private Bundle getHeaders(PluginCall pluginCall) {
         JSObject headersProvided = pluginCall.getObject("headers");
         Bundle headers = new Bundle();
-        if(headersProvided != null) {
+        if (headersProvided != null) {
             Iterator<String> keys = headersProvided.keys();
-            while(keys.hasNext()) {
+            while (keys.hasNext()) {
                 String key = keys.next();
                 headers.putString(key, headersProvided.getString(key));
             }
@@ -154,16 +158,19 @@ public class InAppBrowserPlugin extends Plugin {
         }
 
         if (currentSession == null) {
-            currentSession = customTabsClient.newSession(new CustomTabsCallback(){
-                @Override
-                public void onNavigationEvent(int navigationEvent, Bundle extras) {
-                    switch (navigationEvent) {
-                        case NAVIGATION_FINISHED:
-                            notifyListeners("browserPageLoaded", new JSObject());
-                            break;
+            currentSession =
+                customTabsClient.newSession(
+                    new CustomTabsCallback() {
+                        @Override
+                        public void onNavigationEvent(int navigationEvent, Bundle extras) {
+                            switch (navigationEvent) {
+                                case NAVIGATION_FINISHED:
+                                    notifyListeners("browserPageLoaded", new JSObject());
+                                    break;
+                            }
+                        }
                     }
-                }
-            });
+                );
         }
         return currentSession;
     }

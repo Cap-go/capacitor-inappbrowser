@@ -4,6 +4,7 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 
 public class Options {
+
     private String title;
     private String url;
     private JSObject headers;

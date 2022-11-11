@@ -7,12 +7,13 @@
 //
 
 import Foundation
+import UIKit
 
 public enum WKWebSource: Equatable {
     case remote(URL)
     case file(URL, access: URL)
     case string(String, base: URL?)
-    
+
     public var url: URL? {
         switch self {
         case .remote(let u): return u
@@ -20,14 +21,14 @@ public enum WKWebSource: Equatable {
         default: return nil
         }
     }
-    
+
     public var remoteURL: URL? {
         switch self {
         case .remote(let u): return u
         default: return nil
         }
     }
-    
+
     public var absoluteString: String? {
         switch self {
         case .remote(let u): return u.absoluteString

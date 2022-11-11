@@ -1,13 +1,13 @@
 import type { PluginListenerHandle } from '@capacitor/core';
 
 export type InAppBrowserEventType =
-| 'loadstart'
-| 'loadstop'
-| 'loaderror'
-| 'exit'
-| 'beforeload'
-| 'message'
-| 'customscheme';
+  | 'loadstart'
+  | 'loadstop'
+  | 'loaderror'
+  | 'exit'
+  | 'beforeload'
+  | 'message'
+  | 'customscheme';
 
 export interface InAppBrowserOptions {
   /**
@@ -123,8 +123,8 @@ export interface InAppBrowserOptions {
   [key: string]: any;
 }
 interface InAppBrowserOpenOptions {
-  url: string
-  options?: InAppBrowserOptions
+  url: string;
+  options?: InAppBrowserOptions;
 }
 export interface InAppBrowserEvent extends Event {
   /** the event name */
@@ -139,13 +139,12 @@ export interface InAppBrowserEvent extends Event {
   data: any;
 }
 
-
 export type BrowserEventListener = (event: InAppBrowserEvent) => void;
 export interface InAppBrowserPlugin {
   /**
    * Opens a URL in a new InAppBrowser instance, the current browser instance, or the system browser.
    *
-  * @param options {Object} Details of the script to run, specifying either a file or code key.
+   * @param options {Object} Details of the script to run, specifying either a file or code key.
    * options.url     The URL to load.
    * options.target [target="self"]  The target in which to load the URL, an optional parameter that defaults to _self.
    *                 _self: Opens in the WebView if the URL is in the white list, otherwise it opens in the InAppBrowser.
@@ -160,39 +159,39 @@ export interface InAppBrowserPlugin {
    * Displays an InAppBrowser window that was opened hidden. Calling this has no effect
    * if the InAppBrowser was already visible.
    */
-  show(): Promise<void>
+  show(): Promise<void>;
 
   /**
-    * Closes the InAppBrowser window.
-    */
-  close(): Promise<void>
+   * Closes the InAppBrowser window.
+   */
+  close(): Promise<void>;
 
   /**
-    * Hides an InAppBrowser window that is currently shown. Calling this has no effect
-    * if the InAppBrowser was already hidden.
-    */
-  hide(): Promise<void>
+   * Hides an InAppBrowser window that is currently shown. Calling this has no effect
+   * if the InAppBrowser was already hidden.
+   */
+  hide(): Promise<void>;
 
   /**
-    * Injects JavaScript code into the InAppBrowser window.
-    *
-    * @param options {Object} Details of the script to run, specifying either a file or code key.
-    * @param options.file
-    * @param options.code
-    * @returns {Promise<any>}
-    */
-  executeScript(options: { file?: string; code?: string }): Promise<void>
+   * Injects JavaScript code into the InAppBrowser window.
+   *
+   * @param options {Object} Details of the script to run, specifying either a file or code key.
+   * @param options.file
+   * @param options.code
+   * @returns {Promise<any>}
+   */
+  executeScript(options: { file?: string; code?: string }): Promise<void>;
 
   /**
-    * Injects CSS into the InAppBrowser window.
-    *
-    * @param css {Object} Details of the script to run, specifying either a file or code key.
-    * @param css.file
-    * @param css.code
-    * @returns {Promise<any>}
-    */
-  insertCSS(css: { file?: string; code?: string }): Promise<any>
-  
+   * Injects CSS into the InAppBrowser window.
+   *
+   * @param css {Object} Details of the script to run, specifying either a file or code key.
+   * @param css.file
+   * @param css.code
+   * @returns {Promise<any>}
+   */
+  insertCSS(css: { file?: string; code?: string }): Promise<any>;
+
   /**
    * Listen for loadstart event in the Browser
    *
@@ -200,7 +199,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'loadstart',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -209,7 +208,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'loadstop',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -218,7 +217,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'loaderror',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -227,7 +226,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'exit',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -236,7 +235,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'beforeload',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -245,7 +244,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'message',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -254,6 +253,6 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'customscheme',
-    listenerFunc: BrowserEventListener,
+    listenerFunc: BrowserEventListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }

@@ -13,62 +13,62 @@ public class InAppBrowserPlugin: CAPPlugin {
     var currentPluginCall: CAPPluginCall?
     var isPresentAfterPageLoad = false
     var webViewController: WKWebViewController?
-    
-    private func setup(){
+
+    private func setup() {
         self.isSetupDone = true
-        
+
         #if swift(>=4.2)
         NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive(_:)), name: UIApplication.didBecomeActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive(_:)), name: UIApplication.willResignActiveNotification, object: nil)
         #else
-        NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive(_:)), name:.UIApplicationDidBecomeActive, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive(_:)), name:.UIApplicationWillResignActive, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive(_:)), name: .UIApplicationDidBecomeActive, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillResignActive(_:)), name: .UIApplicationWillResignActive, object: nil)
         #endif
     }
-    
+
     func presentView() {
         self.bridge?.viewController?.present(self.navigationWebViewController!, animated: true, completion: {
             self.currentPluginCall?.resolve()
         })
     }
-    
+
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
             self.setup()
         }
         self.currentPluginCall = call
-        
+
         guard let urlString = call.getString("url") else {
             call.reject("Must provide a URL to open")
             return
         }
-        
+
         if urlString.isEmpty {
             call.reject("URL must not be empty")
             return
         }
-        
+
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
-        
+
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType", "")
         let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
         if toolbarType != "activity" {
             disclaimerContent = nil
         }
-        
+
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
-        
+
         DispatchQueue.main.async {
             let url = URL(string: urlString)
-            
+
             if self.isPresentAfterPageLoad {
                 self.webViewController = WKWebViewController.init(url: url!, headers: headers)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
             }
-            
+
             self.webViewController?.source = .remote(url!)
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
@@ -91,7 +91,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
         }
     }
-    
+
     func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
         var result: [BarButtonItemType] = []
         if toolbarType == "activity" {
@@ -102,7 +102,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
         return result
     }
-    
+
     @objc func setUrl(_ call: CAPPluginCall) {
         guard let url = call.getString("url") else {
             call.reject("Cannot get new url to set")
@@ -116,33 +116,33 @@ public class InAppBrowserPlugin: CAPPlugin {
         if !self.isSetupDone {
             self.setup()
         }
-        
+
         self.currentPluginCall = call
-        
+
         guard let urlString = call.getString("url") else {
             call.reject("Must provide a URL to open")
             return
         }
-        
+
         if urlString.isEmpty {
             call.reject("URL must not be empty")
             return
         }
-        
+
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
-        
+
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
-        
+
         DispatchQueue.main.async {
             let url = URL(string: urlString)
-            
+
             if self.isPresentAfterPageLoad {
                 self.webViewController = WKWebViewController.init(url: url!, headers: headers)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
             }
-            
+
             self.webViewController?.source = .remote(url!)
             self.webViewController?.leftNavigaionBarItemTypes = [.reload]
             self.webViewController?.toolbarItemTypes = [.back, .forward, .activity]
@@ -159,15 +159,15 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
         }
     }
-    
+
     @objc func close(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-         self.navigationWebViewController?.dismiss(animated: true, completion: nil)
-         call.resolve()
+            self.navigationWebViewController?.dismiss(animated: true, completion: nil)
+            call.resolve()
         }
     }
-    
-    private func showPrivacyScreen(){
+
+    private func showPrivacyScreen() {
         if privacyScreen == nil {
             self.privacyScreen = UIImageView()
             if let launchImage = UIImage(named: "LaunchImage") {
@@ -184,15 +184,15 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
         self.navigationWebViewController?.view.addSubview(self.privacyScreen!)
     }
-    
-    private func hidePrivacyScreen(){
+
+    private func hidePrivacyScreen() {
         self.privacyScreen?.removeFromSuperview()
     }
-    
+
     @objc func appDidBecomeActive(_ notification: NSNotification) {
         self.hidePrivacyScreen()
     }
-    
+
     @objc func appWillResignActive(_ notification: NSNotification) {
         self.showPrivacyScreen()
     }
