@@ -152,6 +152,7 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             |
 | **`shareSubject`**           | <code>string</code>                                             |
 | **`title`**                  | <code>string</code>                                             |
+| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     |
 | **`isPresentAfterPageLoad`** | <code>boolean</code>                                            |
 
 
@@ -206,10 +207,18 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 | Members          | Value                     |
 | ---------------- | ------------------------- |
-| **`ACTIVITY`**   | <code>"activity"</code>   |
-| **`NAVIGATION`** | <code>"navigation"</code> |
-| **`BLANK`**      | <code>"blank"</code>      |
-| **`DEFAULT`**    | <code>""</code>           |
+| **`ACTIVITY`**   | <code>'activity'</code>   |
+| **`NAVIGATION`** | <code>'navigation'</code> |
+| **`BLANK`**      | <code>'blank'</code>      |
+| **`DEFAULT`**    | <code>''</code>           |
+
+
+#### BackgroundColor
+
+| Members     | Value                |
+| ----------- | -------------------- |
+| **`WHITE`** | <code>'white'</code> |
+| **`BLACK`** | <code>'black'</code> |
 
 </docgen-api>
 
