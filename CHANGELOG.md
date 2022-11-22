@@ -1,3 +1,10 @@
+## 0.3.6 (2022-11-22)
+
+### Fix
+
+- **deps**: update dependency com.google.android.material:material to v1.7.0
+- **deps**: update dependency androidx.coordinatorlayout:coordinatorlayout to v1.2.0
+
 ## 0.3.5 (2022-11-22)
 
 ### Fix
