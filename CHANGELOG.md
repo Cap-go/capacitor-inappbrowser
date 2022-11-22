@@ -1,3 +1,9 @@
+## 0.3.5 (2022-11-22)
+
+### Fix
+
+- **deps**: update dependency com.android.tools.build:gradle to v7.3.1
+
 ## 0.3.4 (2022-11-11)
 
 ### Fix
