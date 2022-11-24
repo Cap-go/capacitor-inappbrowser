@@ -1,3 +1,9 @@
+## 0.3.7 (2022-11-24)
+
+### Fix
+
+- **deps**: update dependency com.android.support.constraint:constraint-layout to v2
+
 ## 0.3.6 (2022-11-22)
 
 ### Fix
