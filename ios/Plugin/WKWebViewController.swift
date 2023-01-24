@@ -679,6 +679,7 @@ fileprivate extension WKWebViewController {
         }
         if canDismiss {
             //            UIDevice.current.setValue(Int(UIInterfaceOrientation.portrait.rawValue), forKey: "orientation")
+            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }
     }

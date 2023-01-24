@@ -81,6 +81,16 @@ export interface InAppBrowserPlugin {
     eventName: 'urlChangeEvent',
     listenerFunc: UrlChangeListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
+
+  /**
+   * Listen for close click
+   *
+   * @since 0.4.0
+   */
+  addListener(
+    eventName: 'closeEvent',
+    listenerFunc: UrlChangeListener
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
    *

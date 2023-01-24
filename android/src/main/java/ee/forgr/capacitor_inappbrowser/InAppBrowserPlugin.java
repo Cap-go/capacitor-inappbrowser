@@ -91,6 +91,10 @@ public class InAppBrowserPlugin extends Plugin {
                 public void urlChangeEvent(String url) {
                     notifyListeners("urlChangeEvent", new JSObject().put("url", url));
                 }
+                @Override
+                public void closeEvent(String url) {
+                    notifyListeners("closeEvent", new JSObject().put("url", url));
+                }
 
                 @Override
                 public void pageLoaded() {

@@ -72,7 +72,7 @@ public class WebViewDialog extends Dialog {
 
         if (!this._options.isPresentAfterPageLoad()) {
             show();
-            _options.getPluginCall().success();
+            _options.getPluginCall().resolve();
         }
     }
 
@@ -140,6 +140,7 @@ public class WebViewDialog extends Dialog {
                 @Override
                 public void onClick(View view) {
                     dismiss();
+                    _options.getCallbacks().urlChangeEvent(_webView.getUrl());
                 }
             }
         );
@@ -192,7 +193,7 @@ public class WebViewDialog extends Dialog {
                         _webView.clearHistory();
                         if (_options.isPresentAfterPageLoad()) {
                             show();
-                            _options.getPluginCall().success();
+                            _options.getPluginCall().resolve();
                         }
                     }
 
