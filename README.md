@@ -21,6 +21,7 @@ npx cap sync
 * [`openWebView(...)`](#openwebview)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent)
+* [`addListener('closeEvent', ...)`](#addlistenercloseevent)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -34,14 +35,14 @@ npx cap sync
 ### open(...)
 
 ```typescript
-open(options: OpenOptions) => Promise<any>
+open(options: OpenOptions) => any
 ```
 
 | Param         | Type                                                |
 | ------------- | --------------------------------------------------- |
 | **`options`** | <code><a href="#openoptions">OpenOptions</a></code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -49,10 +50,10 @@ open(options: OpenOptions) => Promise<any>
 ### close()
 
 ```typescript
-close() => Promise<any>
+close() => any
 ```
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -60,14 +61,14 @@ close() => Promise<any>
 ### openWebView(...)
 
 ```typescript
-openWebView(options: OpenWebViewOptions) => Promise<any>
+openWebView(options: OpenWebViewOptions) => any
 ```
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -75,14 +76,14 @@ openWebView(options: OpenWebViewOptions) => Promise<any>
 ### setUrl(...)
 
 ```typescript
-setUrl(options: { url: string; }) => Promise<any>
+setUrl(options: { url: string; }) => any
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -100,9 +101,29 @@ Listen for url change
 | **`eventName`**    | <code>'urlChangeEvent'</code>                                   |
 | **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>any</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### addListener('closeEvent', ...)
+
+```typescript
+addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+Listen for close click
+
+| Param              | Type                                                            |
+| ------------------ | --------------------------------------------------------------- |
+| **`eventName`**    | <code>'closeEvent'</code>                                       |
+| **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
+
+**Returns:** <code>any</code>
+
+**Since:** 0.4.0
 
 --------------------
 
@@ -120,7 +141,7 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`eventName`**    | <code>'confirmBtnClicked'</code>                                  |
 | **`listenerFunc`** | <code><a href="#confirmbtnlistener">ConfirmBtnListener</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>any</code>
 
 **Since:** 0.0.1
 
@@ -166,18 +187,18 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`cancelBtn`**  | <code>string</code> |
 
 
-#### PluginListenerHandle
-
-| Prop         | Type                                      |
-| ------------ | ----------------------------------------- |
-| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
-
-
 #### UrlEvent
 
 | Prop      | Type                | Description               | Since |
 | --------- | ------------------- | ------------------------- | ----- |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                      |
+| ------------ | ------------------------- |
+| **`remove`** | <code>() =&gt; any</code> |
 
 
 #### BtnEvent
