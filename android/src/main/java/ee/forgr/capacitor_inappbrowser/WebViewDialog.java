@@ -140,7 +140,7 @@ public class WebViewDialog extends Dialog {
                 @Override
                 public void onClick(View view) {
                     dismiss();
-                    _options.getCallbacks().urlChangeEvent(_webView.getUrl());
+                    _options.getCallbacks().closeEvent(_webView.getUrl());
                 }
             }
         );
