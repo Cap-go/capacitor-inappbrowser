@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/v0.3.21...v0.4.2) (2023-03-20)
+
+
+### Features
+
+* force 0.4 ([1f83751](https://github.com/Cap-go/capacitor-inappbrowser/commit/1f837513c08cc35af08340b703a7811bfb470787))
+
+
+### Bug Fixes
+
+* build script ([551064c](https://github.com/Cap-go/capacitor-inappbrowser/commit/551064cfa95692e202db6de9d79b76f476cfd4b5))
+* missing namespace ([360352e](https://github.com/Cap-go/capacitor-inappbrowser/commit/360352e6ae06b8a1695a8129ad2ecdf026b08601))
+
 ### [0.4.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/v0.3.21...v0.4.1) (2023-03-16)
 
 
