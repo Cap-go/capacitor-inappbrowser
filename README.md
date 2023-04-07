@@ -23,6 +23,7 @@ npx cap sync
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked)
+* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -152,6 +153,21 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 **Returns:** <code>any</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => any
+```
+
+Remove all listeners for this plugin.
+
+**Returns:** <code>any</code>
+
+**Since:** 1.0.0
 
 --------------------
 
