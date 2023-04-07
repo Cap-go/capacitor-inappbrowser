@@ -11,13 +11,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@capacitor/core": "latest",
-    "@capacitor/camera": "latest",
-    "@capacitor/splash-screen": "latest",
+    "@capacitor/camera": "^4.1.4",
+    "@capacitor/core": "^4.7.3",
+    "@capacitor/splash-screen": "^4.2.0",
     "@capgo/inappbrowser": "file:.."
   },
   "devDependencies": {
-    "@capacitor/cli": "latest"
+    "@capacitor/cli": "^4.7.3"
   },
   "author": "",
   "license": "ISC"

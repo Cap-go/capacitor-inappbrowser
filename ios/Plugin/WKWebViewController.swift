@@ -13,10 +13,7 @@ private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
 
-private struct UrlsHandledByApp {
-    public static var hosts = ["itunes.apple.com"]
-    public static var schemes = ["tel", "mailto", "sms"]
-    public static var blank = true
+private struct UrlsHandledByApp {static var hosts = ["itunes.apple.com"]static var schemes = ["tel", "mailto", "sms"]static var blank = true
 }
 
 @objc public protocol WKWebViewControllerDelegate {

@@ -100,7 +100,7 @@ setUrl(options: { url: string; }) => any
 ### addListener('urlChangeEvent', ...)
 
 ```typescript
-addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Listen for url change
@@ -120,7 +120,7 @@ Listen for url change
 ### addListener('closeEvent', ...)
 
 ```typescript
-addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Listen for close click
@@ -140,7 +140,7 @@ Listen for close click
 ### addListener('confirmBtnClicked', ...)
 
 ```typescript
-addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
@@ -252,18 +252,18 @@ Remove all listeners for this plugin.
 
 | Members          | Value                     |
 | ---------------- | ------------------------- |
-| **`ACTIVITY`**   | <code>'activity'</code>   |
-| **`NAVIGATION`** | <code>'navigation'</code> |
-| **`BLANK`**      | <code>'blank'</code>      |
-| **`DEFAULT`**    | <code>''</code>           |
+| **`ACTIVITY`**   | <code>"activity"</code>   |
+| **`NAVIGATION`** | <code>"navigation"</code> |
+| **`BLANK`**      | <code>"blank"</code>      |
+| **`DEFAULT`**    | <code>""</code>           |
 
 
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
-| **`WHITE`** | <code>'white'</code> |
-| **`BLACK`** | <code>'black'</code> |
+| **`WHITE`** | <code>"white"</code> |
+| **`BLACK`** | <code>"black"</code> |
 
 </docgen-api>
 

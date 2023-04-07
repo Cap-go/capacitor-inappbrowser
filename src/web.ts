@@ -1,22 +1,26 @@
-import { WebPlugin } from '@capacitor/core';
+import { WebPlugin } from "@capacitor/core";
 
-import type { InAppBrowserPlugin, OpenWebViewOptions, OpenOptions } from './definitions';
+import type {
+  InAppBrowserPlugin,
+  OpenWebViewOptions,
+  OpenOptions,
+} from "./definitions";
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   async open(options: OpenOptions): Promise<any> {
-    console.log('open', options);
+    console.log("open", options);
     return options;
   }
   async openWebView(options: OpenWebViewOptions): Promise<any> {
-    console.log('openWebView', options);
+    console.log("openWebView", options);
     return options;
   }
   async close(): Promise<any> {
-    console.log('close');
+    console.log("close");
     return;
   }
   async setUrl(options: { url: string }): Promise<any> {
-    console.log('setUrl', options.url);
+    console.log("setUrl", options.url);
     return;
   }
 }
