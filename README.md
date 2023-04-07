@@ -38,11 +38,15 @@ npx cap sync
 open(options: OpenOptions) => any
 ```
 
+Open url in a new window fullscreen
+
 | Param         | Type                                                |
 | ------------- | --------------------------------------------------- |
 | **`options`** | <code><a href="#openoptions">OpenOptions</a></code> |
 
 **Returns:** <code>any</code>
+
+**Since:** 0.1.0
 
 --------------------
 
@@ -64,11 +68,15 @@ close() => any
 openWebView(options: OpenWebViewOptions) => any
 ```
 
+Open url in a new webview with toolbars
+
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
 
 **Returns:** <code>any</code>
+
+**Since:** 0.1.0
 
 --------------------
 
@@ -153,11 +161,11 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 #### OpenOptions
 
-| Prop                         | Type                                        |
-| ---------------------------- | ------------------------------------------- |
-| **`url`**                    | <code>string</code>                         |
-| **`headers`**                | <code><a href="#headers">Headers</a></code> |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                        |
+| Prop                         | Type                                        | Description                                                                                                           | Since |
+| ---------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                         | Target URL to load.                                                                                                   | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code> | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                        | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
 
 
 #### Headers
@@ -165,16 +173,16 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 #### OpenWebViewOptions
 
-| Prop                         | Type                                                            |
-| ---------------------------- | --------------------------------------------------------------- |
-| **`url`**                    | <code>string</code>                                             |
-| **`headers`**                | <code><a href="#headers">Headers</a></code>                     |
-| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> |
-| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             |
-| **`shareSubject`**           | <code>string</code>                                             |
-| **`title`**                  | <code>string</code>                                             |
-| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            |
+| Prop                         | Type                                                            | Description                                                                                                                                                                       | Default                            | Since |
+| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                    | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                    | 0.1.0 |
+| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                    | 0.1.0 |
+| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>   | 0.1.0 |
+| **`shareSubject`**           | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                    | 0.1.0 |
+| **`title`**                  | <code>string</code>                                             | Title of the browser                                                                                                                                                              | <code>'New Window'</code>          | 0.1.0 |
+| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     | Background color of the browser, only on IOS                                                                                                                                      | <code>BackgroundColor.BLACK</code> | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | <code>false</code>                 | 0.1.0 |
 
 
 #### DisclaimerOptions

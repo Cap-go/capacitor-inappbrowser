@@ -36,8 +36,20 @@ export interface Headers {
 }
 
 export interface OpenOptions {
+    /**
+   * Target URL to load.
+   * @since 0.1.0
+   */
   url: string;
+    /**
+   * Headers to send with the request.
+   * @since 0.1.0
+   */
   headers?: Headers;
+  /**
+   * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
+   * @since 0.1.0
+   */
   isPresentAfterPageLoad?: boolean;
 }
 
@@ -49,13 +61,51 @@ export interface DisclaimerOptions {
 }
 
 export interface OpenWebViewOptions {
+  /**
+   * Target URL to load.
+   * @since 0.1.0
+   */
   url: string;
+  /**
+   * Headers to send with the request.
+   * @since 0.1.0
+   */
   headers?: Headers;
+  /**
+   * share options
+   * @since 0.1.0
+   */
   shareDisclaimer?: DisclaimerOptions;
+  /**
+   * Toolbar type
+   * @since 0.1.0
+   * @default ToolBarType.DEFAULT
+   */
   toolbarType?: ToolBarType;
+  /**
+   * Share subject
+   * @since 0.1.0
+   */
   shareSubject?: string;
+  /**
+   * Title of the browser
+   * @since 0.1.0
+   * @default 'New Window'
+   */
   title: string;
+  /**
+   * Background color of the browser, only on IOS
+   * @since 0.1.0
+   * @default BackgroundColor.BLACK
+   */
   backgroundColor?: BackgroundColor;
+  /**
+   * Open url in a new window fullscreen
+   *
+   * isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
+   * @since 0.1.0
+   * @default false
+   */
   isPresentAfterPageLoad?: boolean;
 }
 
@@ -68,8 +118,18 @@ export interface OpenWebViewOptions {
 //   console.log(info.url)
 // })
 export interface InAppBrowserPlugin {
+  /**
+   * Open url in a new window fullscreen
+   *
+   * @since 0.1.0
+   */
   open(options: OpenOptions): Promise<any>;
   close(): Promise<any>;
+  /**
+   * Open url in a new webview with toolbars
+   *
+   * @since 0.1.0
+   */
   openWebView(options: OpenWebViewOptions): Promise<any>;
   setUrl(options: { url: string }): Promise<any>;
   /**
