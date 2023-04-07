@@ -160,4 +160,11 @@ export interface InAppBrowserPlugin {
     eventName: 'confirmBtnClicked',
     listenerFunc: ConfirmBtnListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
+
+  /**
+   * Remove all listeners for this plugin.
+   *
+   * @since 1.0.0
+   */
+  removeAllListeners(): Promise<void>;
 }
