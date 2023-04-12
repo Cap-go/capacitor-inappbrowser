@@ -14,9 +14,9 @@ npx cap sync
 ## Usage
 
 ```js
-import { CapacitorInappbrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser'
 
-CapacitorInappbrowser.open("YOUR_URL");
+InAppBrowser.open("YOUR_URL");
 ```
 
 ## API
