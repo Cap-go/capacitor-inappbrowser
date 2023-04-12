@@ -11,6 +11,13 @@ Capacitor plugin in app browser with urlChangeEvent
 npm install @capgo/inappbrowser
 npx cap sync
 ```
+## Usage
+
+```js
+import { CapacitorInappbrowser } from '@capgo/inappbrowser'
+
+CapacitorInappbrowser.open("YOUR_URL");
+```
 
 ## API
 
