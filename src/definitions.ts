@@ -1,4 +1,4 @@
-import type { PluginListenerHandle } from '@capacitor/core';
+import type { PluginListenerHandle } from "@capacitor/core";
 
 export interface UrlEvent {
   /**
@@ -21,14 +21,14 @@ export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 
 export enum BackgroundColor {
-  WHITE = 'white',
-  BLACK = 'black',
+  WHITE = "white",
+  BLACK = "black",
 }
 export enum ToolBarType {
-  ACTIVITY = 'activity',
-  NAVIGATION = 'navigation',
-  BLANK = 'blank',
-  DEFAULT = '',
+  ACTIVITY = "activity",
+  NAVIGATION = "navigation",
+  BLANK = "blank",
+  DEFAULT = "",
 }
 
 export interface Headers {
@@ -36,8 +36,20 @@ export interface Headers {
 }
 
 export interface OpenOptions {
+  /**
+   * Target URL to load.
+   * @since 0.1.0
+   */
   url: string;
+  /**
+   * Headers to send with the request.
+   * @since 0.1.0
+   */
   headers?: Headers;
+  /**
+   * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
+   * @since 0.1.0
+   */
   isPresentAfterPageLoad?: boolean;
 }
 
@@ -49,13 +61,51 @@ export interface DisclaimerOptions {
 }
 
 export interface OpenWebViewOptions {
+  /**
+   * Target URL to load.
+   * @since 0.1.0
+   */
   url: string;
+  /**
+   * Headers to send with the request.
+   * @since 0.1.0
+   */
   headers?: Headers;
+  /**
+   * share options
+   * @since 0.1.0
+   */
   shareDisclaimer?: DisclaimerOptions;
+  /**
+   * Toolbar type
+   * @since 0.1.0
+   * @default ToolBarType.DEFAULT
+   */
   toolbarType?: ToolBarType;
+  /**
+   * Share subject
+   * @since 0.1.0
+   */
   shareSubject?: string;
+  /**
+   * Title of the browser
+   * @since 0.1.0
+   * @default 'New Window'
+   */
   title: string;
+  /**
+   * Background color of the browser, only on IOS
+   * @since 0.1.0
+   * @default BackgroundColor.BLACK
+   */
   backgroundColor?: BackgroundColor;
+  /**
+   * Open url in a new window fullscreen
+   *
+   * isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
+   * @since 0.1.0
+   * @default false
+   */
   isPresentAfterPageLoad?: boolean;
 }
 
@@ -68,8 +118,18 @@ export interface OpenWebViewOptions {
 //   console.log(info.url)
 // })
 export interface InAppBrowserPlugin {
+  /**
+   * Open url in a new window fullscreen
+   *
+   * @since 0.1.0
+   */
   open(options: OpenOptions): Promise<any>;
   close(): Promise<any>;
+  /**
+   * Open url in a new webview with toolbars
+   *
+   * @since 0.1.0
+   */
   openWebView(options: OpenWebViewOptions): Promise<any>;
   setUrl(options: { url: string }): Promise<any>;
   /**
@@ -78,7 +138,17 @@ export interface InAppBrowserPlugin {
    * @since 0.0.1
    */
   addListener(
-    eventName: 'urlChangeEvent',
+    eventName: "urlChangeEvent",
+    listenerFunc: UrlChangeListener
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+
+  /**
+   * Listen for close click
+   *
+   * @since 0.4.0
+   */
+  addListener(
+    eventName: "closeEvent",
     listenerFunc: UrlChangeListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
@@ -87,7 +157,14 @@ export interface InAppBrowserPlugin {
    * @since 0.0.1
    */
   addListener(
-    eventName: 'confirmBtnClicked',
+    eventName: "confirmBtnClicked",
     listenerFunc: ConfirmBtnListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
+
+  /**
+   * Remove all listeners for this plugin.
+   *
+   * @since 1.0.0
+   */
+  removeAllListeners(): Promise<void>;
 }

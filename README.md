@@ -11,6 +11,13 @@ Capacitor plugin in app browser with urlChangeEvent
 npm install @capgo/inappbrowser
 npx cap sync
 ```
+## Usage
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+InAppBrowser.open("YOUR_URL");
+```
 
 ## API
 
@@ -21,7 +28,9 @@ npx cap sync
 * [`openWebView(...)`](#openwebview)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent)
+* [`addListener('closeEvent', ...)`](#addlistenercloseevent)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked)
+* [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -34,14 +43,18 @@ npx cap sync
 ### open(...)
 
 ```typescript
-open(options: OpenOptions) => Promise<any>
+open(options: OpenOptions) => any
 ```
+
+Open url in a new window fullscreen
 
 | Param         | Type                                                |
 | ------------- | --------------------------------------------------- |
 | **`options`** | <code><a href="#openoptions">OpenOptions</a></code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
+
+**Since:** 0.1.0
 
 --------------------
 
@@ -49,10 +62,10 @@ open(options: OpenOptions) => Promise<any>
 ### close()
 
 ```typescript
-close() => Promise<any>
+close() => any
 ```
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -60,14 +73,18 @@ close() => Promise<any>
 ### openWebView(...)
 
 ```typescript
-openWebView(options: OpenWebViewOptions) => Promise<any>
+openWebView(options: OpenWebViewOptions) => any
 ```
+
+Open url in a new webview with toolbars
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
+
+**Since:** 0.1.0
 
 --------------------
 
@@ -75,14 +92,14 @@ openWebView(options: OpenWebViewOptions) => Promise<any>
 ### setUrl(...)
 
 ```typescript
-setUrl(options: { url: string; }) => Promise<any>
+setUrl(options: { url: string; }) => any
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -90,7 +107,7 @@ setUrl(options: { url: string; }) => Promise<any>
 ### addListener('urlChangeEvent', ...)
 
 ```typescript
-addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Listen for url change
@@ -100,9 +117,29 @@ Listen for url change
 | **`eventName`**    | <code>'urlChangeEvent'</code>                                   |
 | **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>any</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### addListener('closeEvent', ...)
+
+```typescript
+addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+```
+
+Listen for close click
+
+| Param              | Type                                                            |
+| ------------------ | --------------------------------------------------------------- |
+| **`eventName`**    | <code>'closeEvent'</code>                                       |
+| **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
+
+**Returns:** <code>any</code>
+
+**Since:** 0.4.0
 
 --------------------
 
@@ -110,7 +147,7 @@ Listen for url change
 ### addListener('confirmBtnClicked', ...)
 
 ```typescript
-addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle> & PluginListenerHandle
+addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle> & PluginListenerHandle
 ```
 
 Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
@@ -120,9 +157,24 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`eventName`**    | <code>'confirmBtnClicked'</code>                                  |
 | **`listenerFunc`** | <code><a href="#confirmbtnlistener">ConfirmBtnListener</a></code> |
 
-**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
+**Returns:** <code>any</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => any
+```
+
+Remove all listeners for this plugin.
+
+**Returns:** <code>any</code>
+
+**Since:** 1.0.0
 
 --------------------
 
@@ -132,11 +184,11 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 #### OpenOptions
 
-| Prop                         | Type                                        |
-| ---------------------------- | ------------------------------------------- |
-| **`url`**                    | <code>string</code>                         |
-| **`headers`**                | <code><a href="#headers">Headers</a></code> |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                        |
+| Prop                         | Type                                        | Description                                                                                                           | Since |
+| ---------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                         | Target URL to load.                                                                                                   | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code> | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                        | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
 
 
 #### Headers
@@ -144,16 +196,16 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 #### OpenWebViewOptions
 
-| Prop                         | Type                                                            |
-| ---------------------------- | --------------------------------------------------------------- |
-| **`url`**                    | <code>string</code>                                             |
-| **`headers`**                | <code><a href="#headers">Headers</a></code>                     |
-| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> |
-| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             |
-| **`shareSubject`**           | <code>string</code>                                             |
-| **`title`**                  | <code>string</code>                                             |
-| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            |
+| Prop                         | Type                                                            | Description                                                                                                                                                                       | Default                            | Since |
+| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                    | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                    | 0.1.0 |
+| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                    | 0.1.0 |
+| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>   | 0.1.0 |
+| **`shareSubject`**           | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                    | 0.1.0 |
+| **`title`**                  | <code>string</code>                                             | Title of the browser                                                                                                                                                              | <code>'New Window'</code>          | 0.1.0 |
+| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     | Background color of the browser, only on IOS                                                                                                                                      | <code>BackgroundColor.BLACK</code> | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | <code>false</code>                 | 0.1.0 |
 
 
 #### DisclaimerOptions
@@ -166,18 +218,18 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`cancelBtn`**  | <code>string</code> |
 
 
-#### PluginListenerHandle
-
-| Prop         | Type                                      |
-| ------------ | ----------------------------------------- |
-| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
-
-
 #### UrlEvent
 
 | Prop      | Type                | Description               | Since |
 | --------- | ------------------- | ------------------------- | ----- |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                      |
+| ------------ | ------------------------- |
+| **`remove`** | <code>() =&gt; any</code> |
 
 
 #### BtnEvent
@@ -207,18 +259,18 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 
 | Members          | Value                     |
 | ---------------- | ------------------------- |
-| **`ACTIVITY`**   | <code>'activity'</code>   |
-| **`NAVIGATION`** | <code>'navigation'</code> |
-| **`BLANK`**      | <code>'blank'</code>      |
-| **`DEFAULT`**    | <code>''</code>           |
+| **`ACTIVITY`**   | <code>"activity"</code>   |
+| **`NAVIGATION`** | <code>"navigation"</code> |
+| **`BLANK`**      | <code>"blank"</code>      |
+| **`DEFAULT`**    | <code>""</code>           |
 
 
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
-| **`WHITE`** | <code>'white'</code> |
-| **`BLACK`** | <code>'black'</code> |
+| **`WHITE`** | <code>"white"</code> |
+| **`BLACK`** | <code>"black"</code> |
 
 </docgen-api>
 

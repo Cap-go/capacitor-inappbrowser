@@ -74,7 +74,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
             self.webViewController?.capBrowserPlugin = self
-            self.webViewController?.title = call.getString("title", "")
+            self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)

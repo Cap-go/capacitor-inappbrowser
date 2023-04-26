@@ -14,9 +14,9 @@ private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
 
 private struct UrlsHandledByApp {
-    public static var hosts = ["itunes.apple.com"]
-    public static var schemes = ["tel", "mailto", "sms"]
-    public static var blank = true
+    static var hosts = ["itunes.apple.com"]
+    static var schemes = ["tel", "mailto", "sms"]
+    static var blank = true
 }
 
 @objc public protocol WKWebViewControllerDelegate {
@@ -679,6 +679,7 @@ fileprivate extension WKWebViewController {
         }
         if canDismiss {
             //            UIDevice.current.setValue(Int(UIInterfaceOrientation.portrait.rawValue), forKey: "orientation")
+            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }
     }
