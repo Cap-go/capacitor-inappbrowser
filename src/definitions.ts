@@ -125,6 +125,13 @@ export interface InAppBrowserPlugin {
    * @since 0.1.0
    */
   open(options: OpenOptions): Promise<any>;
+
+  /**
+   * Clear all cookies
+   *
+   * @since 0.5.0
+   */
+  clearCookies(): Promise<any>;
   close(): Promise<any>;
   /**
    * Open url in a new webview with toolbars

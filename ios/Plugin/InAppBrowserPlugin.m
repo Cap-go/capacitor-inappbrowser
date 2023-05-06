@@ -5,6 +5,7 @@
 // each method the plugin supports using the CAP_PLUGIN_METHOD macro.
 CAP_PLUGIN(InAppBrowserPlugin, "InAppBrowser",
            CAP_PLUGIN_METHOD(openWebView, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(clearCookies, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(open, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(setUrl, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(show, CAPPluginReturnPromise);

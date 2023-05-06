@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.webkit.WebStorage;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -106,6 +107,12 @@ public class InAppBrowserPlugin extends Plugin {
 
     tabsIntent.launchUrl(getContext(), Uri.parse(url));
 
+    call.resolve();
+  }
+
+  @PluginMethod
+  public void clearCookies(PluginCall call) {
+    WebStorage.getInstance().deleteAllData();
     call.resolve();
   }
 

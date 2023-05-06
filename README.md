@@ -24,6 +24,7 @@ InAppBrowser.open("YOUR_URL");
 <docgen-index>
 
 * [`open(...)`](#open)
+* [`clearCookies()`](#clearcookies)
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
 * [`setUrl(...)`](#seturl)
@@ -55,6 +56,21 @@ Open url in a new window fullscreen
 **Returns:** <code>any</code>
 
 **Since:** 0.1.0
+
+--------------------
+
+
+### clearCookies()
+
+```typescript
+clearCookies() => any
+```
+
+Clear all cookies
+
+**Returns:** <code>any</code>
+
+**Since:** 0.5.0
 
 --------------------
 
