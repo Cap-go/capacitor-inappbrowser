@@ -1,4 +1,4 @@
-import type { PluginListenerHandle } from '@capacitor/core';
+import type { PluginListenerHandle } from "@capacitor/core";
 
 export interface UrlEvent {
   /**
@@ -21,14 +21,14 @@ export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 
 export enum BackgroundColor {
-  WHITE = 'white',
-  BLACK = 'black',
+  WHITE = "white",
+  BLACK = "black",
 }
 export enum ToolBarType {
-  ACTIVITY = 'activity',
-  NAVIGATION = 'navigation',
-  BLANK = 'blank',
-  DEFAULT = '',
+  ACTIVITY = "activity",
+  NAVIGATION = "navigation",
+  BLANK = "blank",
+  DEFAULT = "",
 }
 
 export interface Headers {
@@ -139,7 +139,7 @@ export interface InAppBrowserPlugin {
    * @since 0.0.1
    */
   addListener(
-    eventName: 'urlChangeEvent',
+    eventName: "urlChangeEvent",
     listenerFunc: UrlChangeListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
@@ -149,7 +149,7 @@ export interface InAppBrowserPlugin {
    * @since 0.4.0
    */
   addListener(
-    eventName: 'closeEvent',
+    eventName: "closeEvent",
     listenerFunc: UrlChangeListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
@@ -158,7 +158,7 @@ export interface InAppBrowserPlugin {
    * @since 0.0.1
    */
   addListener(
-    eventName: 'confirmBtnClicked',
+    eventName: "confirmBtnClicked",
     listenerFunc: ConfirmBtnListener
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
