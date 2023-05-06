@@ -2,6 +2,8 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -61,6 +63,10 @@ public class InAppBrowserPlugin extends Plugin {
   @PluginMethod
   public void open(PluginCall call) {
     String url = call.getString("url");
+
+    // get the deeplink prevention, if provided
+    Boolean preventDeeplink = call.getBoolean("preventDeeplink", null);
+
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
     }
@@ -78,6 +84,26 @@ public class InAppBrowserPlugin extends Plugin {
       android.provider.Browser.EXTRA_HEADERS,
       this.getHeaders(call)
     );
+
+    if (preventDeeplink != null) {
+      String browserPackageName = "";
+      Intent browserIntent = new Intent(
+        Intent.ACTION_VIEW,
+        Uri.parse("http://")
+      );
+      ResolveInfo resolveInfo = getContext()
+        .getPackageManager()
+        .resolveActivity(browserIntent, PackageManager.MATCH_DEFAULT_ONLY);
+
+      if (resolveInfo != null) {
+        browserPackageName = resolveInfo.activityInfo.packageName;
+
+        if (!browserPackageName.isEmpty()) {
+          tabsIntent.intent.setPackage(browserPackageName);
+        }
+      }
+    }
+
     tabsIntent.launchUrl(getContext(), Uri.parse(url));
 
     call.resolve();

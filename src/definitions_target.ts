@@ -124,6 +124,7 @@ export interface InAppBrowserOptions {
 }
 interface InAppBrowserOpenOptions {
   url: string;
+  preventDeeplink?: boolean;
   options?: InAppBrowserOptions;
 }
 export interface InAppBrowserEvent extends Event {

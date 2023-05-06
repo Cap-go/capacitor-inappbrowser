@@ -51,6 +51,7 @@ export interface OpenOptions {
    * @since 0.1.0
    */
   isPresentAfterPageLoad?: boolean;
+  preventDeeplink?: boolean;
 }
 
 export interface DisclaimerOptions {
