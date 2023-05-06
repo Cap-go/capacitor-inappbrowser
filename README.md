@@ -189,6 +189,7 @@ Remove all listeners for this plugin.
 | **`url`**                    | <code>string</code>                         | Target URL to load.                                                                                                   | 0.1.0 |
 | **`headers`**                | <code><a href="#headers">Headers</a></code> | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
 | **`isPresentAfterPageLoad`** | <code>boolean</code>                        | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
+| **`preventDeeplink`**        | <code>boolean</code>                        |                                                                                                                       |       |
 
 
 #### Headers
