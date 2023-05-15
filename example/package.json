@@ -11,7 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@capacitor/camera": "^4.1.4",
+    "@capacitor/camera": "^5.0.0",
     "@capacitor/core": "^4.7.3",
     "@capacitor/splash-screen": "^4.2.0",
     "@capgo/inappbrowser": "file:.."
