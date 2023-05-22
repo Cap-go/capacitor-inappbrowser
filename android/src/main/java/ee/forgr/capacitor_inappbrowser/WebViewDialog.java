@@ -13,7 +13,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import androidx.appcompat.widget.Toolbar;
+import android.widget.Toolbar;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
