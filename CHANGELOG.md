@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [5.0.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/v0.3.21...v5.0.0) (2023-05-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* capacitor 5
+
+### Features
+
+* add clearCookie method ([4c5bd3c](https://github.com/Cap-go/capacitor-inappbrowser/commit/4c5bd3c604ca7f080ffe10256fd4033a9d5cbe81))
+* capacitor 5 ([f023b23](https://github.com/Cap-go/capacitor-inappbrowser/commit/f023b230edd5d3e75c94b6e6b75809aa01914035))
+* force 0.4 ([1f83751](https://github.com/Cap-go/capacitor-inappbrowser/commit/1f837513c08cc35af08340b703a7811bfb470787))
+
+
+### Bug Fixes
+
+* add missing definition ([8f4084c](https://github.com/Cap-go/capacitor-inappbrowser/commit/8f4084cb04b312b02e7dbb1c122921a1c9934196))
+* better documentation ([fe4ddab](https://github.com/Cap-go/capacitor-inappbrowser/commit/fe4ddab78f46e17bdd117afb82855b921a38deb7))
+* build issue ([b1775db](https://github.com/Cap-go/capacitor-inappbrowser/commit/b1775db824b2e1ea3e9159242642ded5576d434e))
+* build script ([551064c](https://github.com/Cap-go/capacitor-inappbrowser/commit/551064cfa95692e202db6de9d79b76f476cfd4b5))
+* bump major ([803be81](https://github.com/Cap-go/capacitor-inappbrowser/commit/803be81e74c1e31bab2349aa8d646957e196a568))
+* ci name ([30a9987](https://github.com/Cap-go/capacitor-inappbrowser/commit/30a9987d2d35465e28300ead36c5c7fe76d53534))
+* **deps:** update dependency com.android.tools.build:gradle to v8.0.1 ([f2741a4](https://github.com/Cap-go/capacitor-inappbrowser/commit/f2741a45655f20efa7738d91b18a6394038d2195))
+* **deps:** update dependency com.google.android.material:material to v1.9.0 ([8fe8de0](https://github.com/Cap-go/capacitor-inappbrowser/commit/8fe8de03d1465526ed08bf7ab7de2ee48a37d1b3))
+* finsih config cap 5 ([2b197e8](https://github.com/Cap-go/capacitor-inappbrowser/commit/2b197e81b52bc525c9edb08163c0ff5ba097dd68))
+* ios build ([e63cf37](https://github.com/Cap-go/capacitor-inappbrowser/commit/e63cf37096c44facbd59125190821eb01f57d9a2))
+* lint issue ([cc0d88f](https://github.com/Cap-go/capacitor-inappbrowser/commit/cc0d88f3c60a11eea1a4d64fac07e0898d159451))
+* missing namespace ([360352e](https://github.com/Cap-go/capacitor-inappbrowser/commit/360352e6ae06b8a1695a8129ad2ecdf026b08601))
+* versions actions ([d45036d](https://github.com/Cap-go/capacitor-inappbrowser/commit/d45036dae156f51c3953b09e652111dae2a8557e))
+
 ## [4.0.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/v0.3.21...v4.0.0) (2023-05-23)
 
 
