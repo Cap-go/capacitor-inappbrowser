@@ -49,7 +49,7 @@ public class InAppBrowserPlugin extends Plugin {
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
     }
-    getActivity()
+    this.getActivity()
       .runOnUiThread(
         new Runnable() {
           @Override
