@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@capacitor/camera": "^5.0.0",
-    "@capacitor/camera": "^4.1.4",
+    "@capacitor/camera": "^5.0.0",
     "@capacitor/core": "^5.0.0",
     "@capacitor/splash-screen": "^5.0.0",
     "@capgo/inappbrowser": "file:.."
