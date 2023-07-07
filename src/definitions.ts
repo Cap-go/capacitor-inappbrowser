@@ -141,7 +141,7 @@ export interface InAppBrowserPlugin {
   openWebView(options: OpenWebViewOptions): Promise<any>;
   setUrl(options: { url: string }): Promise<any>;
   /**
-   * Listen for url change
+   * Listen for url change, only for openWebView
    *
    * @since 0.0.1
    */
@@ -151,7 +151,7 @@ export interface InAppBrowserPlugin {
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 
   /**
-   * Listen for close click
+   * Listen for close click only for openWebView
    *
    * @since 0.4.0
    */
