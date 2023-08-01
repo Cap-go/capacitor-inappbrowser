@@ -32,8 +32,9 @@ public class InAppBrowserPlugin: CAPPlugin {
         })
     }
 
-    func clearCookies() {
+    @objc func clearCookies(_ call: CAPPluginCall) {
         HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
+        call.resolve()
     }
 
     @objc func openWebView(_ call: CAPPluginCall) {
