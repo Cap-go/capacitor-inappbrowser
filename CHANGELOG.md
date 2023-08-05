@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.0.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.0.7...1.0.8) (2023-08-05)
+
+
+### Bug Fixes
+
+* clear cookie only on current url ([f8978ea](https://github.com/Cap-go/capacitor-inappbrowser/commit/f8978eada7791e38ed17b18cd05cd2fc44b266ce))
+
 ### [1.0.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.0.6...1.0.7) (2023-08-01)
 
 
