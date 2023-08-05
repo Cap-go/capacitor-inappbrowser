@@ -22,7 +22,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.util.Iterator;
 
-
 @CapacitorPlugin(name = "InAppBrowser")
 public class InAppBrowserPlugin extends Plugin {
 
@@ -115,29 +114,31 @@ public class InAppBrowserPlugin extends Plugin {
     call.resolve();
   }
 
-@PluginMethod
-public void clearCookies(PluginCall call) {
+  @PluginMethod
+  public void clearCookies(PluginCall call) {
     if (webViewDialog == null) {
-        call.reject("WebView is not open");
+      call.reject("WebView is not open");
     } else {
-        String url = currentUrl;
-        if (url == null || TextUtils.isEmpty(url)) {
-            call.reject("Invalid URL");
-        } else {
-            CookieManager cookieManager = CookieManager.getInstance();
-            String cookie = cookieManager.getCookie(url);
-            if (cookie != null) {
-                String[] cookies = cookie.split(";");
-                for (String c : cookies) {
-                    String cookieName = c.substring(0, c.indexOf("="));
-                    cookieManager.setCookie(url, cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT");
-                }
-            }
-            call.resolve();
+      String url = currentUrl;
+      if (url == null || TextUtils.isEmpty(url)) {
+        call.reject("Invalid URL");
+      } else {
+        CookieManager cookieManager = CookieManager.getInstance();
+        String cookie = cookieManager.getCookie(url);
+        if (cookie != null) {
+          String[] cookies = cookie.split(";");
+          for (String c : cookies) {
+            String cookieName = c.substring(0, c.indexOf("="));
+            cookieManager.setCookie(
+              url,
+              cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
+            );
+          }
         }
+        call.resolve();
+      }
     }
-}
-
+  }
 
   @PluginMethod
   public void openWebView(PluginCall call) {
