@@ -44,7 +44,7 @@ InAppBrowser.open("YOUR_URL");
 ### open(...)
 
 ```typescript
-open(options: OpenOptions) => any
+open(options: OpenOptions) => Promise<any>
 ```
 
 Open url in a new window fullscreen
@@ -53,7 +53,7 @@ Open url in a new window fullscreen
 | ------------- | --------------------------------------------------- |
 | **`options`** | <code><a href="#openoptions">OpenOptions</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.1.0
 
@@ -63,12 +63,12 @@ Open url in a new window fullscreen
 ### clearCookies()
 
 ```typescript
-clearCookies() => any
+clearCookies() => Promise<any>
 ```
 
 Clear all cookies
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.5.0
 
@@ -78,10 +78,10 @@ Clear all cookies
 ### close()
 
 ```typescript
-close() => any
+close() => Promise<any>
 ```
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 --------------------
 
@@ -89,7 +89,7 @@ close() => any
 ### openWebView(...)
 
 ```typescript
-openWebView(options: OpenWebViewOptions) => any
+openWebView(options: OpenWebViewOptions) => Promise<any>
 ```
 
 Open url in a new webview with toolbars
@@ -98,7 +98,7 @@ Open url in a new webview with toolbars
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.1.0
 
@@ -108,14 +108,14 @@ Open url in a new webview with toolbars
 ### setUrl(...)
 
 ```typescript
-setUrl(options: { url: string; }) => any
+setUrl(options: { url: string; }) => Promise<any>
 ```
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;any&gt;</code>
 
 --------------------
 
@@ -133,7 +133,7 @@ Listen for url change, only for openWebView
 | **`eventName`**    | <code>'urlChangeEvent'</code>                                   |
 | **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
 **Since:** 0.0.1
 
@@ -153,7 +153,7 @@ Listen for close click only for openWebView
 | **`eventName`**    | <code>'closeEvent'</code>                                       |
 | **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
 **Since:** 0.4.0
 
@@ -173,7 +173,7 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 | **`eventName`**    | <code>'confirmBtnClicked'</code>                                  |
 | **`listenerFunc`** | <code><a href="#confirmbtnlistener">ConfirmBtnListener</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt; & <a href="#pluginlistenerhandle">PluginListenerHandle</a></code>
 
 **Since:** 0.0.1
 
@@ -183,12 +183,10 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 ### removeAllListeners()
 
 ```typescript
-removeAllListeners() => any
+removeAllListeners() => Promise<void>
 ```
 
 Remove all listeners for this plugin.
-
-**Returns:** <code>any</code>
 
 **Since:** 1.0.0
 
@@ -213,16 +211,16 @@ Remove all listeners for this plugin.
 
 #### OpenWebViewOptions
 
-| Prop                         | Type                                                            | Description                                                                                                                                                                       | Default                            | Since  |
-| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------ |
-| **`url`**                    | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                    | 0.1.0  |
-| **`headers`**                | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                    | 0.1.0  |
-| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                    | 0.1.0  |
-| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>   | 0.1.0  |
-| **`shareSubject`**           | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                    | 0.1.0  |
-| **`title`**                  | <code>string</code>                                             | Title of the browser                                                                                                                                                              | <code>'New Window'</code>          | 0.1.0  |
-| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     | Background color of the browser, only on IOS                                                                                                                                      | <code>BackgroundColor.BLACK</code> | 0.1.0  |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | <code>false</code>                 | 0.1.0  |
+| Prop                         | Type                                                            | Description                                                                                                                                                                       | Default                            | Since |
+| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                    | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                    | 0.1.0 |
+| **`shareDisclaimer`**        | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                    | 0.1.0 |
+| **`toolbarType`**            | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>   | 0.1.0 |
+| **`shareSubject`**           | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                    | 0.1.0 |
+| **`title`**                  | <code>string</code>                                             | Title of the browser                                                                                                                                                              | <code>'New Window'</code>          | 0.1.0 |
+| **`backgroundColor`**        | <code><a href="#backgroundcolor">BackgroundColor</a></code>     | Background color of the browser, only on IOS                                                                                                                                      | <code>BackgroundColor.BLACK</code> | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                                            | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | <code>false</code>                 | 0.1.0 |
 | **`showReloadButton`**       | <code>boolean</code>                                            | Shows a reload button that reloads the web page                                                                                                                                   | <code>false</code>                 | 1.0.15 |
 
 
@@ -236,18 +234,18 @@ Remove all listeners for this plugin.
 | **`cancelBtn`**  | <code>string</code> |
 
 
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
+
 #### UrlEvent
 
 | Prop      | Type                | Description               | Since |
 | --------- | ------------------- | ------------------------- | ----- |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
-
-
-#### PluginListenerHandle
-
-| Prop         | Type                      |
-| ------------ | ------------------------- |
-| **`remove`** | <code>() =&gt; any</code> |
 
 
 #### BtnEvent
