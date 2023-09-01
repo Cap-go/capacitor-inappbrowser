@@ -221,8 +221,15 @@ public class WebViewDialog extends Dialog {
           } catch (URISyntaxException e) {
             // Do nothing
           }
-          _options.getCallbacks().urlChangeEvent(url);
         }
+
+        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+          if(!isReload){
+            _options.getCallbacks().urlChangeEvent(url);
+          }
+          super.doUpdateVisitedHistory(view, url, isReload);
+        }
+
 
         @Override
         public void onPageFinished(WebView view, String url) {
