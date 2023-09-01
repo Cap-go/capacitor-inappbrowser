@@ -54,6 +54,11 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
+        let closeModal = call.getBool("closeModal", false)
+        let closeModalTitle = call.getString("closeModalTitle", "Close")
+        let closeModalDescription = call.getString("closeModalDescription", "Are you sure you want to close this window?")
+        let closeModalOk = call.getString("closeModalOk", "OK")
+        let closeModalCancel = call.getString("closeModalCancel", "Cancel")
 
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType", "")
@@ -83,6 +88,13 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
+            if closeModal {
+                self.webViewController?.closeModal = true
+                self.webViewController?.closeModalTitle = closeModalTitle
+                self.webViewController?.closeModalDescription = closeModalDescription
+                self.webViewController?.closeModalOk = closeModalOk
+                self.webViewController?.closeModalCancel = closeModalCancel
+            }
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false

@@ -74,6 +74,11 @@ open class WKWebViewController: UIViewController {
     var viewHeightLandscape: CGFloat?
     var viewHeightPortrait: CGFloat?
     var currentViewHeight: CGFloat?
+    open var closeModal = false
+    open var closeModalTitle = ""
+    open var closeModalDescription = ""
+    open var closeModalOk = ""
+    open var closeModalCancel = ""
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -672,7 +677,7 @@ fileprivate extension WKWebViewController {
         }
     }
 
-    @objc func doneDidClick(sender: AnyObject) {
+    func closeView () {
         var canDismiss = true
         if let url = self.source?.url {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
@@ -682,6 +687,21 @@ fileprivate extension WKWebViewController {
             self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }
+    }
+
+    @objc func doneDidClick(sender: AnyObject) {
+        // check if closeModal is true, if true display alert before close
+        if self.closeModal {
+            let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
+            alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
+                self.closeView()
+            }))
+            alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))
+            self.present(alert, animated: true, completion: nil)
+        } else {
+            self.closeView()
+        }
+
     }
 
     @objc func customDidClick(sender: BlockBarButtonItem) {

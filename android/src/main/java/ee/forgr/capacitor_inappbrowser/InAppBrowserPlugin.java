@@ -158,6 +158,17 @@ public class InAppBrowserPlugin extends Plugin {
     options.setPresentAfterPageLoad(
       call.getBoolean("isPresentAfterPageLoad", false)
     );
+    if (call.getBoolean("closeModal", false)) {
+      options.setCloseModal(true);
+      options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
+      options.setCloseModalDescription(
+        call.getString("closeModalDescription", "Are you sure ?")
+      );
+      options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
+      options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
+    } else {
+      options.setCloseModal(false);
+    }
     options.setPluginCall(call);
     options.setCallbacks(
       new WebViewCallbacks() {
