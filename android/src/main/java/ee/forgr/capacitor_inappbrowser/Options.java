@@ -6,6 +6,11 @@ import com.getcapacitor.PluginCall;
 public class Options {
 
   private String title;
+  private boolean CloseModal;
+  private String CloseModalTitle;
+  private String CloseModalDescription;
+  private String CloseModalCancel;
+  private String CloseModalOk;
   private String url;
   private JSObject headers;
   private String toolbarType;
@@ -29,6 +34,46 @@ public class Options {
 
   public void setTitle(String title) {
     this.title = title;
+  }
+
+  public boolean getCloseModal() {
+    return CloseModal;
+  }
+
+  public void setCloseModal(boolean CloseModal) {
+    this.CloseModal = CloseModal;
+  }
+
+  public String getCloseModalTitle() {
+    return CloseModalTitle;
+  }
+
+  public void setCloseModalTitle(String CloseModalTitle) {
+    this.CloseModalTitle = CloseModalTitle;
+  }
+
+  public String getCloseModalDescription() {
+    return CloseModalDescription;
+  }
+
+  public void setCloseModalDescription(String CloseModalDescription) {
+    this.CloseModalDescription = CloseModalDescription;
+  }
+
+  public String getCloseModalCancel() {
+    return CloseModalCancel;
+  }
+
+  public void setCloseModalCancel(String CloseModalCancel) {
+    this.CloseModalCancel = CloseModalCancel;
+  }
+
+  public String getCloseModalOk() {
+    return CloseModalOk;
+  }
+
+  public void setCloseModalOk(String CloseModalOk) {
+    this.CloseModalOk = CloseModalOk;
   }
 
   public String getUrl() {

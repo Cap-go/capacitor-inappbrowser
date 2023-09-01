@@ -1,7 +1,9 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.text.TextUtils;
 import android.view.View;
@@ -25,11 +27,13 @@ public class WebViewDialog extends Dialog {
   private WebView _webView;
   private Toolbar _toolbar;
   private Options _options;
+  private Context _context;
   private boolean isInitialized = false;
 
   public WebViewDialog(Context context, int theme, Options options) {
     super(context, theme);
     this._options = options;
+    this._context = context;
     this.isInitialized = false;
   }
 
@@ -153,8 +157,27 @@ public class WebViewDialog extends Dialog {
       new View.OnClickListener() {
         @Override
         public void onClick(View view) {
-          dismiss();
-          _options.getCallbacks().closeEvent(_webView.getUrl());
+          // if closeModal true then display a native modal to check if the user is sure to close the browser
+          if (_options.getCloseModal()) {
+            new AlertDialog.Builder(_context)
+              .setTitle(_options.getCloseModalTitle())
+              .setMessage(_options.getCloseModalDescription())
+              .setPositiveButton(
+                _options.getCloseModalOk(),
+                new DialogInterface.OnClickListener() {
+                  public void onClick(DialogInterface dialog, int which) {
+                    // Close button clicked, do something
+                    dismiss();
+                    _options.getCallbacks().closeEvent(_webView.getUrl());
+                  }
+                }
+              )
+              .setNegativeButton(_options.getCloseModalCancel(), null)
+              .show();
+          } else {
+            dismiss();
+            _options.getCallbacks().closeEvent(_webView.getUrl());
+          }
         }
       }
     );
