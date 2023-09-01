@@ -159,6 +159,20 @@ public class WebViewDialog extends Dialog {
       }
     );
 
+    if (_options.getShowReloadButton()) {
+
+      View reloadButton = _toolbar.findViewById(R.id.reloadButton);
+      reloadButton.setVisibility(View.VISIBLE);
+      reloadButton.setOnClickListener(
+              new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                  _webView.reload();
+                }
+              }
+      );
+    }
+
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
       _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
