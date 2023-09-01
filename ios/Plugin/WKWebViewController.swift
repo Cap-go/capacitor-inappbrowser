@@ -186,11 +186,12 @@ open class WKWebViewController: UIViewController {
         if self.webView == nil {
             self.initWebview()
         }
+        self.title = ""
     }
 
     open func initWebview() {
 
-        self.view.backgroundColor = UIColor.white
+        self.view.backgroundColor = UIColor.blue
 
         self.extendedLayoutIncludesOpaqueBars = true
         self.edgesForExtendedLayout = [.bottom]

@@ -118,7 +118,7 @@ public class WebViewDialog extends Dialog {
     } else {
       try {
         URI uri = new URI(_options.getUrl());
-        this.setTitle(uri.getHost());
+        this.setTitle(""); 
       } catch (URISyntaxException e) {
         this.setTitle(_options.getTitle());
       }
