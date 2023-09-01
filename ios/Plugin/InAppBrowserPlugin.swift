@@ -92,7 +92,6 @@ public class InAppBrowserPlugin: CAPPlugin {
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
             }
-            print("showReloadButton", showReloadButton)
             if showReloadButton {
                 var toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
                 self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
