@@ -63,6 +63,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
+        let showReloadButton = call.getBool("showReloadButton", false)
 
         DispatchQueue.main.async {
             let url = URL(string: urlString)
@@ -90,6 +91,11 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
+            }
+            print("showReloadButton", showReloadButton)
+            if showReloadButton {
+                var toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
+                self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
                 self.presentView()

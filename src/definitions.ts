@@ -108,6 +108,12 @@ export interface OpenWebViewOptions {
    * @default false
    */
   isPresentAfterPageLoad?: boolean;
+  /**
+   * Shows a reload button that reloads the web page
+   * @since 1.0.15
+   * @default false
+   */
+  showReloadButton?: boolean;
 }
 
 // CapBrowser.addListener("urlChangeEvent", (info:  any) => {
