@@ -166,7 +166,7 @@ open class WKWebViewController: UIViewController {
     }()
 
     fileprivate lazy var doneBarButtonItem: UIBarButtonItem = {
-        return UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(doneDidClick(sender:)))
+        return UIBarButtonItem(image: forwardBarButtonItemImage ?? UIImage(named: "Forward@2x", in: bundle, compatibleWith: nil), style: .plain,barButtonSystemItem: .done, target: self, action: #selector(doneDidClick(sender:)))
     }()
 
     fileprivate lazy var flexibleSpaceBarButtonItem: UIBarButtonItem = {
@@ -185,12 +185,15 @@ open class WKWebViewController: UIViewController {
         super.viewDidLoad()
         if self.webView == nil {
             self.initWebview()
+
         }
     }
+        self.title = ""
+    
 
     open func initWebview() {
 
-        self.view.backgroundColor = UIColor.white
+        self.view.backgroundColor = "#eeeeff"
 
         self.extendedLayoutIncludesOpaqueBars = true
         self.edgesForExtendedLayout = [.bottom]
