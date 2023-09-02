@@ -261,7 +261,7 @@ open class WKWebViewController: UIViewController {
         var topPadding = CGFloat(0.0)
         if #available(iOS 11.0, *) {
             let window = UIApplication.shared.keyWindow
-            bottomPadding = (window?.safeAreaInsets.bottom)!
+            bottomPadding = window?.safeAreaInsets.bottom ?? 0.0
             topPadding = (window?.safeAreaInsets.top)!
         }
         if UIDevice.current.orientation.isPortrait {
