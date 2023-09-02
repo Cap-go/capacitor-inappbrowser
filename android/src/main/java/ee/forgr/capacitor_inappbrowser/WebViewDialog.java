@@ -183,16 +183,15 @@ public class WebViewDialog extends Dialog {
     );
 
     if (_options.getShowReloadButton()) {
-
       View reloadButton = _toolbar.findViewById(R.id.reloadButton);
       reloadButton.setVisibility(View.VISIBLE);
       reloadButton.setOnClickListener(
-              new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                  _webView.reload();
-                }
-              }
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            _webView.reload();
+          }
+        }
       );
     }
 
@@ -237,13 +236,16 @@ public class WebViewDialog extends Dialog {
           }
         }
 
-        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
-          if(!isReload){
+        public void doUpdateVisitedHistory(
+          WebView view,
+          String url,
+          boolean isReload
+        ) {
+          if (!isReload) {
             _options.getCallbacks().urlChangeEvent(url);
           }
           super.doUpdateVisitedHistory(view, url, isReload);
         }
-
 
         @Override
         public void onPageFinished(WebView view, String url) {

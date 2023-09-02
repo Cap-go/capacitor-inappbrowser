@@ -103,6 +103,7 @@ public class Options {
   public JSObject getShareDisclaimer() {
     return shareDisclaimer;
   }
+
   public boolean showReloadButton;
 
   public boolean getShowReloadButton() {
@@ -112,7 +113,6 @@ public class Options {
   public void setShowReloadButton(boolean showReloadButton) {
     this.showReloadButton = showReloadButton;
   }
-  
 
   public void setShareDisclaimer(JSObject shareDisclaimer) {
     this.shareDisclaimer = shareDisclaimer;
