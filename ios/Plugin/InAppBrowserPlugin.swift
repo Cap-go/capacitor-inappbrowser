@@ -53,6 +53,23 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
 
+    extension UIColor {
+
+     init(hexString: String) {
+     let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int = UInt64()
+        Scanner(string: hex).scanHexInt64(&int)
+        let components = (
+            R: CGFloat((int >> 16) & 0xff) / 255,
+            G: CGFloat((int >> 08) & 0xff) / 255,
+            B: CGFloat((int >> 00) & 0xff) / 255
+        )
+        self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
+    }
+
+}
+}
+
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
         let closeModalTitle = call.getString("closeModalTitle", "Close")
@@ -84,10 +101,12 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
+            self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: bundle, compatibleWith: nil)
             self.webViewController?.capBrowserPlugin = self
             self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
+            self.webViewController?.websiteTitleInNavigationBar = call.getBool("visibleTitle",true)
             if closeModal {
                 self.webViewController?.closeModal = true
                 self.webViewController?.closeModalTitle = closeModalTitle
@@ -174,7 +193,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            self.navigationWebViewController?.toolbar.backgroundColor = .white
+            self.navigationWebViewController?.toolbar.backgroundColor = UIColor(hexString: call.getString("toolbarColor","#ffffff"))
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if !self.isPresentAfterPageLoad {
                 self.presentView()
