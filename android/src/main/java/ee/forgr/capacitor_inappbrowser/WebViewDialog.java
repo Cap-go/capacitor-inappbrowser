@@ -69,7 +69,7 @@ public class WebViewDialog extends Dialog {
       Iterator<String> keys = _options.getHeaders().keys();
       while (keys.hasNext()) {
         String key = keys.next();
-        if (TextUtils.equals(key, "User-Agent")) {
+        if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
           _webView
             .getSettings()
             .setUserAgentString(_options.getHeaders().getString(key));
@@ -98,7 +98,7 @@ public class WebViewDialog extends Dialog {
       Iterator<String> keys = _options.getHeaders().keys();
       while (keys.hasNext()) {
         String key = keys.next();
-        if (TextUtils.equals(key, "User-Agent")) {
+        if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
           _webView
             .getSettings()
             .setUserAgentString(_options.getHeaders().getString(key));

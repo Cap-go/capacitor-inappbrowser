@@ -28,6 +28,16 @@ private struct UrlsHandledByApp {
     @objc optional func webViewController(_ controller: WKWebViewController, decidePolicy url: URL, navigationType: NavigationType) -> Bool
 }
 
+extension Dictionary {
+    func mapKeys<T>(_ transform: (Key) throws -> T) rethrows -> Dictionary<T, Value> {
+        var dictionary = Dictionary<T, Value>()
+        for (key, value) in self {
+            dictionary[try transform(key)] = value
+        }
+        return dictionary
+    }
+}
+
 open class WKWebViewController: UIViewController {
 
     public init() {
@@ -82,9 +92,12 @@ open class WKWebViewController: UIViewController {
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
-        let userAgent = self.headers?["User-Agent"]
+        let lowercasedHeaders = headers.mapKeys { $0.lowercased() }
+        let userAgent = lowercasedHeaders["user-agent"]
         self.headers?.removeValue(forKey: "User-Agent")
-        if userAgent != nil {
+        self.headers?.removeValue(forKey: "user-agent")
+
+        if let userAgent = userAgent {
             self.customUserAgent = userAgent
         }
     }
