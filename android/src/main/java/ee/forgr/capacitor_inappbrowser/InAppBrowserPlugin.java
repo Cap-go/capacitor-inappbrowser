@@ -150,7 +150,7 @@ public class InAppBrowserPlugin extends Plugin {
     final Options options = new Options();
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
-    options.setShowReloadButton(call.getBoolean("showReloadButton"));
+    options.setShowReloadButton(call.getBoolean("showReloadButton", false));
     options.setTitle(call.getString("title", "New Window"));
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setShareSubject(call.getString("shareSubject", null));
