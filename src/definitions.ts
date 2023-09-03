@@ -157,7 +157,7 @@ export interface OpenWebViewOptions {
    */
   visibleTitle?: boolean;
   /**
-   * toolbarColor: color of the toolbar in rgb format
+   * toolbarColor: color of the toolbar in hex format
    * 
    * @since 1.2.5
    * @default '#ffffff''
