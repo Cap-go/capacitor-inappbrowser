@@ -87,7 +87,11 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
-            self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: bundle, compatibleWith: nil)
+            if(call.getBool("showArrow",false))
+            {
+                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: bundle, compatibleWith: nil)
+            }
+            
             self.webViewController?.capBrowserPlugin = self
             self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
