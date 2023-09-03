@@ -53,22 +53,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
 
-    extension UIColor {
+    
 
-     init(hexString: String) {
-     let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int = UInt64()
-        Scanner(string: hex).scanHexInt64(&int)
-        let components = (
-            R: CGFloat((int >> 16) & 0xff) / 255,
-            G: CGFloat((int >> 08) & 0xff) / 255,
-            B: CGFloat((int >> 00) & 0xff) / 255
-        )
-        self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
-    }
-
-}
-}
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
@@ -152,6 +138,36 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
+    extension UIColor {
+
+        convenience init(hexString: String) {
+        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+            var int = UInt64()
+            Scanner(string: hex).scanHexInt64(&int)
+            let components = (
+                R: CGFloat((int >> 16) & 0xff) / 255,
+                G: CGFloat((int >> 08) & 0xff) / 255,
+                B: CGFloat((int >> 00) & 0xff) / 255
+            )
+            self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
+        }
+
+    }
+    func isHexColorCode(_ input: String) -> Bool {
+        let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
+        
+        do {
+            let regex = try NSRegularExpression(pattern: hexColorRegex)
+            let range = NSRange(location: 0, length: input.utf16.count)
+            if let _ = regex.firstMatch(in: input, options: [], range: range) {
+                return true
+            }
+        } catch {
+            print("Error creating regular expression: \(error)")
+        }
+        
+        return false
+    }
 
     @objc func open(_ call: CAPPluginCall) {
         if !self.isSetupDone {
@@ -193,7 +209,14 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            self.navigationWebViewController?.toolbar.backgroundColor = UIColor(hexString: call.getString("toolbarColor","#ffffff"))
+            var inputString:String = call.getString("toolbarColor","#ffffff")
+            var color:UIColor = UIColor(hexString: "#ffffff")
+            if isHexColorCode(inputString) {
+                color = UIColor(hexString:inputString)
+            } else {
+                print("\(inputString) is not a valid hex color code.")
+            }
+            self.navigationWebViewController?.toolbar.backgroundColor = color
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if !self.isPresentAfterPageLoad {
                 self.presentView()

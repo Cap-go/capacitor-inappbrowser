@@ -124,8 +124,16 @@ public class WebViewDialog extends Dialog {
 
   private void setupToolbar() {
     _toolbar = this.findViewById(R.id.tool_bar);
+    try {
+
+      _toolbar.setBackgroundColor(Color.parseColor(_options.getToolbarColor()));
+
+  }
+  catch (IllegalArgumentException e){
     
-    _toolbar.setBackgroundColor(Color.parseColor(_options.getToolbarColor()));
+      _toolbar.setBackgroundColor(Color.parseColor("#ffffff"));
+
+  }
     if (!TextUtils.isEmpty(_options.getTitle())) {
       this.setTitle(_options.getTitle());
     } else {

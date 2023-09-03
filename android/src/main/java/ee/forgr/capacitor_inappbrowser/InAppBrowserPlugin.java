@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -24,7 +25,7 @@ import java.util.Iterator;
 
 @CapacitorPlugin(name = "InAppBrowser")
 public class InAppBrowserPlugin extends Plugin {
-
+    
   public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
   private CustomTabsClient customTabsClient;
   private CustomTabsSession currentSession;
