@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import WebKit
 
 /**
  * Please read the Capacitor iOS Plugin Development Guide
@@ -84,6 +85,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
 
             self.webViewController?.source = .remote(url!)
+            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
@@ -133,6 +135,11 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
         return result
     }
+    @objc func reload(_ call: CAPPluginCall) {
+        self.webViewController?.reload()
+        call.resolve()
+    }
+
 
     @objc func setUrl(_ call: CAPPluginCall) {
         guard let url = call.getString("url") else {
