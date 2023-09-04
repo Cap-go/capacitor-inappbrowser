@@ -12,6 +12,7 @@ import android.view.WindowManager;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
+import android.graphics.Color;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -112,11 +113,27 @@ public class WebViewDialog extends Dialog {
 
   private void setTitle(String newTitleText) {
     TextView textView = (TextView) _toolbar.findViewById(R.id.titleText);
-    textView.setText(newTitleText);
+    if(_options.getVisibleTitle()){
+
+      textView.setText(newTitleText);
+    }
+    else{
+      textView.setText("");
+    }
   }
 
   private void setupToolbar() {
     _toolbar = this.findViewById(R.id.tool_bar);
+    try {
+
+      _toolbar.setBackgroundColor(Color.parseColor(_options.getToolbarColor()));
+
+  }
+  catch (IllegalArgumentException e){
+    
+      _toolbar.setBackgroundColor(Color.parseColor("#ffffff"));
+
+  }
     if (!TextUtils.isEmpty(_options.getTitle())) {
       this.setTitle(_options.getTitle());
     } else {
@@ -181,6 +198,11 @@ public class WebViewDialog extends Dialog {
         }
       }
     );
+
+    if(_options.showArrow())
+    {
+      closeButton.setBackgroundResource(R.drawable.arrow_forward_enabled);
+    }
 
     if (_options.getShowReloadButton()) {
       View reloadButton = _toolbar.findViewById(R.id.reloadButton);
