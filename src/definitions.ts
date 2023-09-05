@@ -237,4 +237,6 @@ export interface InAppBrowserPlugin {
    * @since 1.0.0
    */
   removeAllListeners(): Promise<void>;
+
+  reload(): Promise<any>;
 }
