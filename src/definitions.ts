@@ -151,21 +151,21 @@ export interface OpenWebViewOptions {
   closeModalCancel?: string;
   /**
    * visibleTitle: if true the website title would be shown else shown empty
-   * 
+   *
    * @since 1.2.5
    * @default true
    */
   visibleTitle?: boolean;
   /**
    * toolbarColor: color of the toolbar in hex format
-   * 
+   *
    * @since 1.2.5
    * @default '#ffffff''
    */
   toolbarColor?: string;
   /**
    * showArrow: if true an arrow would be shown instead of cross for closing the window
-   * 
+   *
    * @since 1.2.5
    * @default false
    */

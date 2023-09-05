@@ -144,25 +144,28 @@ public class Options {
   public void setCallbacks(WebViewCallbacks callbacks) {
     this.callbacks = callbacks;
   }
-  public boolean getVisibleTitle(){
+
+  public boolean getVisibleTitle() {
     return VisibleTitle;
   }
-  public void setVisibleTitle(boolean _visibleTitle)
-  {
+
+  public void setVisibleTitle(boolean _visibleTitle) {
     this.VisibleTitle = _visibleTitle;
   }
-  public String getToolbarColor(){
+
+  public String getToolbarColor() {
     return ToolbarColor;
   }
-  public void setToolbarColor(String toolbarColor)
-  {
+
+  public void setToolbarColor(String toolbarColor) {
     this.ToolbarColor = toolbarColor;
   }
-  public boolean showArrow(){
+
+  public boolean showArrow() {
     return ShowArrow;
   }
-  public void setArrow(boolean _showArrow)
-  {
+
+  public void setArrow(boolean _showArrow) {
     this.ShowArrow = _showArrow;
   }
 }
