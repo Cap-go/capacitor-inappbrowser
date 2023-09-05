@@ -1,6 +1,21 @@
 import Foundation
 import Capacitor
 
+extension UIColor {
+
+    convenience init(hexString: String) {
+    let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int = UInt64()
+        Scanner(string: hex).scanHexInt64(&int)
+        let components = (
+            R: CGFloat((int >> 16) & 0xff) / 255,
+            G: CGFloat((int >> 08) & 0xff) / 255,
+            B: CGFloat((int >> 00) & 0xff) / 255
+        )
+        self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
+    }
+
+}
 /**
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
@@ -89,7 +104,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.doneBarButtonItemPosition = .right
             if(call.getBool("showArrow",false))
             {
-                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: bundle, compatibleWith: nil)
+                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }
             
             self.webViewController?.capBrowserPlugin = self
@@ -142,21 +157,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
-    extension UIColor {
 
-        convenience init(hexString: String) {
-        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-            var int = UInt64()
-            Scanner(string: hex).scanHexInt64(&int)
-            let components = (
-                R: CGFloat((int >> 16) & 0xff) / 255,
-                G: CGFloat((int >> 08) & 0xff) / 255,
-                B: CGFloat((int >> 00) & 0xff) / 255
-            )
-            self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
-        }
-
-    }
     func isHexColorCode(_ input: String) -> Bool {
         let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
         
@@ -215,7 +216,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
             var inputString:String = call.getString("toolbarColor","#ffffff")
             var color:UIColor = UIColor(hexString: "#ffffff")
-            if isHexColorCode(inputString) {
+            if self.isHexColorCode(inputString) {
                 color = UIColor(hexString:inputString)
             } else {
                 print("\(inputString) is not a valid hex color code.")
