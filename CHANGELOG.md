@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.4...1.2.5) (2023-09-05)
+
+
+### Bug Fixes
+
+* CI/CD ([682c1bb](https://github.com/Cap-go/capacitor-inappbrowser/commit/682c1bbfcfe110a7d7ba30dcbc1541cce5dfebe6))
+* lock file ([22d9fdd](https://github.com/Cap-go/capacitor-inappbrowser/commit/22d9fdd7428d55a1e11666487b00a7a69de39e6e))
+* nodejs version ([f104acc](https://github.com/Cap-go/capacitor-inappbrowser/commit/f104accffa6cb1817305bc0da6e77750373cccea))
+* npm version ([34ebed7](https://github.com/Cap-go/capacitor-inappbrowser/commit/34ebed7ae6b0e39ebbd09c7e0cfd6aa5c9d3ba0a))
+* spacing issue ([81a05bd](https://github.com/Cap-go/capacitor-inappbrowser/commit/81a05bd7673ea69527794af911bada4fe9165a54))
+
 ### [1.2.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.3...1.2.4) (2023-09-02)
 
 ### [1.2.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.2...1.2.3) (2023-09-02)
