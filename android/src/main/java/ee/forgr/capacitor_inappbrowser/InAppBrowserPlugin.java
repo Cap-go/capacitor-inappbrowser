@@ -227,7 +227,6 @@ public class InAppBrowserPlugin extends Plugin {
     call.resolve();
   }
 
-
   @PluginMethod
   public void close(PluginCall call) {
     if (webViewDialog != null) {
