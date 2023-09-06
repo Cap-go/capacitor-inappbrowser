@@ -25,7 +25,7 @@ import java.util.Iterator;
 
 @CapacitorPlugin(name = "InAppBrowser")
 public class InAppBrowserPlugin extends Plugin {
-    
+
   public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
   private CustomTabsClient customTabsClient;
   private CustomTabsSession currentSession;
@@ -152,16 +152,14 @@ public class InAppBrowserPlugin extends Plugin {
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
     options.setShowReloadButton(call.getBoolean("showReloadButton", false));
-    if(Boolean.TRUE.equals(call.getBoolean("visibleTitle", true))){
+    if (Boolean.TRUE.equals(call.getBoolean("visibleTitle", true))) {
       options.setTitle(call.getString("title", "New Window"));
-   }
-    else
-    {
-    options.setTitle(call.getString("title", ""));
+    } else {
+      options.setTitle(call.getString("title", ""));
     }
-    options.setToolbarColor(call.getString("toolbarColor","#ffffff"));
+    options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
     options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
-   
+
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));

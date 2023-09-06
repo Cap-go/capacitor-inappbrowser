@@ -5,6 +5,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -12,7 +13,6 @@ import android.view.WindowManager;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
-import android.graphics.Color;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -113,11 +113,9 @@ public class WebViewDialog extends Dialog {
 
   private void setTitle(String newTitleText) {
     TextView textView = (TextView) _toolbar.findViewById(R.id.titleText);
-    if(_options.getVisibleTitle()){
-
+    if (_options.getVisibleTitle()) {
       textView.setText(newTitleText);
-    }
-    else{
+    } else {
       textView.setText("");
     }
   }
@@ -125,15 +123,10 @@ public class WebViewDialog extends Dialog {
   private void setupToolbar() {
     _toolbar = this.findViewById(R.id.tool_bar);
     try {
-
       _toolbar.setBackgroundColor(Color.parseColor(_options.getToolbarColor()));
-
-  }
-  catch (IllegalArgumentException e){
-    
+    } catch (IllegalArgumentException e) {
       _toolbar.setBackgroundColor(Color.parseColor("#ffffff"));
-
-  }
+    }
     if (!TextUtils.isEmpty(_options.getTitle())) {
       this.setTitle(_options.getTitle());
     } else {
@@ -199,8 +192,7 @@ public class WebViewDialog extends Dialog {
       }
     );
 
-    if(_options.showArrow())
-    {
+    if (_options.showArrow()) {
       closeButton.setBackgroundResource(R.drawable.arrow_forward_enabled);
     }
 

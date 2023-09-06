@@ -21,6 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="end"
         android:background="#eeeeef"
+        android:paddingRight="10dp"
         android:contentDescription="@string/reload_button"
         android:src="@drawable/ic_refresh"
         android:visibility="gone" />
@@ -43,7 +44,6 @@
         android:layout_gravity="end"
         android:background="#eeeeef"
         android:contentDescription="@string/forward_button"
-        android:paddingLeft="10dp"
         android:paddingRight="10dp"
         android:src="@drawable/arrow_forward_disabled" />
 

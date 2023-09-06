@@ -2,6 +2,21 @@ import Foundation
 import Capacitor
 import WebKit
 
+extension UIColor {
+
+    convenience init(hexString: String) {
+        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int = UInt64()
+        Scanner(string: hex).scanHexInt64(&int)
+        let components = (
+            R: CGFloat((int >> 16) & 0xff) / 255,
+            G: CGFloat((int >> 08) & 0xff) / 255,
+            B: CGFloat((int >> 00) & 0xff) / 255
+        )
+        self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
+    }
+
+}
 /**
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
@@ -54,9 +69,6 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
 
-    
-
-
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
         let closeModalTitle = call.getString("closeModalTitle", "Close")
@@ -89,16 +101,15 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
-            if(call.getBool("showArrow",false))
-            {
-                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: bundle, compatibleWith: nil)
+            if call.getBool("showArrow", false) {
+                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }
-            
+
             self.webViewController?.capBrowserPlugin = self
             self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
-            self.webViewController?.websiteTitleInNavigationBar = call.getBool("visibleTitle",true)
+            self.webViewController?.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             if closeModal {
                 self.webViewController?.closeModal = true
                 self.webViewController?.closeModalTitle = closeModalTitle
@@ -149,24 +160,10 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
-    extension UIColor {
 
-        convenience init(hexString: String) {
-        let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-            var int = UInt64()
-            Scanner(string: hex).scanHexInt64(&int)
-            let components = (
-                R: CGFloat((int >> 16) & 0xff) / 255,
-                G: CGFloat((int >> 08) & 0xff) / 255,
-                B: CGFloat((int >> 00) & 0xff) / 255
-            )
-            self.init(red: components.R, green: components.G, blue: components.B, alpha: 1)
-        }
-
-    }
     func isHexColorCode(_ input: String) -> Bool {
         let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
-        
+
         do {
             let regex = try NSRegularExpression(pattern: hexColorRegex)
             let range = NSRange(location: 0, length: input.utf16.count)
@@ -176,7 +173,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         } catch {
             print("Error creating regular expression: \(error)")
         }
-        
+
         return false
     }
 
@@ -220,10 +217,10 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            var inputString:String = call.getString("toolbarColor","#ffffff")
-            var color:UIColor = UIColor(hexString: "#ffffff")
-            if isHexColorCode(inputString) {
-                color = UIColor(hexString:inputString)
+            var inputString: String = call.getString("toolbarColor", "#ffffff")
+            var color: UIColor = UIColor(hexString: "#ffffff")
+            if self.isHexColorCode(inputString) {
+                color = UIColor(hexString: inputString)
             } else {
                 print("\(inputString) is not a valid hex color code.")
             }
