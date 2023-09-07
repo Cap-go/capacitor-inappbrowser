@@ -122,11 +122,18 @@ public class WebViewDialog extends Dialog {
 
   private void setupToolbar() {
     _toolbar = this.findViewById(R.id.tool_bar);
+    int color = Color.parseColor("#ffffff");
     try {
-      _toolbar.setBackgroundColor(Color.parseColor(_options.getToolbarColor()));
+      color = Color.parseColor(_options.getToolbarColor());
     } catch (IllegalArgumentException e) {
-      _toolbar.setBackgroundColor(Color.parseColor("#ffffff"));
+      // Do nothing
     }
+    _toolbar.setBackgroundColor(color);
+    _toolbar.findViewById(R.id.backButton).setBackgroundColor(color);
+    _toolbar.findViewById(R.id.forwardButton).setBackgroundColor(color);
+    _toolbar.findViewById(R.id.closeButton).setBackgroundColor(color);
+    _toolbar.findViewById(R.id.reloadButton).setBackgroundColor(color);
+
     if (!TextUtils.isEmpty(_options.getTitle())) {
       this.setTitle(_options.getTitle());
     } else {
