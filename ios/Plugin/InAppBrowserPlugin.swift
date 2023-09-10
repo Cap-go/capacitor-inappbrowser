@@ -49,6 +49,8 @@ public class InAppBrowserPlugin: CAPPlugin {
 
     @objc func clearCookies(_ call: CAPPluginCall) {
         HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
+        // clears cache
+        URLCache.shared.removeAllCachedResponses()
         call.resolve()
     }
 
