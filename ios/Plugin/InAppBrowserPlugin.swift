@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import WebKit
 
 extension UIColor {
 
@@ -16,6 +17,7 @@ extension UIColor {
     }
 
 }
+
 /**
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
@@ -98,6 +100,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
 
             self.webViewController?.source = .remote(url!)
+            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
             self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
@@ -136,15 +139,9 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
     }
 
-    func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
-        var result: [BarButtonItemType] = []
-        if toolbarType == "activity" {
-            result.append(.activity)
-        } else if toolbarType == "navigation" {
-            result.append(.back)
-            result.append(.forward)
-        }
-        return result
+    @objc func reload(_ call: CAPPluginCall) {
+        self.webViewController?.reload()
+        call.resolve()
     }
 
     @objc func setUrl(_ call: CAPPluginCall) {
@@ -155,6 +152,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
+
 
     func isHexColorCode(_ input: String) -> Bool {
         let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
