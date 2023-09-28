@@ -378,6 +378,9 @@ public extension WKWebViewController {
             webView?.go(to: firstPageItem)
         }
     }
+    func reload() {
+        webView?.reload()
+    }
 }
 
 // MARK: - Fileprivate Methods

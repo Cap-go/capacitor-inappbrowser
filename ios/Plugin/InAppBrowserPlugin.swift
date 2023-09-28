@@ -137,6 +137,17 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
     }
 
+    func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
+         var result: [BarButtonItemType] = []
+         if toolbarType == "activity" {
+             result.append(.activity)
+         } else if toolbarType == "navigation" {
+             result.append(.back)
+             result.append(.forward)
+         }
+         return result
+     }
+    
     @objc func reload(_ call: CAPPluginCall) {
         self.webViewController?.reload()
         call.resolve()
@@ -208,7 +219,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            var inputString: String = call.getString("toolbarColor", "#ffffff")
+            let inputString: String = call.getString("toolbarColor", "#ffffff")
             var color: UIColor = UIColor(hexString: "#ffffff")
             if self.isHexColorCode(inputString) {
                 color = UIColor(hexString: inputString)

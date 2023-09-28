@@ -178,7 +178,7 @@ public class InAppBrowserPlugin extends Plugin {
       options.setCloseModal(false);
     }
     options.setPluginCall(call);
-    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD);
+//    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {
         @Override
