@@ -228,6 +228,7 @@ public class InAppBrowserPlugin: CAPPlugin {
     @objc func close(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             self.navigationWebViewController?.dismiss(animated: true, completion: nil)
+            self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
             call.resolve()
         }
     }

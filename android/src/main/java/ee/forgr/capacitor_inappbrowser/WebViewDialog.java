@@ -93,6 +93,9 @@ public class WebViewDialog extends Dialog {
     }
   }
 
+  public String getUrl() {
+    return _webView.getUrl();
+  }
   public void setUrl(String url) {
     Map<String, String> requestHeaders = new HashMap<>();
     if (_options.getHeaders() != null) {

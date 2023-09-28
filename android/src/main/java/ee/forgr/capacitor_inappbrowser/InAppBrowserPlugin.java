@@ -222,6 +222,7 @@ public class InAppBrowserPlugin extends Plugin {
   public void close(PluginCall call) {
     if (webViewDialog != null) {
       webViewDialog.dismiss();
+      notifyListeners("closeEvent", new JSObject().put("url", webViewDialog.getUrl()));
       webViewDialog = null;
     } else {
       Intent intent = new Intent(
