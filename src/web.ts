@@ -33,7 +33,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async reload(): Promise<any> {
-    console.log("reload"); 
+    console.log("reload");
     return;
   }
 }

@@ -138,16 +138,16 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
-         var result: [BarButtonItemType] = []
-         if toolbarType == "activity" {
-             result.append(.activity)
-         } else if toolbarType == "navigation" {
-             result.append(.back)
-             result.append(.forward)
-         }
-         return result
-     }
-    
+        var result: [BarButtonItemType] = []
+        if toolbarType == "activity" {
+            result.append(.activity)
+        } else if toolbarType == "navigation" {
+            result.append(.back)
+            result.append(.forward)
+        }
+        return result
+    }
+
     @objc func reload(_ call: CAPPluginCall) {
         self.webViewController?.reload()
         call.resolve()
@@ -161,7 +161,6 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
-
 
     func isHexColorCode(_ input: String) -> Bool {
         let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
