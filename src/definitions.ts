@@ -172,14 +172,6 @@ export interface OpenWebViewOptions {
   showArrow?: boolean;
 }
 
-// CapBrowser.addListener("urlChangeEvent", (info:  any) => {
-//   console.log(info.url)
-// })
-
-// CapBrowser.addListener("confirmBtnClicked", (info:  any) => {
-//   // will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
-//   console.log(info.url)
-// })
 export interface InAppBrowserPlugin {
   /**
    * Open url in a new window fullscreen
@@ -237,4 +229,11 @@ export interface InAppBrowserPlugin {
    * @since 1.0.0
    */
   removeAllListeners(): Promise<void>;
+
+  /**
+   * Reload the current web page.
+   *
+   * @since 1.0.0
+   */
+  reload(): Promise<any>; // Add this line
 }

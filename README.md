@@ -32,6 +32,7 @@ InAppBrowser.open("YOUR_URL");
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked)
 * [`removeAllListeners()`](#removealllisteners)
+* [`reload()`](#reload)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -193,6 +194,21 @@ Remove all listeners for this plugin.
 --------------------
 
 
+### reload()
+
+```typescript
+reload() => Promise<any>
+```
+
+Reload the current web page.
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+**Since:** 1.0.0
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -227,9 +243,9 @@ Remove all listeners for this plugin.
 | **`closeModalDescription`**  | <code>string</code>                                             | CloseModalDescription: description of the confirm when user clicks on close button, only on IOS                                                                                   | <code>'Are you sure you want to close this window?'</code> | 1.1.0  |
 | **`closeModalOk`**           | <code>string</code>                                             | CloseModalOk: text of the confirm button when user clicks on close button, only on IOS                                                                                            | <code>'Close'</code>                                       | 1.1.0  |
 | **`closeModalCancel`**       | <code>string</code>                                             | CloseModalCancel: text of the cancel button when user clicks on close button, only on IOS                                                                                         | <code>'Cancel'</code>                                      | 1.1.0  |
-| **`visibleTitle`**  | <code>boolean</code>                                             | VisibleTitle: If true the the website title will be visible if false a blank title will be shown                                                                                   | <code>true</code> | 1.1.0  |
-| **`showArrow`**           | <code>boolean</code>                                             | ShowArrow: If true an arrow will be shown instead of cross if false the cross will be shown                                                                                            | <code>false</code>                                       | 1.1.0  |
-| **`toolbarColor`**       | <code>string</code>                                             | Toolbar Color: The color of the toolbar in hex format                                                                                         | <code>'#FFFFFF'</code>                                      | 1.1.0  |
+| **`visibleTitle`**           | <code>boolean</code>                                            | visibleTitle: if true the website title would be shown else shown empty                                                                                                           | <code>true</code>                                          | 1.2.5  |
+| **`toolbarColor`**           | <code>string</code>                                             | toolbarColor: color of the toolbar in hex format                                                                                                                                  | <code>'#ffffff''</code>                                    | 1.2.5  |
+| **`showArrow`**              | <code>boolean</code>                                            | showArrow: if true an arrow would be shown instead of cross for closing the window                                                                                                | <code>false</code>                                         | 1.2.5  |
 
 
 #### DisclaimerOptions
