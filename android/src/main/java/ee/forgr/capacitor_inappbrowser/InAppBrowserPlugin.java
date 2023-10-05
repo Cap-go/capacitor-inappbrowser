@@ -202,7 +202,7 @@ public class InAppBrowserPlugin extends Plugin {
         }
       }
     );
-    getActivity()
+    this.getActivity()
       .runOnUiThread(
         new Runnable() {
           @Override
@@ -222,7 +222,15 @@ public class InAppBrowserPlugin extends Plugin {
   @PluginMethod
   public void reload(PluginCall call) {
     if (webViewDialog != null) {
-      webViewDialog.reload();
+      this.getActivity()
+        .runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              webViewDialog.reload();
+            }
+          }
+        );
     }
     call.resolve();
   }
@@ -230,12 +238,20 @@ public class InAppBrowserPlugin extends Plugin {
   @PluginMethod
   public void close(PluginCall call) {
     if (webViewDialog != null) {
-      webViewDialog.dismiss();
-      notifyListeners(
-        "closeEvent",
-        new JSObject().put("url", webViewDialog.getUrl())
-      );
-      webViewDialog = null;
+      this.getActivity()
+        .runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              notifyListeners(
+                "closeEvent",
+                new JSObject().put("url", webViewDialog.getUrl())
+              );
+              webViewDialog.dismiss();
+              webViewDialog = null;
+            }
+          }
+        );
     } else {
       Intent intent = new Intent(
         getContext(),
