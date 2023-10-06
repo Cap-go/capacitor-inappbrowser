@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.14](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.13...1.2.14) (2023-10-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.google.android.material:material to v1.10.0 ([5608ac1](https://github.com/Cap-go/capacitor-inappbrowser/commit/5608ac1d28d076c423a29dc8dacea2e407a6abc5))
+
 ### [1.2.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.12...1.2.13) (2023-10-05)
 
 
