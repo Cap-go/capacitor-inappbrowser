@@ -59,6 +59,7 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
     _webView.getSettings().setDatabaseEnabled(true);
     _webView.getSettings().setDomStorageEnabled(true);
+    _webView.getSettings().setAllowFileAccess(true);
     _webView
       .getSettings()
       .setPluginState(android.webkit.WebSettings.PluginState.ON);
