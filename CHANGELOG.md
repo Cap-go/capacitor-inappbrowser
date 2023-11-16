@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.16...1.2.17) (2023-11-16)
+
+
+### Bug Fixes
+
+* allow File access in Webview ([278c09a](https://github.com/Cap-go/capacitor-inappbrowser/commit/278c09a5c873fdfa2b22edbd37833bbcadbedc1a))
+
 ### [1.2.16](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.15...1.2.16) (2023-10-16)
 
 ### [1.2.15](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.14...1.2.15) (2023-10-09)
