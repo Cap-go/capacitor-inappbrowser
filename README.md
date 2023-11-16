@@ -16,7 +16,7 @@ npx cap sync
 ```js
 import { InAppBrowser } from '@capgo/inappbrowser'
 
-InAppBrowser.open("YOUR_URL");
+InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
 ## API
