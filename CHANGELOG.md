@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.19](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.18...1.2.19) (2023-11-23)
+
+
+### Bug Fixes
+
+* camera issue for modern android ([b85f357](https://github.com/Cap-go/capacitor-inappbrowser/commit/b85f35737b69721ffee445e424deb9d3326f4482))
+* request permissions ([ed06c9e](https://github.com/Cap-go/capacitor-inappbrowser/commit/ed06c9e7dd3e3e19a28bd6b245cf0d651f3ef02f))
+
 ### [1.2.18](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.17...1.2.18) (2023-11-16)
 
 ### [1.2.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.16...1.2.17) (2023-11-16)
