@@ -19,6 +19,16 @@ import { InAppBrowser } from '@capgo/inappbrowser'
 InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
+### Camera usage
+
+if you need the Camera to work in Android, you need to add the following to your `AndroidManifest.xml` file:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+```
+
+Then the permission will be asked when the camera is used.
+
 ## API
 
 <docgen-index>
