@@ -4,13 +4,13 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
-import android.webkit.WebStorage;
+import android.webkit.PermissionRequest;
+
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -214,6 +214,7 @@ public class InAppBrowserPlugin extends Plugin {
                 options
               );
             webViewDialog.presentWebView();
+						webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
           }
         }
       );
