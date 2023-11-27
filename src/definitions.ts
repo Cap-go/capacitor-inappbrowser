@@ -186,6 +186,14 @@ export interface InAppBrowserPlugin {
    * @since 0.5.0
    */
   clearCookies(): Promise<any>;
+
+  /**
+   * Get cookies for a specific URL.
+   * @param options The options, including the URL to get cookies for.
+   * @returns A promise that resolves with the cookies.
+   */
+  getCookies(options: { url: string }): Promise<{ cookies: Record<string, string> }>;
+
   close(): Promise<any>;
   /**
    * Open url in a new webview with toolbars

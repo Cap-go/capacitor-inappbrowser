@@ -17,6 +17,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
+  async getCookies(_options: { url: string }): Promise<{ cookies: Record<string, string> }> {
+    // Web implementation to get cookies
+    const cookies = {}; // Logic to retrieve cookies for the specified URL
+    return Promise.resolve({ cookies });
+  }
+
   async openWebView(options: OpenWebViewOptions): Promise<any> {
     console.log("openWebView", options);
     return options;

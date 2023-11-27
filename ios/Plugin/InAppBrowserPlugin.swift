@@ -54,6 +54,21 @@ public class InAppBrowserPlugin: CAPPlugin {
         call.resolve()
     }
 
+    @objc func getCookies(_ call: CAPPluginCall) {
+        let urlString = call.getString("url") ?? ""
+        guard let url = URL(string: urlString) else {
+            call.reject("Invalid URL")
+            return
+        }
+
+        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+            let cookieDict = cookies.reduce(into: [String: String]()) { dict, cookie in
+                dict[cookie.name] = cookie.value
+            }
+            call.resolve(["cookies": cookieDict])
+        }
+    }
+
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
             self.setup()
