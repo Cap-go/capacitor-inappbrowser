@@ -35,6 +35,7 @@ Then the permission will be asked when the camera is used.
 
 * [`open(...)`](#open)
 * [`clearCookies()`](#clearcookies)
+* [`getCookies(...)`](#getcookies)
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
 * [`setUrl(...)`](#seturl)
@@ -82,6 +83,23 @@ Clear all cookies
 **Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.5.0
+
+--------------------
+
+
+### getCookies(...)
+
+```typescript
+getCookies(options: { url: string; }) => Promise<{ cookies: Record<string, string>; }>
+```
+
+Get cookies for a specific URL.
+
+| Param         | Type                          | Description                                        |
+| ------------- | ----------------------------- | -------------------------------------------------- |
+| **`options`** | <code>{ url: string; }</code> | The options, including the URL to get cookies for. |
+
+**Returns:** <code>Promise&lt;{ cookies: <a href="#record">Record</a>&lt;string, string&gt;; }&gt;</code>
 
 --------------------
 
@@ -290,6 +308,13 @@ Reload the current web page.
 
 
 ### Type Aliases
+
+
+#### Record
+
+Construct a type with a set of properties K of type T
+
+<code>{ [P in K]: T; }</code>
 
 
 #### UrlChangeListener

@@ -35,6 +35,11 @@ export interface Headers {
   [key: string]: string;
 }
 
+export interface GetCookieOptions {
+  url: string;
+  includeHttpOnly?: boolean;
+}
+
 export interface OpenOptions {
   /**
    * Target URL to load.
