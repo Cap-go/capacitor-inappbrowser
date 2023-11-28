@@ -90,14 +90,14 @@ Clear all cookies
 ### getCookies(...)
 
 ```typescript
-getCookies(options: { url: string; }) => Promise<{ cookies: Record<string, string>; }>
+getCookies(options: GetCookieOptions) => Promise<{ cookies: Record<string, string>; }>
 ```
 
 Get cookies for a specific URL.
 
-| Param         | Type                          | Description                                        |
-| ------------- | ----------------------------- | -------------------------------------------------- |
-| **`options`** | <code>{ url: string; }</code> | The options, including the URL to get cookies for. |
+| Param         | Type                                                          | Description                                        |
+| ------------- | ------------------------------------------------------------- | -------------------------------------------------- |
+| **`options`** | <code><a href="#getcookieoptions">GetCookieOptions</a></code> | The options, including the URL to get cookies for. |
 
 **Returns:** <code>Promise&lt;{ cookies: <a href="#record">Record</a>&lt;string, string&gt;; }&gt;</code>
 
@@ -253,6 +253,23 @@ Reload the current web page.
 #### Headers
 
 
+#### GetCookieOptions
+
+| Prop                  | Type                 |
+| --------------------- | -------------------- |
+| **`url`**             | <code>string</code>  |
+| **`includeHttpOnly`** | <code>boolean</code> |
+
+
+#### HttpCookie
+
+| Prop        | Type                |
+| ----------- | ------------------- |
+| **`url`**   | <code>string</code> |
+| **`key`**   | <code>string</code> |
+| **`value`** | <code>string</code> |
+
+
 #### OpenWebViewOptions
 
 | Prop                         | Type                                                            | Description                                                                                                                                                                       | Default                                                    | Since  |
@@ -315,6 +332,32 @@ Reload the current web page.
 Construct a type with a set of properties K of type T
 
 <code>{ [P in K]: T; }</code>
+
+
+#### GetCookieOptions
+
+<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
+
+
+#### Omit
+
+Construct a type with the properties of T except for those in type K.
+
+<code><a href="#pick">Pick</a>&lt;T, <a href="#exclude">Exclude</a>&lt;keyof T, K&gt;&gt;</code>
+
+
+#### Pick
+
+From T, pick a set of properties whose keys are in the union K
+
+<code>{ [P in K]: T[P]; }</code>
+
+
+#### Exclude
+
+<a href="#exclude">Exclude</a> from T those types that are assignable to U
+
+<code>T extends U ? never : T</code>
 
 
 #### UrlChangeListener

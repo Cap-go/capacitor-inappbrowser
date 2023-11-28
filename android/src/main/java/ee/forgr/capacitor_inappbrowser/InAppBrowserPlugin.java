@@ -213,31 +213,25 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void getCookies(PluginCall call) {
-    String urlString = call.getString("url");
-    Boolean includeHttpOnly = call.getBoolean("includeHttpOnly", true);
-
-    if (urlString == null || urlString.isEmpty()) {
-      call.reject("URL is required");
-      return;
-    }
-
-    CookieManager cookieManager = CookieManager.getInstance();
-    String cookiesString = cookieManager.getCookie(urlString);
-    if (cookiesString == null) {
-      call.resolve(new JSObject());
-      return;
-    }
-
-    String[] cookiePairs = cookiesString.split("; ");
-    JSObject result = new JSObject();
-    for (String cookie : cookiePairs) {
-      String[] parts = cookie.split("=", 2);
-      if (parts.length == 2) {
-        result.put(parts[0], parts[1]);
+    String url = call.getString("url");
+    if (url == null || TextUtils.isEmpty(url)) {
+      call.reject("Invalid URL");
+    } else {
+      CookieManager cookieManager = CookieManager.getInstance();
+      String cookieString = cookieManager.getCookie(url);
+      if (cookieString != null) {
+        String[] cookiePairs = cookieString.split("; ");
+        JSObject result = new JSObject();
+        for (String cookie : cookiePairs) {
+          String[] parts = cookie.split("=", 2);
+          if (parts.length == 2) {
+            result.put(parts[0], parts[1]);
+          }
+        }
+        call.resolve(result);
       }
+      call.resolve(new JSObject());
     }
-
-    call.resolve(result);
   }
 
 
