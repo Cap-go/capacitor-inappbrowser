@@ -197,7 +197,7 @@ export interface InAppBrowserPlugin {
    * @param options The options, including the URL to get cookies for.
    * @returns A promise that resolves with the cookies.
    */
-  getCookies(options: GetCookieOptions): Promise<{ cookies: Record<string, string> }>;
+  getCookies(options: GetCookieOptions): Promise<Record<string, string>>;
 
   close(): Promise<any>;
   /**
