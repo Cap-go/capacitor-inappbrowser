@@ -50,6 +50,7 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     @objc func clearCookies(_ call: CAPPluginCall) {
+        let dataStore = WKWebsiteDataStore.default()
         let urlString = call.getString("url") ?? ""
 
         guard let url = URL(string: urlString) else {
