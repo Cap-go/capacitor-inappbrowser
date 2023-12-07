@@ -187,27 +187,23 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void clearCookies(PluginCall call) {
-    if (webViewDialog == null) {
-      call.reject("WebView is not open");
+    String url = call.getString("url");
+    if (url == null || TextUtils.isEmpty(url)) {
+      call.reject("Invalid URL");
     } else {
-      String url = currentUrl;
-      if (url == null || TextUtils.isEmpty(url)) {
-        call.reject("Invalid URL");
-      } else {
-        CookieManager cookieManager = CookieManager.getInstance();
-        String cookie = cookieManager.getCookie(url);
-        if (cookie != null) {
-          String[] cookies = cookie.split(";");
-          for (String c : cookies) {
-            String cookieName = c.substring(0, c.indexOf("="));
-            cookieManager.setCookie(
-              url,
-              cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
-            );
-          }
+      CookieManager cookieManager = CookieManager.getInstance();
+      String cookie = cookieManager.getCookie(url);
+      if (cookie != null) {
+        String[] cookies = cookie.split(";");
+        for (String c : cookies) {
+          String cookieName = c.substring(0, c.indexOf("="));
+          cookieManager.setCookie(
+            url,
+            cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
+          );
         }
-        call.resolve();
       }
+      call.resolve();
     }
   }
 

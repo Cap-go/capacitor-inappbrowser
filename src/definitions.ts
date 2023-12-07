@@ -40,6 +40,10 @@ export interface GetCookieOptions {
   includeHttpOnly?: boolean;
 }
 
+export interface ClearCookieOptions {
+  url: string;
+}
+
 export interface OpenOptions {
   /**
    * Target URL to load.
@@ -186,11 +190,11 @@ export interface InAppBrowserPlugin {
   open(options: OpenOptions): Promise<any>;
 
   /**
-   * Clear all cookies
+   * Clear cookies of url
    *
    * @since 0.5.0
    */
-  clearCookies(): Promise<any>;
+  clearCookies(options: ClearCookieOptions): Promise<any>;
 
   /**
    * Get cookies for a specific URL.

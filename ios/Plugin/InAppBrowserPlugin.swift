@@ -50,8 +50,23 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     @objc func clearCookies(_ call: CAPPluginCall) {
-        HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
-        call.resolve()
+        let urlString = call.getString("url") ?? ""
+
+        guard let url = URL(string: urlString) else {
+            call.reject("Invalid URL")
+            return
+        }
+        let hostName = url.host ?? ""
+
+        dataStore.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
+            let domainRecords = records.filter { record in
+                record.domains.contains(hostName)
+            }
+
+            dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: domainRecords) {
+                call.resolve();
+            }
+        }
     }
 
     @objc func getCookies(_ call: CAPPluginCall) {

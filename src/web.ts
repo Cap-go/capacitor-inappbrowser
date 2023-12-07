@@ -1,10 +1,10 @@
 import { WebPlugin } from "@capacitor/core";
 
-import type {
+import {
   InAppBrowserPlugin,
   OpenWebViewOptions,
   OpenOptions,
-  GetCookieOptions,
+  GetCookieOptions, ClearCookieOptions,
 } from "./definitions";
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
@@ -13,8 +13,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return options;
   }
 
-  async clearCookies(): Promise<any> {
-    console.log("cleanCookies");
+  async clearCookies(options: ClearCookieOptions): Promise<any> {
+    console.log("cleanCookies", options);
     return;
   }
 
