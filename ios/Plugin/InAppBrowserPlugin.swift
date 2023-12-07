@@ -85,7 +85,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                     cookieDict[cookie.name] = cookie.value
                 }
             }
-            call.resolve(["cookies": cookieDict])
+            call.resolve(cookieDict)
         }
     }
 
