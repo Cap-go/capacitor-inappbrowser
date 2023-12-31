@@ -1,10 +1,11 @@
 import { WebPlugin } from "@capacitor/core";
 
-import {
+import type {
   InAppBrowserPlugin,
   OpenWebViewOptions,
   OpenOptions,
-  GetCookieOptions, ClearCookieOptions,
+  GetCookieOptions,
+  ClearCookieOptions,
 } from "./definitions";
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {

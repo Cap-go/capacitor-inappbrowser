@@ -230,7 +230,6 @@ public class InAppBrowserPlugin
     }
   }
 
-
   @PluginMethod
   public void openWebView(PluginCall call) {
     String url = call.getString("url");

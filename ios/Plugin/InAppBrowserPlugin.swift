@@ -65,7 +65,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
 
             dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: domainRecords) {
-                call.resolve();
+                call.resolve()
             }
         }
     }
@@ -89,7 +89,6 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.resolve(cookieDict)
         }
     }
-
 
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
