@@ -53,20 +53,20 @@ public class InAppBrowserPlugin: CAPPlugin {
         let dataStore = WKWebsiteDataStore.default()
         let urlString = call.getString("url") ?? ""
 
-        guard let url = URL(string: urlString) else {
+        guard let url = URL(string: urlString), let hostName = url.host else {
             call.reject("Invalid URL")
             return
         }
-        let hostName = url.host ?? ""
-
-        dataStore.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { records in
-            let domainRecords = records.filter { record in
-                record.domains.contains(hostName)
+        dataStore.httpCookieStore.getAllCookies { cookies in
+            let cookiesToDelete = cookies.filter { cookie in
+                cookie.domain == hostName || cookie.domain.hasSuffix(".\(hostName)") || hostName.hasSuffix(cookie.domain)
             }
 
-            dataStore.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: domainRecords) {
-                call.resolve()
+            for cookie in cookiesToDelete {
+                dataStore.httpCookieStore.delete(cookie)
             }
+
+            call.resolve()
         }
     }
 
@@ -74,7 +74,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         let urlString = call.getString("url") ?? ""
         let includeHttpOnly = call.getBool("includeHttpOnly") ?? true
 
-        guard let url = URL(string: urlString) else {
+        guard let url = URL(string: urlString), let host = url.host else {
             call.reject("Invalid URL")
             return
         }
@@ -82,7 +82,8 @@ public class InAppBrowserPlugin: CAPPlugin {
         WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
             var cookieDict = [String: String]()
             for cookie in cookies {
-                if includeHttpOnly || !cookie.isHTTPOnly {
+
+                if (includeHttpOnly || !cookie.isHTTPOnly) && (cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain)) {
                     cookieDict[cookie.name] = cookie.value
                 }
             }
@@ -164,7 +165,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 self.navigationWebViewController?.navigationBar.isHidden = true
             }
             if showReloadButton {
-                var toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
+                let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
                 self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {

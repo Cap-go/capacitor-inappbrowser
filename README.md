@@ -34,7 +34,7 @@ Then the permission will be asked when the camera is used.
 <docgen-index>
 
 * [`open(...)`](#open)
-* [`clearCookies()`](#clearcookies)
+* [`clearCookies(...)`](#clearcookies)
 * [`getCookies(...)`](#getcookies)
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
@@ -72,13 +72,17 @@ Open url in a new window fullscreen
 --------------------
 
 
-### clearCookies()
+### clearCookies(...)
 
 ```typescript
-clearCookies() => Promise<any>
+clearCookies(options: ClearCookieOptions) => Promise<any>
 ```
 
-Clear all cookies
+Clear cookies of url
+
+| Param         | Type                                                              |
+| ------------- | ----------------------------------------------------------------- |
+| **`options`** | <code><a href="#clearcookieoptions">ClearCookieOptions</a></code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -90,7 +94,7 @@ Clear all cookies
 ### getCookies(...)
 
 ```typescript
-getCookies(options: GetCookieOptions) => Promise<{ cookies: Record<string, string>; }>
+getCookies(options: GetCookieOptions) => Promise<Record<string, string>>
 ```
 
 Get cookies for a specific URL.
@@ -99,7 +103,7 @@ Get cookies for a specific URL.
 | ------------- | ------------------------------------------------------------- | -------------------------------------------------- |
 | **`options`** | <code><a href="#getcookieoptions">GetCookieOptions</a></code> | The options, including the URL to get cookies for. |
 
-**Returns:** <code>Promise&lt;{ cookies: <a href="#record">Record</a>&lt;string, string&gt;; }&gt;</code>
+**Returns:** <code>Promise&lt;<a href="#record">Record</a>&lt;string, string&gt;&gt;</code>
 
 --------------------
 
@@ -253,12 +257,11 @@ Reload the current web page.
 #### Headers
 
 
-#### GetCookieOptions
+#### ClearCookieOptions
 
-| Prop                  | Type                 |
-| --------------------- | -------------------- |
-| **`url`**             | <code>string</code>  |
-| **`includeHttpOnly`** | <code>boolean</code> |
+| Prop      | Type                |
+| --------- | ------------------- |
+| **`url`** | <code>string</code> |
 
 
 #### HttpCookie
@@ -268,6 +271,14 @@ Reload the current web page.
 | **`url`**   | <code>string</code> |
 | **`key`**   | <code>string</code> |
 | **`value`** | <code>string</code> |
+
+
+#### GetCookieOptions
+
+| Prop                  | Type                 |
+| --------------------- | -------------------- |
+| **`url`**             | <code>string</code>  |
+| **`includeHttpOnly`** | <code>boolean</code> |
 
 
 #### OpenWebViewOptions
@@ -327,14 +338,7 @@ Reload the current web page.
 ### Type Aliases
 
 
-#### Record
-
-Construct a type with a set of properties K of type T
-
-<code>{ [P in K]: T; }</code>
-
-
-#### GetCookieOptions
+#### ClearCookieOptions
 
 <code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
 
@@ -358,6 +362,18 @@ From T, pick a set of properties whose keys are in the union K
 <a href="#exclude">Exclude</a> from T those types that are assignable to U
 
 <code>T extends U ? never : T</code>
+
+
+#### Record
+
+Construct a type with a set of properties K of type T
+
+<code>{ [P in K]: T; }</code>
+
+
+#### GetCookieOptions
+
+<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
 
 
 #### UrlChangeListener
