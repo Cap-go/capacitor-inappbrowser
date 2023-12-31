@@ -109,13 +109,13 @@ export interface OpenWebViewOptions {
    */
   isPresentAfterPageLoad?: boolean;
   /**
-   * Whether the website in the webview is inspectable or not
+   * Whether the website in the webview is inspectable or not, ios only
    *
    * @default false
    */
   isInspectable?: boolean;
   /**
-   * Whether the webview opening is animated or not
+   * Whether the webview opening is animated or not, ios only
    *
    * @default true
    */

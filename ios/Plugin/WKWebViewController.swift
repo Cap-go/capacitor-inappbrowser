@@ -220,7 +220,6 @@ open class WKWebViewController: UIViewController {
             webView.isInspectable = isInspectable
         }
 
-
         webView.uiDelegate = self
         webView.navigationDelegate = self
 
