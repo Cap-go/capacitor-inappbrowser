@@ -60,11 +60,11 @@ open class WKWebViewController: UIViewController {
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.setHeaders(headers: headers)
-        self.initWebview()
+        self.initWebview(isInspectable: isInspectable)
     }
 
     open var hasDynamicTitle = false
@@ -206,7 +206,7 @@ open class WKWebViewController: UIViewController {
         }
     }
 
-    open func initWebview() {
+    open func initWebview(isInspectable: Bool = true) {
 
         self.view.backgroundColor = UIColor.white
 
@@ -215,6 +215,10 @@ open class WKWebViewController: UIViewController {
 
         let webConfiguration = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
+
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = isInspectable
+        }
 
         webView.uiDelegate = self
         webView.navigationDelegate = self
@@ -313,11 +317,6 @@ open class WKWebViewController: UIViewController {
         rollbackState()
     }
 
-    override open func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
-
     override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
         switch keyPath {
         case estimatedProgressKeyPath?:
@@ -377,6 +376,9 @@ public extension WKWebViewController {
         if let firstPageItem = webView?.backForwardList.backList.first {
             webView?.go(to: firstPageItem)
         }
+    }
+    func reload() {
+        webView?.reload()
     }
 }
 

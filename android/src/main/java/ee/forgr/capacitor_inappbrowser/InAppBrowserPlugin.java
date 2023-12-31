@@ -1,36 +1,79 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
-import android.webkit.WebStorage;
+import android.webkit.PermissionRequest;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 import java.util.Iterator;
 
-@CapacitorPlugin(name = "InAppBrowser")
-public class InAppBrowserPlugin extends Plugin {
+@CapacitorPlugin(
+  name = "InAppBrowser",
+  permissions = {
+    @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
+  }
+)
+public class InAppBrowserPlugin
+  extends Plugin
+  implements WebViewDialog.PermissionHandler {
 
   public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
   private CustomTabsClient customTabsClient;
   private CustomTabsSession currentSession;
   private WebViewDialog webViewDialog = null;
   private String currentUrl = "";
+
+  private PermissionRequest currentPermissionRequest;
+
+  public void handleCameraPermissionRequest(PermissionRequest request) {
+    this.currentPermissionRequest = request;
+    if (getPermissionState("camera") != PermissionState.GRANTED) {
+      requestPermissionForAlias("camera", null, "cameraPermissionCallback");
+    } else {
+      grantCameraPermission();
+    }
+  }
+
+  @PermissionCallback
+  private void cameraPermissionCallback() {
+    if (getPermissionState("camera") == PermissionState.GRANTED) {
+      grantCameraPermission();
+    } else {
+      if (currentPermissionRequest != null) {
+        currentPermissionRequest.deny();
+        currentPermissionRequest = null;
+      }
+      // Handle the case where permission was not granted
+    }
+  }
+
+  private void grantCameraPermission() {
+    if (currentPermissionRequest != null) {
+      currentPermissionRequest.grant(
+        new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+      );
+      currentPermissionRequest = null;
+    }
+  }
 
   CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
     @Override
@@ -45,6 +88,33 @@ public class InAppBrowserPlugin extends Plugin {
     @Override
     public void onServiceDisconnected(ComponentName name) {}
   };
+
+  @PluginMethod
+  public void requestCameraPermission(PluginCall call) {
+    if (getPermissionState("camera") != PermissionState.GRANTED) {
+      requestPermissionForAlias("camera", call, "cameraPermissionCallback");
+    } else {
+      call.resolve();
+    }
+  }
+
+  @PermissionCallback
+  private void cameraPermissionCallback(PluginCall call) {
+    if (getPermissionState("camera") == PermissionState.GRANTED) {
+      // Permission granted, notify the WebView to proceed
+      if (
+        webViewDialog != null && webViewDialog.currentPermissionRequest != null
+      ) {
+        webViewDialog.currentPermissionRequest.grant(
+          new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+        );
+        webViewDialog.currentPermissionRequest = null;
+      }
+      call.resolve();
+    } else {
+      call.reject("Camera permission is required");
+    }
+  }
 
   @PluginMethod
   public void setUrl(PluginCall call) {
@@ -117,28 +187,50 @@ public class InAppBrowserPlugin extends Plugin {
 
   @PluginMethod
   public void clearCookies(PluginCall call) {
-    if (webViewDialog == null) {
-      call.reject("WebView is not open");
+    String url = call.getString("url");
+    Boolean clearCache = call.getBoolean("cache", false);
+    if (url == null || TextUtils.isEmpty(url)) {
+      call.reject("Invalid URL");
     } else {
-      String url = currentUrl;
-      if (url == null || TextUtils.isEmpty(url)) {
-        call.reject("Invalid URL");
-      } else {
-        CookieManager cookieManager = CookieManager.getInstance();
-        String cookie = cookieManager.getCookie(url);
-        if (cookie != null) {
-          String[] cookies = cookie.split(";");
-          for (String c : cookies) {
-            String cookieName = c.substring(0, c.indexOf("="));
-            cookieManager.setCookie(
-              url,
-              cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
-            );
+      CookieManager cookieManager = CookieManager.getInstance();
+      String cookie = cookieManager.getCookie(url);
+      if (cookie != null) {
+        String[] cookies = cookie.split(";");
+        for (String c : cookies) {
+          String cookieName = c.substring(0, c.indexOf("="));
+          cookieManager.setCookie(
+            url,
+            cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
+          );
+          if (clearCache) {
             cookieManager.removeSessionCookie();
           }
         }
-        call.resolve();
       }
+      call.resolve();
+    }
+  }
+
+  @PluginMethod
+  public void getCookies(PluginCall call) {
+    String url = call.getString("url");
+    if (url == null || TextUtils.isEmpty(url)) {
+      call.reject("Invalid URL");
+    } else {
+      CookieManager cookieManager = CookieManager.getInstance();
+      String cookieString = cookieManager.getCookie(url);
+      if (cookieString != null) {
+        String[] cookiePairs = cookieString.split("; ");
+        JSObject result = new JSObject();
+        for (String cookie : cookiePairs) {
+          String[] parts = cookie.split("=", 2);
+          if (parts.length == 2) {
+            result.put(parts[0], parts[1]);
+          }
+        }
+        call.resolve(result);
+      }
+      call.resolve(new JSObject());
     }
   }
 
@@ -179,7 +271,7 @@ public class InAppBrowserPlugin extends Plugin {
       options.setCloseModal(false);
     }
     options.setPluginCall(call);
-    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD);
+    //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {
         @Override
@@ -203,7 +295,7 @@ public class InAppBrowserPlugin extends Plugin {
         }
       }
     );
-    getActivity()
+    this.getActivity()
       .runOnUiThread(
         new Runnable() {
           @Override
@@ -212,9 +304,11 @@ public class InAppBrowserPlugin extends Plugin {
               new WebViewDialog(
                 getContext(),
                 android.R.style.Theme_NoTitleBar,
-                options
+                options,
+                InAppBrowserPlugin.this
               );
             webViewDialog.presentWebView();
+            webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
           }
         }
       );
@@ -223,7 +317,15 @@ public class InAppBrowserPlugin extends Plugin {
   @PluginMethod
   public void reload(PluginCall call) {
     if (webViewDialog != null) {
-      webViewDialog.reload();
+      this.getActivity()
+        .runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              webViewDialog.reload();
+            }
+          }
+        );
     }
     call.resolve();
   }
@@ -231,8 +333,20 @@ public class InAppBrowserPlugin extends Plugin {
   @PluginMethod
   public void close(PluginCall call) {
     if (webViewDialog != null) {
-      webViewDialog.dismiss();
-      webViewDialog = null;
+      this.getActivity()
+        .runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              notifyListeners(
+                "closeEvent",
+                new JSObject().put("url", webViewDialog.getUrl())
+              );
+              webViewDialog.dismiss();
+              webViewDialog = null;
+            }
+          }
+        );
     } else {
       Intent intent = new Intent(
         getContext(),

@@ -35,6 +35,16 @@ export interface Headers {
   [key: string]: string;
 }
 
+export interface GetCookieOptions {
+  url: string;
+  includeHttpOnly?: boolean;
+}
+
+export interface ClearCookieOptions {
+  url: string;
+  cache?: boolean;
+}
+
 export interface OpenOptions {
   /**
    * Target URL to load.
@@ -93,7 +103,7 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @default 'New Window'
    */
-  title: string;
+  title?: string;
   /**
    * Background color of the browser, only on IOS
    * @since 0.1.0
@@ -108,6 +118,18 @@ export interface OpenWebViewOptions {
    * @default false
    */
   isPresentAfterPageLoad?: boolean;
+  /**
+   * Whether the website in the webview is inspectable or not, ios only
+   *
+   * @default false
+   */
+  isInspectable?: boolean;
+  /**
+   * Whether the webview opening is animated or not, ios only
+   *
+   * @default true
+   */
+  isAnimated?: boolean;
   /**
    * Shows a reload button that reloads the web page
    * @since 1.0.15
@@ -181,11 +203,19 @@ export interface InAppBrowserPlugin {
   open(options: OpenOptions): Promise<any>;
 
   /**
-   * Clear all cookies
+   * Clear cookies of url
    *
    * @since 0.5.0
    */
-  clearCookies(): Promise<any>;
+  clearCookies(options: ClearCookieOptions): Promise<any>;
+
+  /**
+   * Get cookies for a specific URL.
+   * @param options The options, including the URL to get cookies for.
+   * @returns A promise that resolves with the cookies.
+   */
+  getCookies(options: GetCookieOptions): Promise<Record<string, string>>;
+
   close(): Promise<any>;
   /**
    * Open url in a new webview with toolbars

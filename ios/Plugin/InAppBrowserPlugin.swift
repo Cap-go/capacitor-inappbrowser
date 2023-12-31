@@ -43,16 +43,57 @@ public class InAppBrowserPlugin: CAPPlugin {
         #endif
     }
 
-    func presentView() {
-        self.bridge?.viewController?.present(self.navigationWebViewController!, animated: true, completion: {
+    func presentView(isAnimated: Bool = true) {
+        self.bridge?.viewController?.present(self.navigationWebViewController!, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
     }
 
     @objc func clearCookies(_ call: CAPPluginCall) {
-        HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
-        URLCache.shared.removeAllCachedResponses()
-        call.resolve()
+        let dataStore = WKWebsiteDataStore.default()
+        let urlString = call.getString("url") ?? ""
+        let clearCache = call.getBool("cache") ?? false
+
+        if (clearCache) {
+            URLCache.shared.removeAllCachedResponses()
+        }
+
+        guard let url = URL(string: urlString), let hostName = url.host else {
+            call.reject("Invalid URL")
+            return
+        }
+        dataStore.httpCookieStore.getAllCookies { cookies in
+            let cookiesToDelete = cookies.filter { cookie in
+                cookie.domain == hostName || cookie.domain.hasSuffix(".\(hostName)") || hostName.hasSuffix(cookie.domain)
+            }
+
+            for cookie in cookiesToDelete {
+                dataStore.httpCookieStore.delete(cookie)
+            }
+
+            call.resolve()
+        }
+    }
+
+    @objc func getCookies(_ call: CAPPluginCall) {
+        let urlString = call.getString("url") ?? ""
+        let includeHttpOnly = call.getBool("includeHttpOnly") ?? true
+
+        guard let url = URL(string: urlString), let host = url.host else {
+            call.reject("Invalid URL")
+            return
+        }
+
+        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+            var cookieDict = [String: String]()
+            for cookie in cookies {
+
+                if (includeHttpOnly || !cookie.isHTTPOnly) && (cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain)) {
+                    cookieDict[cookie.name] = cookie.value
+                }
+            }
+            call.resolve(cookieDict)
+        }
     }
 
     @objc func openWebView(_ call: CAPPluginCall) {
@@ -77,6 +118,8 @@ public class InAppBrowserPlugin: CAPPlugin {
         let closeModalDescription = call.getString("closeModalDescription", "Are you sure you want to close this window?")
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
+        let isInspectable = call.getBool("isInspectable", false)
+        let isAnimated = call.getBool("isAnimated", true)
 
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType", "")
@@ -92,7 +135,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
@@ -129,13 +172,24 @@ public class InAppBrowserPlugin: CAPPlugin {
                 self.navigationWebViewController?.navigationBar.isHidden = true
             }
             if showReloadButton {
-                var toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
+                let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
                 self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
-                self.presentView()
+                self.presentView(isAnimated: isAnimated)
             }
         }
+    }
+
+    func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
+        var result: [BarButtonItemType] = []
+        if toolbarType == "activity" {
+            result.append(.activity)
+        } else if toolbarType == "navigation" {
+            result.append(.back)
+            result.append(.forward)
+        }
+        return result
     }
 
     @objc func reload(_ call: CAPPluginCall) {
@@ -151,7 +205,6 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.webViewController?.load(remote: URL(string: url)!)
         call.resolve()
     }
-
 
     func isHexColorCode(_ input: String) -> Bool {
         let hexColorRegex = "^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$"
@@ -174,6 +227,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.setup()
         }
 
+        let isInspectable = call.getBool("isInspectable", false)
+
         self.currentPluginCall = call
 
         guard let urlString = call.getString("url") else {
@@ -194,7 +249,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
@@ -209,7 +264,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            var inputString: String = call.getString("toolbarColor", "#ffffff")
+            let inputString: String = call.getString("toolbarColor", "#ffffff")
             var color: UIColor = UIColor(hexString: "#ffffff")
             if self.isHexColorCode(inputString) {
                 color = UIColor(hexString: inputString)
@@ -227,6 +282,7 @@ public class InAppBrowserPlugin: CAPPlugin {
     @objc func close(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             self.navigationWebViewController?.dismiss(animated: true, completion: nil)
+            self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
             call.resolve()
         }
     }

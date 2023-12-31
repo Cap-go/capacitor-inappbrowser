@@ -2,6 +2,75 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.20](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.19...1.2.20) (2023-12-31)
+
+
+### Bug Fixes
+
+* ios ([3215c76](https://github.com/Cap-go/capacitor-inappbrowser/commit/3215c764d44cf8a3377fce0cfb800f1c281cd5ce))
+* lint ([69270ba](https://github.com/Cap-go/capacitor-inappbrowser/commit/69270ba3d45e3a8a704ea5cce23aa1efb78c94eb))
+
+### [1.2.19](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.18...1.2.19) (2023-11-23)
+
+
+### Bug Fixes
+
+* camera issue for modern android ([b85f357](https://github.com/Cap-go/capacitor-inappbrowser/commit/b85f35737b69721ffee445e424deb9d3326f4482))
+* request permissions ([ed06c9e](https://github.com/Cap-go/capacitor-inappbrowser/commit/ed06c9e7dd3e3e19a28bd6b245cf0d651f3ef02f))
+
+### [1.2.18](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.17...1.2.18) (2023-11-16)
+
+### [1.2.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.16...1.2.17) (2023-11-16)
+
+
+### Bug Fixes
+
+* allow File access in Webview ([278c09a](https://github.com/Cap-go/capacitor-inappbrowser/commit/278c09a5c873fdfa2b22edbd37833bbcadbedc1a))
+
+### [1.2.16](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.15...1.2.16) (2023-10-16)
+
+### [1.2.15](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.14...1.2.15) (2023-10-09)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.android.tools.build:gradle to v8.1.2 ([615722e](https://github.com/Cap-go/capacitor-inappbrowser/commit/615722efcc7da94a68b58ad4d373134b24736306))
+
+### [1.2.14](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.13...1.2.14) (2023-10-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.google.android.material:material to v1.10.0 ([5608ac1](https://github.com/Cap-go/capacitor-inappbrowser/commit/5608ac1d28d076c423a29dc8dacea2e407a6abc5))
+
+### [1.2.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.12...1.2.13) (2023-10-05)
+
+
+### Bug Fixes
+
+* thread issue close event ([a32c538](https://github.com/Cap-go/capacitor-inappbrowser/commit/a32c53872d1a81686973670106fe208e283d42c8))
+
+### [1.2.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.11...1.2.12) (2023-09-28)
+
+
+### Bug Fixes
+
+* lint issue ([2641449](https://github.com/Cap-go/capacitor-inappbrowser/commit/264144947474cd5e2b1e797b416a0c432cdab8c8))
+
+### [1.2.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.10...1.2.11) (2023-09-28)
+
+
+### Bug Fixes
+
+* build issue ([db17c26](https://github.com/Cap-go/capacitor-inappbrowser/commit/db17c26fbff884e5de570b4301f89a3ac921551a))
+
+### [1.2.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.9...1.2.10) (2023-09-28)
+
+
+### Bug Fixes
+
+* add missing event close browser manually ([fa577e9](https://github.com/Cap-go/capacitor-inappbrowser/commit/fa577e94356404a54f065cfd8656b6256190433f))
+
 ### [1.2.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.8...1.2.9) (2023-09-12)
 
 ### [1.2.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.2.7...1.2.8) (2023-09-07)
