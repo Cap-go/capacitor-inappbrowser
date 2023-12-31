@@ -60,11 +60,11 @@ open class WKWebViewController: UIViewController {
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.setHeaders(headers: headers)
-        self.initWebview()
+        self.initWebview(isInspectable: isInspectable)
     }
 
     open var hasDynamicTitle = false
@@ -206,7 +206,7 @@ open class WKWebViewController: UIViewController {
         }
     }
 
-    open func initWebview() {
+    open func initWebview(isInspectable: Bool = true) {
 
         self.view.backgroundColor = UIColor.white
 
@@ -215,6 +215,10 @@ open class WKWebViewController: UIViewController {
 
         let webConfiguration = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
+
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = isInspectable
+        }
 
         webView.uiDelegate = self
         webView.navigationDelegate = self

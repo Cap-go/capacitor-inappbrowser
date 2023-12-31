@@ -43,8 +43,8 @@ public class InAppBrowserPlugin: CAPPlugin {
         #endif
     }
 
-    func presentView() {
-        self.bridge?.viewController?.present(self.navigationWebViewController!, animated: true, completion: {
+    func presentView(isAnimated: Bool = true) {
+        self.bridge?.viewController?.present(self.navigationWebViewController!, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
     }
@@ -113,6 +113,8 @@ public class InAppBrowserPlugin: CAPPlugin {
         let closeModalDescription = call.getString("closeModalDescription", "Are you sure you want to close this window?")
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
+        let isInspectable = call.getBool("isInspectable", false)
+        let isAnimated = call.getBool("isAnimated", true)
 
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType", "")
@@ -128,7 +130,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
@@ -169,7 +171,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
-                self.presentView()
+                self.presentView(isAnimated: isAnimated)
             }
         }
     }
@@ -220,6 +222,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.setup()
         }
 
+        let isInspectable = call.getBool("isInspectable", false)
+
         self.currentPluginCall = call
 
         guard let urlString = call.getString("url") else {
@@ -240,7 +244,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)

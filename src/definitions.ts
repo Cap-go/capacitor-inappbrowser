@@ -102,7 +102,7 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @default 'New Window'
    */
-  title: string;
+  title?: string;
   /**
    * Background color of the browser, only on IOS
    * @since 0.1.0
@@ -117,6 +117,18 @@ export interface OpenWebViewOptions {
    * @default false
    */
   isPresentAfterPageLoad?: boolean;
+  /**
+   * Whether the website in the webview is inspectable or not, ios only
+   *
+   * @default false
+   */
+  isInspectable?: boolean;
+  /**
+   * Whether the webview opening is animated or not, ios only
+   *
+   * @default true
+   */
+  isAnimated?: boolean;
   /**
    * Shows a reload button that reloads the web page
    * @since 1.0.15
