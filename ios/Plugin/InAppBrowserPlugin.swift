@@ -54,7 +54,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         let urlString = call.getString("url") ?? ""
         let clearCache = call.getBool("cache") ?? false
 
-        if (clearCache) {
+        if clearCache {
             URLCache.shared.removeAllCachedResponses()
         }
 
