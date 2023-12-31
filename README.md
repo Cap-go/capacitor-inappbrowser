@@ -259,9 +259,10 @@ Reload the current web page.
 
 #### ClearCookieOptions
 
-| Prop      | Type                |
-| --------- | ------------------- |
-| **`url`** | <code>string</code> |
+| Prop        | Type                 |
+| ----------- | -------------------- |
+| **`url`**   | <code>string</code>  |
+| **`cache`** | <code>boolean</code> |
 
 
 #### HttpCookie
