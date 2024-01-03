@@ -315,6 +315,28 @@ public class InAppBrowserPlugin
   }
 
   @PluginMethod
+  public void executeScript(PluginCall call) {
+    String script = call.getString("code");
+    if (script == null || TextUtils.isEmpty(script)) {
+      call.reject("No script to run");
+    }
+
+    if (webViewDialog != null) {
+      this.getActivity()
+        .runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              webViewDialog.executeScript(script);
+            }
+          }
+        );
+    }
+
+    call.resolve();
+  }
+
+  @PluginMethod
   public void reload(PluginCall call) {
     if (webViewDialog != null) {
       this.getActivity()

@@ -89,7 +89,6 @@ open class WKWebViewController: UIViewController {
     open var closeModalDescription = ""
     open var closeModalOk = ""
     open var closeModalCancel = ""
-    open var javascriptToExecute: String = ""
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -380,8 +379,8 @@ public extension WKWebViewController {
         webView?.reload()
     }
 
-    func executeScript(script: String) {
-        webView?.evaluateJavaScript(script);
+    func executeScript(script: String, completion: ((Any?, Error?) -> Void)? = nil) {
+        webView?.evaluateJavaScript(script, completionHandler: completion)
     }
 }
 
@@ -754,10 +753,6 @@ extension WKWebViewController: WKNavigationDelegate {
         if let url = webView.url {
             self.url = url
             delegate?.webViewController?(self, didFinish: url)
-        }
-
-        if !self.javascriptToExecute.isEmpty {
-            webView.evaluateJavaScript(self.javascriptToExecute, completionHandler: nil)
         }
     }
 

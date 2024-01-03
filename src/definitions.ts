@@ -131,10 +131,6 @@ export interface OpenWebViewOptions {
    */
   isAnimated?: boolean;
   /**
-   * JSON stringified javascript code to execute once the webview is loaded, ios only
-   */
-  executeScript?: string;
-  /**
    * Shows a reload button that reloads the web page
    * @since 1.0.15
    * @default false

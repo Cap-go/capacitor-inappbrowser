@@ -171,6 +171,10 @@ public class WebViewDialog extends Dialog {
     return _webView.getUrl();
   }
 
+  public void executeScript(String script) {
+    _webView.evaluateJavascript(script, null);
+  }
+
   public void setUrl(String url) {
     Map<String, String> requestHeaders = new HashMap<>();
     if (_options.getHeaders() != null) {
