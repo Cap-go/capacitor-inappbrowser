@@ -208,12 +208,12 @@ public class InAppBrowserPlugin: CAPPlugin {
         call.resolve()
     }
 
-    @objc func executeScript(_ call: CaPPluginCall) {
+    @objc func executeScript(_ call: CAPPluginCall) {
         guard let executeScript = call.getString("executeScript") else {
             call.reject("Cannot get script to execute")
             return
         }
-        self.webViewController?.executeScript(executeScript: executeScript)
+        self.webViewController?.executeScript(script: executeScript)
         call.resolve()
     }
 
