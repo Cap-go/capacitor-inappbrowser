@@ -227,6 +227,10 @@ export interface InAppBrowserPlugin {
    * @since 0.1.0
    */
   openWebView(options: OpenWebViewOptions): Promise<any>;
+  /**
+   * Injects JavaScript code into the InAppBrowser window.
+   */
+  executeScript({ code }: { code: string }): Promise<void>;
   setUrl(options: { url: string }): Promise<any>;
   /**
    * Listen for url change, only for openWebView

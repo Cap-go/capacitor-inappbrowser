@@ -209,12 +209,11 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     @objc func executeScript(_ call: CAPPluginCall) {
-        guard let executeScript = call.getString("executeScript") else {
+        guard let script = call.getString("code") else {
             call.reject("Cannot get script to execute")
             return
         }
-        self.webViewController?.executeScript(script: executeScript)
-        call.resolve()
+        self.webViewController?.executeScript(script: script)
     }
 
     func isHexColorCode(_ input: String) -> Bool {

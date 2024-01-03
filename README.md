@@ -38,6 +38,7 @@ Then the permission will be asked when the camera is used.
 * [`getCookies(...)`](#getcookies)
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
+* [`executeScript(...)`](#executescript)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent)
@@ -134,6 +135,21 @@ Open url in a new webview with toolbars
 **Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.1.0
+
+--------------------
+
+
+### executeScript(...)
+
+```typescript
+executeScript({ code }: { code: string; }) => Promise<void>
+```
+
+Injects JavaScript code into the InAppBrowser window.
+
+| Param     | Type                           |
+| --------- | ------------------------------ |
+| **`__0`** | <code>{ code: string; }</code> |
 
 --------------------
 

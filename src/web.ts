@@ -29,6 +29,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return options;
   }
 
+  async executeScript({ code }: {code: string }): Promise<any> {
+    console.log("code", code);
+    return code;
+  }
+
   async close(): Promise<any> {
     console.log("close");
     return;
