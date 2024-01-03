@@ -120,6 +120,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
         let isInspectable = call.getBool("isInspectable", false)
         let isAnimated = call.getBool("isAnimated", true)
+        let javascriptToExecute = call.getString("executeScript", "")
 
         var disclaimerContent = call.getObject("shareDisclaimer")
         let toolbarType = call.getString("toolbarType", "")
@@ -162,6 +163,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 self.webViewController?.closeModalOk = closeModalOk
                 self.webViewController?.closeModalCancel = closeModalCancel
             }
+            self.webViewController?.javascriptToExecute = javascriptToExecute
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
@@ -203,6 +205,15 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
         self.webViewController?.load(remote: URL(string: url)!)
+        call.resolve()
+    }
+
+    @objc func executeScript(_ call: CaPPluginCall) {
+        guard let executeScript = call.getString("executeScript") else {
+            call.reject("Cannot get script to execute")
+            return
+        }
+        self.webViewController?.executeScript(executeScript: executeScript)
         call.resolve()
     }
 

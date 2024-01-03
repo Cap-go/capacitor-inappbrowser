@@ -89,6 +89,7 @@ open class WKWebViewController: UIViewController {
     open var closeModalDescription = ""
     open var closeModalOk = ""
     open var closeModalCancel = ""
+    open var javascriptToExecute: String = ""
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -245,8 +246,6 @@ open class WKWebViewController: UIViewController {
             self.previousToolbarState = (navigation.toolbar.tintColor, navigation.toolbar.isHidden)
         }
 
-        //        self.restateViewHeight()
-
         if let s = self.source {
             self.load(source: s)
         } else {
@@ -379,6 +378,10 @@ public extension WKWebViewController {
     }
     func reload() {
         webView?.reload()
+    }
+
+    func executeScript(script: String) {
+        webView?.evaluateJavaScript(script);
     }
 }
 
@@ -751,6 +754,10 @@ extension WKWebViewController: WKNavigationDelegate {
         if let url = webView.url {
             self.url = url
             delegate?.webViewController?(self, didFinish: url)
+        }
+
+        if !self.javascriptToExecute.isEmpty {
+            webView.evaluateJavaScript(self.javascriptToExecute, completionHandler: nil)
         }
     }
 
