@@ -167,6 +167,10 @@ public class WebViewDialog extends Dialog {
     _webView.reload();
   }
 
+  public void destroy() {
+    _webView.destroy();
+  }
+
   public String getUrl() {
     return _webView.getUrl();
   }
@@ -268,6 +272,7 @@ public class WebViewDialog extends Dialog {
                     // Close button clicked, do something
                     dismiss();
                     _options.getCallbacks().closeEvent(_webView.getUrl());
+                    _webView.destroy();
                   }
                 }
               )
@@ -276,6 +281,7 @@ public class WebViewDialog extends Dialog {
           } else {
             dismiss();
             _options.getCallbacks().closeEvent(_webView.getUrl());
+            _webView.destroy();
           }
         }
       }
