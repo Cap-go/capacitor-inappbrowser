@@ -111,6 +111,19 @@ export interface OpenWebViewOptions {
    */
   backgroundColor?: BackgroundColor;
   /**
+   * If true, active the native navigation within the webview, Android only
+   *
+   * @default false
+   */
+  activeNativeNavigationForWebview?: boolean;
+  /**
+   * Disable the possibility to go back on native application,
+   * usefull to force user to stay on the webview, Android only
+   *
+   * @default false
+   */
+  disableGoBackOnNativeApplication?: boolean;
+  /**
    * Open url in a new window fullscreen
    *
    * isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.

@@ -407,10 +407,11 @@ public class WebViewDialog extends Dialog {
   public void onBackPressed() {
     if (
       _webView.canGoBack() &&
-      TextUtils.equals(_options.getToolbarType(), "navigation")
+      (TextUtils.equals(_options.getToolbarType(), "navigation") ||
+      _options.getActiveNativeNavigationForWebview())
     ) {
       _webView.goBack();
-    } else {
+    } else if (!_options.getDisableGoBackOnNativeApplication()) {
       super.onBackPressed();
     }
   }

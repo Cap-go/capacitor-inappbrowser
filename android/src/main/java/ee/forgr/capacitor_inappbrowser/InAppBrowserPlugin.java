@@ -256,6 +256,12 @@ public class InAppBrowserPlugin
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
+    options.setActiveNativeNavigationForWebview(
+      call.getBoolean("activeNativeNavigationForWebview", false)
+    );
+    options.setDisableGoBackOnNativeApplication(
+      call.getBoolean("disableGoBackOnNativeApplication", false)
+    );
     options.setPresentAfterPageLoad(
       call.getBoolean("isPresentAfterPageLoad", false)
     );
