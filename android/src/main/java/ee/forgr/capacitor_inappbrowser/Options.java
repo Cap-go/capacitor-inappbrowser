@@ -16,6 +16,8 @@ public class Options {
   private String toolbarType;
   private JSObject shareDisclaimer;
   private String shareSubject;
+  private boolean disableGoBackOnNativeApplication;
+  private boolean activeNativeNavigationForWebview;
   private boolean isPresentAfterPageLoad;
   private WebViewCallbacks callbacks;
   private PluginCall pluginCall;
@@ -127,6 +129,26 @@ public class Options {
 
   public void setShareSubject(String shareSubject) {
     this.shareSubject = shareSubject;
+  }
+
+  public boolean getActiveNativeNavigationForWebview() {
+    return activeNativeNavigationForWebview;
+  }
+
+  public void setActiveNativeNavigationForWebview(
+    boolean activeNativeNavigationForWebview
+  ) {
+    this.activeNativeNavigationForWebview = activeNativeNavigationForWebview;
+  }
+
+  public boolean getDisableGoBackOnNativeApplication() {
+    return disableGoBackOnNativeApplication;
+  }
+
+  public void setDisableGoBackOnNativeApplication(
+    boolean disableGoBackOnNativeApplication
+  ) {
+    this.disableGoBackOnNativeApplication = disableGoBackOnNativeApplication;
   }
 
   public boolean isPresentAfterPageLoad() {
