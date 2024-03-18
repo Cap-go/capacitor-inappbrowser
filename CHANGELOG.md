@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.8...1.3.9) (2024-03-18)
+
+
+### Bug Fixes
+
+* potential crash at setUrl ([5a801f3](https://github.com/Cap-go/capacitor-inappbrowser/commit/5a801f39e1b6f800dde5b8b69002630844c95e05))
+
 ### [1.3.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.7...1.3.8) (2024-03-18)
 
 
