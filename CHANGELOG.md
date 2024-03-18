@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.7...1.3.8) (2024-03-18)
+
+
+### Bug Fixes
+
+* make resize crash safe ([2697a82](https://github.com/Cap-go/capacitor-inappbrowser/commit/2697a82a842b4e65d1564cfa03a7c92339d3e879))
+
 ### [1.3.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.6...1.3.7) (2024-01-12)
 
 
