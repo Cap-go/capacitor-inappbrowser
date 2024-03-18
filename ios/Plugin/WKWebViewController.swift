@@ -216,8 +216,9 @@ open class WKWebViewController: UIViewController {
         let webConfiguration = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
-        if #available(iOS 16.4, *) {
-            webView.isInspectable = isInspectable
+        if webView.responds(to: Selector(("setInspectable:"))) {
+            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
+            webView.perform(Selector(("setInspectable:")), with: isInspectable)
         }
 
         webView.uiDelegate = self
