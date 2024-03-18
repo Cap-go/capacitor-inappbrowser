@@ -198,11 +198,17 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     @objc func setUrl(_ call: CAPPluginCall) {
-        guard let url = call.getString("url") else {
+        guard let urlString = call.getString("url") else {
             call.reject("Cannot get new url to set")
             return
         }
-        self.webViewController?.load(remote: URL(string: url)!)
+        
+        guard let url = URL(string: urlString) else {
+            call.reject("Invalid URL")
+            return
+        }
+        
+        self.webViewController?.load(remote: url)
         call.resolve()
     }
 
