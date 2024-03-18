@@ -19,6 +19,8 @@ import { InAppBrowser } from '@capgo/inappbrowser'
 InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
+Web platform is not supported. Use `window.open` instead.
+
 ### Camera usage
 
 if you need the Camera to work in Android, you need to add the following to your `AndroidManifest.xml` file:
@@ -375,7 +377,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -389,7 +393,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
