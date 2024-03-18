@@ -202,12 +202,12 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("Cannot get new url to set")
             return
         }
-        
+
         guard let url = URL(string: urlString) else {
             call.reject("Invalid URL")
             return
         }
-        
+
         self.webViewController?.load(remote: url)
         call.resolve()
     }
