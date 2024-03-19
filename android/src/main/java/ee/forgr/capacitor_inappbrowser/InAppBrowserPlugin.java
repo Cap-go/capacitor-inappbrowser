@@ -360,12 +360,12 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void close(PluginCall call) {
-    if (webViewDialog != null) {
-      this.getActivity()
-        .runOnUiThread(
-          new Runnable() {
-            @Override
-            public void run() {
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            if (webViewDialog != null) {
               notifyListeners(
                 "closeEvent",
                 new JSObject().put("url", webViewDialog.getUrl())
@@ -373,18 +373,18 @@ public class InAppBrowserPlugin
               webViewDialog.dismiss();
               webViewDialog.destroy();
               webViewDialog = null;
+            } else {
+              Intent intent = new Intent(
+                getContext(),
+                getBridge().getActivity().getClass()
+              );
+              intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+              getContext().startActivity(intent);
             }
+            call.resolve();
           }
-        );
-    } else {
-      Intent intent = new Intent(
-        getContext(),
-        getBridge().getActivity().getClass()
+        }
       );
-      intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-      getContext().startActivity(intent);
-    }
-    call.resolve();
   }
 
   private Bundle getHeaders(PluginCall pluginCall) {
