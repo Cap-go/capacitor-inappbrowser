@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.17...1.4.0) (2024-03-20)
+
+
+### Features
+
+* **android:** handle opening deeplinks inside webview ([4b820e1](https://github.com/Cap-go/capacitor-inappbrowser/commit/4b820e1ebec241fc82870bbae37366f27f200d00))
+
+
+### Bug Fixes
+
+* lint ([a182cc4](https://github.com/Cap-go/capacitor-inappbrowser/commit/a182cc4c02a128e6151d9754f10523c270d764de))
+
 ### [1.3.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.16...1.3.17) (2024-03-20)
 
 
