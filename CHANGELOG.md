@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.16...1.3.17) (2024-03-20)
+
+
+### Bug Fixes
+
+* **android:** fixes compiling for sdk 33 ([5323a79](https://github.com/Cap-go/capacitor-inappbrowser/commit/5323a791a1c62319cfce8641e871bf736328a1e7))
+
 ### [1.3.16](https://github.com/Cap-go/capacitor-inappbrowser/compare/1.3.15...1.3.16) (2024-03-19)
 
 
