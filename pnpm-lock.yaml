@@ -7,19 +7,19 @@ settings:
 devDependencies:
   '@capacitor/android':
     specifier: ^5.3.0
-    version: 5.7.4(@capacitor/core@5.7.4)
+    version: 5.7.5(@capacitor/core@5.7.5)
   '@capacitor/cli':
     specifier: ^5.0.3
-    version: 5.7.4
+    version: 5.7.5
   '@capacitor/core':
     specifier: ^5.0.3
-    version: 5.7.4
+    version: 5.7.5
   '@capacitor/docgen':
     specifier: ^0.2.1
     version: 0.2.1
   '@capacitor/ios':
     specifier: ^5.0.3
-    version: 5.7.4(@capacitor/core@5.7.4)
+    version: 5.7.5(@capacitor/core@5.7.5)
   '@ionic/eslint-config':
     specifier: ^0.3.0
     version: 0.3.0(eslint@8.41.0)(typescript@5.0.4)
@@ -89,16 +89,16 @@ packages:
       js-tokens: 4.0.0
     dev: true
 
-  /@capacitor/android@5.7.4(@capacitor/core@5.7.4):
-    resolution: {integrity: sha512-9ETwrCaLaimLHbwGpgfsPS9cHcPMFLmKFdlYsFsYIusMO6aOrcQTA9Q4xVAkr55ava4Wk+pVRniRYsekrbOLdw==}
+  /@capacitor/android@5.7.5(@capacitor/core@5.7.5):
+    resolution: {integrity: sha512-VKb9VarGA2hJ8PuLk4EhSq4jvgM+V8JOoNw00WdD6Q4rbgDKSa7WIKTw75sFrNRGiwHSZ99FPvmisJfr1Spk+Q==}
     peerDependencies:
       '@capacitor/core': ^5.7.0
     dependencies:
-      '@capacitor/core': 5.7.4
+      '@capacitor/core': 5.7.5
     dev: true
 
-  /@capacitor/cli@5.7.4:
-    resolution: {integrity: sha512-Cn7ndfMHWfMT+A/wRoeac4/mAxZWNTlZoD1Mn7UQyVV+iGxZB2JpS9omqha7gBN4xrAuTi/X9FqkzrmR+1V96A==}
+  /@capacitor/cli@5.7.5:
+    resolution: {integrity: sha512-CEgCXq3NNacS+9EptJXM+Cm915oB8eNPhiTP7ylKsQchrY0CGbeyO5y4A/oYnB/h4f+UiaX3ShlIOljx3+agqw==}
     engines: {node: '>=16.0.0'}
     hasBin: true
     dependencies:
@@ -116,15 +116,15 @@ packages:
       prompts: 2.4.2
       rimraf: 4.4.1
       semver: 7.6.0
-      tar: 6.2.0
+      tar: 6.2.1
       tslib: 2.6.2
       xml2js: 0.5.0
     transitivePeerDependencies:
       - supports-color
     dev: true
 
-  /@capacitor/core@5.7.4:
-    resolution: {integrity: sha512-iZBgvx3o4amzKv5ttA+QHB6i7cxK+/mYpCQd1tnSdipg6ZkvfBhg1HkzhEqHk+I7MNur+QwgYDZho9+ycHRwOw==}
+  /@capacitor/core@5.7.5:
+    resolution: {integrity: sha512-babBo26lgIyKkAOr/AbPq5wwi9I4uHDP0lBteJq7p4xZElA6tAA8mD3xRH1/4EKmZ4+acYpKmmyegX3zsVh37A==}
     dependencies:
       tslib: 2.6.2
     dev: true
@@ -141,12 +141,12 @@ packages:
       typescript: 4.2.4
     dev: true
 
-  /@capacitor/ios@5.7.4(@capacitor/core@5.7.4):
-    resolution: {integrity: sha512-tQH24WMSYVKYr/Jl1gFImooQmu8OdXUFHoDaPV1WpZIiwbwxbTdwOXeLlGes5U8B8t7xuxTWMWMDt3IwRlDbhQ==}
+  /@capacitor/ios@5.7.5(@capacitor/core@5.7.5):
+    resolution: {integrity: sha512-mREcvv4XC9USSAbYmf/2Lmbr52eZjMDpKYwxwi2CKLJXGXNjYfJaHm6jnPordAl6kZdm3Bm/tnx+rYpb9KptGA==}
     peerDependencies:
       '@capacitor/core': ^5.7.0
     dependencies:
-      '@capacitor/core': 5.7.4
+      '@capacitor/core': 5.7.5
     dev: true
 
   /@eslint-community/eslint-utils@4.4.0(eslint@8.41.0):
@@ -1620,9 +1620,9 @@ packages:
     dependencies:
       foreground-child: 3.1.1
       jackspeak: 2.2.1
-      minimatch: 9.0.3
+      minimatch: 9.0.4
       minipass: 6.0.2
-      path-scurry: 1.10.1
+      path-scurry: 1.10.2
     dev: true
 
   /glob@7.2.3:
@@ -1643,7 +1643,7 @@ packages:
       fs.realpath: 1.0.0
       minimatch: 8.0.4
       minipass: 4.2.8
-      path-scurry: 1.10.1
+      path-scurry: 1.10.2
     dev: true
 
   /globals@13.20.0:
@@ -2057,8 +2057,8 @@ packages:
       brace-expansion: 2.0.1
     dev: true
 
-  /minimatch@9.0.3:
-    resolution: {integrity: sha512-RHiac9mvaRw0x3AYRgDC1CxAP7HTcNrrECeA8YYJeWnpo+2Q5CegtZjaotWTWxDG3UeGA1coE05iH1mPjT/2mg==}
+  /minimatch@9.0.4:
+    resolution: {integrity: sha512-KqWh+VchfxcMNRAJjj2tnsSJdNbHsVgnkBhTNrW7AjVo6OvLtxw8zfT9oLw1JSohlFzJ8jCoTgaoXvJ+kHt6fw==}
     engines: {node: '>=16 || 14 >=14.17'}
     dependencies:
       brace-expansion: 2.0.1
@@ -2250,8 +2250,8 @@ packages:
     resolution: {integrity: sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==}
     dev: true
 
-  /path-scurry@1.10.1:
-    resolution: {integrity: sha512-MkhCqzzBEpPvxxQ71Md0b1Kk51W01lrYvlMzSUaIzNsODdd7mqhiimSZlr+VegAz5Z6Vzt9Xg2ttE//XBhH3EQ==}
+  /path-scurry@1.10.2:
+    resolution: {integrity: sha512-7xTavNy5RQXnsjANvVvMkEjvloOinkAjv/Z6Ildz9v2RinZ4SBKTWFOVRbaF8p0vpHnyjV/UwNDdKuUv6M5qcA==}
     engines: {node: '>=16 || 14 >=14.17'}
     dependencies:
       lru-cache: 10.2.0
@@ -2603,8 +2603,8 @@ packages:
       - supports-color
     dev: true
 
-  /tar@6.2.0:
-    resolution: {integrity: sha512-/Wo7DcT0u5HUV486xg675HtjNd3BXZ6xDbzsCUZPt5iw8bTQ63bP0Raut3mvro9u+CUyq7YQd8Cx55fsZXxqLQ==}
+  /tar@6.2.1:
+    resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
     engines: {node: '>=10'}
     dependencies:
       chownr: 2.0.0
