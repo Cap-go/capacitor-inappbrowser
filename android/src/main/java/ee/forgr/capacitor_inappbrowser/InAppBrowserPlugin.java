@@ -1,6 +1,7 @@
 package ee.forgr.capacitor_inappbrowser;
 
 import android.Manifest;
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -21,6 +22,7 @@ import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
@@ -30,7 +32,10 @@ import java.util.Iterator;
   name = "InAppBrowser",
   permissions = {
     @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
-  }
+    @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE } ),
+    @Permission(alias = "storage", strings = { Manifest.permission.READ_MEDIA_IMAGES } ),
+  },
+  requestCodes = {WebViewDialog.FILE_CHOOSER_REQUEST_CODE}
 )
 public class InAppBrowserPlugin
   extends Plugin
@@ -50,6 +55,32 @@ public class InAppBrowserPlugin
       requestPermissionForAlias("camera", null, "cameraPermissionCallback");
     } else {
       grantCameraPermission();
+    }
+  }
+
+  @Override
+  protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+    super.handleOnActivityResult(requestCode, resultCode, data);
+
+    // Check if the request code matches the file chooser request code
+    if (requestCode == WebViewDialog.FILE_CHOOSER_REQUEST_CODE) {
+      if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
+        Uri[] results = null;
+
+        if (resultCode == Activity.RESULT_OK) {
+          if (data != null) {
+            results = new Uri[]{data.getData()};
+          }
+        }
+
+        // Pass the results back to the WebView
+        try {
+          webViewDialog.mFilePathCallback.onReceiveValue(results);
+          webViewDialog.mFilePathCallback = null;
+        } catch (Exception e) {
+          Log.e("ACTIVITYRESULT", e.getMessage());
+        }
+      }
     }
   }
 
