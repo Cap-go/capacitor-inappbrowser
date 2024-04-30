@@ -306,13 +306,12 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            webViewDialog =
-              new WebViewDialog(
-                getContext(),
-                android.R.style.Theme_NoTitleBar,
-                options,
-                InAppBrowserPlugin.this
-              );
+            webViewDialog = new WebViewDialog(
+              getContext(),
+              android.R.style.Theme_NoTitleBar,
+              options,
+              InAppBrowserPlugin.this
+            );
             webViewDialog.presentWebView();
             webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
           }
@@ -421,19 +420,18 @@ public class InAppBrowserPlugin
     }
 
     if (currentSession == null) {
-      currentSession =
-        customTabsClient.newSession(
-          new CustomTabsCallback() {
-            @Override
-            public void onNavigationEvent(int navigationEvent, Bundle extras) {
-              switch (navigationEvent) {
-                case NAVIGATION_FINISHED:
-                  notifyListeners("browserPageLoaded", new JSObject());
-                  break;
-              }
+      currentSession = customTabsClient.newSession(
+        new CustomTabsCallback() {
+          @Override
+          public void onNavigationEvent(int navigationEvent, Bundle extras) {
+            switch (navigationEvent) {
+              case NAVIGATION_FINISHED:
+                notifyListeners("browserPageLoaded", new JSObject());
+                break;
             }
           }
-        );
+        }
+      );
     }
     return currentSession;
   }

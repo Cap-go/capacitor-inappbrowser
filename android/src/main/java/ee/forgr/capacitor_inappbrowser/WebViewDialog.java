@@ -122,13 +122,11 @@ public class WebViewDialog extends Dialog {
         @Override
         public void onPermissionRequestCanceled(PermissionRequest request) {
           super.onPermissionRequestCanceled(request);
-          Toast
-            .makeText(
-              WebViewDialog.this.activity,
-              "Permission Denied",
-              Toast.LENGTH_SHORT
-            )
-            .show();
+          Toast.makeText(
+            WebViewDialog.this.activity,
+            "Permission Denied",
+            Toast.LENGTH_SHORT
+          ).show();
           // Handle the denied permission
           if (currentPermissionRequest != null) {
             currentPermissionRequest.deny();
@@ -423,10 +421,8 @@ public class WebViewDialog extends Dialog {
   public void onBackPressed() {
     if (
       _webView.canGoBack() &&
-      (
-        TextUtils.equals(_options.getToolbarType(), "navigation") ||
-        _options.getActiveNativeNavigationForWebview()
-      )
+      (TextUtils.equals(_options.getToolbarType(), "navigation") ||
+        _options.getActiveNativeNavigationForWebview())
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {

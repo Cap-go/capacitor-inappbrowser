@@ -200,7 +200,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "loadstart",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -209,7 +209,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "loadstop",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -218,7 +218,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "loaderror",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -227,7 +227,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "exit",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -236,7 +236,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "beforeload",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -245,7 +245,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "message",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
   /**
    * Listen for loadstart event in the Browser
@@ -254,6 +254,6 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: "customscheme",
-    listenerFunc: BrowserEventListener
+    listenerFunc: BrowserEventListener,
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }
