@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -10,12 +11,14 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.PermissionRequest;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -413,7 +416,20 @@ public class WebViewDialog extends Dialog {
           super.onReceivedError(view, request, error);
           _options.getCallbacks().pageLoadError();
         }
+
+        @SuppressLint("WebViewClientOnReceivedSslError")
+        @Override
+        public void onReceivedSslError(WebView view, SslErrorHandler handler,
+                                       SslError error) {
+          boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
+          if(ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) handler.proceed();
+          else {
+            super.onReceivedSslError(view, handler, error);
+          }
+        }
       }
+
+
     );
   }
 

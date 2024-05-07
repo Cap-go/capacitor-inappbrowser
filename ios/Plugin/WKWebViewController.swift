@@ -89,6 +89,7 @@ open class WKWebViewController: UIViewController {
     open var closeModalDescription = ""
     open var closeModalOk = ""
     open var closeModalCancel = ""
+    open var ignoreUntrustedSSLError = false;
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -780,7 +781,21 @@ extension WKWebViewController: WKNavigationDelegate {
             let credential = URLCredential(trust: challenge.protectionSpace.serverTrust!)
             completionHandler(.useCredential, credential)
         } else {
-            completionHandler(.performDefaultHandling, nil)
+            guard self.ignoreUntrustedSSLError else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+            /* allows to open links with self-signed certificates
+             Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
+             */
+            guard let serverTrust = challenge.protectionSpace.serverTrust  else {
+                completionHandler(.useCredential, nil)
+                return
+            }
+            let credential = URLCredential(trust: serverTrust)
+            completionHandler(.useCredential, credential)
+            
+           
         }
     }
 

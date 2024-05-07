@@ -127,6 +127,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         if toolbarType != "activity" {
             disclaimerContent = nil
         }
+        let ignoreUntrustedSSLError = call.getBool("ignoreUntrustedSSLError", false)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
@@ -162,6 +163,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 self.webViewController?.closeModalOk = closeModalOk
                 self.webViewController?.closeModalCancel = closeModalCancel
             }
+            self.webViewController?.ignoreUntrustedSSLError = ignoreUntrustedSSLError
             self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
