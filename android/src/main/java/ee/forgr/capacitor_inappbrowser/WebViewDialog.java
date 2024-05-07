@@ -353,7 +353,9 @@ public class WebViewDialog extends Dialog {
           super.onPageStarted(view, url, favicon);
           try {
             URI uri = new URI(url);
-            setTitle(uri.getHost());
+            if (TextUtils.isEmpty(_options.getTitle())) {
+              setTitle(uri.getHost());
+            }
           } catch (URISyntaxException e) {
             // Do nothing
           }
