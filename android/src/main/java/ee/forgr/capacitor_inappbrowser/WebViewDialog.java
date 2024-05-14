@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -41,6 +42,9 @@ public class WebViewDialog extends Dialog {
   private boolean isInitialized = false;
 
   public PermissionRequest currentPermissionRequest;
+  public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
+  public ValueCallback<Uri> mUploadMessage;
+  public ValueCallback<Uri[]> mFilePathCallback;
 
   public interface PermissionHandler {
     void handleCameraPermissionRequest(PermissionRequest request);
@@ -95,8 +99,19 @@ public class WebViewDialog extends Dialog {
 
     _webView.setWebChromeClient(
       new WebChromeClient() {
-        // Grant permissions for cam
 
+        // Enable file open dialog
+        @Override
+        public boolean onShowFileChooser(
+          WebView webView,
+          ValueCallback<Uri[]> filePathCallback,
+          WebChromeClient.FileChooserParams fileChooserParams
+        ) {
+          openFileChooser(filePathCallback, fileChooserParams.getAcceptTypes()[0]);
+          return true;
+        }
+
+        // Grant permissions for cam
         @Override
         public void onPermissionRequest(final PermissionRequest request) {
           Log.i(
@@ -162,6 +177,17 @@ public class WebViewDialog extends Dialog {
       show();
       _options.getPluginCall().resolve();
     }
+  }
+
+  private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType) {
+    mFilePathCallback = filePathCallback;
+    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType(acceptType); // Default to */*
+    activity.startActivityForResult(
+      Intent.createChooser(intent, "Select File"),
+      FILE_CHOOSER_REQUEST_CODE
+    );
   }
 
   public void reload() {
