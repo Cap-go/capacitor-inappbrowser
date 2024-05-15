@@ -245,7 +245,8 @@ public class InAppBrowserPlugin
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
     options.setShowReloadButton(call.getBoolean("showReloadButton", false));
-    if (Boolean.TRUE.equals(call.getBoolean("visibleTitle", true))) {
+    options.setVisibleTitle(call.getBoolean("visibleTitle", true));
+    if (Boolean.TRUE.equals(options.getVisibleTitle())) {
       options.setTitle(call.getString("title", "New Window"));
     } else {
       options.setTitle(call.getString("title", ""));
