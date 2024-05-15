@@ -32,10 +32,16 @@ import java.util.Iterator;
   name = "InAppBrowser",
   permissions = {
     @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
-    @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE } ),
-    @Permission(alias = "storage", strings = { Manifest.permission.READ_MEDIA_IMAGES } ),
+    @Permission(
+      alias = "storage",
+      strings = { Manifest.permission.READ_EXTERNAL_STORAGE }
+    ),
+    @Permission(
+      alias = "storage",
+      strings = { Manifest.permission.READ_MEDIA_IMAGES }
+    ),
   },
-  requestCodes = {WebViewDialog.FILE_CHOOSER_REQUEST_CODE}
+  requestCodes = { WebViewDialog.FILE_CHOOSER_REQUEST_CODE }
 )
 public class InAppBrowserPlugin
   extends Plugin
@@ -59,7 +65,11 @@ public class InAppBrowserPlugin
   }
 
   @Override
-  protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+  protected void handleOnActivityResult(
+    int requestCode,
+    int resultCode,
+    Intent data
+  ) {
     super.handleOnActivityResult(requestCode, resultCode, data);
 
     // Check if the request code matches the file chooser request code
@@ -69,7 +79,7 @@ public class InAppBrowserPlugin
 
         if (resultCode == Activity.RESULT_OK) {
           if (data != null) {
-            results = new Uri[]{data.getData()};
+            results = new Uri[] { data.getData() };
           }
         }
 
@@ -276,14 +286,17 @@ public class InAppBrowserPlugin
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
     options.setShowReloadButton(call.getBoolean("showReloadButton", false));
-    if (Boolean.TRUE.equals(call.getBoolean("visibleTitle", true))) {
+    options.setVisibleTitle(call.getBoolean("visibleTitle", true));
+    if (Boolean.TRUE.equals(options.getVisibleTitle())) {
       options.setTitle(call.getString("title", "New Window"));
     } else {
       options.setTitle(call.getString("title", ""));
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
     options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
-
+    options.setIgnoreUntrustedSSLError(
+      Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
+    );
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));

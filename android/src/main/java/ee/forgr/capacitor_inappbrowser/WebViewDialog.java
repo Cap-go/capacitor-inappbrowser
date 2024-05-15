@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -10,12 +11,14 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.PermissionRequest;
+import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -99,7 +102,6 @@ public class WebViewDialog extends Dialog {
 
     _webView.setWebChromeClient(
       new WebChromeClient() {
-
         // Enable file open dialog
         @Override
         public boolean onShowFileChooser(
@@ -107,7 +109,10 @@ public class WebViewDialog extends Dialog {
           ValueCallback<Uri[]> filePathCallback,
           WebChromeClient.FileChooserParams fileChooserParams
         ) {
-          openFileChooser(filePathCallback, fileChooserParams.getAcceptTypes()[0]);
+          openFileChooser(
+            filePathCallback,
+            fileChooserParams.getAcceptTypes()[0]
+          );
           return true;
         }
 
@@ -179,7 +184,10 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-  private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType) {
+  private void openFileChooser(
+    ValueCallback<Uri[]> filePathCallback,
+    String acceptType
+  ) {
     mFilePathCallback = filePathCallback;
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -379,7 +387,9 @@ public class WebViewDialog extends Dialog {
           super.onPageStarted(view, url, favicon);
           try {
             URI uri = new URI(url);
-            setTitle(uri.getHost());
+            if (TextUtils.isEmpty(_options.getTitle())) {
+              setTitle(uri.getHost());
+            }
           } catch (URISyntaxException e) {
             // Do nothing
           }
@@ -438,6 +448,23 @@ public class WebViewDialog extends Dialog {
         ) {
           super.onReceivedError(view, request, error);
           _options.getCallbacks().pageLoadError();
+        }
+
+        @SuppressLint("WebViewClientOnReceivedSslError")
+        @Override
+        public void onReceivedSslError(
+          WebView view,
+          SslErrorHandler handler,
+          SslError error
+        ) {
+          boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
+          if (
+            ignoreSSLUntrustedError &&
+            error.getPrimaryError() == SslError.SSL_UNTRUSTED
+          ) handler.proceed();
+          else {
+            super.onReceivedSslError(view, handler, error);
+          }
         }
       }
     );
