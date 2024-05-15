@@ -24,6 +24,7 @@ public class Options {
   private boolean VisibleTitle;
   private String ToolbarColor;
   private boolean ShowArrow;
+  private boolean ignoreUntrustedSSLError;
 
   public PluginCall getPluginCall() {
     return pluginCall;
@@ -189,5 +190,12 @@ public class Options {
 
   public void setArrow(boolean _showArrow) {
     this.ShowArrow = _showArrow;
+  }
+  public boolean ignoreUntrustedSSLError() {
+    return ignoreUntrustedSSLError;
+  }
+
+  public void setIgnoreUntrustedSSLError(boolean _ignoreUntrustedSSLError) {
+    this.ignoreUntrustedSSLError = _ignoreUntrustedSSLError;
   }
 }

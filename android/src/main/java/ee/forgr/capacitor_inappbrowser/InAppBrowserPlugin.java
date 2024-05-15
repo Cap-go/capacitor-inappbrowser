@@ -253,7 +253,7 @@ public class InAppBrowserPlugin
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
     options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
-
+    options.setIgnoreUntrustedSSLError(Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false)));
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));

@@ -205,6 +205,13 @@ export interface OpenWebViewOptions {
    * @default false
    */
   showArrow?: boolean;
+    /**
+   * ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.
+   *
+   * @since 6.1.0
+   * @default false
+   */
+    ignoreUntrustedSSLError?: boolean;
 }
 
 export interface InAppBrowserPlugin {
