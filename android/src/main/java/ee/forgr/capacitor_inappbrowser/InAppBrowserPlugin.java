@@ -236,16 +236,9 @@ public class InAppBrowserPlugin
       CookieManager cookieManager = CookieManager.getInstance();
       String cookie = cookieManager.getCookie(url);
       if (cookie != null) {
-        String[] cookies = cookie.split(";");
-        for (String c : cookies) {
-          String cookieName = c.substring(0, c.indexOf("="));
-          cookieManager.setCookie(
-            url,
-            cookieName + "=; Expires=Thu, 01 Jan 1970 00:00:01 GMT"
-          );
-          if (clearCache) {
-            cookieManager.removeSessionCookie();
-          }
+        cookieManager.removeAllCookies(null);
+        if (Boolean.TRUE.equals(clearCache)) {
+          cookieManager.removeSessionCookies(null);
         }
       }
       call.resolve();
