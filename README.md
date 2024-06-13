@@ -264,15 +264,24 @@ Reload the current web page.
 
 #### OpenOptions
 
-| Prop                         | Type                                        | Description                                                                                                           | Since |
-| ---------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`url`**                    | <code>string</code>                         | Target URL to load.                                                                                                   | 0.1.0 |
-| **`headers`**                | <code><a href="#headers">Headers</a></code> | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                        | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
-| **`preventDeeplink`**        | <code>boolean</code>                        |                                                                                                                       |       |
+| Prop                         | Type                                                | Description                                                                                                           | Since |
+| ---------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **`url`**                    | <code>string</code>                                 | Target URL to load.                                                                                                   | 0.1.0 |
+| **`headers`**                | <code><a href="#headers">Headers</a></code>         | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
+| **`credentials`**            | <code><a href="#credentials">Credentials</a></code> | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.        | 6.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code>                                | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
+| **`preventDeeplink`**        | <code>boolean</code>                                |                                                                                                                       |       |
 
 
 #### Headers
+
+
+#### Credentials
+
+| Prop           | Type                |
+| -------------- | ------------------- |
+| **`username`** | <code>string</code> |
+| **`password`** | <code>string</code> |
 
 
 #### ClearCookieOptions
@@ -306,6 +315,7 @@ Reload the current web page.
 | -------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------ |
 | **`url`**                              | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                                            | 0.1.0  |
 | **`headers`**                          | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                                            | 0.1.0  |
+| **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>             | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                    |                                                            | 6.1.0  |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                                            | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>                           | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                                            | 0.1.0  |
