@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.0.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.0.20...6.0.21) (2024-06-14)
+
+
+### Bug Fixes
+
+* make text color reverse than background ([91be3c2](https://github.com/Cap-go/capacitor-inappbrowser/commit/91be3c25a85358b37540155d12ab82974bb308fc))
+
 ### [6.0.20](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.0.19...6.0.20) (2024-06-14)
 
 
