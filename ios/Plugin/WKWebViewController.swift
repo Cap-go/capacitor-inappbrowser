@@ -132,7 +132,7 @@ open class WKWebViewController: UIViewController {
 
     open var websiteTitleInNavigationBar = true
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
-    open var leftNavigaionBarItemTypes: [BarButtonItemType] = []
+    open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
     open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .reload, .activity]
 
@@ -468,7 +468,7 @@ fileprivate extension WKWebViewController {
         //        if presentingViewController != nil {
         switch doneBarButtonItemPosition {
         case .left:
-            if !leftNavigaionBarItemTypes.contains(where: { type in
+            if !leftNavigationBarItemTypes.contains(where: { type in
                 switch type {
                 case .done:
                     return true
@@ -476,7 +476,7 @@ fileprivate extension WKWebViewController {
                     return false
                 }
             }) {
-                leftNavigaionBarItemTypes.insert(.done, at: 0)
+                leftNavigationBarItemTypes.insert(.done, at: 0)
             }
         case .right:
             if !rightNavigaionBarItemTypes.contains(where: { type in
@@ -494,7 +494,7 @@ fileprivate extension WKWebViewController {
         }
         //        }
 
-        navigationItem.leftBarButtonItems = leftNavigaionBarItemTypes.map {
+        navigationItem.leftBarButtonItems = leftNavigationBarItemTypes.map {
             barButtonItemType in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem

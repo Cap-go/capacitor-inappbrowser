@@ -143,8 +143,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
 
             self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
-            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
+            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
+            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
             if call.getBool("showArrow", false) {
@@ -175,7 +175,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
             if showReloadButton {
                 let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
-                self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
+                self.webViewController?.leftNavigationBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
@@ -272,7 +272,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             }
 
             self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigaionBarItemTypes = [.reload]
+            self.webViewController?.leftNavigationBarItemTypes = [.reload]
             self.webViewController?.toolbarItemTypes = [.back, .forward, .activity]
             self.webViewController?.capBrowserPlugin = self
             self.webViewController?.hasDynamicTitle = true
