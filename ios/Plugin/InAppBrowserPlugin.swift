@@ -169,6 +169,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
             self.navigationWebViewController?.toolbar.backgroundColor = backgroundColor
+            self.navigationWebViewController?.toolbar.tintColor = backgroundColor == UIColor.black ? UIColor.white : UIColor.black
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
