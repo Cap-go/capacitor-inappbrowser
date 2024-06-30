@@ -25,8 +25,6 @@ public class Options {
   private String ToolbarColor;
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
-  private boolean useWhitePanelMode;
-  private boolean useHardwareAcceleration;
 
   public PluginCall getPluginCall() {
     return pluginCall;
@@ -200,21 +198,5 @@ public class Options {
 
   public void setIgnoreUntrustedSSLError(boolean _ignoreUntrustedSSLError) {
     this.ignoreUntrustedSSLError = _ignoreUntrustedSSLError;
-  }
-
-  public boolean useWhitePanelMode() {
-    return useWhitePanelMode;
-  }
-
-  public void setUseWhitePanelMode(boolean _useWhitePanelMode) {
-    this.useWhitePanelMode = _useWhitePanelMode;
-  }
-
-  public boolean useHardwareAcceleration() {
-    return useHardwareAcceleration;
-  }
-
-  public void setUseHardwareAcceleration(boolean _useHardwareAcceleration) {
-    this.useHardwareAcceleration = _useHardwareAcceleration;
   }
 }
