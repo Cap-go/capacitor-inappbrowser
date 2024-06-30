@@ -212,14 +212,6 @@ export interface OpenWebViewOptions {
    * @default false
    */
   ignoreUntrustedSSLError?: boolean;
-  /**
-   * useWhitePanelMode: Android only. If true, the webview will override the system theme to show status bar and navigation bar in white color.
-   */
-  whitePanelMode?: boolean;
-  /**
-   * enableHardwareAcceleration: Android only. If true, the webview will use hardware acceleration to render the web content.
-   */
-  enableHardwareAcceleration?: boolean;
 }
 
 export interface InAppBrowserPlugin {

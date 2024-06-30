@@ -338,16 +338,6 @@ public class InAppBrowserPlugin
         }
       }
     );
-
-    options.setUseWhitePanelMode(call.getBoolean("whitePanelMode", false));
-    options.setUseHardwareAcceleration(
-      call.getBoolean("enableHardwareAcceleration", false)
-    );
-
-    boolean useWhitePanelMode = options.useWhitePanelMode();
-    int defaultTheme = android.R.style.Theme_NoTitleBar;
-    int lightPanelTheme = android.R.style.Theme_Light_Panel;
-
     this.getActivity()
       .runOnUiThread(
         new Runnable() {
@@ -355,7 +345,7 @@ public class InAppBrowserPlugin
           public void run() {
             webViewDialog = new WebViewDialog(
               getContext(),
-              useWhitePanelMode ? lightPanelTheme : defaultTheme,
+              android.R.style.Theme_NoTitleBar,
               options,
               InAppBrowserPlugin.this
             );

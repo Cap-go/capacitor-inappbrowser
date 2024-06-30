@@ -71,23 +71,11 @@ public class WebViewDialog extends Dialog {
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setCancelable(true);
-    if (!_options.useWhitePanelMode()) {
-      getWindow()
-        .setFlags(
-          WindowManager.LayoutParams.FLAG_FULLSCREEN,
-          WindowManager.LayoutParams.FLAG_FULLSCREEN
-        );
-    }
-
-    if (_options.useHardwareAcceleration()) {
-      // Enable hardware acceleration for the webdialog window
-      getWindow()
-        .setFlags(
-          WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-          WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
-        );
-    }
-
+    getWindow()
+      .setFlags(
+        WindowManager.LayoutParams.FLAG_FULLSCREEN,
+        WindowManager.LayoutParams.FLAG_FULLSCREEN
+      );
     setContentView(R.layout.activity_browser);
     getWindow()
       .setLayout(
@@ -96,16 +84,6 @@ public class WebViewDialog extends Dialog {
       );
 
     this._webView = findViewById(R.id.browser_view);
-
-    if (_options.useHardwareAcceleration()) {
-      // Enable hardware acceleration
-      _webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-    }
-
-    if (_options.useWhitePanelMode()) {
-      // Show a white view until the page is loaded
-      _webView.setBackgroundColor(Color.WHITE);
-    }
 
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
