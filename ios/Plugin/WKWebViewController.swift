@@ -90,6 +90,7 @@ open class WKWebViewController: UIViewController {
     open var closeModalOk = ""
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
+    var viewWasPresented = false
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -308,8 +309,11 @@ open class WKWebViewController: UIViewController {
 
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        self.setupViewElements()
-        setUpState()
+        if !self.viewWasPresented {
+            self.setupViewElements()
+            setUpState()
+            self.viewWasPresented = true
+        }
     }
 
     override open func viewWillDisappear(_ animated: Bool) {
