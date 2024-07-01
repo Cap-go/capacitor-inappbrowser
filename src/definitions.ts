@@ -45,6 +45,11 @@ export interface ClearCookieOptions {
   cache?: boolean;
 }
 
+export interface Credentials {
+  username: string;
+  password: string;
+}
+
 export interface OpenOptions {
   /**
    * Target URL to load.
@@ -56,6 +61,11 @@ export interface OpenOptions {
    * @since 0.1.0
    */
   headers?: Headers;
+  /**
+   * Credentials to send with the request and all subsequent requests for the same host.
+   * @since 6.1.0
+   */                                                                                                                                                                                    
+  credentials?: Credentials;
   /**
    * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
    * @since 0.1.0
@@ -82,6 +92,11 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    */
   headers?: Headers;
+  /**
+   * Credentials to send with the request and all subsequent requests for the same host.
+   * @since 6.1.0
+   */                                                                                                                                                                                    
+  credentials?: Credentials;
   /**
    * share options
    * @since 0.1.0
