@@ -2,4 +2,5 @@
 <resources>
     <color name="disable">#36262626</color>
     <color name="enable">#262626</color>
+    <color name="white">#FFFFFF</color>
 </resources>
