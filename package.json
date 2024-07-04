@@ -1,7 +1,7 @@
 {
-  "name": "@capgo/inappbrowser",
+  "name": "@felix-health/inappbrowser",
   "version": "6.0.27",
-  "description": "Capacitor plugin in app browser",
+  "description": "Capacitor plugin in app browser | Felix Health fork",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -13,14 +13,14 @@
     "ios/Plugin/",
     "CapgoInappbrowser.podspec"
   ],
-  "author": "Martin Donadieu",
+  "author": "Martin Donadieu + Felix Health",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Cap-go/capacitor-inappbrowser.git"
+    "url": "git+https://github.com/Felix-Health/capacitor-inappbrowser.git"
   },
   "bugs": {
-    "url": "https://github.com/Cap-go/capacitor-inappbrowser/issues"
+    "url": "https://github.com/Felix-Health/capacitor-inappbrowser/issues"
   },
   "keywords": [
     "capacitor",
