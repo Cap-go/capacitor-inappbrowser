@@ -174,7 +174,7 @@ setUrl(options: { url: string; }) => Promise<any>
 ### addListener('urlChangeEvent', ...)
 
 ```typescript
-addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for url change, only for openWebView
@@ -194,7 +194,7 @@ Listen for url change, only for openWebView
 ### addListener('closeEvent', ...)
 
 ```typescript
-addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for close click only for openWebView
@@ -214,7 +214,7 @@ Listen for close click only for openWebView
 ### addListener('confirmBtnClicked', ...)
 
 ```typescript
-addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
+addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
@@ -419,18 +419,18 @@ Construct a type with a set of properties K of type T
 
 | Members          | Value                     |
 | ---------------- | ------------------------- |
-| **`ACTIVITY`**   | <code>'activity'</code>   |
-| **`NAVIGATION`** | <code>'navigation'</code> |
-| **`BLANK`**      | <code>'blank'</code>      |
-| **`DEFAULT`**    | <code>''</code>           |
+| **`ACTIVITY`**   | <code>"activity"</code>   |
+| **`NAVIGATION`** | <code>"navigation"</code> |
+| **`BLANK`**      | <code>"blank"</code>      |
+| **`DEFAULT`**    | <code>""</code>           |
 
 
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
-| **`WHITE`** | <code>'white'</code> |
-| **`BLACK`** | <code>'black'</code> |
+| **`WHITE`** | <code>"white"</code> |
+| **`BLACK`** | <code>"black"</code> |
 
 </docgen-api>
 
