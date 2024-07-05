@@ -352,6 +352,7 @@ open class WKWebViewController: UIViewController {
                         }
                     }
                 } else {
+                    // To remove as soon as iOS < 16 is no longer supported
                     if let fullUrl = webView?.url {
                         let path = fullUrl.lastPathComponent == "/" ? "/" : "/" + fullUrl.lastPathComponent
                         if self.autoClosePatterns.contains(path) {
