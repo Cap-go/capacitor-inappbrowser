@@ -91,6 +91,7 @@ open class WKWebViewController: UIViewController {
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
+    open var autoClosePatterns: [String] = []
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -343,6 +344,22 @@ open class WKWebViewController: UIViewController {
                 self.navigationItem.title = webView?.url?.host
             }
         case "URL":
+            if self.autoClosePatterns.count != 0 {
+                if #available(iOS 16.0, *) {
+                    if let newPath = webView?.url?.path() {
+                        if self.autoClosePatterns.contains(newPath) {
+                            self.closeView()
+                        }
+                    }
+                } else {
+                    if let fullUrlAsString = webView?.url?.absoluteString {
+                        let urlComponents = fullUrlAsString.components(separatedBy: "/")
+                        if self.autoClosePatterns.contains(urlComponents[urlComponents.count - 1]) {
+                            self.closeView()
+                        }
+                    }
+                }
+            }
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
@@ -743,6 +760,7 @@ extension WKWebViewController: WKUIDelegate {
 extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         updateBarButtonItems()
+
         self.progressView?.progress = 0
         if let u = webView.url {
             self.url = u

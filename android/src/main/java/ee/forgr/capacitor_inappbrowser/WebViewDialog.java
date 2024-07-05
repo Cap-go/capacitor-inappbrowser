@@ -126,6 +126,9 @@ public class WebViewDialog extends Dialog {
 
     _webView.setWebViewClient(new WebViewClient());
 
+    getWindow().getAttributes().windowAnimations =
+      com.google.android.material.R.style.Animation_Design_BottomSheetDialog;
+
     _webView.setWebChromeClient(
       new WebChromeClient() {
         // Enable file open dialog

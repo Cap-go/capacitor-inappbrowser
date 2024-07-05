@@ -132,6 +132,8 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
 
+        let autoClosePatterns = call.getArray("autoclosePatterns", [])
+
         DispatchQueue.main.async {
             let url = URL(string: urlString)
 
@@ -147,6 +149,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
+            self.webViewController?.autoClosePatterns = autoClosePatterns.map { $0 as! String }
             if call.getBool("showArrow", false) {
                 self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }
