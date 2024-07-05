@@ -1,4 +1,4 @@
-import type { PluginListenerHandle } from "@capacitor/core";
+import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface UrlEvent {
   /**
@@ -21,14 +21,14 @@ export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 
 export enum BackgroundColor {
-  WHITE = "white",
-  BLACK = "black",
+  WHITE = 'white',
+  BLACK = 'black',
 }
 export enum ToolBarType {
-  ACTIVITY = "activity",
-  NAVIGATION = "navigation",
-  BLANK = "blank",
-  DEFAULT = "",
+  ACTIVITY = 'activity',
+  NAVIGATION = 'navigation',
+  BLANK = 'blank',
+  DEFAULT = '',
 }
 
 export interface Headers {
@@ -220,6 +220,10 @@ export interface OpenWebViewOptions {
    * enableHardwareAcceleration: Android only. If true, the webview will use hardware acceleration to render the web content.
    */
   enableHardwareAcceleration?: boolean;
+  /**
+   * autoclosePatterns: Whenever a URL matches any of the patterns, the webview will be closed automatically.
+   */
+  autoclosePatterns?: string[];
 }
 
 export interface InAppBrowserPlugin {
@@ -261,29 +265,20 @@ export interface InAppBrowserPlugin {
    *
    * @since 0.0.1
    */
-  addListener(
-    eventName: "urlChangeEvent",
-    listenerFunc: UrlChangeListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
 
   /**
    * Listen for close click only for openWebView
    *
    * @since 0.4.0
    */
-  addListener(
-    eventName: "closeEvent",
-    listenerFunc: UrlChangeListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
   /**
    * Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
    *
    * @since 0.0.1
    */
-  addListener(
-    eventName: "confirmBtnClicked",
-    listenerFunc: ConfirmBtnListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener): Promise<PluginListenerHandle>;
 
   /**
    * Remove all listeners for this plugin.

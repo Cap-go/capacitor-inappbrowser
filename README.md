@@ -174,7 +174,7 @@ setUrl(options: { url: string; }) => Promise<any>
 ### addListener('urlChangeEvent', ...)
 
 ```typescript
-addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for url change, only for openWebView
@@ -194,7 +194,7 @@ Listen for url change, only for openWebView
 ### addListener('closeEvent', ...)
 
 ```typescript
-addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for close click only for openWebView
@@ -214,7 +214,7 @@ Listen for close click only for openWebView
 ### addListener('confirmBtnClicked', ...)
 
 ```typescript
-addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
@@ -328,6 +328,7 @@ Reload the current web page.
 | **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                            | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                             | <code>false</code>                                         | 6.1.0  |
 | **`whitePanelMode`**                   | <code>boolean</code>                                            | useWhitePanelMode: Android only. If true, the webview will override the system theme to show status bar and navigation bar in white color.                                        |                                                            |        |
 | **`enableHardwareAcceleration`**       | <code>boolean</code>                                            | enableHardwareAcceleration: Android only. If true, the webview will use hardware acceleration to render the web content.                                                          |                                                            |        |
+| **`autoclosePatterns`**                | <code>string[]</code>                                           | autoclosePatterns: Whenever a URL matches any of the patterns, the webview will be closed automatically.                                                                          |                                                            |        |
 
 
 #### DisclaimerOptions
@@ -419,18 +420,18 @@ Construct a type with a set of properties K of type T
 
 | Members          | Value                     |
 | ---------------- | ------------------------- |
-| **`ACTIVITY`**   | <code>"activity"</code>   |
-| **`NAVIGATION`** | <code>"navigation"</code> |
-| **`BLANK`**      | <code>"blank"</code>      |
-| **`DEFAULT`**    | <code>""</code>           |
+| **`ACTIVITY`**   | <code>'activity'</code>   |
+| **`NAVIGATION`** | <code>'navigation'</code> |
+| **`BLANK`**      | <code>'blank'</code>      |
+| **`DEFAULT`**    | <code>''</code>           |
 
 
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
-| **`WHITE`** | <code>"white"</code> |
-| **`BLACK`** | <code>"black"</code> |
+| **`WHITE`** | <code>'white'</code> |
+| **`BLACK`** | <code>'black'</code> |
 
 </docgen-api>
 

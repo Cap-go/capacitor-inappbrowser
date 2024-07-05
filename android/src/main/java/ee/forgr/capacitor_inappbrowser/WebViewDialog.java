@@ -29,8 +29,12 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+
+import com.getcapacitor.JSArray;
+
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -407,6 +411,19 @@ public class WebViewDialog extends Dialog {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
           super.onPageStarted(view, url, favicon);
+          if (_options.getAutoClosePatterns().length() != 0) {
+            try {
+              String path = new URL(url).getPath();
+              if (_options.getAutoClosePatterns().toList().contains(path)) {
+                dismiss();
+                _options.getCallbacks().urlChangeEvent(url);
+                _webView.destroy();
+              }
+            } catch (Exception e) {
+              Log.e("AUTOCLOSE", "Unable to cast autoclose params");
+            }
+          }
+
           try {
             URI uri = new URI(url);
             if (TextUtils.isEmpty(_options.getTitle())) {
