@@ -352,9 +352,9 @@ open class WKWebViewController: UIViewController {
                         }
                     }
                 } else {
-                    if let fullUrlAsString = webView?.url?.absoluteString {
-                        let urlComponents = fullUrlAsString.components(separatedBy: "/")
-                        if self.autoClosePatterns.contains(urlComponents[urlComponents.count - 1]) {
+                    if let fullUrl = webView?.url {
+                        let path = fullUrl.lastPathComponent == "/" ? "/" : "/" + fullUrl.lastPathComponent
+                        if self.autoClosePatterns.contains(path) {
                             self.closeView()
                         }
                     }
