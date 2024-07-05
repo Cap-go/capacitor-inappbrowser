@@ -17,7 +17,6 @@ import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -28,7 +27,6 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 import java.lang.reflect.Array;
 import java.util.Iterator;
 
@@ -352,7 +350,9 @@ public class InAppBrowserPlugin
     int defaultTheme = android.R.style.Theme_NoTitleBar;
     int lightPanelTheme = android.R.style.Theme_Light_Panel;
 
-    options.setAutoClosePatterns(call.getArray("autoclosePatterns", new JSArray()));
+    options.setAutoClosePatterns(
+      call.getArray("autoclosePatterns", new JSArray())
+    );
 
     this.getActivity()
       .runOnUiThread(

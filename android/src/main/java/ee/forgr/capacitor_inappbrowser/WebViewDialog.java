@@ -29,9 +29,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-
 import com.getcapacitor.JSArray;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
