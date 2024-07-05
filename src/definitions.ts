@@ -220,6 +220,10 @@ export interface OpenWebViewOptions {
    * enableHardwareAcceleration: Android only. If true, the webview will use hardware acceleration to render the web content.
    */
   enableHardwareAcceleration?: boolean;
+  /**
+   * autoclosePatterns: Whenever a URL matches any of the patterns, the webview will be closed automatically.
+   */
+  autoclosePatterns?: string[];
 }
 
 export interface InAppBrowserPlugin {

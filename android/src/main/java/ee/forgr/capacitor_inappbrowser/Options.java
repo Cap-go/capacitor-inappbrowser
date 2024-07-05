@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 
@@ -27,6 +28,7 @@ public class Options {
   private boolean ignoreUntrustedSSLError;
   private boolean useWhitePanelMode;
   private boolean useHardwareAcceleration;
+  private JSArray autoClosePatterns;
 
   public PluginCall getPluginCall() {
     return pluginCall;
@@ -216,5 +218,13 @@ public class Options {
 
   public void setUseHardwareAcceleration(boolean _useHardwareAcceleration) {
     this.useHardwareAcceleration = _useHardwareAcceleration;
+  }
+
+  public JSArray getAutoClosePatterns() {
+    return autoClosePatterns;
+  }
+
+  public void setAutoClosePatterns(JSArray autoClosePatterns) {
+    this.autoClosePatterns = autoClosePatterns;
   }
 }
