@@ -390,12 +390,28 @@ public class WebViewDialog extends Dialog {
         ) {
           Context context = view.getContext();
           String url = request.getUrl().toString();
+          String path = request.getUrl().getPath();
 
-          if (url.startsWith("http")) {
+          try {
+            if (_options.getAutoClosePatterns().length() != 0 &&
+              !_options.getAutoClosePatterns().toList().contains(path) &&
+              url.startsWith("http")
+            ) {
+              try {
+                openSystemBrowser(url, context);
+                return true;
+              } catch (ActivityNotFoundException e) {
+                // Do nothing
+              }
+            }
+          } catch (Exception e) {
+            Log.e("URLCHANGE", e.getMessage());
+          }
+
+
+          if (!url.startsWith("http") && !url.startsWith("http://")) {
             try {
-              Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-              context.startActivity(intent);
+              openSystemBrowser(url, context);
               return true;
             } catch (ActivityNotFoundException e) {
               // Do nothing
@@ -521,5 +537,11 @@ public class WebViewDialog extends Dialog {
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
       super.onBackPressed();
     }
+  }
+
+  private void openSystemBrowser(String url, Context context) {
+    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    context.startActivity(intent);
   }
 }
