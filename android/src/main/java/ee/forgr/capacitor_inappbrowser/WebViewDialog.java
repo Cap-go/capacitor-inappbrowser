@@ -391,6 +391,16 @@ public class WebViewDialog extends Dialog {
           Context context = view.getContext();
           String url = request.getUrl().toString();
 
+          try {
+            if (_options.getOpenSystemBrowserList().length() != 0
+              && _options.getOpenSystemBrowserList().toList().contains(url)) {
+              openSystemBrowser(url, context);
+              return true;
+            }
+          } catch (Exception e) {
+            Log.e("SYSTEMBROWSERLINKS", e.getMessage());
+          }
+
           if (!url.startsWith("http") && !url.startsWith("http://")) {
             try {
               openSystemBrowser(url, context);

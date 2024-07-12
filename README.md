@@ -329,6 +329,7 @@ Reload the current web page.
 | **`whitePanelMode`**                   | <code>boolean</code>                                            | useWhitePanelMode: Android only. If true, the webview will override the system theme to show status bar and navigation bar in white color.                                        |                                                            |        |
 | **`enableHardwareAcceleration`**       | <code>boolean</code>                                            | enableHardwareAcceleration: Android only. If true, the webview will use hardware acceleration to render the web content.                                                          |                                                            |        |
 | **`autoclosePatterns`**                | <code>string[]</code>                                           | autoclosePatterns: Whenever a URL matches any of the patterns, the webview will be closed automatically.                                                                          |                                                            |        |
+| **`openSystemBrowserLinks`**           | <code>string[]</code>                                           | openSystemBrowserLinks: Android only: Whenever a URL matches any of the patterns, the webview will open the URL in the system browser.                                            |                                                            |        |
 
 
 #### DisclaimerOptions
