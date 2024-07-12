@@ -393,20 +393,30 @@ public class WebViewDialog extends Dialog {
           String path = request.getUrl().getPath();
 
           try {
-              boolean isHttpUrl = url.startsWith("http");
-              boolean shouldAutoClose = _options.getAutoClosePatterns().length() != 0 &&
-                                        !_options.getAutoClosePatterns().toList().contains(path);
-
-              if ((isHttpUrl && shouldAutoClose) || !isHttpUrl) {
-                  openSystemBrowser(url, context);
-                  return true;
+            if (_options.getAutoClosePatterns().length() != 0 &&
+              !_options.getAutoClosePatterns().toList().contains(path) &&
+              url.startsWith("http")
+            ) {
+              try {
+                openSystemBrowser(url, context);
+                return true;
+              } catch (ActivityNotFoundException e) {
+                // Do nothing
               }
-          } catch (ActivityNotFoundException e) {
-              // Do nothing
+            }
           } catch (Exception e) {
-              Log.e("URLCHANGE", e.getMessage());
+            Log.e("URLCHANGE", e.getMessage());
           }
 
+
+          if (!url.startsWith("http") && !url.startsWith("http://")) {
+            try {
+              openSystemBrowser(url, context);
+              return true;
+            } catch (ActivityNotFoundException e) {
+              // Do nothing
+            }
+          }
           return false;
         }
 
