@@ -395,6 +395,7 @@ public class WebViewDialog extends Dialog {
             if (_options.getOpenSystemBrowserList().length() != 0
               && _options.getOpenSystemBrowserList().toList().contains(url)) {
               openSystemBrowser(url, context);
+              return true;
             }
           } catch (Exception e) {
             Log.e("SYSTEMBROWSERLINKS", e.getMessage());

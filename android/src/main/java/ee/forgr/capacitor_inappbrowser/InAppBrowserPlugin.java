@@ -355,7 +355,7 @@ public class InAppBrowserPlugin
     );
 
     options.setOpenSystemBrowserList(
-      call.getArray("openSystemBrowserList", new JSArray())
+      call.getArray("openSystemBrowserLinks", new JSArray())
     );
 
     this.getActivity()
