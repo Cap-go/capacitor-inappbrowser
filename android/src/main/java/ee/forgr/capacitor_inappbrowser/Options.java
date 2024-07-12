@@ -29,6 +29,7 @@ public class Options {
   private boolean useWhitePanelMode;
   private boolean useHardwareAcceleration;
   private JSArray autoClosePatterns;
+  private JSArray openSystemBrowserList;
 
   public PluginCall getPluginCall() {
     return pluginCall;
@@ -226,5 +227,13 @@ public class Options {
 
   public void setAutoClosePatterns(JSArray autoClosePatterns) {
     this.autoClosePatterns = autoClosePatterns;
+  }
+
+  public void setOpenSystemBrowserList(JSArray openSystemBrowserList) {
+    this.openSystemBrowserList = openSystemBrowserList;
+  }
+
+  public JSArray getOpenSystemBrowserList() {
+    return openSystemBrowserList;
   }
 }

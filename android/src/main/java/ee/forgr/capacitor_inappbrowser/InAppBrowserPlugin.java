@@ -354,6 +354,10 @@ public class InAppBrowserPlugin
       call.getArray("autoclosePatterns", new JSArray())
     );
 
+    options.setOpenSystemBrowserList(
+      call.getArray("openSystemBrowserList", new JSArray())
+    );
+
     this.getActivity()
       .runOnUiThread(
         new Runnable() {
