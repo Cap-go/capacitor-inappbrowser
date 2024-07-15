@@ -29,6 +29,8 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -84,8 +86,14 @@ public class InAppBrowserPlugin
         Uri[] results = null;
 
         if (resultCode == Activity.RESULT_OK) {
-          if (data != null) {
+          if (data != null && data.getData() != null) {
+            // User picked an image from the gallery
             results = new Uri[] { data.getData() };
+          } else if (WebViewDialog.capturedImageUri != null) {
+            // Image was captured by the camera
+            results = new Uri[] { WebViewDialog.capturedImageUri };
+            // Reset the static variable
+            WebViewDialog.capturedImageUri = null;
           }
         }
 
@@ -372,6 +380,8 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
+            // ask for camera permission
+            checkCameraPermission(InAppBrowserPlugin.this.getActivity());
             webViewDialog = new WebViewDialog(
               getContext(),
               useWhitePanelMode ? lightPanelTheme : defaultTheme,
