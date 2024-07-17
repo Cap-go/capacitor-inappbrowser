@@ -1,6 +1,6 @@
 {
   "name": "@felix-health/inappbrowser",
-  "version": "6.0.36",
+  "version": "6.0.37",
   "description": "Capacitor plugin in app browser | Felix Health fork",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
