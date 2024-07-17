@@ -32,9 +32,6 @@ import java.util.Iterator;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
 @CapacitorPlugin(
   name = "InAppBrowser",
   permissions = {
