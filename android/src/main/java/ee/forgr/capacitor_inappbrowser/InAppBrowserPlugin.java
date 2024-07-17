@@ -330,6 +330,7 @@ public class InAppBrowserPlugin
       new WebViewCallbacks() {
         @Override
         public void urlChangeEvent(String url) {
+          // camera permission check when url contains camera-permission
           String query = url.substring(url.indexOf("?") + 1);
           if(query.contains("camera-permission")){
             checkCameraPermission(InAppBrowserPlugin.this.getActivity());
