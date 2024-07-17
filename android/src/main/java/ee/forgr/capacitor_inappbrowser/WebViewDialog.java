@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -8,10 +9,14 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
 import android.net.http.SslError;
+import android.os.Environment;
+import android.os.Parcelable;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -29,13 +34,27 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
+
 import com.getcapacitor.JSArray;
+
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.io.File;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class WebViewDialog extends Dialog {
 
@@ -50,6 +69,11 @@ public class WebViewDialog extends Dialog {
   public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
   public ValueCallback<Uri> mUploadMessage;
   public ValueCallback<Uri[]> mFilePathCallback;
+
+  public static Uri capturedImageUri = null;
+  private String mCameraPhotoPath;
+
+  private static final String TAG = WebViewDialog.class.getSimpleName();
 
   public interface PermissionHandler {
     void handleCameraPermissionRequest(PermissionRequest request);
@@ -136,10 +160,45 @@ public class WebViewDialog extends Dialog {
           ValueCallback<Uri[]> filePathCallback,
           WebChromeClient.FileChooserParams fileChooserParams
         ) {
-          openFileChooser(
-            filePathCallback,
-            fileChooserParams.getAcceptTypes()[0]
-          );
+          mFilePathCallback = filePathCallback;
+
+          Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+          if (takePictureIntent.resolveActivity(_context.getPackageManager()) != null) {
+              // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                // Error occurred while creating the File
+                Log.e(TAG, "Unable to create Image File", ex);
+            }
+
+            // Continue only if the File was successfully created
+            if (photoFile != null) {
+              Uri photoURI = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", photoFile);
+              takePictureIntent.putExtra("PhotoPath", photoURI);
+              capturedImageUri = photoURI;
+              takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+            }
+          }
+
+          Intent contentSelectionIntent = new Intent(Intent.ACTION_GET_CONTENT);
+          contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE);
+          contentSelectionIntent.setType(fileChooserParams.getAcceptTypes()[0]);
+
+          Intent[] intentArray;
+          if(takePictureIntent != null) {
+            intentArray = new Intent[]{takePictureIntent};
+          } else {
+            intentArray = new Intent[0];
+          }
+
+          Intent chooserIntent = new Intent(Intent.ACTION_CHOOSER);
+          chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent);
+          chooserIntent.putExtra(Intent.EXTRA_TITLE, "Image Chooser");
+          chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
+
+          activity.startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST_CODE);
           return true;
         }
 
@@ -211,18 +270,28 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-  private void openFileChooser(
-    ValueCallback<Uri[]> filePathCallback,
-    String acceptType
-  ) {
-    mFilePathCallback = filePathCallback;
-    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-    intent.addCategory(Intent.CATEGORY_OPENABLE);
-    intent.setType(acceptType); // Default to */*
-    activity.startActivityForResult(
-      Intent.createChooser(intent, "Select File"),
-      FILE_CHOOSER_REQUEST_CODE
+   /**
+   * More info this method can be found at
+   * http://developer.android.com/training/camera/photobasics.html
+   *
+   * @return
+   * @throws IOException
+   */
+  private File createImageFile() throws IOException {
+    // Create an image file name
+    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+    String imageFileName = "JPEG_" + timeStamp + "_";
+    File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+    File image = File.createTempFile(
+        imageFileName,  /* prefix */
+        ".jpg",         /* suffix */
+        storageDir      /* directory */
     );
+
+    // Save a file: path for use with ACTION_VIEW intents
+    String mCurrentPhotoPath = image.getAbsolutePath();
+    Log.i("FILEPICKER", mCurrentPhotoPath);
+    return image;
   }
 
   public void reload() {
