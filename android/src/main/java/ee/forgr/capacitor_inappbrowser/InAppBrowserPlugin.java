@@ -380,8 +380,6 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            // ask for camera permission
-            checkCameraPermission(InAppBrowserPlugin.this.getActivity());
             webViewDialog = new WebViewDialog(
               getContext(),
               useWhitePanelMode ? lightPanelTheme : defaultTheme,
