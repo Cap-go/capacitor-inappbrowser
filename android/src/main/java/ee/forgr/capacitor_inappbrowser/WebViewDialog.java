@@ -223,15 +223,7 @@ public class WebViewDialog extends Dialog {
               new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                  // Redirect to settings
-                  Intent intent = new Intent();
-                  intent.setAction(
-                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                  );
-                  intent.setData(
-                    Uri.parse("package:" + getContext().getPackageName())
-                  );
-                  getContext().startActivity(intent);
+                  goToSettings();
                 }
               }
             );
@@ -664,5 +656,13 @@ public class WebViewDialog extends Dialog {
     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
     intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     context.startActivity(intent);
+  }
+
+  private void goToSettings() {
+    Intent intent = new Intent();
+    intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+    Uri uri = Uri.fromParts("package", getContext().getPackageName(), null);
+    intent.setData(uri);
+    getContext().startActivity(intent);
   }
 }
