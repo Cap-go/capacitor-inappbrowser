@@ -219,7 +219,7 @@ public class WebViewDialog extends Dialog {
             builder.setMessage(R.string.camera_permission_alert_message);
 
             builder.setPositiveButton(
-              "Go to settings",
+              R.string.camera_permission_alert_positive,
               new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
@@ -237,7 +237,7 @@ public class WebViewDialog extends Dialog {
             );
 
             builder.setNegativeButton(
-              "Cancel",
+              R.string.camera_permission_alert_negative,
               new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
