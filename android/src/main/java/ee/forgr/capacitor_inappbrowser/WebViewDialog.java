@@ -34,27 +34,24 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-
 import com.getcapacitor.JSArray;
-
 import java.io.File;
+import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.io.File;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 
 public class WebViewDialog extends Dialog {
 
@@ -162,20 +159,29 @@ public class WebViewDialog extends Dialog {
         ) {
           mFilePathCallback = filePathCallback;
 
-          Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-          if (takePictureIntent.resolveActivity(_context.getPackageManager()) != null) {
-              // Create the File where the photo should go
+          Intent takePictureIntent = new Intent(
+            MediaStore.ACTION_IMAGE_CAPTURE
+          );
+          if (
+            takePictureIntent.resolveActivity(_context.getPackageManager()) !=
+            null
+          ) {
+            // Create the File where the photo should go
             File photoFile = null;
             try {
-                photoFile = createImageFile();
+              photoFile = createImageFile();
             } catch (IOException ex) {
-                // Error occurred while creating the File
-                Log.e(TAG, "Unable to create Image File", ex);
+              // Error occurred while creating the File
+              Log.e(TAG, "Unable to create Image File", ex);
             }
 
             // Continue only if the File was successfully created
             if (photoFile != null) {
-              Uri photoURI = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", photoFile);
+              Uri photoURI = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                photoFile
+              );
               takePictureIntent.putExtra("PhotoPath", photoURI);
               capturedImageUri = photoURI;
               takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
@@ -187,8 +193,8 @@ public class WebViewDialog extends Dialog {
           contentSelectionIntent.setType(fileChooserParams.getAcceptTypes()[0]);
 
           Intent[] intentArray;
-          if(takePictureIntent != null) {
-            intentArray = new Intent[]{takePictureIntent};
+          if (takePictureIntent != null) {
+            intentArray = new Intent[] { takePictureIntent };
           } else {
             intentArray = new Intent[0];
           }
@@ -198,34 +204,56 @@ public class WebViewDialog extends Dialog {
           chooserIntent.putExtra(Intent.EXTRA_TITLE, "Image Chooser");
           chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
 
-          if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), com.google.android.material.R.style.Theme_AppCompat_Light_Dialog_Alert);
+          if (
+            ContextCompat.checkSelfPermission(
+              getContext(),
+              Manifest.permission.CAMERA
+            ) !=
+            PackageManager.PERMISSION_GRANTED
+          ) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(
+              getContext(),
+              com.google.android.material.R.style.Theme_AppCompat_Light_Dialog_Alert
+            );
             builder.setTitle(R.string.camera_permission_alert_title);
             builder.setMessage(R.string.camera_permission_alert_message);
 
-            builder.setPositiveButton("Go to settings", new DialogInterface.OnClickListener() {
-              @Override
-              public void onClick(DialogInterface dialog, int which) {
-                // Redirect to settings
-                Intent intent = new Intent();
-                intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-                getContext().startActivity(intent);
+            builder.setPositiveButton(
+              "Go to settings",
+              new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                  // Redirect to settings
+                  Intent intent = new Intent();
+                  intent.setAction(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                  );
+                  intent.setData(
+                    Uri.parse("package:" + getContext().getPackageName())
+                  );
+                  getContext().startActivity(intent);
+                }
               }
-            });
+            );
 
-            builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-              @Override
-              public void onClick(DialogInterface dialog, int which) {
-                // Cancel
+            builder.setNegativeButton(
+              "Cancel",
+              new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                  // Cancel
+                }
               }
-            });
+            );
 
             builder.show();
             return false;
           }
 
-          activity.startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST_CODE);
+          activity.startActivityForResult(
+            chooserIntent,
+            FILE_CHOOSER_REQUEST_CODE
+          );
           return true;
         }
 
@@ -297,7 +325,7 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-   /**
+  /**
    * More info this method can be found at
    * http://developer.android.com/training/camera/photobasics.html
    *
@@ -306,13 +334,16 @@ public class WebViewDialog extends Dialog {
    */
   private File createImageFile() throws IOException {
     // Create an image file name
-    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+    String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(
+      new Date()
+    );
     String imageFileName = "JPEG_" + timeStamp + "_";
-    File storageDir = getContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+    File storageDir = getContext()
+      .getExternalFilesDir(Environment.DIRECTORY_PICTURES);
     File image = File.createTempFile(
-        imageFileName,  /* prefix */
-        ".jpg",         /* suffix */
-        storageDir      /* directory */
+      imageFileName,/* prefix */
+      ".jpg",/* suffix */
+      storageDir/* directory */
     );
 
     // Save a file: path for use with ACTION_VIEW intents
@@ -488,8 +519,10 @@ public class WebViewDialog extends Dialog {
           String url = request.getUrl().toString();
 
           try {
-            if (_options.getOpenSystemBrowserList().length() != 0
-              && _options.getOpenSystemBrowserList().toList().contains(url)) {
+            if (
+              _options.getOpenSystemBrowserList().length() != 0 &&
+              _options.getOpenSystemBrowserList().toList().contains(url)
+            ) {
               openSystemBrowser(url, context);
               return true;
             }
