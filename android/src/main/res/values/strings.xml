@@ -7,4 +7,6 @@
     <string name="back_button">Back Button</string>
     <string name="title">Title</string>
     <string name="forward_button">Forward Button</string>
+    <string name="camera_permission_alert_title">Enable camera access?</string>
+    <string name="camera_permission_alert_message">Camera access can be enabled from your system settings.</string>
 </resources>

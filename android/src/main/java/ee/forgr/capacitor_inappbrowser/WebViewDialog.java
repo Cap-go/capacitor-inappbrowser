@@ -198,6 +198,33 @@ public class WebViewDialog extends Dialog {
           chooserIntent.putExtra(Intent.EXTRA_TITLE, "Image Chooser");
           chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray);
 
+          if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(getContext(), com.google.android.material.R.style.Theme_AppCompat_Light_Dialog_Alert);
+            builder.setTitle(R.string.camera_permission_alert_title);
+            builder.setMessage(R.string.camera_permission_alert_message);
+
+            builder.setPositiveButton("Go to settings", new DialogInterface.OnClickListener() {
+              @Override
+              public void onClick(DialogInterface dialog, int which) {
+                // Redirect to settings
+                Intent intent = new Intent();
+                intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+                getContext().startActivity(intent);
+              }
+            });
+
+            builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+              @Override
+              public void onClick(DialogInterface dialog, int which) {
+                // Cancel
+              }
+            });
+
+            builder.show();
+            return false;
+          }
+
           activity.startActivityForResult(chooserIntent, FILE_CHOOSER_REQUEST_CODE);
           return true;
         }
