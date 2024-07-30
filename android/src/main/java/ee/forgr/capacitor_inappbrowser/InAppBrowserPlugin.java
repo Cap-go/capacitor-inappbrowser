@@ -17,6 +17,8 @@ import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -29,8 +31,6 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.lang.reflect.Array;
 import java.util.Iterator;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 @CapacitorPlugin(
   name = "InAppBrowser",
@@ -332,7 +332,7 @@ public class InAppBrowserPlugin
         public void urlChangeEvent(String url) {
           // camera permission check when url contains camera-permission
           String query = url.substring(url.indexOf("?") + 1);
-          if(query.contains("camera-permission")){
+          if (query.contains("camera-permission")) {
             checkCameraPermission(InAppBrowserPlugin.this.getActivity());
           }
 
@@ -392,8 +392,18 @@ public class InAppBrowserPlugin
   }
 
   private void checkCameraPermission(Activity activity) {
-    if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-      ActivityCompat.requestPermissions(activity, new String[]{ Manifest.permission.CAMERA }, REQUEST_CAMERA_PERMISSION);
+    if (
+      ContextCompat.checkSelfPermission(
+        getContext(),
+        Manifest.permission.CAMERA
+      ) !=
+      PackageManager.PERMISSION_GRANTED
+    ) {
+      ActivityCompat.requestPermissions(
+        activity,
+        new String[] { Manifest.permission.CAMERA },
+        REQUEST_CAMERA_PERMISSION
+      );
     }
   }
 
