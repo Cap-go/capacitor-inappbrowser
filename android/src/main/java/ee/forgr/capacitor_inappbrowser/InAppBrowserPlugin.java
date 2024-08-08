@@ -278,6 +278,7 @@ public class InAppBrowserPlugin
     final Options options = new Options();
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
+    options.setCredentials(call.getObject("credentials"));
     options.setShowReloadButton(call.getBoolean("showReloadButton", false));
     options.setVisibleTitle(call.getBoolean("visibleTitle", true));
     if (Boolean.TRUE.equals(options.getVisibleTitle())) {
