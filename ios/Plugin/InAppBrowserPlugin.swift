@@ -51,11 +51,16 @@ public class InAppBrowserPlugin: CAPPlugin {
 
     @objc func clearCookies(_ call: CAPPluginCall) {
         let dataStore = WKWebsiteDataStore.default()
-        let urlString = call.getString("url") ?? ""
-        let clearCache = call.getBool("cache") ?? false
+        let urlString = call.getString("url")
+        let clearCache = call.getBool("cache", false)
 
         if clearCache {
             URLCache.shared.removeAllCachedResponses()
+        }
+        if !urlString {
+            HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
+            call.resolve()
+            return
         }
 
         guard let url = URL(string: urlString), let hostName = url.host else {
