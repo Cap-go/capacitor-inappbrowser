@@ -228,7 +228,7 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void clearCookies(PluginCall call) {
-    String url = call.getString("url");
+    String url = call.getString("url", currentUrl);
     Boolean clearCache = call.getBoolean("cache", false);
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
