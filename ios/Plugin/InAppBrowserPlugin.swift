@@ -53,30 +53,33 @@ public class InAppBrowserPlugin: CAPPlugin {
         let dataStore = WKWebsiteDataStore.default()
         let urlString = call.getString("url", "")
         let clearCache = call.getBool("cache", false)
+        DispatchQueue.main.async {
+            Task {
+                if clearCache {
+                    URLCache.shared.removeAllCachedResponses()
+                }
+                if (urlString.isEmpty) {
+                    HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
+                    call.resolve()
+                    return
+                }
 
-        if clearCache {
-            URLCache.shared.removeAllCachedResponses()
-        }
-        if (urlString.isEmpty) {
-            HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
-            call.resolve()
-            return
-        }
+                guard let url = URL(string: urlString), let hostName = url.host else {
+                    call.reject("Invalid URL")
+                    return
+                }
+                dataStore.httpCookieStore.getAllCookies { cookies in
+                    let cookiesToDelete = cookies.filter { cookie in
+                        cookie.domain == hostName || cookie.domain.hasSuffix(".\(hostName)") || hostName.hasSuffix(cookie.domain)
+                    }
 
-        guard let url = URL(string: urlString), let hostName = url.host else {
-            call.reject("Invalid URL")
-            return
-        }
-        dataStore.httpCookieStore.getAllCookies { cookies in
-            let cookiesToDelete = cookies.filter { cookie in
-                cookie.domain == hostName || cookie.domain.hasSuffix(".\(hostName)") || hostName.hasSuffix(cookie.domain)
+                    for cookie in cookiesToDelete {
+                        dataStore.httpCookieStore.delete(cookie)
+                    }
+
+                    call.resolve()
+                }
             }
-
-            for cookie in cookiesToDelete {
-                dataStore.httpCookieStore.delete(cookie)
-            }
-
-            call.resolve()
         }
     }
 
