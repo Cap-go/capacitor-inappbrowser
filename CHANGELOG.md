@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.3.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.2.1...6.3.0) (2024-08-28)
+
+
+### Features
+
+* add support to specify request credentials ([3adbc42](https://github.com/Cap-go/capacitor-inappbrowser/commit/3adbc426967e50318883a6b5de3f7209ade89010))
+
+
+### Bug Fixes
+
+* lint ([1eb1e2e](https://github.com/Cap-go/capacitor-inappbrowser/commit/1eb1e2e0d956dd84378feb8f7b579d2cd448d334))
+
 ### [6.2.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.2.0...6.2.1) (2024-08-28)
 
 
