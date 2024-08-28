@@ -219,7 +219,7 @@ open class WKWebViewController: UIViewController {
             self.initWebview()
         }
     }
-    
+
     open func setCredentials(credentials: WKWebViewCredentials?) {
         self.credentials = credentials
     }
@@ -799,8 +799,7 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         if let credentials = credentials,
            challenge.protectionSpace.receivesCredentialSecurely,
-           let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil)
-        {
+           let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
             let urlCredential = URLCredential(user: credentials.username, password: credentials.password, persistence: .none)
             completionHandler(.useCredential, urlCredential)
         } else if let bypassedSSLHosts = bypassedSSLHosts, bypassedSSLHosts.contains(challenge.protectionSpace.host) {

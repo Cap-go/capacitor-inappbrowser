@@ -64,7 +64,7 @@ export interface OpenOptions {
   /**
    * Credentials to send with the request and all subsequent requests for the same host.
    * @since 6.1.0
-   */                                                                                                                                                                                    
+   */
   credentials?: Credentials;
   /**
    * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
@@ -95,7 +95,7 @@ export interface OpenWebViewOptions {
   /**
    * Credentials to send with the request and all subsequent requests for the same host.
    * @since 6.1.0
-   */                                                                                                                                                                                    
+   */
   credentials?: Credentials;
   /**
    * share options

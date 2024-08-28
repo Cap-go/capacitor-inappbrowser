@@ -348,7 +348,7 @@ public class InAppBrowserPlugin: CAPPlugin {
     @objc func appWillResignActive(_ notification: NSNotification) {
         self.showPrivacyScreen()
     }
-    
+
     private func readCredentials(_ call: CAPPluginCall) -> WKWebViewCredentials? {
         var credentials: WKWebViewCredentials?
         let credentialsDict = call.getObject("credentials", [:]).mapValues { String(describing: $0 as Any) }

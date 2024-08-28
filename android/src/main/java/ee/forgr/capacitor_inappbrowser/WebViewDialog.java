@@ -392,12 +392,23 @@ public class WebViewDialog extends Dialog {
         }
 
         @Override
-        public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler, String host, String realm) {
+        public void onReceivedHttpAuthRequest(
+          WebView view,
+          HttpAuthHandler handler,
+          String host,
+          String realm
+        ) {
           final String sourceUrl = _options.getUrl();
           final String url = view.getUrl();
           final JSObject credentials = _options.getCredentials();
 
-          if (credentials != null && credentials.getString("username") != null && credentials.getString("password") != null && sourceUrl != null && url != null) {
+          if (
+            credentials != null &&
+            credentials.getString("username") != null &&
+            credentials.getString("password") != null &&
+            sourceUrl != null &&
+            url != null
+          ) {
             String sourceProtocol = "";
             String sourceHost = "";
             int sourcePort = -1;
@@ -406,8 +417,12 @@ public class WebViewDialog extends Dialog {
               sourceProtocol = uri.getScheme();
               sourceHost = uri.getHost();
               sourcePort = uri.getPort();
-              if (sourcePort == -1 && Objects.equals(sourceProtocol, "https")) sourcePort = 443;
-              else if (sourcePort == -1 && Objects.equals(sourceProtocol, "http")) sourcePort = 80;
+              if (
+                sourcePort == -1 && Objects.equals(sourceProtocol, "https")
+              ) sourcePort = 443;
+              else if (
+                sourcePort == -1 && Objects.equals(sourceProtocol, "http")
+              ) sourcePort = 80;
             } catch (URISyntaxException e) {
               e.printStackTrace();
             }
@@ -419,14 +434,23 @@ public class WebViewDialog extends Dialog {
               protocol = uri.getScheme();
               port = uri.getPort();
               if (port == -1 && Objects.equals(protocol, "https")) port = 443;
-              else if (port == -1 && Objects.equals(protocol, "http")) port = 80;
+              else if (port == -1 && Objects.equals(protocol, "http")) port =
+                80;
             } catch (URISyntaxException e) {
               e.printStackTrace();
             }
 
-            if (Objects.equals(sourceHost, host) && Objects.equals(sourceProtocol, protocol) && sourcePort == port) {
-              final String username = Objects.requireNonNull(credentials.getString("username"));
-              final String password = Objects.requireNonNull(credentials.getString("password"));
+            if (
+              Objects.equals(sourceHost, host) &&
+              Objects.equals(sourceProtocol, protocol) &&
+              sourcePort == port
+            ) {
+              final String username = Objects.requireNonNull(
+                credentials.getString("username")
+              );
+              final String password = Objects.requireNonNull(
+                credentials.getString("password")
+              );
               handler.proceed(username, password);
               return;
             }
