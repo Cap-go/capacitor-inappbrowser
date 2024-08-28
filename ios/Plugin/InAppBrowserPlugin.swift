@@ -137,14 +137,17 @@ public class InAppBrowserPlugin: CAPPlugin {
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
 
+        let credentials = self.readCredentials(call)
+
         DispatchQueue.main.async {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
+                self.webViewController?.setCredentials(credentials: credentials)
             }
 
             self.webViewController?.source = .remote(url!)
@@ -267,14 +270,17 @@ public class InAppBrowserPlugin: CAPPlugin {
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
 
+        let credentials = self.readCredentials(call)
+
         DispatchQueue.main.async {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
+                self.webViewController?.setCredentials(credentials: credentials)
             }
 
             self.webViewController?.source = .remote(url!)
@@ -337,5 +343,14 @@ public class InAppBrowserPlugin: CAPPlugin {
 
     @objc func appWillResignActive(_ notification: NSNotification) {
         self.showPrivacyScreen()
+    }
+
+    private func readCredentials(_ call: CAPPluginCall) -> WKWebViewCredentials? {
+        var credentials: WKWebViewCredentials?
+        let credentialsDict = call.getObject("credentials", [:]).mapValues { String(describing: $0 as Any) }
+        if !credentialsDict.isEmpty, let username = credentialsDict["username"], let password = credentialsDict["password"] {
+            credentials = WKWebViewCredentials(username: username, password: password)
+        }
+        return credentials
     }
 }

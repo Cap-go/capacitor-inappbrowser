@@ -17,6 +17,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.HttpAuthHandler;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
@@ -29,11 +30,13 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+import com.getcapacitor.JSObject;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 public class WebViewDialog extends Dialog {
 
@@ -386,6 +389,74 @@ public class WebViewDialog extends Dialog {
             }
           }
           return false;
+        }
+
+        @Override
+        public void onReceivedHttpAuthRequest(
+          WebView view,
+          HttpAuthHandler handler,
+          String host,
+          String realm
+        ) {
+          final String sourceUrl = _options.getUrl();
+          final String url = view.getUrl();
+          final JSObject credentials = _options.getCredentials();
+
+          if (
+            credentials != null &&
+            credentials.getString("username") != null &&
+            credentials.getString("password") != null &&
+            sourceUrl != null &&
+            url != null
+          ) {
+            String sourceProtocol = "";
+            String sourceHost = "";
+            int sourcePort = -1;
+            try {
+              URI uri = new URI(sourceUrl);
+              sourceProtocol = uri.getScheme();
+              sourceHost = uri.getHost();
+              sourcePort = uri.getPort();
+              if (
+                sourcePort == -1 && Objects.equals(sourceProtocol, "https")
+              ) sourcePort = 443;
+              else if (
+                sourcePort == -1 && Objects.equals(sourceProtocol, "http")
+              ) sourcePort = 80;
+            } catch (URISyntaxException e) {
+              e.printStackTrace();
+            }
+
+            String protocol = "";
+            int port = -1;
+            try {
+              URI uri = new URI(url);
+              protocol = uri.getScheme();
+              port = uri.getPort();
+              if (port == -1 && Objects.equals(protocol, "https")) port = 443;
+              else if (port == -1 && Objects.equals(protocol, "http")) port =
+                80;
+            } catch (URISyntaxException e) {
+              e.printStackTrace();
+            }
+
+            if (
+              Objects.equals(sourceHost, host) &&
+              Objects.equals(sourceProtocol, protocol) &&
+              sourcePort == port
+            ) {
+              final String username = Objects.requireNonNull(
+                credentials.getString("username")
+              );
+              final String password = Objects.requireNonNull(
+                credentials.getString("password")
+              );
+              handler.proceed(username, password);
+              return;
+            }
+          }
+
+          super.onReceivedHttpAuthRequest(view, handler, host, realm);
         }
 
         @Override

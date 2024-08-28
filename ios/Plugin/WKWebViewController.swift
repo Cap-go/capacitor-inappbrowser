@@ -19,6 +19,11 @@ private struct UrlsHandledByApp {
     static var blank = true
 }
 
+public struct WKWebViewCredentials {
+    var username: String
+    var password: String
+}
+
 @objc public protocol WKWebViewControllerDelegate {
     @objc optional func webViewController(_ controller: WKWebViewController, canDismiss url: URL) -> Bool
 
@@ -48,21 +53,24 @@ open class WKWebViewController: UIViewController {
         super.init(coder: aDecoder)
     }
 
-    public init(source: WKWebSource?) {
+    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.source = source
+        self.credentials = credentials
         self.initWebview()
     }
 
-    public init(url: URL) {
+    public init(url: URL, credentials: WKWebViewCredentials? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
+        self.credentials = credentials
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
+        self.credentials = credentials
         self.setHeaders(headers: headers)
         self.initWebview(isInspectable: isInspectable)
     }
@@ -194,6 +202,8 @@ open class WKWebViewController: UIViewController {
         return UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
     }()
 
+    fileprivate var credentials: WKWebViewCredentials?
+
     deinit {
         webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
@@ -207,6 +217,10 @@ open class WKWebViewController: UIViewController {
         if self.webView == nil {
             self.initWebview()
         }
+    }
+
+    open func setCredentials(credentials: WKWebViewCredentials?) {
+        self.credentials = credentials
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -782,7 +796,12 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        if let bypassedSSLHosts = bypassedSSLHosts, bypassedSSLHosts.contains(challenge.protectionSpace.host) {
+        if let credentials = credentials,
+           challenge.protectionSpace.receivesCredentialSecurely,
+           let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
+            let urlCredential = URLCredential(user: credentials.username, password: credentials.password, persistence: .none)
+            completionHandler(.useCredential, urlCredential)
+        } else if let bypassedSSLHosts = bypassedSSLHosts, bypassedSSLHosts.contains(challenge.protectionSpace.host) {
             let credential = URLCredential(trust: challenge.protectionSpace.serverTrust!)
             completionHandler(.useCredential, credential)
         } else {
