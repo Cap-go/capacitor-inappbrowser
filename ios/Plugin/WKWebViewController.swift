@@ -12,6 +12,7 @@ import WebKit
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
+private let preventDeeplink: Bool = false
 
 private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
@@ -67,11 +68,12 @@ open class WKWebViewController: UIViewController {
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
+        self.preventDeeplink = preventDeeplink
         self.initWebview(isInspectable: isInspectable)
     }
 
@@ -98,6 +100,7 @@ open class WKWebViewController: UIViewController {
     open var closeModalOk = ""
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
+    var viewWasPresented = false
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -140,7 +143,7 @@ open class WKWebViewController: UIViewController {
 
     open var websiteTitleInNavigationBar = true
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
-    open var leftNavigaionBarItemTypes: [BarButtonItemType] = []
+    open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
     open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .reload, .activity]
 
@@ -322,8 +325,11 @@ open class WKWebViewController: UIViewController {
 
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        self.setupViewElements()
-        setUpState()
+        if !self.viewWasPresented {
+            self.setupViewElements()
+            setUpState()
+            self.viewWasPresented = true
+        }
     }
 
     override open func viewWillDisappear(_ animated: Bool) {
@@ -482,7 +488,7 @@ fileprivate extension WKWebViewController {
         //        if presentingViewController != nil {
         switch doneBarButtonItemPosition {
         case .left:
-            if !leftNavigaionBarItemTypes.contains(where: { type in
+            if !leftNavigationBarItemTypes.contains(where: { type in
                 switch type {
                 case .done:
                     return true
@@ -490,7 +496,7 @@ fileprivate extension WKWebViewController {
                     return false
                 }
             }) {
-                leftNavigaionBarItemTypes.insert(.done, at: 0)
+                leftNavigationBarItemTypes.insert(.done, at: 0)
             }
         case .right:
             if !rightNavigaionBarItemTypes.contains(where: { type in
@@ -508,7 +514,7 @@ fileprivate extension WKWebViewController {
         }
         //        }
 
-        navigationItem.leftBarButtonItems = leftNavigaionBarItemTypes.map {
+        navigationItem.leftBarButtonItems = leftNavigationBarItemTypes.map {
             barButtonItemType in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
@@ -820,6 +826,11 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         var actionPolicy: WKNavigationActionPolicy = .allow
+
+        if self.preventDeeplink {
+            actionPolicy = .preventDeeplinkActionPolicy
+        }
+
         defer {
             decisionHandler(actionPolicy)
         }
@@ -853,4 +864,8 @@ extension WKWebViewController: WKNavigationDelegate {
 class BlockBarButtonItem: UIBarButtonItem {
 
     var block: ((WKWebViewController) -> Void)?
+}
+
+extension WKNavigationActionPolicy {
+    static let preventDeeplinkActionPolicy = WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2)!
 }

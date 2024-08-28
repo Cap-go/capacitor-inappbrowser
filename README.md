@@ -23,13 +23,46 @@ Web platform is not supported. Use `window.open` instead.
 
 ### Camera usage
 
-if you need the Camera to work in Android, you need to add the following to your `AndroidManifest.xml` file:
+#### Android
+
+Add the following to your `AndroidManifest.xml` file:
 
 ```xml
 <uses-permission android:name="android.permission.CAMERA" />
 ```
 
 Then the permission will be asked when the camera is used.
+
+#### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>We need access to the camera to record audio.</string>
+```
+
+### Microphone usage
+
+#### Android
+
+Add the following to your `AndroidManifest.xml` file:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+```
+
+Then the permission will be asked when the microphone is used.
+
+#### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>We need access to the microphone to record audio.</string>
+```
 
 ## API
 

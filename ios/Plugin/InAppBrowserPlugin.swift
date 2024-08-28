@@ -51,11 +51,16 @@ public class InAppBrowserPlugin: CAPPlugin {
 
     @objc func clearCookies(_ call: CAPPluginCall) {
         let dataStore = WKWebsiteDataStore.default()
-        let urlString = call.getString("url") ?? ""
-        let clearCache = call.getBool("cache") ?? false
+        let urlString = call.getString("url", "")
+        let clearCache = call.getBool("cache", false)
 
         if clearCache {
             URLCache.shared.removeAllCachedResponses()
+        }
+        if urlString.isEmpty {
+            HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
+            call.resolve()
+            return
         }
 
         guard let url = URL(string: urlString), let hostName = url.host else {
@@ -119,6 +124,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
         let isInspectable = call.getBool("isInspectable", false)
+        let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
 
         var disclaimerContent = call.getObject("shareDisclaimer")
@@ -138,16 +144,17 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
                 self.webViewController?.setCredentials(credentials: credentials)
+                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
             }
 
             self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
-            self.webViewController?.leftNavigaionBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
+            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
+            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
             if call.getBool("showArrow", false) {
@@ -172,13 +179,14 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
             self.navigationWebViewController?.toolbar.backgroundColor = backgroundColor
+            self.navigationWebViewController?.toolbar.tintColor = backgroundColor == UIColor.black ? UIColor.white : UIColor.black
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
             }
             if showReloadButton {
                 let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
-                self.webViewController?.leftNavigaionBarItemTypes = toolbarItems + [.reload]
+                self.webViewController?.leftNavigationBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
@@ -247,6 +255,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
 
         let isInspectable = call.getBool("isInspectable", false)
+        let preventDeeplink = call.getBool("preventDeeplink", false)
 
         self.currentPluginCall = call
 
@@ -270,15 +279,16 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
                 self.webViewController?.setCredentials(credentials: credentials)
+                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
             }
 
             self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigaionBarItemTypes = [.reload]
+            self.webViewController?.leftNavigationBarItemTypes = [.reload]
             self.webViewController?.toolbarItemTypes = [.back, .forward, .activity]
             self.webViewController?.capBrowserPlugin = self
             self.webViewController?.hasDynamicTitle = true
