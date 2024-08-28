@@ -124,7 +124,6 @@ public class InAppBrowserPlugin: CAPPlugin {
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
         let isInspectable = call.getBool("isInspectable", false)
-        let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
 
         var disclaimerContent = call.getObject("shareDisclaimer")
@@ -142,11 +141,10 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, preventDeeplink: preventDeeplink)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
-                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
             }
 
             self.webViewController?.source = .remote(url!)
@@ -252,7 +250,6 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
 
         let isInspectable = call.getBool("isInspectable", false)
-        let preventDeeplink = call.getBool("preventDeeplink", false)
 
         self.currentPluginCall = call
 
@@ -274,11 +271,10 @@ public class InAppBrowserPlugin: CAPPlugin {
             let url = URL(string: urlString)
 
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, preventDeeplink: preventDeeplink)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable)
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
-                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
             }
 
             self.webViewController?.source = .remote(url!)

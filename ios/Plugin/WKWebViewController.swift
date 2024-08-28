@@ -12,7 +12,6 @@ import WebKit
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
-private let preventDeeplink: Bool = false
 
 private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
@@ -61,11 +60,10 @@ open class WKWebViewController: UIViewController {
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, preventDeeplink: Bool) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.setHeaders(headers: headers)
-        self.preventDeeplink = preventDeeplink
         self.initWebview(isInspectable: isInspectable)
     }
 
@@ -105,6 +103,7 @@ open class WKWebViewController: UIViewController {
             self.customUserAgent = userAgent
         }
     }
+
 
     internal var customUserAgent: String? {
         didSet {
@@ -807,10 +806,6 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         var actionPolicy: WKNavigationActionPolicy = .allow
 
-        if self.preventDeeplink {
-            actionPolicy = .preventDeeplinkActionPolicy
-        }
-
         defer {
             decisionHandler(actionPolicy)
         }
@@ -844,8 +839,4 @@ extension WKWebViewController: WKNavigationDelegate {
 class BlockBarButtonItem: UIBarButtonItem {
 
     var block: ((WKWebViewController) -> Void)?
-}
-
-extension WKNavigationActionPolicy {
-    static let preventDeeplinkActionPolicy = WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2)!
 }
