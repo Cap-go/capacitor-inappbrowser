@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.2.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.2.0...6.2.1) (2024-08-28)
+
+
+### Bug Fixes
+
+* revert GPT useless code ([dd11382](https://github.com/Cap-go/capacitor-inappbrowser/commit/dd113824205b138cb5abe2c1cb28e9059c9544ce))
+
 ## [6.2.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.1.1...6.2.0) (2024-08-28)
 
 
