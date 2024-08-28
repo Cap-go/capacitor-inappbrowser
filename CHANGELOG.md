@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.1.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.0.53...6.1.0) (2024-08-28)
+
+
+### Features
+
+* allow microphone in the webview ([94e7a51](https://github.com/Cap-go/capacitor-inappbrowser/commit/94e7a51d69982921c5197b5e6c88e78700780aca))
+
 ### [6.0.53](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.0.52...6.0.53) (2024-08-28)
 
 
