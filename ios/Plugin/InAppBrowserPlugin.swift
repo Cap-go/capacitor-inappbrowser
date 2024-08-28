@@ -57,7 +57,7 @@ public class InAppBrowserPlugin: CAPPlugin {
         if clearCache {
             URLCache.shared.removeAllCachedResponses()
         }
-        if (urlString.isEmpty) {
+        if urlString.isEmpty {
             HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
             call.resolve()
             return

@@ -51,6 +51,8 @@ public class WebViewDialog extends Dialog {
 
   public interface PermissionHandler {
     void handleCameraPermissionRequest(PermissionRequest request);
+
+    void handleMicrophonePermissionRequest(PermissionRequest request);
   }
 
   private PermissionHandler permissionHandler;
@@ -133,6 +135,15 @@ public class WebViewDialog extends Dialog {
               // Initiate the permission request through the plugin
               if (permissionHandler != null) {
                 permissionHandler.handleCameraPermissionRequest(request);
+              }
+              break;
+            } else if (r.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+              Log.i("INAPPBROWSER", "RESOURCE_AUDIO_CAPTURE req");
+              // Store the permission request
+              currentPermissionRequest = request;
+              // Initiate the permission request through the plugin
+              if (permissionHandler != null) {
+                permissionHandler.handleMicrophonePermissionRequest(request);
               }
               break;
             }

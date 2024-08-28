@@ -33,6 +33,10 @@ import java.util.Iterator;
   permissions = {
     @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
     @Permission(
+      alias = "microphone",
+      strings = { Manifest.permission.RECORD_AUDIO }
+    ),
+    @Permission(
       alias = "storage",
       strings = { Manifest.permission.READ_EXTERNAL_STORAGE }
     ),
@@ -54,6 +58,59 @@ public class InAppBrowserPlugin
   private String currentUrl = "";
 
   private PermissionRequest currentPermissionRequest;
+
+  public void handleMicrophonePermissionRequest(PermissionRequest request) {
+    this.currentPermissionRequest = request;
+    if (getPermissionState("microphone") != PermissionState.GRANTED) {
+      requestPermissionForAlias(
+        "microphone",
+        null,
+        "microphonePermissionCallback"
+      );
+    } else {
+      grantMicrophonePermission();
+    }
+  }
+
+  private void grantMicrophonePermission() {
+    if (currentPermissionRequest != null) {
+      currentPermissionRequest.grant(
+        new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+      );
+      currentPermissionRequest = null;
+    }
+  }
+
+  @PermissionCallback
+  private void microphonePermissionCallback() {
+    if (getPermissionState("microphone") == PermissionState.GRANTED) {
+      grantCameraPermission();
+    } else {
+      if (currentPermissionRequest != null) {
+        currentPermissionRequest.deny();
+        currentPermissionRequest = null;
+      }
+      // Handle the case where permission was not granted
+    }
+  }
+
+  @PermissionCallback
+  private void microphonePermissionCallback(PluginCall call) {
+    if (getPermissionState("microphone") == PermissionState.GRANTED) {
+      // Permission granted, notify the WebView to proceed
+      if (
+        webViewDialog != null && webViewDialog.currentPermissionRequest != null
+      ) {
+        webViewDialog.currentPermissionRequest.grant(
+          new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE }
+        );
+        webViewDialog.currentPermissionRequest = null;
+      }
+      call.resolve();
+    } else {
+      call.reject("Camera permission is required");
+    }
+  }
 
   public void handleCameraPermissionRequest(PermissionRequest request) {
     this.currentPermissionRequest = request;
@@ -107,6 +164,24 @@ public class InAppBrowserPlugin
     }
   }
 
+  @PermissionCallback
+  private void cameraPermissionCallback(PluginCall call) {
+    if (getPermissionState("camera") == PermissionState.GRANTED) {
+      // Permission granted, notify the WebView to proceed
+      if (
+        webViewDialog != null && webViewDialog.currentPermissionRequest != null
+      ) {
+        webViewDialog.currentPermissionRequest.grant(
+          new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+        );
+        webViewDialog.currentPermissionRequest = null;
+      }
+      call.resolve();
+    } else {
+      call.reject("Camera permission is required");
+    }
+  }
+
   private void grantCameraPermission() {
     if (currentPermissionRequest != null) {
       currentPermissionRequest.grant(
@@ -136,24 +211,6 @@ public class InAppBrowserPlugin
       requestPermissionForAlias("camera", call, "cameraPermissionCallback");
     } else {
       call.resolve();
-    }
-  }
-
-  @PermissionCallback
-  private void cameraPermissionCallback(PluginCall call) {
-    if (getPermissionState("camera") == PermissionState.GRANTED) {
-      // Permission granted, notify the WebView to proceed
-      if (
-        webViewDialog != null && webViewDialog.currentPermissionRequest != null
-      ) {
-        webViewDialog.currentPermissionRequest.grant(
-          new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE }
-        );
-        webViewDialog.currentPermissionRequest = null;
-      }
-      call.resolve();
-    } else {
-      call.reject("Camera permission is required");
     }
   }
 
