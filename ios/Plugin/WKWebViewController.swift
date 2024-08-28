@@ -112,7 +112,6 @@ open class WKWebViewController: UIViewController {
         }
     }
 
-
     internal var customUserAgent: String? {
         didSet {
             guard let agent = userAgent else {
