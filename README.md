@@ -198,14 +198,16 @@ Injects JavaScript code into the InAppBrowser window.
 ### postMessage(...)
 
 ```typescript
-postMessage(options: Record<string, any>) => Promise<void>
+postMessage(options: { detail: Record<string, any>; }) => Promise<void>
 ```
 
-Sends an event to the webview.
+Sends an event to the webview. you can listen to this event with addListener("messageFromWebview", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
+detail is the data you want to send to the webview, the key will be stripped from the event object, it's a requirement of Capacitor
+Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
 
-| Param         | Type                                                         |
-| ------------- | ------------------------------------------------------------ |
-| **`options`** | <code><a href="#record">Record</a>&lt;string, any&gt;</code> |
+| Param         | Type                                                                      |
+| ------------- | ------------------------------------------------------------------------- |
+| **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; }</code> |
 
 --------------------
 
@@ -293,7 +295,11 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 addListener(eventName: "messageFromWebview", listenerFunc: (event: Record<string, any>) => void) => Promise<PluginListenerHandle>
 ```
 
-Will be triggered when event is sent from webview
+Will be triggered when event is sent from webview, to send an event to the webview use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
+detail is the data you want to send to the webview, the key will be stripped from the event object, we made it consistent with Capacitor
+Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
+
+This method is inject at runtime in the webview
 
 | Param              | Type                                                                             |
 | ------------------ | -------------------------------------------------------------------------------- |

@@ -265,9 +265,11 @@ export interface InAppBrowserPlugin {
    */
   executeScript({ code }: { code: string }): Promise<void>;
   /**
-   * Sends an event to the webview.
+   * Sends an event to the webview. you can listen to this event with addListener("messageFromWebview", listenerFunc: (event: Record<string, any>) => void)
+   * detail is the data you want to send to the webview, the key will be stripped from the event object, it's a requirement of Capacitor
+   * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
    */
-  postMessage(options: Record<string, any>): Promise<void>;
+  postMessage(options: { detail: Record<string, any> }): Promise<void>;
   /**
    * Sets the URL of the webview.
    */
@@ -301,7 +303,11 @@ export interface InAppBrowserPlugin {
     listenerFunc: ConfirmBtnListener,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when event is sent from webview
+   * Will be triggered when event is sent from webview, to send an event to the webview use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
+   * detail is the data you want to send to the webview, the key will be stripped from the event object, we made it consistent with Capacitor
+   * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
+   * 
+   * This method is inject at runtime in the webview
    */
   addListener(
     eventName: "messageFromWebview",
