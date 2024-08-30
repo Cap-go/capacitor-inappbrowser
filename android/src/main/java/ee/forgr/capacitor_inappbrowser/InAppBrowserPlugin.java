@@ -285,22 +285,50 @@ public class InAppBrowserPlugin
   }
 
   @PluginMethod
+  public void clearAllCookies(PluginCall call) {
+    boolean clearCache = call.getBoolean("cache", false);
+
+    // Clear all cookies
+    CookieManager cookieManager = CookieManager.getInstance();
+    cookieManager.removeAllCookies(null);
+    cookieManager.flush();
+
+    if (clearCache) {
+      // Clear cache
+      cookieManager.removeSessionCookies(null);
+    }
+
+    call.resolve();
+  }
+
+  @PluginMethod
   public void clearCookies(PluginCall call) {
     String url = call.getString("url", currentUrl);
-    Boolean clearCache = call.getBoolean("cache", false);
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
-    } else {
-      CookieManager cookieManager = CookieManager.getInstance();
-      String cookie = cookieManager.getCookie(url);
-      if (cookie != null) {
-        cookieManager.removeAllCookies(null);
-        if (Boolean.TRUE.equals(clearCache)) {
-          cookieManager.removeSessionCookies(null);
+      return;
+    }
+
+    CookieManager cookieManager = CookieManager.getInstance();
+    String cookieString = cookieManager.getCookie(url);
+
+    if (cookieString != null) {
+      String[] cookies = cookieString.split(";");
+      Uri uri = Uri.parse(url);
+      String domain = uri.getHost();
+
+      for (String cookie : cookies) {
+        String[] parts = cookie.split("=");
+        if (parts.length > 0) {
+          String newCookie =
+            parts[0].trim() + "=; Domain=" + domain + "; Path=/; Max-Age=0";
+          cookieManager.setCookie(url, newCookie);
         }
       }
-      call.resolve();
+      cookieManager.flush();
     }
+
+    call.resolve();
   }
 
   @PluginMethod

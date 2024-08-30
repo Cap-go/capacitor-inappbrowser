@@ -42,6 +42,9 @@ export interface GetCookieOptions {
 
 export interface ClearCookieOptions {
   url: string;
+}
+
+export interface ClearAllCookieOptions {
   cache?: boolean;
 }
 
@@ -243,6 +246,12 @@ export interface InAppBrowserPlugin {
    * @since 0.5.0
    */
   clearCookies(options: ClearCookieOptions): Promise<any>;
+  /**
+   * Clear all cookies
+   *
+   * @since 6.5.0
+   */
+  clearAllCookies(options: ClearAllCookieOptions): Promise<any>;
 
   /**
    * Get cookies for a specific URL.

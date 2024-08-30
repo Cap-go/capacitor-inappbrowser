@@ -7,6 +7,7 @@ CAP_PLUGIN(InAppBrowserPlugin, "InAppBrowser",
            CAP_PLUGIN_METHOD(openWebView, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(clearCookies, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(getCookies, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(clearAllCookies, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(reload, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(open, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(setUrl, CAPPluginReturnPromise);

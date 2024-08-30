@@ -49,34 +49,43 @@ public class InAppBrowserPlugin: CAPPlugin {
         })
     }
 
+    @objc func clearAllCookies(_ call: CAPPluginCall) {
+        let clearCache = call.getBool("cache") ?? false
+
+        DispatchQueue.main.async {
+            let dataStore = WKWebsiteDataStore.default()
+            var dataTypes = Set([WKWebsiteDataTypeCookies])
+
+            if clearCache {
+                dataTypes.insert(WKWebsiteDataTypeDiskCache)
+                dataTypes.insert(WKWebsiteDataTypeMemoryCache)
+            }
+
+            dataStore.removeData(ofTypes: dataTypes,
+                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+                call.resolve()
+            }
+        }
+    }
+
     @objc func clearCookies(_ call: CAPPluginCall) {
-        let dataStore = WKWebsiteDataStore.default()
-        let urlString = call.getString("url", "")
-        let clearCache = call.getBool("cache", false)
-
-        if clearCache {
-            URLCache.shared.removeAllCachedResponses()
-        }
-        if urlString.isEmpty {
-            HTTPCookieStorage.shared.cookies?.forEach(HTTPCookieStorage.shared.deleteCookie)
-            call.resolve()
-            return
-        }
-
-        guard let url = URL(string: urlString), let hostName = url.host else {
+        guard let url = call.getString("url"),
+              let host = URL(string: url)?.host else {
             call.reject("Invalid URL")
             return
         }
-        dataStore.httpCookieStore.getAllCookies { cookies in
-            let cookiesToDelete = cookies.filter { cookie in
-                cookie.domain == hostName || cookie.domain.hasSuffix(".\(hostName)") || hostName.hasSuffix(cookie.domain)
-            }
 
-            for cookie in cookiesToDelete {
-                dataStore.httpCookieStore.delete(cookie)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let dataStore = WKWebsiteDataStore.default()
+            dataStore.fetchDataRecords(ofTypes: [WKWebsiteDataTypeCookies]) { records in
+                let cookiesToRemove = records.filter { $0.displayName.contains(host) }
+                dataStore.removeData(ofTypes: [WKWebsiteDataTypeCookies],
+                                     for: cookiesToRemove) {
+                    DispatchQueue.main.async {
+                        call.resolve()
+                    }
+                }
             }
-
-            call.resolve()
         }
     }
 
