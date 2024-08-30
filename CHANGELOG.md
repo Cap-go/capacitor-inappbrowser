@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.5.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.4.4...6.5.0) (2024-08-30)
+
+
+### Features
+
+* add clearAllCookies and fix clearCookies ([b8113be](https://github.com/Cap-go/capacitor-inappbrowser/commit/b8113be66e4c71ebbc6e0625cc196ca6f33ccec0))
+
+
+### Bug Fixes
+
+* multi upload ([4e7e90b](https://github.com/Cap-go/capacitor-inappbrowser/commit/4e7e90b3735623525c0e85cc7e0dab921cd80cfd))
+
 ### [6.4.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.4.3...6.4.4) (2024-08-30)
 
 ### [6.4.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.4.2...6.4.3) (2024-08-30)
