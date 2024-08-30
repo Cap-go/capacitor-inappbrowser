@@ -292,21 +292,19 @@ public class InAppBrowserPlugin
 
     call.resolve();
   }
-
   @PluginMethod
-  public void clearAllCookies(PluginCall call) {
-    boolean clearCache = call.getBoolean("cache", false);
-
-    // Clear all cookies
+  public void clearCache(PluginCall call) {
     CookieManager cookieManager = CookieManager.getInstance();
     cookieManager.removeAllCookies(null);
     cookieManager.flush();
+    call.resolve();
+  }
 
-    if (clearCache) {
-      // Clear cache
-      cookieManager.removeSessionCookies(null);
-    }
-
+  @PluginMethod
+  public void clearAllCookies(PluginCall call) {
+    CookieManager cookieManager = CookieManager.getInstance();
+    cookieManager.removeAllCookies(null);
+    cookieManager.flush();
     call.resolve();
   }
 

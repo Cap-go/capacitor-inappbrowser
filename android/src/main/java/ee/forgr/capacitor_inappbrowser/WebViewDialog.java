@@ -257,7 +257,7 @@ public class WebViewDialog extends Dialog {
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
     intent.setType(acceptType); // Default to */*
-    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
+    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
     activity.startActivityForResult(
       Intent.createChooser(intent, "Select File"),
       FILE_CHOOSER_REQUEST_CODE

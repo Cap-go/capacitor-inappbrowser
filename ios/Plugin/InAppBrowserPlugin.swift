@@ -50,16 +50,23 @@ public class InAppBrowserPlugin: CAPPlugin {
     }
 
     @objc func clearAllCookies(_ call: CAPPluginCall) {
-        let clearCache = call.getBool("cache") ?? false
-
         DispatchQueue.main.async {
             let dataStore = WKWebsiteDataStore.default()
             var dataTypes = Set([WKWebsiteDataTypeCookies])
 
-            if clearCache {
-                dataTypes.insert(WKWebsiteDataTypeDiskCache)
-                dataTypes.insert(WKWebsiteDataTypeMemoryCache)
+            dataStore.removeData(ofTypes: dataTypes,
+                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+                call.resolve()
             }
+        }
+    }
+
+    @objc func clearCache(_ call: CAPPluginCall) {
+       let clearCache = call.getBool("cache") ?? false
+
+        DispatchQueue.main.async {
+            let dataStore = WKWebsiteDataStore.default()
+            var dataTypes = Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
 
             dataStore.removeData(ofTypes: dataTypes,
                                  modifiedSince: Date(timeIntervalSince1970: 0)) {
