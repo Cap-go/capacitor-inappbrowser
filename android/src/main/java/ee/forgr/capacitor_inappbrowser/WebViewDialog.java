@@ -131,7 +131,8 @@ public class WebViewDialog extends Dialog {
         ) {
           openFileChooser(
             filePathCallback,
-            fileChooserParams.getAcceptTypes()[0]
+            fileChooserParams.getAcceptTypes()[0],
+            fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE
           );
           return true;
         }
@@ -249,12 +250,14 @@ public class WebViewDialog extends Dialog {
 
   private void openFileChooser(
     ValueCallback<Uri[]> filePathCallback,
-    String acceptType
+    String acceptType,
+    boolean isMultiple
   ) {
     mFilePathCallback = filePathCallback;
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
     intent.setType(acceptType); // Default to */*
+    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, multiple);
     activity.startActivityForResult(
       Intent.createChooser(intent, "Select File"),
       FILE_CHOOSER_REQUEST_CODE

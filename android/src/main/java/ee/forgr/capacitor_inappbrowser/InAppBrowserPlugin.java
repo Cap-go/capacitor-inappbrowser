@@ -137,7 +137,16 @@ public class InAppBrowserPlugin
 
         if (resultCode == Activity.RESULT_OK) {
           if (data != null) {
-            results = new Uri[] { data.getData() };
+            String dataString = data.getDataString();
+            if (data.getClipData() != null) {  // If multiple file selected
+              int count = data.getClipData().getItemCount();
+              results = new Uri[count];
+              for (int i = 0; i < count; i++) {
+                results[i] = data.getClipData().getItemAt(i).getUri();
+              }
+            } else if (dataString != null) {  //if single file selected
+              results = new Uri[]{Uri.parse(dataString)};
+            }
           }
         }
 
