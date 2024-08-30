@@ -32,16 +32,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import com.getcapacitor.JSObject;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
 
@@ -221,10 +219,16 @@ public class WebViewDialog extends Dialog {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("detail", detail);
         String jsonDetail = jsonObject.toString();
-        String script = "window.dispatchEvent(new CustomEvent('messageFromNative', " + jsonDetail + "));";
+        String script =
+          "window.dispatchEvent(new CustomEvent('messageFromNative', " +
+          jsonDetail +
+          "));";
         _webView.post(() -> _webView.evaluateJavascript(script, null));
       } catch (Exception e) {
-        Log.e("postMessageToJS", "Error sending message to JS: " + e.getMessage());
+        Log.e(
+          "postMessageToJS",
+          "Error sending message to JS: " + e.getMessage()
+        );
       }
     }
   }

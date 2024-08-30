@@ -306,7 +306,7 @@ export interface InAppBrowserPlugin {
    * Will be triggered when event is sent from webview, to send an event to the webview use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
    * detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
    * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
-   * 
+   *
    * This method is inject at runtime in the webview
    */
   addListener(
