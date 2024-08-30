@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.5.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.5.0...6.5.1) (2024-08-30)
+
+
+### Bug Fixes
+
+* create clearCache method to have all topic separated ([a300c2f](https://github.com/Cap-go/capacitor-inappbrowser/commit/a300c2fd62ebcfc5d08fe5ff47f75a6ff28f6617))
+
 ## [6.5.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.4.4...6.5.0) (2024-08-30)
 
 
