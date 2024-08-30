@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.4.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.3.4...6.4.0) (2024-08-30)
+
+
+### Features
+
+* add post message between JS and mobileApp ([658bf81](https://github.com/Cap-go/capacitor-inappbrowser/commit/658bf81b4b5618a488cb75fae79b6f329ae18041))
+
 ### [6.3.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.3.3...6.3.4) (2024-08-29)
 
 
