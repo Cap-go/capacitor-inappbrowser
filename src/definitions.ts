@@ -250,7 +250,9 @@ export interface InAppBrowserPlugin {
    * @returns A promise that resolves with the cookies.
    */
   getCookies(options: GetCookieOptions): Promise<Record<string, string>>;
-
+  /**
+   * Close the webview.
+   */
   close(): Promise<any>;
   /**
    * Open url in a new webview with toolbars
@@ -262,6 +264,13 @@ export interface InAppBrowserPlugin {
    * Injects JavaScript code into the InAppBrowser window.
    */
   executeScript({ code }: { code: string }): Promise<void>;
+  /**
+   * Sends an event to the webview.
+   */
+  postMessage(options: Record<string, any>): Promise<void>;
+  /**
+   * Sets the URL of the webview.
+   */
   setUrl(options: { url: string }): Promise<any>;
   /**
    * Listen for url change, only for openWebView
@@ -291,7 +300,29 @@ export interface InAppBrowserPlugin {
     eventName: "confirmBtnClicked",
     listenerFunc: ConfirmBtnListener,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when event is sent from webview
+   */
+  addListener(
+    eventName: "messageFromWebview",
+    listenerFunc: (event: Record<string, any>) => void,
+  ): Promise<PluginListenerHandle>;
 
+  /**
+   * Will be triggered when page is loaded
+   */
+  addListener(
+    eventName: "browserPageLoaded",
+    listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Will be triggered when page is loaded
+   */
+  addListener(
+    eventName: "pageLoadError",
+    listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>;
   /**
    * Remove all listeners for this plugin.
    *

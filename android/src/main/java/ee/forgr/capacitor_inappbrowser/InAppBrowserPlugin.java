@@ -22,11 +22,12 @@ import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.util.Iterator;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 @CapacitorPlugin(
   name = "InAppBrowser",
@@ -394,6 +395,43 @@ public class InAppBrowserPlugin
         public void pageLoadError() {
           notifyListeners("pageLoadError", new JSObject());
         }
+
+        @Override
+        public void javascriptCallback(String message) {
+          // Handle the message received from JavaScript
+          Log.d(
+            "WebViewDialog",
+            "Received message from JavaScript: " + message
+          );
+          // Process the message as needed
+          try {
+            // Parse the received message as a JSON object
+            JSONObject jsonMessage = new JSONObject(message);
+
+            // Create a new JSObject to send to the Capacitor plugin
+            JSObject jsObject = new JSObject();
+
+            // Iterate through the keys in the JSON object and add them to the JSObject
+            Iterator<String> keys = jsonMessage.keys();
+            while (keys.hasNext()) {
+              String key = keys.next();
+              jsObject.put(key, jsonMessage.get(key));
+            }
+
+            // Notify listeners with the parsed message
+            notifyListeners("messageFromWebview", jsObject);
+          } catch (JSONException e) {
+            Log.e(
+              "WebViewDialog",
+              "Error parsing JSON message: " + e.getMessage()
+            );
+
+            // If JSON parsing fails, send the raw message as a string
+            JSObject jsObject = new JSObject();
+            jsObject.put("rawMessage", message);
+            notifyListeners("messageFromWebview", jsObject);
+          }
+        }
       }
     );
     this.getActivity()
@@ -409,6 +447,31 @@ public class InAppBrowserPlugin
             );
             webViewDialog.presentWebView();
             webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
+          }
+        }
+      );
+  }
+
+  @PluginMethod
+  public void postMessage(PluginCall call) {
+    if (webViewDialog == null) {
+      call.reject("WebView is not initialized");
+      return;
+    }
+    JSObject eventData = call.getObject("detail");
+    // Log event data
+    Log.d("InAppBrowserPlugin", "Event data: " + eventData.toString());
+    if (eventData == null) {
+      call.reject("No event data provided");
+      return;
+    }
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            webViewDialog.postMessageToJS(eventData);
+            call.resolve();
           }
         }
       );

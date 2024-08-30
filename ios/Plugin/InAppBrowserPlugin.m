@@ -14,5 +14,6 @@ CAP_PLUGIN(InAppBrowserPlugin, "InAppBrowser",
            CAP_PLUGIN_METHOD(close, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(hide, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(executeScript, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(postMessage, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(insertCSS, CAPPluginReturnPromise);
 )

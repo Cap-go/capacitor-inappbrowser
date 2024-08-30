@@ -18,6 +18,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.HttpAuthHandler;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
@@ -31,6 +32,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import com.getcapacitor.JSObject;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
@@ -73,6 +78,15 @@ public class WebViewDialog extends Dialog {
     this.isInitialized = false;
   }
 
+  public class JavaScriptInterface {
+
+    @JavascriptInterface
+    public void postMessage(String message) {
+      // Handle message from JavaScript
+      _options.getCallbacks().javascriptCallback(message);
+    }
+  }
+
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setCancelable(true);
@@ -89,7 +103,10 @@ public class WebViewDialog extends Dialog {
       );
 
     this._webView = findViewById(R.id.browser_view);
-
+    _webView.addJavascriptInterface(
+      new JavaScriptInterface(),
+      "AndroidInterface"
+    );
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
     _webView.getSettings().setDatabaseEnabled(true);
@@ -196,6 +213,34 @@ public class WebViewDialog extends Dialog {
       show();
       _options.getPluginCall().resolve();
     }
+  }
+
+  public void postMessageToJS(Object detail) {
+    if (_webView != null) {
+      try {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("detail", detail);
+        String jsonDetail = jsonObject.toString();
+        String script = "window.dispatchEvent(new CustomEvent('messageFromNative', " + jsonDetail + "));";
+        _webView.post(() -> _webView.evaluateJavascript(script, null));
+      } catch (Exception e) {
+        Log.e("postMessageToJS", "Error sending message to JS: " + e.getMessage());
+      }
+    }
+  }
+
+  private void injectJavaScriptInterface() {
+    String script =
+      "if (!window.mobileApp) { " +
+      "    window.mobileApp = { " +
+      "        postMessage: function(message) { " +
+      "            if (window.AndroidInterface) { " +
+      "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
+      "            } " +
+      "        } " +
+      "    }; " +
+      "}";
+    _webView.evaluateJavascript(script, null);
   }
 
   private void openFileChooser(
@@ -486,12 +531,12 @@ public class WebViewDialog extends Dialog {
             _options.getCallbacks().urlChangeEvent(url);
           }
           super.doUpdateVisitedHistory(view, url, isReload);
+          injectJavaScriptInterface();
         }
 
         @Override
         public void onPageFinished(WebView view, String url) {
           super.onPageFinished(view, url);
-          _options.getCallbacks().pageLoaded();
           if (!isInitialized) {
             isInitialized = true;
             _webView.clearHistory();
@@ -520,6 +565,7 @@ public class WebViewDialog extends Dialog {
           }
 
           _options.getCallbacks().pageLoaded();
+          injectJavaScriptInterface();
         }
 
         @Override

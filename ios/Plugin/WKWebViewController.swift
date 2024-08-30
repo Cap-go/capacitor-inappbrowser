@@ -43,7 +43,7 @@ extension Dictionary {
     }
 }
 
-open class WKWebViewController: UIViewController {
+open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     public init() {
         super.init(nibName: nil, bundle: nil)
@@ -222,6 +222,43 @@ open class WKWebViewController: UIViewController {
         self.credentials = credentials
     }
 
+    // Method to send a message from Swift to JavaScript
+    open func postMessageToJS(message: [String: Any]) {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
+            webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
+    }
+
+    // Method to receive messages from JavaScript
+    public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "messageHandler" {
+            if let messageBody = message.body as? [String: Any] {
+                print("Received message from JavaScript:", messageBody)
+                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: messageBody)
+            } else {
+                print("Received non-dictionary message from JavaScript:", message.body)
+                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
+            }
+        }
+    }
+
+    func injectJavaScriptInterface() {
+        let script = """
+        if (!window.mobileApp) {
+            window.mobileApp = {
+                postMessage: function(message) {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                        window.webkit.messageHandlers.messageHandler.postMessage(message);
+                    }
+                }
+            };
+        }
+        """
+        webView?.evaluateJavaScript(script, completionHandler: nil)
+    }
+
     open func initWebview(isInspectable: Bool = true) {
 
         self.view.backgroundColor = UIColor.white
@@ -230,6 +267,9 @@ open class WKWebViewController: UIViewController {
         self.edgesForExtendedLayout = [.bottom]
 
         let webConfiguration = WKWebViewConfiguration()
+        let userContentController = WKUserContentController()
+        userContentController.add(self, name: "messageHandler")
+        webConfiguration.userContentController = userContentController
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
         if webView.responds(to: Selector(("setInspectable:"))) {
@@ -358,6 +398,7 @@ open class WKWebViewController: UIViewController {
             }
         case "URL":
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            self.injectJavaScriptInterface()
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
@@ -776,6 +817,8 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFinish: url)
         }
+        self.injectJavaScriptInterface()
+        self.capBrowserPlugin?.notifyListeners("browserPageLoaded", data: [:])
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -785,6 +828,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
+        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -794,6 +838,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
+        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
@@ -819,8 +864,8 @@ extension WKWebViewController: WKNavigationDelegate {
             }
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
-
         }
+        self.injectJavaScriptInterface()
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
@@ -853,6 +898,7 @@ extension WKWebViewController: WKNavigationDelegate {
         if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue), let result = delegate?.webViewController?(self, decidePolicy: u, navigationType: navigationType) {
             actionPolicy = result ? .allow : .cancel
         }
+        self.injectJavaScriptInterface()
     }
 }
 

@@ -48,4 +48,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log("reload");
     return;
   }
+  async postMessage(options: Record<string, any>): Promise<any> {
+    console.log("postMessage", options);
+    return options;
+  }
 }

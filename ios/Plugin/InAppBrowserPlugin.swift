@@ -189,6 +189,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
+            call.resolve()
         }
     }
 
@@ -229,6 +230,20 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
         self.webViewController?.executeScript(script: script)
+        call.resolve()
+    }
+
+    @objc func postMessage(_ call: CAPPluginCall) {
+        let eventData = call.getObject("detail", [:])
+        // Check if eventData is empty
+        if eventData.isEmpty {
+            call.reject("Event data must not be empty")
+            return
+        }
+        print("Event data: \(eventData)")
+
+        self.webViewController?.postMessageToJS(message: eventData)
+        call.resolve()
     }
 
     func isHexColorCode(_ input: String) -> Bool {
@@ -304,6 +319,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             if !self.isPresentAfterPageLoad {
                 self.presentView()
             }
+            call.resolve()
         }
     }
 

@@ -74,10 +74,14 @@ Add the following to your `Info.plist` file:
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
+* [`postMessage(...)`](#postmessage)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
+* [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
+* [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
+* [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload()`](#reload)
 * [Interfaces](#interfaces)
@@ -150,6 +154,8 @@ Get cookies for a specific URL.
 close() => Promise<any>
 ```
 
+Close the webview.
+
 **Returns:** <code>Promise&lt;any&gt;</code>
 
 --------------------
@@ -189,11 +195,28 @@ Injects JavaScript code into the InAppBrowser window.
 --------------------
 
 
+### postMessage(...)
+
+```typescript
+postMessage(options: Record<string, any>) => Promise<void>
+```
+
+Sends an event to the webview.
+
+| Param         | Type                                                         |
+| ------------- | ------------------------------------------------------------ |
+| **`options`** | <code><a href="#record">Record</a>&lt;string, any&gt;</code> |
+
+--------------------
+
+
 ### setUrl(...)
 
 ```typescript
 setUrl(options: { url: string; }) => Promise<any>
 ```
+
+Sets the URL of the webview.
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
@@ -260,6 +283,60 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### addListener('messageFromWebview', ...)
+
+```typescript
+addListener(eventName: "messageFromWebview", listenerFunc: (event: Record<string, any>) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when event is sent from webview
+
+| Param              | Type                                                                             |
+| ------------------ | -------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'messageFromWebview'</code>                                                |
+| **`listenerFunc`** | <code>(event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('browserPageLoaded', ...)
+
+```typescript
+addListener(eventName: "browserPageLoaded", listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when page is loaded
+
+| Param              | Type                             |
+| ------------------ | -------------------------------- |
+| **`eventName`**    | <code>'browserPageLoaded'</code> |
+| **`listenerFunc`** | <code>() =&gt; void</code>       |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('pageLoadError', ...)
+
+```typescript
+addListener(eventName: "pageLoadError", listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when page is loaded
+
+| Param              | Type                         |
+| ------------------ | ---------------------------- |
+| **`eventName`**    | <code>'pageLoadError'</code> |
+| **`listenerFunc`** | <code>() =&gt; void</code>   |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
