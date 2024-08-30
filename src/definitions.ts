@@ -323,7 +323,7 @@ export interface InAppBrowserPlugin {
   ): Promise<PluginListenerHandle>;
 
   /**
-   * Will be triggered when page is loaded
+   * Will be triggered when page load error
    */
   addListener(
     eventName: "pageLoadError",
