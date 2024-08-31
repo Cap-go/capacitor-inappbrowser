@@ -3,15 +3,21 @@ package ee.forgr.capacitor_inappbrowser;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
+import android.util.ArrayMap;
+import android.view.View;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.view.View;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -25,7 +31,15 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.Semaphore;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -57,6 +71,11 @@ public class InAppBrowserPlugin
   private CustomTabsSession currentSession;
   private WebViewDialog webViewDialog = null;
   private String currentUrl = "";
+
+  private Semaphore deleteCookieSemaphore = null;
+  private String longCookieDeleteUUID = null;
+  private ArrayList<String> cookiesToRemove = new ArrayList<>();
+
 
   private PermissionRequest currentPermissionRequest;
 
@@ -308,6 +327,8 @@ public class InAppBrowserPlugin
     call.resolve();
   }
 
+  // Warning: no thread safety for the semaphore
+  // If this method is called simultaneously, it will cause problems
   @PluginMethod
   public void clearCookies(PluginCall call) {
     String url = call.getString("url", currentUrl);
@@ -316,25 +337,53 @@ public class InAppBrowserPlugin
       return;
     }
 
+    Uri uri = Uri.parse(url);
+    String host = uri.getHost();
+    if (host == null || TextUtils.isEmpty(host)) {
+      call.reject("Invalid URL (Host is null)");
+      return;
+    }
+
     CookieManager cookieManager = CookieManager.getInstance();
     String cookieString = cookieManager.getCookie(url);
 
+    cookiesToRemove.clear();
+
     if (cookieString != null) {
-      String[] cookies = cookieString.split(";");
-      Uri uri = Uri.parse(url);
+      String[] cookies = cookieString.split("; ");
+
       String domain = uri.getHost();
 
       for (String cookie : cookies) {
         String[] parts = cookie.split("=");
         if (parts.length > 0) {
-          String newCookie =
-            parts[0].trim() + "=; Domain=" + domain + "; Path=/; Max-Age=0";
-          cookieManager.setCookie(url, newCookie);
+          cookiesToRemove.add(parts[0].trim());
+          CookieManager.getInstance().setCookie(url, String.format("%s=del;", parts[0].trim()));
         }
       }
-      cookieManager.flush();
     }
 
+    StringBuilder scriptToRun = new StringBuilder();
+    for (String cookieToRemove: cookiesToRemove) {
+      scriptToRun.append(String.format("window.cookieStore.delete('%s', {name: '%s', domain: '%s'});", cookieToRemove, cookieToRemove, url));
+    }
+
+    Log.i("DelCookies", String.format("Script to run:\n%s", scriptToRun));
+
+//    this.longCookieDeleteUUID = String.format("%s-%s", UUID.randomUUID().toString(), UUID.randomUUID().toString());
+//    this.deleteCookieSemaphore = new Semaphore(1);
+
+    this.getActivity()
+        .runOnUiThread(
+            new Runnable() {
+              @Override
+              public void run() {
+                webViewDialog.executeScript(scriptToRun.toString());//String.format("fetch(\"%s/delete_cookies/%s\", { credentials: 'include' })", host, longCookieDeleteUUID));
+              }
+            }
+        );
+
+    // deleteCookieSemaphore.wait();
     call.resolve();
   }
 
@@ -466,6 +515,33 @@ public class InAppBrowserPlugin
             jsObject.put("rawMessage", message);
             notifyListeners("messageFromWebview", jsObject);
           }
+        }
+
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
+          if (deleteCookieSemaphore == null || longCookieDeleteUUID == null) {
+            return null;
+          }
+
+          if (Objects.requireNonNullElse(request.getUrl().getPath(), "").contains(longCookieDeleteUUID)) {
+            ArrayMap<String, String> headers = new ArrayMap<>();
+            for (String cookieToRemove: cookiesToRemove) {
+              headers.put("Set-Cookie", String.format("%s=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", cookieToRemove));
+            }
+
+            WebResourceResponse res = new WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                204,
+                "No Content",
+                headers,
+                null
+            );
+
+            return res;
+          };
+
+          return null;
         }
       }
     );
@@ -620,6 +696,22 @@ public class InAppBrowserPlugin
             switch (navigationEvent) {
               case NAVIGATION_FINISHED:
                 notifyListeners("browserPageLoaded", new JSObject());
+                // Assuming `activity_main` is the layout resource ID of your loaded layout
+                View rootView = getActivity().findViewById(android.R.id.content).getRootView();
+                List<View> allViews = ViewUtils.getAllViews(rootView);
+
+                // Example: Output the view IDs
+                for (View view : allViews) {
+                  // You can perform any operation you want on each view
+                  int viewId = view.getId();
+                  if (viewId != View.NO_ID) {
+                    String viewName = getContext().getResources().getResourceName(viewId);
+                    Log.d("ViewList", "View ID: " + viewId + " | View Name: " + viewName);
+                  } else {
+                    Log.d("ViewList", "Unnamed View: " + view.toString());
+                  }
+                }
+
                 break;
             }
           }

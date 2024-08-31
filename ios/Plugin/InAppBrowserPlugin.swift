@@ -82,16 +82,20 @@ public class InAppBrowserPlugin: CAPPlugin {
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let dataStore = WKWebsiteDataStore.default()
-            dataStore.fetchDataRecords(ofTypes: [WKWebsiteDataTypeCookies]) { records in
-                let cookiesToRemove = records.filter { $0.displayName.contains(host) }
-                dataStore.removeData(ofTypes: [WKWebsiteDataTypeCookies],
-                                     for: cookiesToRemove) {
-                    DispatchQueue.main.async {
-                        call.resolve()
+        DispatchQueue.main.async {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                for cookie in cookies {
+
+                    if (cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain)) {
+                        let semaphore = DispatchSemaphore(value: 1)
+                        WKWebsiteDataStore.default().httpCookieStore.delete(cookie) {
+                            semaphore.signal()
+                        }
+                        semaphore.wait()
                     }
                 }
+                
+                call.resolve()
             }
         }
     }
@@ -104,17 +108,20 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("Invalid URL")
             return
         }
+        
+        DispatchQueue.main.async {
+            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                var cookieDict = [String: String]()
+                for cookie in cookies {
 
-        WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-            var cookieDict = [String: String]()
-            for cookie in cookies {
-
-                if (includeHttpOnly || !cookie.isHTTPOnly) && (cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain)) {
-                    cookieDict[cookie.name] = cookie.value
+                    if (includeHttpOnly || !cookie.isHTTPOnly) && (cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain)) {
+                        cookieDict[cookie.name] = cookie.value
+                    }
                 }
+                call.resolve(cookieDict)
             }
-            call.resolve(cookieDict)
         }
+
     }
 
     @objc func openWebView(_ call: CAPPluginCall) {

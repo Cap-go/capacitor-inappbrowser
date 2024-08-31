@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -25,12 +26,16 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+
+import androidx.annotation.Nullable;
+
 import com.getcapacitor.JSObject;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -117,6 +122,7 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setUseWideViewPort(true);
     _webView.getSettings().setAllowFileAccessFromFileURLs(true);
     _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+    _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
     _webView.setWebViewClient(new WebViewClient());
 
@@ -600,6 +606,12 @@ public class WebViewDialog extends Dialog {
           else {
             super.onReceivedSslError(view, handler, error);
           }
+        }
+
+        @Nullable
+        @Override
+        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+          return _options.getCallbacks().shouldInterceptRequest(request);
         }
       }
     );
