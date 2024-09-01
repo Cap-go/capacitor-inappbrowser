@@ -290,6 +290,10 @@ public class WebViewDialog extends Dialog {
 //    String script =
 //        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
 
+    if (preShowSemaphore != null) {
+      return;
+    }
+
     String script =
       "async function preShowFunction() {\n" +
       _options.getPreShowScript() + '\n' +
@@ -658,6 +662,8 @@ public class WebViewDialog extends Dialog {
                 });
               }
             }
+          } else if (_options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty()) {
+            injectPreShowScript();
           }
 
           ImageButton backButton = _toolbar.findViewById(R.id.backButton);
