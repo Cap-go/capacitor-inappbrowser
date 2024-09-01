@@ -26,6 +26,7 @@ public class Options {
   private String ToolbarColor;
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
+  private String preShowScript;
 
   public PluginCall getPluginCall() {
     return pluginCall;
@@ -207,5 +208,13 @@ public class Options {
 
   public void setIgnoreUntrustedSSLError(boolean _ignoreUntrustedSSLError) {
     this.ignoreUntrustedSSLError = _ignoreUntrustedSSLError;
+  }
+
+  public String getPreShowScript() {
+    return preShowScript;
+  }
+
+  public void setPreShowScript(String preLoadScript) {
+    this.preShowScript = preLoadScript;
   }
 }

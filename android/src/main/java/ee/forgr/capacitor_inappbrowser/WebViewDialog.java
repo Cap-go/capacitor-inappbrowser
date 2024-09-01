@@ -43,6 +43,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -55,10 +60,14 @@ public class WebViewDialog extends Dialog {
   public Activity activity;
   private boolean isInitialized = false;
 
+  Semaphore preShowSemaphore = null;
+  String preshowError = null;
+
   public PermissionRequest currentPermissionRequest;
   public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
   public ValueCallback<Uri> mUploadMessage;
   public ValueCallback<Uri[]> mFilePathCallback;
+  ExecutorService executorService = Executors.newFixedThreadPool(1);
 
   public interface PermissionHandler {
     void handleCameraPermissionRequest(PermissionRequest request);
@@ -90,6 +99,25 @@ public class WebViewDialog extends Dialog {
     }
   }
 
+  public class PreShowScriptInterface {
+    @JavascriptInterface
+    public void error(String error) {
+      // Handle message from JavaScript
+      if (preShowSemaphore != null) {
+        preshowError = error;
+        preShowSemaphore.release();
+      }
+    }
+
+    @JavascriptInterface
+    public void success() {
+      // Handle message from JavaScript
+      if (preShowSemaphore != null) {
+        preShowSemaphore.release();
+      }
+    }
+  }
+
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setCancelable(true);
@@ -109,6 +137,10 @@ public class WebViewDialog extends Dialog {
     _webView.addJavascriptInterface(
       new JavaScriptInterface(),
       "AndroidInterface"
+    );
+    _webView.addJavascriptInterface(
+        new PreShowScriptInterface(),
+        "PreShowScriptInterface"
     );
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
@@ -252,6 +284,55 @@ public class WebViewDialog extends Dialog {
       "    }; " +
       "}";
     _webView.evaluateJavascript(script, null);
+  }
+
+  private void injectPreShowScript() {
+//    String script =
+//        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
+
+    String script =
+      "async function preShowFunction() {\n" +
+      _options.getPreShowScript() + '\n' +
+      "};\n" +
+      "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Preshow error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
+
+    Log.i(
+    "InjectPreShowScript",
+    String.format("PreShowScript script:\n%s", script)
+    );
+
+    preShowSemaphore = new Semaphore(0);
+    activity.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        _webView.evaluateJavascript(script, null);
+      }
+    });
+
+    try {
+      if (!preShowSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
+        Log.e(
+        "InjectPreShowScript",
+        "PreShowScript running for over 10 seconds. The plugin will not wait any longer!"
+        );
+        return;
+      }
+      if (preshowError != null && !preshowError.isEmpty()) {
+        Log.e(
+        "InjectPreShowScript",
+        "Error within the user-provided preShowFunction: " + preshowError
+        );
+      }
+
+    } catch (InterruptedException e) {
+      Log.e(
+          "InjectPreShowScript",
+          "Error when calling InjectPreShowScript: " + e.getMessage()
+      );
+    } finally {
+      preShowSemaphore = null;
+      preshowError = null;
+    }
   }
 
   private void openFileChooser(
@@ -554,8 +635,28 @@ public class WebViewDialog extends Dialog {
             isInitialized = true;
             _webView.clearHistory();
             if (_options.isPresentAfterPageLoad()) {
-              show();
-              _options.getPluginCall().resolve();
+              boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
+              if (!usePreShowScript) {
+                show();
+                _options.getPluginCall().resolve();
+              } else {
+                executorService.execute(new Runnable() {
+                  @Override
+                  public void run() {
+                    if (_options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty()) {
+                      injectPreShowScript();
+                    }
+
+                    activity.runOnUiThread(new Runnable() {
+                      @Override
+                      public void run() {
+                        show();
+                        _options.getPluginCall().resolve();
+                      }
+                    });
+                  }
+                });
+              }
             }
           }
 

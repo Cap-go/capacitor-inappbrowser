@@ -434,6 +434,7 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
+    options.setPreShowScript(call.getString("preShowScript", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
     options.setActiveNativeNavigationForWebview(
