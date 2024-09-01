@@ -323,8 +323,6 @@ public class InAppBrowserPlugin
     call.resolve();
   }
 
-  // Warning: no thread safety for the semaphore
-  // If this method is called simultaneously, it will cause problems
   @PluginMethod
   public void clearCookies(PluginCall call) {
     String url = call.getString("url", currentUrl);
@@ -372,7 +370,7 @@ public class InAppBrowserPlugin
             new Runnable() {
               @Override
               public void run() {
-                webViewDialog.executeScript(scriptToRun.toString());//String.format("fetch(\"%s/delete_cookies/%s\", { credentials: 'include' })", host, longCookieDeleteUUID));
+                webViewDialog.executeScript(scriptToRun.toString());
               }
             }
         );
