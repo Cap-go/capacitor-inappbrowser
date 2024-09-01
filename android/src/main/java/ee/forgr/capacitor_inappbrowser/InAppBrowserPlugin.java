@@ -72,10 +72,6 @@ public class InAppBrowserPlugin
   private WebViewDialog webViewDialog = null;
   private String currentUrl = "";
 
-  private Semaphore deleteCookieSemaphore = null;
-  private String longCookieDeleteUUID = null;
-  private ArrayList<String> cookiesToRemove = new ArrayList<>();
-
 
   private PermissionRequest currentPermissionRequest;
 
@@ -346,6 +342,7 @@ public class InAppBrowserPlugin
 
     CookieManager cookieManager = CookieManager.getInstance();
     String cookieString = cookieManager.getCookie(url);
+    ArrayList<String> cookiesToRemove = new ArrayList<>();
 
     cookiesToRemove.clear();
 
@@ -370,9 +367,6 @@ public class InAppBrowserPlugin
 
     Log.i("DelCookies", String.format("Script to run:\n%s", scriptToRun));
 
-//    this.longCookieDeleteUUID = String.format("%s-%s", UUID.randomUUID().toString(), UUID.randomUUID().toString());
-//    this.deleteCookieSemaphore = new Semaphore(1);
-
     this.getActivity()
         .runOnUiThread(
             new Runnable() {
@@ -383,7 +377,6 @@ public class InAppBrowserPlugin
             }
         );
 
-    // deleteCookieSemaphore.wait();
     call.resolve();
   }
 
@@ -516,33 +509,6 @@ public class InAppBrowserPlugin
             jsObject.put("rawMessage", message);
             notifyListeners("messageFromWebview", jsObject);
           }
-        }
-
-        @Override
-        public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
-          if (deleteCookieSemaphore == null || longCookieDeleteUUID == null) {
-            return null;
-          }
-
-          if (Objects.requireNonNullElse(request.getUrl().getPath(), "").contains(longCookieDeleteUUID)) {
-            ArrayMap<String, String> headers = new ArrayMap<>();
-            for (String cookieToRemove: cookiesToRemove) {
-              headers.put("Set-Cookie", String.format("%s=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT", cookieToRemove));
-            }
-
-            WebResourceResponse res = new WebResourceResponse(
-                "text/plain",
-                "UTF-8",
-                204,
-                "No Content",
-                headers,
-                null
-            );
-
-            return res;
-          };
-
-          return null;
         }
       }
     );
@@ -697,22 +663,6 @@ public class InAppBrowserPlugin
             switch (navigationEvent) {
               case NAVIGATION_FINISHED:
                 notifyListeners("browserPageLoaded", new JSObject());
-                // Assuming `activity_main` is the layout resource ID of your loaded layout
-                View rootView = getActivity().findViewById(android.R.id.content).getRootView();
-                List<View> allViews = ViewUtils.getAllViews(rootView);
-
-                // Example: Output the view IDs
-                for (View view : allViews) {
-                  // You can perform any operation you want on each view
-                  int viewId = view.getId();
-                  if (viewId != View.NO_ID) {
-                    String viewName = getContext().getResources().getResourceName(viewId);
-                    Log.d("ViewList", "View ID: " + viewId + " | View Name: " + viewName);
-                  } else {
-                    Log.d("ViewList", "Unnamed View: " + view.toString());
-                  }
-                }
-
                 break;
             }
           }

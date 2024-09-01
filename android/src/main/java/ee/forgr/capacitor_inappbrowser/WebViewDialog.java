@@ -708,12 +708,6 @@ public class WebViewDialog extends Dialog {
             super.onReceivedSslError(view, handler, error);
           }
         }
-
-        @Nullable
-        @Override
-        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-          return _options.getCallbacks().shouldInterceptRequest(request);
-        }
       }
     );
   }
