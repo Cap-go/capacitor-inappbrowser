@@ -186,6 +186,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.title = call.getString("title", "New Window")
             self.webViewController?.shareSubject = call.getString("shareSubject")
             self.webViewController?.shareDisclaimer = disclaimerContent
+            self.webViewController?.preShowScript = call.getString("preShowScript")
             self.webViewController?.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             if closeModal {
                 self.webViewController?.closeModal = true
