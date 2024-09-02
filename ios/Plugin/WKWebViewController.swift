@@ -864,11 +864,19 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
             // injectPreShowScript will block, don't execute on the main thread
+            if (self.preShowScript != nil && !self.preShowScript!.isEmpty) {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    self.injectPreShowScript()
+                    DispatchQueue.main.async { [weak self] in
+                        self?.capBrowserPlugin?.presentView()
+                    }
+                }
+            } else {
+                self.capBrowserPlugin?.presentView()
+            }
+        } else if (self.preShowScript != nil && !self.preShowScript!.isEmpty && self.capBrowserPlugin?.isPresentAfterPageLoad == true) {
             DispatchQueue.global(qos: .userInitiated).async {
                 self.injectPreShowScript()
-                DispatchQueue.main.async { [weak self] in
-                    self?.capBrowserPlugin?.presentView()
-                }
             }
         }
         didpageInit = true
