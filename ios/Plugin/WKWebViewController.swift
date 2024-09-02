@@ -154,6 +154,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var reloadBarButtonItemImage: UIImage?
     open var stopBarButtonItemImage: UIImage?
     open var activityBarButtonItemImage: UIImage?
+    
+    open var buttonNearDoneIcon: UIImage?
 
     fileprivate var webView: WKWebView?
     fileprivate var progressView: UIProgressView?
@@ -583,13 +585,17 @@ fileprivate extension WKWebViewController {
             return UIBarButtonItem()
         }
 
-        navigationItem.rightBarButtonItems = rightNavigaionBarItemTypes.map {
+        var rightBarButtons = rightNavigaionBarItemTypes.map {
             barButtonItemType in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
             }
             return UIBarButtonItem()
         }
+        if (rightBarButtons.count == 1 && buttonNearDoneIcon != nil) {
+            rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: nil))
+        }
+        navigationItem.rightBarButtonItems = rightBarButtons
 
         if toolbarItemTypes.count > 0 {
             for index in 0..<toolbarItemTypes.count - 1 {
@@ -597,13 +603,14 @@ fileprivate extension WKWebViewController {
             }
         }
 
-        setToolbarItems(toolbarItemTypes.map {
+        let gen = toolbarItemTypes.map {
             barButtonItemType -> UIBarButtonItem in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
             }
             return UIBarButtonItem()
-        }, animated: true)
+        }
+        setToolbarItems(gen, animated: true)
     }
 
     func updateBarButtonItems() {

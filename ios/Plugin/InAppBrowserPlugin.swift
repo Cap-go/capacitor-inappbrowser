@@ -139,6 +139,29 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("URL must not be empty")
             return
         }
+        
+        var buttonNearDoneIcon: UIImage? = nil
+        if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
+            guard let iconType = buttonNearDoneSettings["iconType"] as? String else {
+                call.reject("buttonNearDone.iconType is empty")
+                return
+            }
+            if (iconType != "sf-symbol" && iconType != "resource") {
+                call.reject("IconType is neither 'sf-symbol' nor 'resource'")
+                return
+            }
+            guard let icon = buttonNearDoneSettings["icon"] as? String else {
+                call.reject("buttonNearDone.icon is empty")
+                return
+            }
+
+            
+            if (iconType == "sf-symbol") {
+                buttonNearDoneIcon = UIImage(systemName: icon)
+            } else {
+                buttonNearDoneIcon = UIImage(named: icon)
+            }
+        }
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
@@ -178,6 +201,9 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
+            
+            self.webViewController?.buttonNearDoneIcon = buttonNearDoneIcon
+            
             if call.getBool("showArrow", false) {
                 self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }

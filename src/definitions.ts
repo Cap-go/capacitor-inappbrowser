@@ -233,6 +233,15 @@ export interface OpenWebViewOptions {
    * @since 6.6.0
    */
   preShowScript?: String;
+  /**
+   * TODO
+   *
+   * @since 6.7.0
+   */
+  buttonNearDone?: {
+    iconType: 'sf-symbol' | 'resource',
+    icon: String
+  };
 }
 
 export interface InAppBrowserPlugin {
