@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.6.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.5.1...6.6.0) (2024-09-02)
+
+
+### Features
+
+* **IOS:** implement preShowScript ([e5f15b2](https://github.com/Cap-go/capacitor-inappbrowser/commit/e5f15b20f709edc93c1937a85dc67076d306517c))
+
+
+### Bug Fixes
+
+* handle preShowScript onReload ([e68034d](https://github.com/Cap-go/capacitor-inappbrowser/commit/e68034db08f30a3fd5ae4a26ae6deba0252cce81))
+* **IOS:** Wait max 10s for the script to finish ([e1ede31](https://github.com/Cap-go/capacitor-inappbrowser/commit/e1ede31e2d3b2ce9ec6e56ef184f50fab6e276be))
+* **WiP:** some fixes ([f255b1b](https://github.com/Cap-go/capacitor-inappbrowser/commit/f255b1b55fbfcaef77a01191683d7e80f35709cf))
+
 ### [6.5.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.5.0...6.5.1) (2024-08-30)
 
 
