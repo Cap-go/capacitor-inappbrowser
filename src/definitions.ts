@@ -226,6 +226,13 @@ export interface OpenWebViewOptions {
    * @default false
    */
   ignoreUntrustedSSLError?: boolean;
+  /**
+   * preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser.
+   * This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)
+   *
+   * @since 6.6.0
+   */
+  preShowScript?: String;
 }
 
 export interface InAppBrowserPlugin {

@@ -99,6 +99,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
+    
+    internal var preShowSemaphore: DispatchSemaphore? = nil;
+    internal var preShowError: String? = nil;
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -141,6 +144,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     open var websiteTitleInNavigationBar = true
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
+    open var preShowScript: String? = nil;
     open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
     open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .reload, .activity]
@@ -241,8 +245,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 print("Received non-dictionary message from JavaScript:", message.body)
                 self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
             }
+        } else if (message.name == "preShowScriptSuccess") {
+            guard let semaphore = preShowSemaphore else {
+                print("[InAppBrowser - preShowScriptSuccess]: Semaphore not found")
+                return
+            }
+            
+            semaphore.signal()
+        } else if (message.name == "preShowScriptError") {
+            guard let semaphore = preShowSemaphore else {
+                print("[InAppBrowser - preShowScriptError]: Semaphore not found")
+                return
+            }
+            print("[InAppBrowser - preShowScriptError]: Error!!!!")
+            semaphore.signal()
         }
-    }
+     }
 
     func injectJavaScriptInterface() {
         let script = """
@@ -269,6 +287,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let webConfiguration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
         userContentController.add(self, name: "messageHandler")
+        userContentController.add(self, name: "preShowScriptError")
+        userContentController.add(self, name: "preShowScriptSuccess")
         webConfiguration.userContentController = userContentController
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
@@ -798,6 +818,49 @@ extension WKWebViewController: WKUIDelegate {
 
 // MARK: - WKNavigationDelegate
 extension WKWebViewController: WKNavigationDelegate {
+    internal func injectPreShowScript() {
+        if (preShowSemaphore != nil) {
+            return
+        }
+        
+        // TODO: implement interface
+        let script = """
+            async function preShowFunction() {
+            \(self.preShowScript ?? "")
+            };
+            preShowFunction().then(
+                () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})
+            ).catch(
+                err => { 
+                    console.error('Preshow error', err);
+                    window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+                }
+            )
+            """
+        print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
+        
+        self.preShowSemaphore = DispatchSemaphore(value: 0)
+        self.executeScript(script: script) // this will run on the main thread
+        
+        defer {
+            self.preShowSemaphore = nil;
+            self.preShowError = nil;
+        }
+        
+        if (self.preShowSemaphore?.wait(timeout: .now() + 10) == .timedOut) {
+            print("[InAppBrowser - InjectPreShowScript] PreShowScript running for over 10 seconds. The plugin will not wait any longer!")
+            return
+        }
+        
+
+//            "async function preShowFunction() {\n" +
+//            self.preShowScript + "\n" +
+//            "};\n" +
+//            "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Preshow error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
+        
+        
+    }
+    
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         updateBarButtonItems()
         self.progressView?.progress = 0
@@ -808,7 +871,21 @@ extension WKWebViewController: WKNavigationDelegate {
     }
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
-            self.capBrowserPlugin?.presentView()
+            // injectPreShowScript will block, don't execute on the main thread
+            if (self.preShowScript != nil && !self.preShowScript!.isEmpty) {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    self.injectPreShowScript()
+                    DispatchQueue.main.async { [weak self] in
+                        self?.capBrowserPlugin?.presentView()
+                    }
+                }
+            } else {
+                self.capBrowserPlugin?.presentView()
+            }
+        } else if (self.preShowScript != nil && !self.preShowScript!.isEmpty && self.capBrowserPlugin?.isPresentAfterPageLoad == true) {
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.injectPreShowScript()
+            }
         }
         didpageInit = true
         updateBarButtonItems()

@@ -9,6 +9,14 @@ import type {
 } from "./definitions";
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
+  clearAllCookies(): Promise<any> {
+    console.log("clearAllCookies");
+    return Promise.resolve()
+  }
+  clearCache(): Promise<any> {
+    console.log("clearCache");
+    return Promise.resolve()
+  }
   async open(options: OpenOptions): Promise<any> {
     console.log("open", options);
     return options;
