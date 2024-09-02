@@ -841,10 +841,18 @@ extension WKWebViewController: WKNavigationDelegate {
         
         self.preShowSemaphore = DispatchSemaphore(value: 0)
         self.executeScript(script: script) // this will run on the main thread
-        self.preShowSemaphore?.wait()
         
-        self.preShowSemaphore = nil;
-        self.preShowSemaphore = nil;
+        defer {
+            self.preShowSemaphore = nil;
+            self.preShowError = nil;
+        }
+        
+        if (self.preShowSemaphore?.wait(timeout: .now() + 10) == .timedOut) {
+            print("[InAppBrowser - InjectPreShowScript] PreShowScript running for over 10 seconds. The plugin will not wait any longer!")
+            return
+        }
+        
+
 //            "async function preShowFunction() {\n" +
 //            self.preShowScript + "\n" +
 //            "};\n" +
