@@ -239,8 +239,10 @@ export interface OpenWebViewOptions {
    * @since 6.7.0
    */
   buttonNearDone?: {
-    iconType: 'sf-symbol' | 'resource',
-    icon: String
+    ios: {
+      iconType: 'sf-symbol' | 'resource',
+      icon: String
+    }
   };
 }
 

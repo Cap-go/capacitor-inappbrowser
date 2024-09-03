@@ -142,7 +142,17 @@ public class InAppBrowserPlugin: CAPPlugin {
         
         var buttonNearDoneIcon: UIImage? = nil
         if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
-            guard let iconType = buttonNearDoneSettings["iconType"] as? String else {
+            guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
+                call.reject("IOS settings not found")
+                return
+            }
+            if !(iosSettingsRaw is JSObject) {
+                call.reject("IOS settings are not an object")
+                return
+            }
+            let iosSettings = iosSettingsRaw as! JSObject
+            
+            guard let iconType = iosSettings["iconType"] as? String else {
                 call.reject("buttonNearDone.iconType is empty")
                 return
             }
@@ -150,7 +160,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 call.reject("IconType is neither 'sf-symbol' nor 'resource'")
                 return
             }
-            guard let icon = buttonNearDoneSettings["icon"] as? String else {
+            guard let icon = iosSettings["icon"] as? String else {
                 call.reject("buttonNearDone.icon is empty")
                 return
             }
@@ -159,7 +169,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             if (iconType == "sf-symbol") {
                 buttonNearDoneIcon = UIImage(systemName: icon)
             } else {
-                buttonNearDoneIcon = UIImage(named: icon)
+                // UIImage(resource: ImageResource(name: "public/monkey.svg", bundle: Bundle.main))
+                buttonNearDoneIcon = UIImage(named: icon, in: Bundle.main, with: nil)
             }
         }
 
