@@ -3,21 +3,20 @@ package ee.forgr.capacitor_inappbrowser;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
-import android.util.ArrayMap;
-import android.view.View;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
-import android.view.View;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.ArrayMap;
 import android.util.Log;
+import android.view.View;
+import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
-
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -31,7 +30,6 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -39,7 +37,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -71,7 +68,6 @@ public class InAppBrowserPlugin
   private CustomTabsSession currentSession;
   private WebViewDialog webViewDialog = null;
   private String currentUrl = "";
-
 
   private PermissionRequest currentPermissionRequest;
 
@@ -153,14 +149,14 @@ public class InAppBrowserPlugin
         if (resultCode == Activity.RESULT_OK) {
           if (data != null) {
             String dataString = data.getDataString();
-            if (data.getClipData() != null) {  // If multiple file selected
+            if (data.getClipData() != null) { // If multiple file selected
               int count = data.getClipData().getItemCount();
               results = new Uri[count];
               for (int i = 0; i < count; i++) {
                 results[i] = data.getClipData().getItemAt(i).getUri();
               }
-            } else if (dataString != null) {  //if single file selected
-              results = new Uri[]{Uri.parse(dataString)};
+            } else if (dataString != null) { //if single file selected
+              results = new Uri[] { Uri.parse(dataString) };
             }
           }
         }
@@ -307,6 +303,7 @@ public class InAppBrowserPlugin
 
     call.resolve();
   }
+
   @PluginMethod
   public void clearCache(PluginCall call) {
     CookieManager cookieManager = CookieManager.getInstance();
@@ -353,27 +350,35 @@ public class InAppBrowserPlugin
         String[] parts = cookie.split("=");
         if (parts.length > 0) {
           cookiesToRemove.add(parts[0].trim());
-          CookieManager.getInstance().setCookie(url, String.format("%s=del;", parts[0].trim()));
+          CookieManager.getInstance()
+            .setCookie(url, String.format("%s=del;", parts[0].trim()));
         }
       }
     }
 
     StringBuilder scriptToRun = new StringBuilder();
-    for (String cookieToRemove: cookiesToRemove) {
-      scriptToRun.append(String.format("window.cookieStore.delete('%s', {name: '%s', domain: '%s'});", cookieToRemove, cookieToRemove, url));
+    for (String cookieToRemove : cookiesToRemove) {
+      scriptToRun.append(
+        String.format(
+          "window.cookieStore.delete('%s', {name: '%s', domain: '%s'});",
+          cookieToRemove,
+          cookieToRemove,
+          url
+        )
+      );
     }
 
     Log.i("DelCookies", String.format("Script to run:\n%s", scriptToRun));
 
     this.getActivity()
-        .runOnUiThread(
-            new Runnable() {
-              @Override
-              public void run() {
-                webViewDialog.executeScript(scriptToRun.toString());
-              }
-            }
-        );
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            webViewDialog.executeScript(scriptToRun.toString());
+          }
+        }
+      );
 
     call.resolve();
   }

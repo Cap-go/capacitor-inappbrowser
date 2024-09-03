@@ -33,9 +33,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-
 import androidx.annotation.Nullable;
-
 import com.getcapacitor.JSObject;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -47,7 +45,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -100,6 +97,7 @@ public class WebViewDialog extends Dialog {
   }
 
   public class PreShowScriptInterface {
+
     @JavascriptInterface
     public void error(String error) {
       // Handle message from JavaScript
@@ -139,8 +137,8 @@ public class WebViewDialog extends Dialog {
       "AndroidInterface"
     );
     _webView.addJavascriptInterface(
-        new PreShowScriptInterface(),
-        "PreShowScriptInterface"
+      new PreShowScriptInterface(),
+      "PreShowScriptInterface"
     );
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
@@ -287,8 +285,8 @@ public class WebViewDialog extends Dialog {
   }
 
   private void injectPreShowScript() {
-//    String script =
-//        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
+    //    String script =
+    //        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
 
     if (preShowSemaphore != null) {
       return;
@@ -296,42 +294,44 @@ public class WebViewDialog extends Dialog {
 
     String script =
       "async function preShowFunction() {\n" +
-      _options.getPreShowScript() + '\n' +
+      _options.getPreShowScript() +
+      '\n' +
       "};\n" +
       "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Preshow error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
 
     Log.i(
-    "InjectPreShowScript",
-    String.format("PreShowScript script:\n%s", script)
+      "InjectPreShowScript",
+      String.format("PreShowScript script:\n%s", script)
     );
 
     preShowSemaphore = new Semaphore(0);
-    activity.runOnUiThread(new Runnable() {
-      @Override
-      public void run() {
-        _webView.evaluateJavascript(script, null);
+    activity.runOnUiThread(
+      new Runnable() {
+        @Override
+        public void run() {
+          _webView.evaluateJavascript(script, null);
+        }
       }
-    });
+    );
 
     try {
       if (!preShowSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
         Log.e(
-        "InjectPreShowScript",
-        "PreShowScript running for over 10 seconds. The plugin will not wait any longer!"
+          "InjectPreShowScript",
+          "PreShowScript running for over 10 seconds. The plugin will not wait any longer!"
         );
         return;
       }
       if (preshowError != null && !preshowError.isEmpty()) {
         Log.e(
-        "InjectPreShowScript",
-        "Error within the user-provided preShowFunction: " + preshowError
+          "InjectPreShowScript",
+          "Error within the user-provided preShowFunction: " + preshowError
         );
       }
-
     } catch (InterruptedException e) {
       Log.e(
-          "InjectPreShowScript",
-          "Error when calling InjectPreShowScript: " + e.getMessage()
+        "InjectPreShowScript",
+        "Error when calling InjectPreShowScript: " + e.getMessage()
       );
     } finally {
       preShowSemaphore = null;
@@ -639,30 +639,42 @@ public class WebViewDialog extends Dialog {
             isInitialized = true;
             _webView.clearHistory();
             if (_options.isPresentAfterPageLoad()) {
-              boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
+              boolean usePreShowScript =
+                _options.getPreShowScript() != null &&
+                !_options.getPreShowScript().isEmpty();
               if (!usePreShowScript) {
                 show();
                 _options.getPluginCall().resolve();
               } else {
-                executorService.execute(new Runnable() {
-                  @Override
-                  public void run() {
-                    if (_options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty()) {
-                      injectPreShowScript();
-                    }
-
-                    activity.runOnUiThread(new Runnable() {
-                      @Override
-                      public void run() {
-                        show();
-                        _options.getPluginCall().resolve();
+                executorService.execute(
+                  new Runnable() {
+                    @Override
+                    public void run() {
+                      if (
+                        _options.getPreShowScript() != null &&
+                        !_options.getPreShowScript().isEmpty()
+                      ) {
+                        injectPreShowScript();
                       }
-                    });
+
+                      activity.runOnUiThread(
+                        new Runnable() {
+                          @Override
+                          public void run() {
+                            show();
+                            _options.getPluginCall().resolve();
+                          }
+                        }
+                      );
+                    }
                   }
-                });
+                );
               }
             }
-          } else if (_options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty()) {
+          } else if (
+            _options.getPreShowScript() != null &&
+            !_options.getPreShowScript().isEmpty()
+          ) {
             injectPreShowScript();
           }
 
