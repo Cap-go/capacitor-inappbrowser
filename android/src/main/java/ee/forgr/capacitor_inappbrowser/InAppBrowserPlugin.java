@@ -9,14 +9,10 @@ import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.ArrayMap;
 import android.util.Log;
-import android.view.View;
-import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
+import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -32,11 +28,6 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.Semaphore;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -215,7 +206,7 @@ public class InAppBrowserPlugin
   CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
     @Override
     public void onCustomTabsServiceConnected(
-      ComponentName name,
+      @NonNull ComponentName name,
       CustomTabsClient client
     ) {
       customTabsClient = client;
@@ -339,8 +330,6 @@ public class InAppBrowserPlugin
     String cookieString = cookieManager.getCookie(url);
     ArrayList<String> cookiesToRemove = new ArrayList<>();
 
-    cookiesToRemove.clear();
-
     if (cookieString != null) {
       String[] cookies = cookieString.split("; ");
 
@@ -417,8 +406,12 @@ public class InAppBrowserPlugin
     options.setUrl(url);
     options.setHeaders(call.getObject("headers"));
     options.setCredentials(call.getObject("credentials"));
-    options.setShowReloadButton(call.getBoolean("showReloadButton", false));
-    options.setVisibleTitle(call.getBoolean("visibleTitle", true));
+    options.setShowReloadButton(
+      Boolean.TRUE.equals(call.getBoolean("showReloadButton", false))
+    );
+    options.setVisibleTitle(
+      Boolean.TRUE.equals(call.getBoolean("visibleTitle", true))
+    );
     if (Boolean.TRUE.equals(options.getVisibleTitle())) {
       options.setTitle(call.getString("title", "New Window"));
     } else {
@@ -434,15 +427,19 @@ public class InAppBrowserPlugin
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
     options.setActiveNativeNavigationForWebview(
-      call.getBoolean("activeNativeNavigationForWebview", false)
+      Boolean.TRUE.equals(
+        call.getBoolean("activeNativeNavigationForWebview", false)
+      )
     );
     options.setDisableGoBackOnNativeApplication(
-      call.getBoolean("disableGoBackOnNativeApplication", false)
+      Boolean.TRUE.equals(
+        call.getBoolean("disableGoBackOnNativeApplication", false)
+      )
     );
     options.setPresentAfterPageLoad(
-      call.getBoolean("isPresentAfterPageLoad", false)
+      Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
     );
-    if (call.getBoolean("closeModal", false)) {
+    if (Boolean.TRUE.equals(call.getBoolean("closeModal", false))) {
       options.setCloseModal(true);
       options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
       options.setCloseModalDescription(
@@ -541,11 +538,11 @@ public class InAppBrowserPlugin
     }
     JSObject eventData = call.getObject("detail");
     // Log event data
-    Log.d("InAppBrowserPlugin", "Event data: " + eventData.toString());
     if (eventData == null) {
       call.reject("No event data provided");
       return;
     }
+    Log.d("InAppBrowserPlugin", "Event data: " + eventData.toString());
     this.getActivity()
       .runOnUiThread(
         new Runnable() {

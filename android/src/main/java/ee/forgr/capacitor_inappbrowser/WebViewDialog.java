@@ -14,7 +14,6 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -26,17 +25,16 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-import androidx.annotation.Nullable;
 import com.getcapacitor.JSObject;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -45,7 +43,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
@@ -116,14 +113,14 @@ public class WebViewDialog extends Dialog {
     }
   }
 
+  @SuppressLint("SetJavaScriptEnabled")
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setCancelable(true);
-    getWindow()
-      .setFlags(
-        WindowManager.LayoutParams.FLAG_FULLSCREEN,
-        WindowManager.LayoutParams.FLAG_FULLSCREEN
-      );
+    Objects.requireNonNull(getWindow()).setFlags(
+      WindowManager.LayoutParams.FLAG_FULLSCREEN,
+      WindowManager.LayoutParams.FLAG_FULLSCREEN
+    );
     setContentView(R.layout.activity_browser);
     getWindow()
       .setLayout(
@@ -178,7 +175,7 @@ public class WebViewDialog extends Dialog {
         public void onPermissionRequest(final PermissionRequest request) {
           Log.i(
             "INAPPBROWSER",
-            "onPermissionRequest " + request.getResources().toString()
+            "onPermissionRequest " + Arrays.toString(request.getResources())
           );
           final String[] requestedResources = request.getResources();
           for (String r : requestedResources) {
