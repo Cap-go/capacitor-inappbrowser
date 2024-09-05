@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.6.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.5...6.6.6) (2024-09-05)
+
+
+### Bug Fixes
+
+* add mic perm on camera perm ([891ab1e](https://github.com/Cap-go/capacitor-inappbrowser/commit/891ab1e4f159276522c151b7cc7d4adb1aeaaf60))
+* Android studio lint ([619f5fb](https://github.com/Cap-go/capacitor-inappbrowser/commit/619f5fb1e332340f349453a3fd48d49c3b9ef652))
+* doc perms ([b2557a3](https://github.com/Cap-go/capacitor-inappbrowser/commit/b2557a3b2466c7d1de90e9b5e54cbb815430e178))
+
 ### [6.6.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.4...6.6.5) (2024-09-04)
 
 
