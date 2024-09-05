@@ -188,7 +188,7 @@ public class WebViewDialog extends Dialog {
               if (permissionHandler != null) {
                 permissionHandler.handleCameraPermissionRequest(request);
               }
-              break;
+              return; // Return here to avoid denying the request
             } else if (r.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
               Log.i("INAPPBROWSER", "RESOURCE_AUDIO_CAPTURE req");
               // Store the permission request
@@ -197,9 +197,11 @@ public class WebViewDialog extends Dialog {
               if (permissionHandler != null) {
                 permissionHandler.handleMicrophonePermissionRequest(request);
               }
-              break;
+              return; // Return here to avoid denying the request
             }
           }
+          // If no matching permission is found, deny the request
+          request.deny();
         }
 
         @Override

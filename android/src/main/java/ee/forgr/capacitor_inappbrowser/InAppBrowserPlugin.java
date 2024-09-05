@@ -85,33 +85,27 @@ public class InAppBrowserPlugin
   }
 
   @PermissionCallback
-  private void microphonePermissionCallback() {
+  private void microphonePermissionCallback(PluginCall call) {
     if (getPermissionState("microphone") == PermissionState.GRANTED) {
-      grantCameraPermission();
+      grantCameraAndMicrophonePermission();
     } else {
       if (currentPermissionRequest != null) {
         currentPermissionRequest.deny();
         currentPermissionRequest = null;
       }
-      // Handle the case where permission was not granted
+      call.reject("Microphone permission is required");
     }
   }
 
-  @PermissionCallback
-  private void microphonePermissionCallback(PluginCall call) {
-    if (getPermissionState("microphone") == PermissionState.GRANTED) {
-      // Permission granted, notify the WebView to proceed
-      if (
-        webViewDialog != null && webViewDialog.currentPermissionRequest != null
-      ) {
-        webViewDialog.currentPermissionRequest.grant(
-          new String[] { PermissionRequest.RESOURCE_AUDIO_CAPTURE }
-        );
-        webViewDialog.currentPermissionRequest = null;
-      }
-      call.resolve();
-    } else {
-      call.reject("Camera permission is required");
+  private void grantCameraAndMicrophonePermission() {
+    if (currentPermissionRequest != null) {
+      currentPermissionRequest.grant(
+        new String[] {
+          PermissionRequest.RESOURCE_VIDEO_CAPTURE,
+          PermissionRequest.RESOURCE_AUDIO_CAPTURE,
+        }
+      );
+      currentPermissionRequest = null;
     }
   }
 
@@ -119,8 +113,14 @@ public class InAppBrowserPlugin
     this.currentPermissionRequest = request;
     if (getPermissionState("camera") != PermissionState.GRANTED) {
       requestPermissionForAlias("camera", null, "cameraPermissionCallback");
+    } else if (getPermissionState("microphone") != PermissionState.GRANTED) {
+      requestPermissionForAlias(
+        "microphone",
+        null,
+        "microphonePermissionCallback"
+      );
     } else {
-      grantCameraPermission();
+      grantCameraAndMicrophonePermission();
     }
   }
 
@@ -179,17 +179,20 @@ public class InAppBrowserPlugin
   @PermissionCallback
   private void cameraPermissionCallback(PluginCall call) {
     if (getPermissionState("camera") == PermissionState.GRANTED) {
-      // Permission granted, notify the WebView to proceed
-      if (
-        webViewDialog != null && webViewDialog.currentPermissionRequest != null
-      ) {
-        webViewDialog.currentPermissionRequest.grant(
-          new String[] { PermissionRequest.RESOURCE_VIDEO_CAPTURE }
+      if (getPermissionState("microphone") != PermissionState.GRANTED) {
+        requestPermissionForAlias(
+          "microphone",
+          null,
+          "microphonePermissionCallback"
         );
-        webViewDialog.currentPermissionRequest = null;
+      } else {
+        grantCameraAndMicrophonePermission();
       }
-      call.resolve();
     } else {
+      if (currentPermissionRequest != null) {
+        currentPermissionRequest.deny();
+        currentPermissionRequest = null;
+      }
       call.reject("Camera permission is required");
     }
   }
