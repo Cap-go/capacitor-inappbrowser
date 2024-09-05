@@ -19,6 +19,7 @@ export interface BtnEvent {
 
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
+export type ButtonNearListener = (state: {}) => void;
 
 export enum BackgroundColor {
   WHITE = "white",
@@ -312,6 +313,11 @@ export interface InAppBrowserPlugin {
   addListener(
     eventName: "urlChangeEvent",
     listenerFunc: UrlChangeListener,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: "buttonNearDoneClick",
+    listenerFunc: ButtonNearListener,
   ): Promise<PluginListenerHandle>;
 
   /**

@@ -70,6 +70,8 @@ Add the following to your `Info.plist` file:
 
 * [`open(...)`](#open)
 * [`clearCookies(...)`](#clearcookies)
+* [`clearAllCookies()`](#clearallcookies)
+* [`clearCache()`](#clearcache)
 * [`getCookies(...)`](#getcookies)
 * [`close()`](#close)
 * [`openWebView(...)`](#openwebview)
@@ -77,6 +79,7 @@ Add the following to your `Info.plist` file:
 * [`postMessage(...)`](#postmessage)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
+* [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
@@ -127,6 +130,36 @@ Clear cookies of url
 **Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 0.5.0
+
+--------------------
+
+
+### clearAllCookies()
+
+```typescript
+clearAllCookies() => Promise<any>
+```
+
+Clear all cookies
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+**Since:** 6.5.0
+
+--------------------
+
+
+### clearCache()
+
+```typescript
+clearCache() => Promise<any>
+```
+
+Clear cache
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+**Since:** 6.5.0
 
 --------------------
 
@@ -202,7 +235,7 @@ postMessage(options: { detail: Record<string, any>; }) => Promise<void>
 ```
 
 Sends an event to the webview. you can listen to this event with addListener("messageFromWebview", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
-detail is the data you want to send to the webview, the key will be stripped from the event object, it's a requirement of Capacitor
+detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
 Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
 
 | Param         | Type                                                                      |
@@ -245,6 +278,22 @@ Listen for url change, only for openWebView
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### addListener('buttonNearDoneClick', ...)
+
+```typescript
+addListener(eventName: "buttonNearDoneClick", listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>
+```
+
+| Param              | Type                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| **`eventName`**    | <code>'buttonNearDoneClick'</code>                                |
+| **`listenerFunc`** | <code><a href="#buttonnearlistener">ButtonNearListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
@@ -292,19 +341,19 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 ### addListener('messageFromWebview', ...)
 
 ```typescript
-addListener(eventName: "messageFromWebview", listenerFunc: (event: Record<string, any>) => void) => Promise<PluginListenerHandle>
+addListener(eventName: "messageFromWebview", listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when event is sent from webview, to send an event to the webview use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
-detail is the data you want to send to the webview, the key will be stripped from the event object, we made it consistent with Capacitor
+detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
 Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
 
 This method is inject at runtime in the webview
 
-| Param              | Type                                                                             |
-| ------------------ | -------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'messageFromWebview'</code>                                                |
-| **`listenerFunc`** | <code>(event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void</code> |
+| Param              | Type                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'messageFromWebview'</code>                                                             |
+| **`listenerFunc`** | <code>(event: { detail: <a href="#record">Record</a>&lt;string, any&gt;; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -335,7 +384,7 @@ Will be triggered when page is loaded
 addListener(eventName: "pageLoadError", listenerFunc: () => void) => Promise<PluginListenerHandle>
 ```
 
-Will be triggered when page is loaded
+Will be triggered when page load error
 
 | Param              | Type                         |
 | ------------------ | ---------------------------- |
@@ -402,10 +451,9 @@ Reload the current web page.
 
 #### ClearCookieOptions
 
-| Prop        | Type                 |
-| ----------- | -------------------- |
-| **`url`**   | <code>string</code>  |
-| **`cache`** | <code>boolean</code> |
+| Prop      | Type                |
+| --------- | ------------------- |
+| **`url`** | <code>string</code> |
 
 
 #### HttpCookie
@@ -427,31 +475,33 @@ Reload the current web page.
 
 #### OpenWebViewOptions
 
-| Prop                                   | Type                                                            | Description                                                                                                                                                                       | Default                                                    | Since  |
-| -------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------ |
-| **`url`**                              | <code>string</code>                                             | Target URL to load.                                                                                                                                                               |                                                            | 0.1.0  |
-| **`headers`**                          | <code><a href="#headers">Headers</a></code>                     | <a href="#headers">Headers</a> to send with the request.                                                                                                                          |                                                            | 0.1.0  |
-| **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>             | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                    |                                                            | 6.1.0  |
-| **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code> | share options                                                                                                                                                                     |                                                            | 0.1.0  |
-| **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>             | Toolbar type                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>                           | 0.1.0  |
-| **`shareSubject`**                     | <code>string</code>                                             | Share subject                                                                                                                                                                     |                                                            | 0.1.0  |
-| **`title`**                            | <code>string</code>                                             | Title of the browser                                                                                                                                                              | <code>'New Window'</code>                                  | 0.1.0  |
-| **`backgroundColor`**                  | <code><a href="#backgroundcolor">BackgroundColor</a></code>     | Background color of the browser, only on IOS                                                                                                                                      | <code>BackgroundColor.BLACK</code>                         | 0.1.0  |
-| **`activeNativeNavigationForWebview`** | <code>boolean</code>                                            | If true, active the native navigation within the webview, Android only                                                                                                            | <code>false</code>                                         |        |
-| **`disableGoBackOnNativeApplication`** | <code>boolean</code>                                            | Disable the possibility to go back on native application, usefull to force user to stay on the webview, Android only                                                              | <code>false</code>                                         |        |
-| **`isPresentAfterPageLoad`**           | <code>boolean</code>                                            | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | <code>false</code>                                         | 0.1.0  |
-| **`isInspectable`**                    | <code>boolean</code>                                            | Whether the website in the webview is inspectable or not, ios only                                                                                                                | <code>false</code>                                         |        |
-| **`isAnimated`**                       | <code>boolean</code>                                            | Whether the webview opening is animated or not, ios only                                                                                                                          | <code>true</code>                                          |        |
-| **`showReloadButton`**                 | <code>boolean</code>                                            | Shows a reload button that reloads the web page                                                                                                                                   | <code>false</code>                                         | 1.0.15 |
-| **`closeModal`**                       | <code>boolean</code>                                            | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                | <code>false</code>                                         | 1.1.0  |
-| **`closeModalTitle`**                  | <code>string</code>                                             | CloseModalTitle: title of the confirm when user clicks on close button, only on IOS                                                                                               | <code>'Close'</code>                                       | 1.1.0  |
-| **`closeModalDescription`**            | <code>string</code>                                             | CloseModalDescription: description of the confirm when user clicks on close button, only on IOS                                                                                   | <code>'Are you sure you want to close this window?'</code> | 1.1.0  |
-| **`closeModalOk`**                     | <code>string</code>                                             | CloseModalOk: text of the confirm button when user clicks on close button, only on IOS                                                                                            | <code>'Close'</code>                                       | 1.1.0  |
-| **`closeModalCancel`**                 | <code>string</code>                                             | CloseModalCancel: text of the cancel button when user clicks on close button, only on IOS                                                                                         | <code>'Cancel'</code>                                      | 1.1.0  |
-| **`visibleTitle`**                     | <code>boolean</code>                                            | visibleTitle: if true the website title would be shown else shown empty                                                                                                           | <code>true</code>                                          | 1.2.5  |
-| **`toolbarColor`**                     | <code>string</code>                                             | toolbarColor: color of the toolbar in hex format                                                                                                                                  | <code>'#ffffff''</code>                                    | 1.2.5  |
-| **`showArrow`**                        | <code>boolean</code>                                            | showArrow: if true an arrow would be shown instead of cross for closing the window                                                                                                | <code>false</code>                                         | 1.2.5  |
-| **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                            | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                             | <code>false</code>                                         | 6.1.0  |
+| Prop                                   | Type                                                                                                | Description                                                                                                                                                                                                                                       | Default                                                    | Since  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------ |
+| **`url`**                              | <code>string</code>                                                                                 | Target URL to load.                                                                                                                                                                                                                               |                                                            | 0.1.0  |
+| **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                         | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                          |                                                            | 0.1.0  |
+| **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>                                                 | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                                                                                    |                                                            | 6.1.0  |
+| **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                     | share options                                                                                                                                                                                                                                     |                                                            | 0.1.0  |
+| **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                 | Toolbar type                                                                                                                                                                                                                                      | <code>ToolBarType.DEFAULT</code>                           | 0.1.0  |
+| **`shareSubject`**                     | <code>string</code>                                                                                 | Share subject                                                                                                                                                                                                                                     |                                                            | 0.1.0  |
+| **`title`**                            | <code>string</code>                                                                                 | Title of the browser                                                                                                                                                                                                                              | <code>'New Window'</code>                                  | 0.1.0  |
+| **`backgroundColor`**                  | <code><a href="#backgroundcolor">BackgroundColor</a></code>                                         | Background color of the browser, only on IOS                                                                                                                                                                                                      | <code>BackgroundColor.BLACK</code>                         | 0.1.0  |
+| **`activeNativeNavigationForWebview`** | <code>boolean</code>                                                                                | If true, active the native navigation within the webview, Android only                                                                                                                                                                            | <code>false</code>                                         |        |
+| **`disableGoBackOnNativeApplication`** | <code>boolean</code>                                                                                | Disable the possibility to go back on native application, usefull to force user to stay on the webview, Android only                                                                                                                              | <code>false</code>                                         |        |
+| **`isPresentAfterPageLoad`**           | <code>boolean</code>                                                                                | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.                                                                 | <code>false</code>                                         | 0.1.0  |
+| **`isInspectable`**                    | <code>boolean</code>                                                                                | Whether the website in the webview is inspectable or not, ios only                                                                                                                                                                                | <code>false</code>                                         |        |
+| **`isAnimated`**                       | <code>boolean</code>                                                                                | Whether the webview opening is animated or not, ios only                                                                                                                                                                                          | <code>true</code>                                          |        |
+| **`showReloadButton`**                 | <code>boolean</code>                                                                                | Shows a reload button that reloads the web page                                                                                                                                                                                                   | <code>false</code>                                         | 1.0.15 |
+| **`closeModal`**                       | <code>boolean</code>                                                                                | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                                                                                | <code>false</code>                                         | 1.1.0  |
+| **`closeModalTitle`**                  | <code>string</code>                                                                                 | CloseModalTitle: title of the confirm when user clicks on close button, only on IOS                                                                                                                                                               | <code>'Close'</code>                                       | 1.1.0  |
+| **`closeModalDescription`**            | <code>string</code>                                                                                 | CloseModalDescription: description of the confirm when user clicks on close button, only on IOS                                                                                                                                                   | <code>'Are you sure you want to close this window?'</code> | 1.1.0  |
+| **`closeModalOk`**                     | <code>string</code>                                                                                 | CloseModalOk: text of the confirm button when user clicks on close button, only on IOS                                                                                                                                                            | <code>'Close'</code>                                       | 1.1.0  |
+| **`closeModalCancel`**                 | <code>string</code>                                                                                 | CloseModalCancel: text of the cancel button when user clicks on close button, only on IOS                                                                                                                                                         | <code>'Cancel'</code>                                      | 1.1.0  |
+| **`visibleTitle`**                     | <code>boolean</code>                                                                                | visibleTitle: if true the website title would be shown else shown empty                                                                                                                                                                           | <code>true</code>                                          | 1.2.5  |
+| **`toolbarColor`**                     | <code>string</code>                                                                                 | toolbarColor: color of the toolbar in hex format                                                                                                                                                                                                  | <code>'#ffffff''</code>                                    | 1.2.5  |
+| **`showArrow`**                        | <code>boolean</code>                                                                                | showArrow: if true an arrow would be shown instead of cross for closing the window                                                                                                                                                                | <code>false</code>                                         | 1.2.5  |
+| **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                             | <code>false</code>                                         | 6.1.0  |
+| **`preShowScript`**                    | <code><a href="#string">String</a></code>                                                           | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds) |                                                            | 6.6.0  |
+| **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'resource'; icon: <a href="#string">String</a>; }; }</code> | TODO                                                                                                                                                                                                                                              |                                                            | 6.7.0  |
 
 
 #### DisclaimerOptions
@@ -462,6 +512,72 @@ Reload the current web page.
 | **`message`**    | <code>string</code> |
 | **`confirmBtn`** | <code>string</code> |
 | **`cancelBtn`**  | <code>string</code> |
+
+
+#### String
+
+Allows manipulation and formatting of text strings and determination and location of substrings within strings.
+
+| Prop         | Type                | Description                                                  |
+| ------------ | ------------------- | ------------------------------------------------------------ |
+| **`length`** | <code>number</code> | Returns the length of a <a href="#string">String</a> object. |
+
+| Method                | Signature                                                                                                                      | Description                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **toString**          | () =&gt; string                                                                                                                | Returns a string representation of a string.                                                                                                  |
+| **charAt**            | (pos: number) =&gt; string                                                                                                     | Returns the character at the specified index.                                                                                                 |
+| **charCodeAt**        | (index: number) =&gt; number                                                                                                   | Returns the Unicode value of the character at the specified location.                                                                         |
+| **concat**            | (...strings: string[]) =&gt; string                                                                                            | Returns a string that contains the concatenation of two or more strings.                                                                      |
+| **indexOf**           | (searchString: string, position?: number \| undefined) =&gt; number                                                            | Returns the position of the first occurrence of a substring.                                                                                  |
+| **lastIndexOf**       | (searchString: string, position?: number \| undefined) =&gt; number                                                            | Returns the last occurrence of a substring in the string.                                                                                     |
+| **localeCompare**     | (that: string) =&gt; number                                                                                                    | Determines whether two strings are equivalent in the current locale.                                                                          |
+| **match**             | (regexp: string \| <a href="#regexp">RegExp</a>) =&gt; <a href="#regexpmatcharray">RegExpMatchArray</a> \| null                | Matches a string with a regular expression, and returns an array containing the results of that search.                                       |
+| **replace**           | (searchValue: string \| <a href="#regexp">RegExp</a>, replaceValue: string) =&gt; string                                       | Replaces text in a string, using a regular expression or search string.                                                                       |
+| **replace**           | (searchValue: string \| <a href="#regexp">RegExp</a>, replacer: (substring: string, ...args: any[]) =&gt; string) =&gt; string | Replaces text in a string, using a regular expression or search string.                                                                       |
+| **search**            | (regexp: string \| <a href="#regexp">RegExp</a>) =&gt; number                                                                  | Finds the first substring match in a regular expression search.                                                                               |
+| **slice**             | (start?: number \| undefined, end?: number \| undefined) =&gt; string                                                          | Returns a section of a string.                                                                                                                |
+| **split**             | (separator: string \| <a href="#regexp">RegExp</a>, limit?: number \| undefined) =&gt; string[]                                | Split a string into substrings using the specified separator and return them as an array.                                                     |
+| **substring**         | (start: number, end?: number \| undefined) =&gt; string                                                                        | Returns the substring at the specified location within a <a href="#string">String</a> object.                                                 |
+| **toLowerCase**       | () =&gt; string                                                                                                                | Converts all the alphabetic characters in a string to lowercase.                                                                              |
+| **toLocaleLowerCase** | (locales?: string \| string[] \| undefined) =&gt; string                                                                       | Converts all alphabetic characters to lowercase, taking into account the host environment's current locale.                                   |
+| **toUpperCase**       | () =&gt; string                                                                                                                | Converts all the alphabetic characters in a string to uppercase.                                                                              |
+| **toLocaleUpperCase** | (locales?: string \| string[] \| undefined) =&gt; string                                                                       | Returns a string where all alphabetic characters have been converted to uppercase, taking into account the host environment's current locale. |
+| **trim**              | () =&gt; string                                                                                                                | Removes the leading and trailing white space and line terminator characters from a string.                                                    |
+| **substr**            | (from: number, length?: number \| undefined) =&gt; string                                                                      | Gets a substring beginning at the specified location and having the specified length.                                                         |
+| **valueOf**           | () =&gt; string                                                                                                                | Returns the primitive value of the specified object.                                                                                          |
+
+
+#### RegExpMatchArray
+
+| Prop        | Type                |
+| ----------- | ------------------- |
+| **`index`** | <code>number</code> |
+| **`input`** | <code>string</code> |
+
+
+#### RegExp
+
+| Prop             | Type                 | Description                                                                                                                                                          |
+| ---------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`source`**     | <code>string</code>  | Returns a copy of the text of the regular expression pattern. Read-only. The regExp argument is a Regular expression object. It can be a variable name or a literal. |
+| **`global`**     | <code>boolean</code> | Returns a Boolean value indicating the state of the global flag (g) used with a regular expression. Default is false. Read-only.                                     |
+| **`ignoreCase`** | <code>boolean</code> | Returns a Boolean value indicating the state of the ignoreCase flag (i) used with a regular expression. Default is false. Read-only.                                 |
+| **`multiline`**  | <code>boolean</code> | Returns a Boolean value indicating the state of the multiline flag (m) used with a regular expression. Default is false. Read-only.                                  |
+| **`lastIndex`**  | <code>number</code>  |                                                                                                                                                                      |
+
+| Method      | Signature                                                                     | Description                                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **exec**    | (string: string) =&gt; <a href="#regexpexecarray">RegExpExecArray</a> \| null | Executes a search on a string using a regular expression pattern, and returns an array containing the results of that search. |
+| **test**    | (string: string) =&gt; boolean                                                | Returns a Boolean value that indicates whether or not a pattern exists in a searched string.                                  |
+| **compile** | () =&gt; this                                                                 |                                                                                                                               |
+
+
+#### RegExpExecArray
+
+| Prop        | Type                |
+| ----------- | ------------------- |
+| **`index`** | <code>number</code> |
+| **`input`** | <code>string</code> |
 
 
 #### PluginListenerHandle
@@ -529,6 +645,11 @@ Construct a type with a set of properties K of type T
 #### UrlChangeListener
 
 <code>(state: <a href="#urlevent">UrlEvent</a>): void</code>
+
+
+#### ButtonNearListener
+
+<code>(state: {}): void</code>
 
 
 #### ConfirmBtnListener

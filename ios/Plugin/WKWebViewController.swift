@@ -276,7 +276,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             };
         }
         """
-        webView?.evaluateJavaScript(script, completionHandler: nil)
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -400,25 +402,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
         switch keyPath {
         case estimatedProgressKeyPath?:
-            guard let estimatedProgress = self.webView?.estimatedProgress else {
-                return
-            }
-            self.progressView?.alpha = 1
-            self.progressView?.setProgress(Float(estimatedProgress), animated: true)
+            DispatchQueue.main.async {
+                guard let estimatedProgress = self.webView?.estimatedProgress else {
+                    return
+                }
+                self.progressView?.alpha = 1
+                self.progressView?.setProgress(Float(estimatedProgress), animated: true)
 
-            if estimatedProgress >= 1.0 {
-                UIView.animate(withDuration: 0.3, delay: 0.3, options: .curveEaseOut, animations: {
-                    self.progressView?.alpha = 0
-                }, completion: {
-                    _ in
-                    self.progressView?.setProgress(0, animated: false)
-                })
+                if estimatedProgress >= 1.0 {
+                    UIView.animate(withDuration: 0.3, delay: 0.3, options: .curveEaseOut, animations: {
+                        self.progressView?.alpha = 0
+                    }, completion: {
+                        _ in
+                        self.progressView?.setProgress(0, animated: false)
+                    })
+                }
             }
         case titleKeyPath?:
             if self.hasDynamicTitle {
                 self.navigationItem.title = webView?.url?.host
             }
         case "URL":
+            
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             self.injectJavaScriptInterface()
         default:
@@ -442,7 +447,9 @@ public extension WKWebViewController {
     }
 
     func load(remote: URL) {
-        webView?.load(createRequest(url: remote))
+        DispatchQueue.main.async {
+            self.webView?.load(self.createRequest(url: remote))
+        }
     }
 
     func load(file: URL, access: URL) {
@@ -592,8 +599,8 @@ fileprivate extension WKWebViewController {
             }
             return UIBarButtonItem()
         }
-        if (rightBarButtons.count == 1 && buttonNearDoneIcon != nil) {
-            rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: nil))
+        if (rightBarButtons.count == 1 && buttonNearDoneIcon != nil && rightBarButtons[0] == doneBarButtonItem) {
+            rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: #selector(buttonNearDoneDidClick)))
         }
         navigationItem.rightBarButtonItems = rightBarButtons
 
@@ -727,6 +734,10 @@ fileprivate extension WKWebViewController {
 
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
+    }
+    
+    @objc func buttonNearDoneDidClick(sender: AnyObject) {
+        self.capBrowserPlugin?.notifyListeners("buttonNearDoneClick", data: [:])
     }
 
     @objc func reloadDidClick(sender: AnyObject) {
