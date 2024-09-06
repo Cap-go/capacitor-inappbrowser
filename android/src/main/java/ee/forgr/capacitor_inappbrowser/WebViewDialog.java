@@ -2,18 +2,23 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.graphics.Picture;
 import android.app.AlertDialog;
+import android.view.ViewGroup.LayoutParams;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Log;
+import com.caverock.androidsvg.SVG;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
@@ -36,7 +41,11 @@ import android.widget.Toolbar;
 
 import androidx.annotation.Nullable;
 
+import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
+
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.HashMap;
@@ -494,6 +503,39 @@ public class WebViewDialog extends Dialog {
           }
         }
       );
+    }
+
+    Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
+    if (buttonNearDone != null) {
+      AssetManager assetManager = _context.getAssets();
+
+      // Open the SVG file from assets
+      InputStream inputStream = null;
+      try {
+        ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+        buttonNearDoneView.setVisibility(View.VISIBLE);
+
+        inputStream  = assetManager.open(buttonNearDone.getIcon());
+
+        SVG svg = SVG.getFromInputStream(inputStream);
+        Picture picture = svg.renderToPicture(buttonNearDone.getWidth(), buttonNearDone.getHeight());
+        PictureDrawable pictureDrawable = new PictureDrawable(picture);
+
+        buttonNearDoneView.setImageDrawable(pictureDrawable);
+      } catch (IOException | SVGParseException e) {
+          throw new RuntimeException(e);
+      } finally {
+        if (inputStream != null) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+      }
+    } else {
+      ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+      buttonNearDoneView.setVisibility(View.GONE);
     }
 
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {

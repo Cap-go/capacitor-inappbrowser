@@ -243,6 +243,12 @@ export interface OpenWebViewOptions {
     ios: {
       iconType: 'sf-symbol' | 'resource',
       icon: String
+    },
+    android: {
+      iconType: 'asset',
+      icon: String,
+      width?: number
+      height?: number
     }
   };
 }
