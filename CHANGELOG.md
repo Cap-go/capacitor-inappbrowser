@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.7.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.8...6.7.0) (2024-09-07)
+
+
+### Features
+
+* **Android:** Implement buttonNearDone part 1 ([635fc5b](https://github.com/Cap-go/capacitor-inappbrowser/commit/635fc5bfe3db272f7c5463b6383e0a102245cdfa))
+* finish buttonNearDone ([6c57219](https://github.com/Cap-go/capacitor-inappbrowser/commit/6c57219ce83bd2162c44f3447c18b0e242d5dbc7))
+* **IOS:** add buttonNearDone ([2bdd1bd](https://github.com/Cap-go/capacitor-inappbrowser/commit/2bdd1bd8998463b579f176d11b53678e052268e8))
+* **IOS:** finish custom button near done ([e7cae52](https://github.com/Cap-go/capacitor-inappbrowser/commit/e7cae52d6a84d8f27790750872a09ffe39e38195))
+* **IOS:** IOS specific settings && support for custom icons ([d045215](https://github.com/Cap-go/capacitor-inappbrowser/commit/d045215bbfd0a10b38927ec2e931daf9ef991ba2))
+
 ### [6.6.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.7...6.6.8) (2024-09-05)
 
 ### [6.6.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.6...6.6.7) (2024-09-05)
