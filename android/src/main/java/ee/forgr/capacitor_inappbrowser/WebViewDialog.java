@@ -505,50 +505,57 @@ public class WebViewDialog extends Dialog {
       );
     }
 
-    Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
-    if (buttonNearDone != null) {
-      AssetManager assetManager = _context.getAssets();
-
-      // Open the SVG file from assets
-      InputStream inputStream = null;
-      try {
-        ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
-        buttonNearDoneView.setVisibility(View.VISIBLE);
-
-        inputStream  = assetManager.open(buttonNearDone.getIcon());
-
-        SVG svg = SVG.getFromInputStream(inputStream);
-        Picture picture = svg.renderToPicture(buttonNearDone.getWidth(), buttonNearDone.getHeight());
-        PictureDrawable pictureDrawable = new PictureDrawable(picture);
-
-        buttonNearDoneView.setImageDrawable(pictureDrawable);
-      } catch (IOException | SVGParseException e) {
-          throw new RuntimeException(e);
-      } finally {
-        if (inputStream != null) {
-            try {
-                inputStream.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-      }
-    } else {
-      ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
-      buttonNearDoneView.setVisibility(View.GONE);
-    }
-
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
       _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
+      ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+      buttonNearDoneView.setVisibility(View.GONE);
       //TODO: Add share button functionality
     } else if (TextUtils.equals(_options.getToolbarType(), "navigation")) {
+      ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+      buttonNearDoneView.setVisibility(View.GONE);
       //TODO: Remove share button when implemented
     } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
       _toolbar.setVisibility(View.GONE);
     } else {
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
       _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
+
+      Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
+      if (buttonNearDone != null) {
+        AssetManager assetManager = _context.getAssets();
+
+        // Open the SVG file from assets
+        InputStream inputStream = null;
+        try {
+          ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+          buttonNearDoneView.setVisibility(View.VISIBLE);
+
+          inputStream  = assetManager.open(buttonNearDone.getIcon());
+
+          SVG svg = SVG.getFromInputStream(inputStream);
+          Picture picture = svg.renderToPicture(buttonNearDone.getWidth(), buttonNearDone.getHeight());
+          PictureDrawable pictureDrawable = new PictureDrawable(picture);
+
+          buttonNearDoneView.setImageDrawable(pictureDrawable);
+          buttonNearDoneView.setOnClickListener(
+                  view -> _options.getCallbacks().buttonNearDoneClicked()
+          );
+        } catch (IOException | SVGParseException e) {
+          throw new RuntimeException(e);
+        } finally {
+          if (inputStream != null) {
+            try {
+              inputStream.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+        }
+      } else {
+        ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+        buttonNearDoneView.setVisibility(View.GONE);
+      }
     }
   }
 
@@ -705,7 +712,12 @@ public class WebViewDialog extends Dialog {
               }
             }
           } else if (_options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty()) {
-            injectPreShowScript();
+            executorService.execute(new Runnable() {
+              @Override
+              public void run() {
+                injectPreShowScript();
+              }
+            });
           }
 
           ImageButton backButton = _toolbar.findViewById(R.id.backButton);

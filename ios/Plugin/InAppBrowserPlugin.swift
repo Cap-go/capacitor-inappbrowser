@@ -156,8 +156,8 @@ public class InAppBrowserPlugin: CAPPlugin {
                 call.reject("buttonNearDone.iconType is empty")
                 return
             }
-            if (iconType != "sf-symbol" && iconType != "resource") {
-                call.reject("IconType is neither 'sf-symbol' nor 'resource'")
+            if (iconType != "sf-symbol" && iconType != "asset") {
+                call.reject("IconType is neither 'sf-symbol' nor 'asset'")
                 return
             }
             guard let icon = iosSettings["icon"] as? String else {

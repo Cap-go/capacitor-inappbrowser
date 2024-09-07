@@ -789,6 +789,7 @@ fileprivate extension WKWebViewController {
             self.present(alert, animated: true, completion: nil)
         } else {
             let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            #imageLiteral(resourceName: "simulator_screenshot_B8B44B8D-EB30-425C-9BF4-1F37697A8459.png")
             activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
             activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
             self.present(activityViewController, animated: true, completion: nil)

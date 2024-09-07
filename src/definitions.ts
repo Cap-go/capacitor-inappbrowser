@@ -235,13 +235,13 @@ export interface OpenWebViewOptions {
    */
   preShowScript?: String;
   /**
-   * TODO
+   * buttonNearDone allows for a creation of a custom button. Please see [buttonNearDone.md](/buttonNearDone.md) for more info.
    *
    * @since 6.7.0
    */
   buttonNearDone?: {
     ios: {
-      iconType: 'sf-symbol' | 'resource',
+      iconType: 'sf-symbol' | 'asset',
       icon: String
     },
     android: {

@@ -487,6 +487,11 @@ public class InAppBrowserPlugin
         }
 
         @Override
+        public void buttonNearDoneClicked() {
+          notifyListeners("buttonNearDoneClick", new JSObject());
+        }
+
+        @Override
         public void javascriptCallback(String message) {
           // Handle the message received from JavaScript
           Log.d(
