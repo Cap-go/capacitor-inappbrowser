@@ -19,6 +19,7 @@ export interface BtnEvent {
 
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
+export type ButtonNearListener = (state: {}) => void;
 
 export enum BackgroundColor {
   WHITE = "white",
@@ -233,6 +234,23 @@ export interface OpenWebViewOptions {
    * @since 6.6.0
    */
   preShowScript?: String;
+  /**
+   * buttonNearDone allows for a creation of a custom button. Please see [buttonNearDone.md](/buttonNearDone.md) for more info.
+   *
+   * @since 6.7.0
+   */
+  buttonNearDone?: {
+    ios: {
+      iconType: 'sf-symbol' | 'asset',
+      icon: String
+    },
+    android: {
+      iconType: 'asset',
+      icon: String,
+      width?: number
+      height?: number
+    }
+  };
 }
 
 export interface InAppBrowserPlugin {
@@ -301,6 +319,11 @@ export interface InAppBrowserPlugin {
   addListener(
     eventName: "urlChangeEvent",
     listenerFunc: UrlChangeListener,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: "buttonNearDoneClick",
+    listenerFunc: ButtonNearListener,
   ): Promise<PluginListenerHandle>;
 
   /**

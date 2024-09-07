@@ -425,6 +425,20 @@ public class InAppBrowserPlugin
     options.setIgnoreUntrustedSSLError(
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
+
+    try {
+      Options.ButtonNearDone buttonNearDone = Options.ButtonNearDone.generateFromPluginCall(call, getActivity().getAssets());
+      options.setButtonNearDone(buttonNearDone);
+    } catch (IllegalArgumentException illegalArgumentException) {
+      call.reject(String.format("ButtonNearDone rejected: %s", illegalArgumentException.getMessage()));
+    } catch (RuntimeException e) {
+      Log.e(
+      "WebViewDialog",
+      String.format("ButtonNearDone runtime error: %s", e)
+      );
+      call.reject(String.format("ButtonNearDone RuntimeException: %s", e));
+    }
+
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setPreShowScript(call.getString("preShowScript", null));
     options.setShareSubject(call.getString("shareSubject", null));
@@ -475,6 +489,11 @@ public class InAppBrowserPlugin
         @Override
         public void pageLoadError() {
           notifyListeners("pageLoadError", new JSObject());
+        }
+
+        @Override
+        public void buttonNearDoneClicked() {
+          notifyListeners("buttonNearDoneClick", new JSObject());
         }
 
         @Override

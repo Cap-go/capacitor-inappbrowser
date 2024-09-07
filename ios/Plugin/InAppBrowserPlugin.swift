@@ -137,6 +137,40 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("URL must not be empty")
             return
         }
+        
+        var buttonNearDoneIcon: UIImage? = nil
+        if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
+            guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
+                call.reject("IOS settings not found")
+                return
+            }
+            if !(iosSettingsRaw is JSObject) {
+                call.reject("IOS settings are not an object")
+                return
+            }
+            let iosSettings = iosSettingsRaw as! JSObject
+            
+            guard let iconType = iosSettings["iconType"] as? String else {
+                call.reject("buttonNearDone.iconType is empty")
+                return
+            }
+            if (iconType != "sf-symbol" && iconType != "asset") {
+                call.reject("IconType is neither 'sf-symbol' nor 'asset'")
+                return
+            }
+            guard let icon = iosSettings["icon"] as? String else {
+                call.reject("buttonNearDone.icon is empty")
+                return
+            }
+
+            
+            if (iconType == "sf-symbol") {
+                buttonNearDoneIcon = UIImage(systemName: icon)
+            } else {
+                // UIImage(resource: ImageResource(name: "public/monkey.svg", bundle: Bundle.main))
+                buttonNearDoneIcon = UIImage(named: icon, in: Bundle.main, with: nil)
+            }
+        }
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
@@ -176,6 +210,9 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
+            
+            self.webViewController?.buttonNearDoneIcon = buttonNearDoneIcon
+            
             if call.getBool("showArrow", false) {
                 self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }

@@ -10,4 +10,6 @@ public interface WebViewCallbacks {
   public void pageLoadError();
 
   public void javascriptCallback(String message);
+
+  public void buttonNearDoneClicked();
 }

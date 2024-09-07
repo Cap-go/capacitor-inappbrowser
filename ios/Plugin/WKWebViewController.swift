@@ -154,6 +154,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var reloadBarButtonItemImage: UIImage?
     open var stopBarButtonItemImage: UIImage?
     open var activityBarButtonItemImage: UIImage?
+    
+    open var buttonNearDoneIcon: UIImage?
 
     fileprivate var webView: WKWebView?
     fileprivate var progressView: UIProgressView?
@@ -274,7 +276,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             };
         }
         """
-        webView?.evaluateJavaScript(script, completionHandler: nil)
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -398,25 +402,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
         switch keyPath {
         case estimatedProgressKeyPath?:
-            guard let estimatedProgress = self.webView?.estimatedProgress else {
-                return
-            }
-            self.progressView?.alpha = 1
-            self.progressView?.setProgress(Float(estimatedProgress), animated: true)
+            DispatchQueue.main.async {
+                guard let estimatedProgress = self.webView?.estimatedProgress else {
+                    return
+                }
+                self.progressView?.alpha = 1
+                self.progressView?.setProgress(Float(estimatedProgress), animated: true)
 
-            if estimatedProgress >= 1.0 {
-                UIView.animate(withDuration: 0.3, delay: 0.3, options: .curveEaseOut, animations: {
-                    self.progressView?.alpha = 0
-                }, completion: {
-                    _ in
-                    self.progressView?.setProgress(0, animated: false)
-                })
+                if estimatedProgress >= 1.0 {
+                    UIView.animate(withDuration: 0.3, delay: 0.3, options: .curveEaseOut, animations: {
+                        self.progressView?.alpha = 0
+                    }, completion: {
+                        _ in
+                        self.progressView?.setProgress(0, animated: false)
+                    })
+                }
             }
         case titleKeyPath?:
             if self.hasDynamicTitle {
                 self.navigationItem.title = webView?.url?.host
             }
         case "URL":
+            
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             self.injectJavaScriptInterface()
         default:
@@ -440,7 +447,9 @@ public extension WKWebViewController {
     }
 
     func load(remote: URL) {
-        webView?.load(createRequest(url: remote))
+        DispatchQueue.main.async {
+            self.webView?.load(self.createRequest(url: remote))
+        }
     }
 
     func load(file: URL, access: URL) {
@@ -583,13 +592,17 @@ fileprivate extension WKWebViewController {
             return UIBarButtonItem()
         }
 
-        navigationItem.rightBarButtonItems = rightNavigaionBarItemTypes.map {
+        var rightBarButtons = rightNavigaionBarItemTypes.map {
             barButtonItemType in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
             }
             return UIBarButtonItem()
         }
+        if (rightBarButtons.count == 1 && buttonNearDoneIcon != nil && rightBarButtons[0] == doneBarButtonItem) {
+            rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: #selector(buttonNearDoneDidClick)))
+        }
+        navigationItem.rightBarButtonItems = rightBarButtons
 
         if toolbarItemTypes.count > 0 {
             for index in 0..<toolbarItemTypes.count - 1 {
@@ -597,13 +610,14 @@ fileprivate extension WKWebViewController {
             }
         }
 
-        setToolbarItems(toolbarItemTypes.map {
+        let gen = toolbarItemTypes.map {
             barButtonItemType -> UIBarButtonItem in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
             }
             return UIBarButtonItem()
-        }, animated: true)
+        }
+        setToolbarItems(gen, animated: true)
     }
 
     func updateBarButtonItems() {
@@ -721,6 +735,10 @@ fileprivate extension WKWebViewController {
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
     }
+    
+    @objc func buttonNearDoneDidClick(sender: AnyObject) {
+        self.capBrowserPlugin?.notifyListeners("buttonNearDoneClick", data: [:])
+    }
 
     @objc func reloadDidClick(sender: AnyObject) {
         webView?.stopLoading()
@@ -771,6 +789,7 @@ fileprivate extension WKWebViewController {
             self.present(alert, animated: true, completion: nil)
         } else {
             let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            #imageLiteral(resourceName: "simulator_screenshot_B8B44B8D-EB30-425C-9BF4-1F37697A8459.png")
             activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
             activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
             self.present(activityViewController, animated: true, completion: nil)
