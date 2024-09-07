@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.6.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.7...6.6.8) (2024-09-05)
+
+### [6.6.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.6...6.6.7) (2024-09-05)
+
+### [6.6.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.5...6.6.6) (2024-09-05)
+
+
+### Bug Fixes
+
+* add mic perm on camera perm ([891ab1e](https://github.com/Cap-go/capacitor-inappbrowser/commit/891ab1e4f159276522c151b7cc7d4adb1aeaaf60))
+* Android studio lint ([619f5fb](https://github.com/Cap-go/capacitor-inappbrowser/commit/619f5fb1e332340f349453a3fd48d49c3b9ef652))
+* doc perms ([b2557a3](https://github.com/Cap-go/capacitor-inappbrowser/commit/b2557a3b2466c7d1de90e9b5e54cbb815430e178))
+
+### [6.6.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.4...6.6.5) (2024-09-04)
+
+
+### Bug Fixes
+
+* lint issue ([0bc34a7](https://github.com/Cap-go/capacitor-inappbrowser/commit/0bc34a73e07967b607d5c94366c282e1c4bc12ef))
+
+### [6.6.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.3...6.6.4) (2024-09-04)
+
+### [6.6.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.2...6.6.3) (2024-09-04)
+
+
+### Bug Fixes
+
+* node action ([a2e226a](https://github.com/Cap-go/capacitor-inappbrowser/commit/a2e226a114a60814a18656a024dbbfa7d954d350))
+
+### [6.6.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.1...6.6.2) (2024-09-04)
+
+### [6.6.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.0...6.6.1) (2024-09-03)
+
+
+### Bug Fixes
+
+* lint ([436459e](https://github.com/Cap-go/capacitor-inappbrowser/commit/436459e299dd2391fbd594366a457ed3b3b107c4))
+
+## [6.6.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.5.1...6.6.0) (2024-09-02)
+
+
+### Features
+
+* **IOS:** implement preShowScript ([e5f15b2](https://github.com/Cap-go/capacitor-inappbrowser/commit/e5f15b20f709edc93c1937a85dc67076d306517c))
+
+
+### Bug Fixes
+
+* handle preShowScript onReload ([e68034d](https://github.com/Cap-go/capacitor-inappbrowser/commit/e68034db08f30a3fd5ae4a26ae6deba0252cce81))
+* **IOS:** Wait max 10s for the script to finish ([e1ede31](https://github.com/Cap-go/capacitor-inappbrowser/commit/e1ede31e2d3b2ce9ec6e56ef184f50fab6e276be))
+* **WiP:** some fixes ([f255b1b](https://github.com/Cap-go/capacitor-inappbrowser/commit/f255b1b55fbfcaef77a01191683d7e80f35709cf))
+
 ### [6.5.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.5.0...6.5.1) (2024-08-30)
 
 
