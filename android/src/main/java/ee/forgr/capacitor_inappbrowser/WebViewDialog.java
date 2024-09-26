@@ -588,7 +588,7 @@ public class WebViewDialog extends Dialog {
             } catch (ActivityNotFoundException e) {
               // Do nothing
             } catch (URISyntaxException e) {
-              throw new RuntimeException(e);
+              // Do nothin
             }
           }
           return false;
