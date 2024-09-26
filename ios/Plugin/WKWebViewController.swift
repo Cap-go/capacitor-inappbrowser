@@ -67,11 +67,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
@@ -99,6 +100,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
+    var preventDeeplink: Bool = false
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -113,6 +115,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         if let userAgent = userAgent {
             self.customUserAgent = userAgent
         }
+    }
+
+    func setPreventDeeplink(preventDeeplink: Bool) {
+        self.preventDeeplink = preventDeeplink
     }
 
     internal var customUserAgent: String? {
@@ -965,6 +971,10 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         var actionPolicy: WKNavigationActionPolicy = .allow
 
+        if self.preventDeeplink {
+            actionPolicy = .preventDeeplinkActionPolicy
+        }
+
         defer {
             decisionHandler(actionPolicy)
         }
@@ -999,4 +1009,8 @@ extension WKWebViewController: WKNavigationDelegate {
 class BlockBarButtonItem: UIBarButtonItem {
 
     var block: ((WKWebViewController) -> Void)?
+}
+
+extension WKNavigationActionPolicy {
+    static let preventDeeplinkActionPolicy = WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2)!
 }
