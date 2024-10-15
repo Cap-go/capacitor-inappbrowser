@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.8.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.7.1...6.8.0) (2024-10-15)
+
+
+### Features
+
+* use preventDeeplink parameter also on ios ([1da2890](https://github.com/Cap-go/capacitor-inappbrowser/commit/1da2890015994df8fd38b7dc58902a54d3aba75e))
+
 ### [6.7.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.7.0...6.7.1) (2024-10-15)
 
 ## [6.7.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.6.8...6.7.0) (2024-09-07)
