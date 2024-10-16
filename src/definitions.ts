@@ -241,15 +241,15 @@ export interface OpenWebViewOptions {
    */
   buttonNearDone?: {
     ios: {
-      iconType: 'sf-symbol' | 'asset',
-      icon: String
-    },
+      iconType: "sf-symbol" | "asset";
+      icon: String;
+    };
     android: {
-      iconType: 'asset',
-      icon: String,
-      width?: number
-      height?: number
-    }
+      iconType: "asset";
+      icon: String;
+      width?: number;
+      height?: number;
+    };
   };
 }
 

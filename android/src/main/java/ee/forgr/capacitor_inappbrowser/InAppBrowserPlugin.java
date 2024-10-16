@@ -427,14 +427,23 @@ public class InAppBrowserPlugin
     );
 
     try {
-      Options.ButtonNearDone buttonNearDone = Options.ButtonNearDone.generateFromPluginCall(call, getActivity().getAssets());
+      Options.ButtonNearDone buttonNearDone =
+        Options.ButtonNearDone.generateFromPluginCall(
+          call,
+          getActivity().getAssets()
+        );
       options.setButtonNearDone(buttonNearDone);
     } catch (IllegalArgumentException illegalArgumentException) {
-      call.reject(String.format("ButtonNearDone rejected: %s", illegalArgumentException.getMessage()));
+      call.reject(
+        String.format(
+          "ButtonNearDone rejected: %s",
+          illegalArgumentException.getMessage()
+        )
+      );
     } catch (RuntimeException e) {
       Log.e(
-      "WebViewDialog",
-      String.format("ButtonNearDone runtime error: %s", e)
+        "WebViewDialog",
+        String.format("ButtonNearDone runtime error: %s", e)
       );
       call.reject(String.format("ButtonNearDone RuntimeException: %s", e));
     }

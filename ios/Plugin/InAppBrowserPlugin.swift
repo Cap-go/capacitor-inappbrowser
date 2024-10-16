@@ -137,8 +137,8 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("URL must not be empty")
             return
         }
-        
-        var buttonNearDoneIcon: UIImage? = nil
+
+        var buttonNearDoneIcon: UIImage?
         if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
             guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
                 call.reject("IOS settings not found")
@@ -149,12 +149,12 @@ public class InAppBrowserPlugin: CAPPlugin {
                 return
             }
             let iosSettings = iosSettingsRaw as! JSObject
-            
+
             guard let iconType = iosSettings["iconType"] as? String else {
                 call.reject("buttonNearDone.iconType is empty")
                 return
             }
-            if (iconType != "sf-symbol" && iconType != "asset") {
+            if iconType != "sf-symbol" && iconType != "asset" {
                 call.reject("IconType is neither 'sf-symbol' nor 'asset'")
                 return
             }
@@ -163,8 +163,7 @@ public class InAppBrowserPlugin: CAPPlugin {
                 return
             }
 
-            
-            if (iconType == "sf-symbol") {
+            if iconType == "sf-symbol" {
                 buttonNearDoneIcon = UIImage(systemName: icon)
             } else {
                 // UIImage(resource: ImageResource(name: "public/monkey.svg", bundle: Bundle.main))
@@ -212,9 +211,9 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
             self.webViewController?.toolbarItemTypes = []
             self.webViewController?.doneBarButtonItemPosition = .right
-            
+
             self.webViewController?.buttonNearDoneIcon = buttonNearDoneIcon
-            
+
             if call.getBool("showArrow", false) {
                 self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }

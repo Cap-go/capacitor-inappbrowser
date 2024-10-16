@@ -1,12 +1,9 @@
 package ee.forgr.capacitor_inappbrowser;
 
 import android.content.res.AssetManager;
-
 import androidx.annotation.Nullable;
-
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
@@ -14,8 +11,9 @@ import java.util.Objects;
 public class Options {
 
   public static class ButtonNearDone {
+
     public enum AllIconTypes {
-      ASSET
+      ASSET,
     }
 
     private AllIconTypes iconType;
@@ -23,7 +21,12 @@ public class Options {
     private int height;
     private int width;
 
-    private ButtonNearDone(AllIconTypes iconType, String icon, int height, int width) {
+    private ButtonNearDone(
+      AllIconTypes iconType,
+      String icon,
+      int height,
+      int width
+    ) {
       this.iconType = iconType;
       this.icon = icon;
       this.height = height;
@@ -31,7 +34,10 @@ public class Options {
     }
 
     @Nullable
-    public static ButtonNearDone generateFromPluginCall(PluginCall call, AssetManager assetManager) throws IllegalArgumentException, RuntimeException {
+    public static ButtonNearDone generateFromPluginCall(
+      PluginCall call,
+      AssetManager assetManager
+    ) throws IllegalArgumentException, RuntimeException {
       JSObject buttonNearDone = call.getObject("buttonNearDone");
       if (buttonNearDone == null) {
         // Return null when "buttonNearDone" isn't configured, else throw an error
@@ -45,12 +51,16 @@ public class Options {
 
       String iconType = android.getString("iconType", "asset");
       if (!Objects.equals(iconType, "asset")) {
-        throw new IllegalArgumentException("buttonNearDone.android.iconType is not equal to \"asset\"");
+        throw new IllegalArgumentException(
+          "buttonNearDone.android.iconType is not equal to \"asset\""
+        );
       }
 
       String icon = android.getString("icon");
       if (icon == null) {
-        throw new IllegalArgumentException("buttonNearDone.android.icon is null");
+        throw new IllegalArgumentException(
+          "buttonNearDone.android.icon is null"
+        );
       }
 
       InputStream fileInputString = null;
@@ -60,7 +70,9 @@ public class Options {
         fileInputString = assetManager.open(icon);
         // do nothing
       } catch (IOException e) {
-        throw new IllegalArgumentException("buttonNearDone.android.icon cannot be found in the assetManager");
+        throw new IllegalArgumentException(
+          "buttonNearDone.android.icon cannot be found in the assetManager"
+        );
       } finally {
         // Close the input stream if it was opened
         if (fileInputString != null) {
@@ -70,11 +82,10 @@ public class Options {
             throw new RuntimeException(e);
           }
         }
-      };
-
+      }
       Integer width = android.getInteger("width", 48);
-      Integer height = android.getInteger("height", 48);
 
+      Integer height = android.getInteger("height", 48);
       return new ButtonNearDone(AllIconTypes.ASSET, icon, height, width);
     }
 

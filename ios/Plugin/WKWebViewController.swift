@@ -160,7 +160,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var reloadBarButtonItemImage: UIImage?
     open var stopBarButtonItemImage: UIImage?
     open var activityBarButtonItemImage: UIImage?
-    
+
     open var buttonNearDoneIcon: UIImage?
 
     fileprivate var webView: WKWebView?
@@ -429,7 +429,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 self.navigationItem.title = webView?.url?.host
             }
         case "URL":
-            
+
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             self.injectJavaScriptInterface()
         default:
@@ -605,7 +605,7 @@ fileprivate extension WKWebViewController {
             }
             return UIBarButtonItem()
         }
-        if (rightBarButtons.count == 1 && buttonNearDoneIcon != nil && rightBarButtons[0] == doneBarButtonItem) {
+        if rightBarButtons.count == 1 && buttonNearDoneIcon != nil && rightBarButtons[0] == doneBarButtonItem {
             rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: #selector(buttonNearDoneDidClick)))
         }
         navigationItem.rightBarButtonItems = rightBarButtons
@@ -741,7 +741,7 @@ fileprivate extension WKWebViewController {
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
     }
-    
+
     @objc func buttonNearDoneDidClick(sender: AnyObject) {
         self.capBrowserPlugin?.notifyListeners("buttonNearDoneClick", data: [:])
     }
