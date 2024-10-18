@@ -975,11 +975,16 @@ extension WKWebViewController: WKNavigationDelegate {
             actionPolicy = .preventDeeplinkActionPolicy
         }
 
-        defer {
+        guard let url = navigationAction.request.url else {
             decisionHandler(actionPolicy)
+            return
         }
-        guard let u = navigationAction.request.url else {
-            print("Cannot handle empty URLs")
+
+        // Check if the URL is an App Store URL
+        if url.absoluteString.contains("apps.apple.com") {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            // Cancel the navigation in the web view
+            decisionHandler(.cancel)
             return
         }
 
@@ -1003,6 +1008,7 @@ extension WKWebViewController: WKNavigationDelegate {
             actionPolicy = result ? .allow : .cancel
         }
         self.injectJavaScriptInterface()
+        decisionHandler(actionPolicy)
     }
 }
 
