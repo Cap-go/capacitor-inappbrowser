@@ -272,16 +272,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func injectJavaScriptInterface() {
         let script = """
-        if (!window.mobileApp) {
-            window.mobileApp = {
-                postMessage: function(message) {
-                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                        window.webkit.messageHandlers.messageHandler.postMessage(message);
-                    }
+                if (!window.mobileApp) {
+                        window.mobileApp = {
+                                postMessage: function(message) {
+                                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                                                window.webkit.messageHandlers.messageHandler.postMessage(message);
+                                        }
+                                }
+                        };
                 }
-            };
-        }
-        """
+                """
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script, completionHandler: nil)
         }
@@ -850,18 +850,18 @@ extension WKWebViewController: WKNavigationDelegate {
 
         // TODO: implement interface
         let script = """
-            async function preShowFunction() {
-            \(self.preShowScript ?? "")
-            };
-            preShowFunction().then(
-                () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})
-            ).catch(
-                err => {
-                    console.error('Preshow error', err);
-                    window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-                }
-            )
-            """
+                        async function preShowFunction() {
+                        \(self.preShowScript ?? "")
+                        };
+                        preShowFunction().then(
+                                () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})
+                        ).catch(
+                                err => {
+                                        console.error('Preshow error', err);
+                                        window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+                                }
+                        )
+                        """
         print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
 
         self.preShowSemaphore = DispatchSemaphore(value: 0)
@@ -975,14 +975,14 @@ extension WKWebViewController: WKNavigationDelegate {
             actionPolicy = .preventDeeplinkActionPolicy
         }
 
-        guard let url = navigationAction.request.url else {
+        guard let u = navigationAction.request.url else {
             decisionHandler(actionPolicy)
             return
         }
 
         // Check if the URL is an App Store URL
-        if url.absoluteString.contains("apps.apple.com") {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        if u.absoluteString.contains("apps.apple.com") {
+            UIApplication.shared.open(u, options: [:], completionHandler: nil)
             // Cancel the navigation in the web view
             decisionHandler(.cancel)
             return
