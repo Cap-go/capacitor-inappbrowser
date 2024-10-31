@@ -75,6 +75,12 @@ body:
         required: true
       - label: I understand that incomplete issues (e.g. without reproduction) are closed.
         required: true
+  - type: checkboxes
+    attributes:
+      label: Fastest way to fix this issue 
+      description: |
+        Founding is a great way to get your issue fixed fast. This make community contributions more likely to happen and discharge the maintainers from the burden of being the only one fixing all issues.
+      options:
       - label: I want to get this fix ASAP and [found the issue with Algora](https://console.algora.io/org/gl/bounties/community?fund=Cap-go%2Fcapacitor-inappbrowser) we recommend ($50 to $500)
         required: false
 
