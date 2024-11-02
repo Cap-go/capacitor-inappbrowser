@@ -239,8 +239,8 @@ export interface OpenWebViewOptions {
    *
    * @since 6.9.0
    */
-  proxyRequests?: String
-   /**
+  proxyRequests?: String;
+  /**
    * buttonNearDone allows for a creation of a custom button. Please see [buttonNearDone.md](/buttonNearDone.md) for more info.
    *
    * @since 6.7.0

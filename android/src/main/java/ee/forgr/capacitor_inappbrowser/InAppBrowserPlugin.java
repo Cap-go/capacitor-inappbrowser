@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -434,7 +433,10 @@ public class InAppBrowserPlugin
       try {
         options.setProxyRequestsPattern(Pattern.compile(proxyRequestsStr));
       } catch (PatternSyntaxException e) {
-        Log.e("WebViewDialog", String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr));
+        Log.e(
+          "WebViewDialog",
+          String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr)
+        );
       }
     }
 
