@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [6.9.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.8.21...6.9.0) (2024-11-02)
+
+
+### Features
+
+* proxy android ([160d542](https://github.com/Cap-go/capacitor-inappbrowser/commit/160d542d643ecdd3fe546f2df251c762d724562f))
+
 ### [6.8.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.8.20...6.8.21) (2024-10-31)
 
 
