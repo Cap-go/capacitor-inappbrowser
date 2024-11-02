@@ -612,6 +612,7 @@ public class WebViewDialog extends Dialog {
       return;
     }
     proxiedRequestsHashmap.remove(id);
+    proxiedRequest.semaphore.release();
   }
 
   public void handleProxyResultOk(JSONObject result, String id) {
