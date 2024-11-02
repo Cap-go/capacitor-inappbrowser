@@ -7,6 +7,7 @@ import com.getcapacitor.PluginCall;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public class Options {
 
@@ -129,6 +130,15 @@ public class Options {
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
   private String preShowScript;
+  private Pattern proxyRequestsPattern = null;
+
+  public Pattern getProxyRequestsPattern() {
+    return proxyRequestsPattern;
+  }
+
+  public void setProxyRequestsPattern(Pattern proxyRequestsPattern) {
+    this.proxyRequestsPattern = proxyRequestsPattern;
+  }
 
   public PluginCall getPluginCall() {
     return pluginCall;

@@ -15,11 +15,11 @@ import android.graphics.Picture;
 import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
+import android.os.Build;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.HttpAuthHandler;
@@ -30,32 +30,61 @@ import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-import androidx.annotation.Nullable;
+
+import androidx.annotation.RequiresApi;
+
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.CookiePolicy;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
+
+  private class ProxiedRequest {
+    private WebResourceResponse response;
+    private Semaphore semaphore;
+
+    public WebResourceResponse getResponse() {
+      return response;
+    }
+
+    public ProxiedRequest() {
+      this.semaphore = new Semaphore(0);
+      this.response = null;
+    }
+  }
 
   private WebView _webView;
   private Toolbar _toolbar;
@@ -63,6 +92,8 @@ public class WebViewDialog extends Dialog {
   private Context _context;
   public Activity activity;
   private boolean isInitialized = false;
+  private WebView capacitorWebView;
+  private HashMap<String, ProxiedRequest> proxiedRequestsHashmap;
 
   Semaphore preShowSemaphore = null;
   String preshowError = null;
@@ -85,13 +116,16 @@ public class WebViewDialog extends Dialog {
     Context context,
     int theme,
     Options options,
-    PermissionHandler permissionHandler
+    PermissionHandler permissionHandler,
+    WebView capacitorWebView
   ) {
     super(context, theme);
     this._options = options;
     this._context = context;
     this.permissionHandler = permissionHandler;
     this.isInitialized = false;
+    this.capacitorWebView = capacitorWebView;
+    this.proxiedRequestsHashmap = new HashMap<>();
   }
 
   public class JavaScriptInterface {
@@ -570,6 +604,74 @@ public class WebViewDialog extends Dialog {
     }
   }
 
+  public void handleProxyResultError(String result, String id) {
+    Log.i("InAppBrowserProxy", String.format("handleProxyResultError: %s, ok: %s id: %s", result, false, id));
+    ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
+    if (proxiedRequest == null) {
+      Log.e("InAppBrowserProxy", "proxiedRequest is null");
+      return;
+    }
+    proxiedRequestsHashmap.remove(id);
+  }
+
+  public void handleProxyResultOk(JSONObject result, String id) {
+    Log.i("InAppBrowserProxy", String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id));
+    ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
+    if (proxiedRequest == null) {
+      Log.e("InAppBrowserProxy", "proxiedRequest is null");
+      return;
+    }
+    proxiedRequestsHashmap.remove(id);
+
+    if (result == null) {
+      proxiedRequest.semaphore.release();
+      return;
+    }
+
+    Map<String, String> responseHeaders = new HashMap<>();
+    String body;
+    int code;
+
+    try {
+      body = result.getString("body");
+      code = result.getInt("code");
+      JSONObject headers = result.getJSONObject("headers");
+      for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
+        String headerName = it.next();
+        String header = headers.getString(headerName);
+        responseHeaders.put(headerName, header);
+      }
+
+    } catch (JSONException e) {
+      Log.e("InAppBrowserProxy", "Cannot parse OK result", e);
+      return;
+    }
+
+    String contentType = responseHeaders.get("Content-Type");
+    if (contentType == null) {
+      contentType = responseHeaders.get("content-type");
+    }
+    if (contentType == null) {
+      Log.e("InAppBrowserProxy", "'Content-Type' header is required");
+      return;
+    }
+
+    if (!((100 <= code && code <= 299) || (400 <= code && code <= 599) )) {
+      Log.e("InAppBrowserProxy", String.format("Status code %s outside of the allowed range", code));
+      return;
+    }
+
+    WebResourceResponse webResourceResponse = new WebResourceResponse(
+        contentType,
+        "utf-8",
+        new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
+    );
+
+    webResourceResponse.setStatusCodeAndReasonPhrase(code, getReasonPhrase(code));
+    proxiedRequest.response = webResourceResponse;
+    proxiedRequest.semaphore.release();
+  }
+
   private void setWebViewClient() {
     _webView.setWebViewClient(
       new WebViewClient() {
@@ -578,6 +680,10 @@ public class WebViewDialog extends Dialog {
           WebView view,
           WebResourceRequest request
         ) {
+
+//          HashMap<String, String> map = new HashMap<>();
+//          map.put("x-requested-with", null);
+//          view.loadUrl(request.getUrl().toString(), map);
           Context context = view.getContext();
           String url = request.getUrl().toString();
 
@@ -601,6 +707,78 @@ public class WebViewDialog extends Dialog {
           }
           return false;
         }
+
+        private String randomRequestId() {
+          return UUID.randomUUID().toString();
+        }
+
+        private String toBase64(String raw) {
+          String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
+          if (s.endsWith("=")) {
+            s = s.substring(0, s.length() - 2);
+          }
+          return s;
+        }
+//
+//        void handleRedirect(String currentUrl, Response response) {
+//          String loc = response.header("Location");
+//          _webView.evaluateJavascript("");
+//        }
+//
+          @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+          @Override
+          public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            Pattern pattern = _options.getProxyRequestsPattern();
+            if (pattern == null) {
+              return null;
+            }
+            Matcher matcher = pattern.matcher(request.getUrl().toString());
+            if (!matcher.find()) {
+              return null;
+            }
+
+            // Requests matches the regex
+            if (Objects.equals(request.getMethod(), "POST")) {
+              // Log.e("HTTP", String.format("returned null (ok) %s", request.getUrl().toString()));
+              return null;
+            }
+
+            Log.i("InAppBrowserProxy", String.format("Proxying request: %s", request.getUrl().toString()));
+
+            // We need to call a JS function
+            String requestId = randomRequestId();
+            ProxiedRequest proxiedRequest = new ProxiedRequest();
+            proxiedRequestsHashmap.put(requestId, proxiedRequest);
+
+            // lsuakdchgbbaHandleProxiedRequest
+            activity.runOnUiThread(new Runnable() {
+              @Override
+              public void run() {
+                StringBuilder headers = new StringBuilder();
+                Map<String, String> requestHeaders = request.getRequestHeaders();
+                for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
+                  headers.append(String.format("h[atob('%s')]=atob('%s');", toBase64(header.getKey()), toBase64(header.getValue())));
+                }
+                String s = String.format("try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'}))} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})}", headers, toBase64(request.getUrl().toString()), request.getMethod(), requestId, requestId, requestId);
+                // Log.i("HTTP", s);
+                capacitorWebView.evaluateJavascript(s, null);
+              }
+            });
+
+            // 10 seconds wait max
+            try {
+              if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                return proxiedRequest.response;
+              } else {
+                Log.e("InAppBrowserProxy", "Semaphore timed out");
+                proxiedRequestsHashmap.remove(requestId); // prevent mem leak
+              }
+            } catch (InterruptedException e) {
+              Log.e("InAppBrowserProxy", "Semaphore wait error", e);
+            }
+            return null;
+          }
+
 
         @Override
         public void onReceivedHttpAuthRequest(
@@ -815,6 +993,57 @@ public class WebViewDialog extends Dialog {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
       super.onBackPressed();
+    }
+  }
+
+  public static String getReasonPhrase(int statusCode) {
+    switch(statusCode) {
+      case (200): return "OK";
+      case (201): return "Created";
+      case (202): return "Accepted";
+      case (203): return "Non Authoritative Information";
+      case (204): return "No Content";
+      case (205): return "Reset Content";
+      case (206): return "Partial Content";
+      case (207): return "Partial Update OK";
+      case (300): return "Mutliple Choices";
+      case (301): return "Moved Permanently";
+      case (302): return "Moved Temporarily";
+      case (303): return "See Other";
+      case (304): return "Not Modified";
+      case (305): return "Use Proxy";
+      case (307): return "Temporary Redirect";
+      case (400): return "Bad Request";
+      case (401): return "Unauthorized";
+      case (402): return "Payment Required";
+      case (403): return "Forbidden";
+      case (404): return "Not Found";
+      case (405): return "Method Not Allowed";
+      case (406): return "Not Acceptable";
+      case (407): return "Proxy Authentication Required";
+      case (408): return "Request Timeout";
+      case (409): return "Conflict";
+      case (410): return "Gone";
+      case (411): return "Length Required";
+      case (412): return "Precondition Failed";
+      case (413): return "Request Entity Too Large";
+      case (414): return "Request-URI Too Long";
+      case (415): return "Unsupported Media Type";
+      case (416): return "Requested Range Not Satisfiable";
+      case (417): return "Expectation Failed";
+      case (418): return "Reauthentication Required";
+      case (419): return "Proxy Reauthentication Required";
+      case (422): return "Unprocessable Entity";
+      case (423): return "Locked";
+      case (424): return "Failed Dependency";
+      case (500): return "Server Error";
+      case (501): return "Not Implemented";
+      case (502): return "Bad Gateway";
+      case (503): return "Service Unavailable";
+      case (504): return "Gateway Timeout";
+      case (505): return "HTTP Version Not Supported";
+      case (507): return "Insufficient Storage";
+      default: return "";
     }
   }
 }
