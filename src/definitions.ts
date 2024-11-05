@@ -235,6 +235,12 @@ export interface OpenWebViewOptions {
    */
   preShowScript?: String;
   /**
+   * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
+   *
+   * @since 6.9.0
+   */
+  proxyRequests?: String;
+  /**
    * buttonNearDone allows for a creation of a custom button. Please see [buttonNearDone.md](/buttonNearDone.md) for more info.
    *
    * @since 6.7.0

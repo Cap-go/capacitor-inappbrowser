@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.9.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.3...6.9.4) (2024-11-04)
+
+### [6.9.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.2...6.9.3) (2024-11-04)
+
+### [6.9.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.1...6.9.2) (2024-11-02)
+
+### [6.9.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.0...6.9.1) (2024-11-02)
+
+
+### Bug Fixes
+
+* fix semaphore timeout on proxy error ([ed14ff4](https://github.com/Cap-go/capacitor-inappbrowser/commit/ed14ff4cd81d81001248aa2cdf6c89ac8158a861))
+
+## [6.9.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.8.21...6.9.0) (2024-11-02)
+
+
+### Features
+
+* proxy android ([160d542](https://github.com/Cap-go/capacitor-inappbrowser/commit/160d542d643ecdd3fe546f2df251c762d724562f))
+
 ### [6.8.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.8.20...6.8.21) (2024-10-31)
 
 
