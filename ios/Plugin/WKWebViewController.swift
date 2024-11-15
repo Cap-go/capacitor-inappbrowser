@@ -990,18 +990,16 @@ extension WKWebViewController: WKNavigationDelegate {
 
         if !self.allowsFileURL && u.isFileURL {
             print("Cannot handle file URLs")
-            return
+            decisionHandler(.cancel)
         }
 
         if handleURLWithApp(u, targetFrame: navigationAction.targetFrame) {
             actionPolicy = .cancel
-            return
         }
 
         if u.host == self.source?.url?.host, let cookies = availableCookies, !checkRequestCookies(navigationAction.request, cookies: cookies) {
             self.load(remote: u)
             actionPolicy = .cancel
-            return
         }
 
         if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue), let result = delegate?.webViewController?(self, decidePolicy: u, navigationType: navigationType) {
