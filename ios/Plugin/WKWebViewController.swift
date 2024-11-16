@@ -991,6 +991,7 @@ extension WKWebViewController: WKNavigationDelegate {
         if !self.allowsFileURL && u.isFileURL {
             print("Cannot handle file URLs")
             decisionHandler(.cancel)
+            return
         }
 
         if handleURLWithApp(u, targetFrame: navigationAction.targetFrame) {
