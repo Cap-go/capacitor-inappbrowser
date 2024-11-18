@@ -298,7 +298,7 @@ export interface InAppBrowserPlugin {
    */
   close(): Promise<any>;
   /**
-   * Open url in a new webview with toolbars
+   * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
    * @since 0.1.0
    */
