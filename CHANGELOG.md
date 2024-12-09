@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [6.9.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.20...6.9.21) (2024-12-09)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.android.tools.build:gradle to v8.7.3 ([#244](https://github.com/Cap-go/capacitor-inappbrowser/issues/244)) ([f4fb2be](https://github.com/Cap-go/capacitor-inappbrowser/commit/f4fb2bee3b11c815caf843ac9fe39d5c536acce9))
+
 ### [6.9.20](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.19...6.9.20) (2024-12-02)
 
 ### [6.9.19](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.18...6.9.19) (2024-12-02)
