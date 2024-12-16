@@ -28,7 +28,7 @@ importers:
         version: 0.4.0(eslint@9.17.0)(typescript@5.6.3)
       '@ionic/prettier-config':
         specifier: ^4.0.0
-        version: 4.0.0(prettier@3.3.3)
+        version: 4.0.0(prettier@3.4.2)
       '@ionic/swiftlint-config':
         specifier: ^2.0.0
         version: 2.0.0
@@ -52,7 +52,7 @@ importers:
         version: 9.1.7
       prettier:
         specifier: ^3.3.3
-        version: 3.3.3
+        version: 3.4.2
       prettier-plugin-java:
         specifier: ^2.6.5
         version: 2.6.5
@@ -1358,8 +1358,8 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
 
-  prettier@3.3.3:
-    resolution: {integrity: sha512-i2tDNA0O5IrMO757lfrdQZCc2jPNDVntV0m/+4whiDfWaTKfMNgR7Qz0NAeGz/nRqF4m5/6CLzbP4/liHt12Ew==}
+  prettier@3.4.2:
+    resolution: {integrity: sha512-e9MewbtFo+Fevyuxn/4rrcDAaq0IYxPGLvObpQjiZBMAzB9IGmzlnG9RZy3FFas+eBMu2vA0CszMeduow5dIuQ==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -1806,9 +1806,9 @@ snapshots:
       - supports-color
       - typescript
 
-  '@ionic/prettier-config@4.0.0(prettier@3.3.3)':
+  '@ionic/prettier-config@4.0.0(prettier@3.4.2)':
     dependencies:
-      prettier: 3.3.3
+      prettier: 3.4.2
 
   '@ionic/swiftlint-config@2.0.0': {}
 
@@ -3187,7 +3187,7 @@ snapshots:
 
   prettier@3.2.5: {}
 
-  prettier@3.3.3: {}
+  prettier@3.4.2: {}
 
   prompts@2.4.2:
     dependencies:
