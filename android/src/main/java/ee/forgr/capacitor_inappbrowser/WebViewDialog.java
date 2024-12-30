@@ -132,6 +132,21 @@ public class WebViewDialog extends Dialog {
       // Handle message from JavaScript
       _options.getCallbacks().javascriptCallback(message);
     }
+
+    @JavascriptInterface
+    public void close() {
+      // close webview
+      activity.runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            dismiss();
+            _options.getCallbacks().closeEvent(_webView.getUrl());
+            _webView.destroy();
+          }
+        }
+      );
+    }
   }
 
   public class PreShowScriptInterface {
