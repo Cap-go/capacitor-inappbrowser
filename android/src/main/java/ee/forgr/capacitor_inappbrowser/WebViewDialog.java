@@ -191,7 +191,10 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setAllowFileAccessFromFileURLs(true);
     _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
     _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
-
+    //text zoom
+    int rounded = (int) Math.round(_options.getTextZoom() * 100);
+    _webView.getSettings().setTextZoom(rounded);
+    
     _webView.setWebViewClient(new WebViewClient());
 
     _webView.setWebChromeClient(

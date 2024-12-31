@@ -131,6 +131,7 @@ public class Options {
   private boolean ignoreUntrustedSSLError;
   private String preShowScript;
   private Pattern proxyRequestsPattern = null;
+  private Double textZoom;
 
   public Pattern getProxyRequestsPattern() {
     return proxyRequestsPattern;
@@ -154,6 +155,14 @@ public class Options {
 
   public void setTitle(String title) {
     this.title = title;
+  }
+
+  public Double getTextZoom() {
+    return textZoom;
+  }
+
+  public void setTextZoom(Double textZoom) {
+    this.textZoom = textZoom;
   }
 
   public boolean getCloseModal() {
