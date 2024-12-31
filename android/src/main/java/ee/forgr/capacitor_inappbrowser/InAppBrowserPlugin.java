@@ -428,6 +428,8 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
 
+    options.setTextZoom(call.getDouble("textZoom"));
+
     String proxyRequestsStr = call.getString("proxyRequests");
     if (proxyRequestsStr != null) {
       try {
