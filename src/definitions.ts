@@ -257,6 +257,10 @@ export interface OpenWebViewOptions {
       height?: number;
     };
   };
+  /**
+   * text zoom in webview, 1.0 is 100%, 1.2 is 120%
+   */
+  textZoom?: number
 }
 
 export interface InAppBrowserPlugin {
