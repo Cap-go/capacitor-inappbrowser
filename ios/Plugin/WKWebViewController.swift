@@ -267,6 +267,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             print("[InAppBrowser - preShowScriptError]: Error!!!!")
             semaphore.signal()
+        } else if message.name == "close" {
+          closeView()
         }
     }
 
@@ -299,6 +301,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(self, name: "messageHandler")
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
+        userContentController.add(self, name: "close")
         webConfiguration.userContentController = userContentController
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
