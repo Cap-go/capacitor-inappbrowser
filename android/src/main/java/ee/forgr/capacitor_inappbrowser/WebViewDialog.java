@@ -487,7 +487,7 @@ public class WebViewDialog extends Dialog {
       }
     );
 
-    View closeButton = _toolbar.findViewById(R.id.closeButton);
+    ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
     closeButton.setOnClickListener(
       new View.OnClickListener() {
         @Override
@@ -520,7 +520,7 @@ public class WebViewDialog extends Dialog {
     );
 
     if (_options.showArrow()) {
-      closeButton.setBackgroundResource(R.drawable.arrow_forward_enabled);
+      closeButton.setImageResource(R.drawable.arrow_back_enabled);
     }
 
     if (_options.getShowReloadButton()) {
