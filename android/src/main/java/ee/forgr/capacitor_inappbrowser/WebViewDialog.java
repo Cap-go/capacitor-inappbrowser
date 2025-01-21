@@ -528,7 +528,7 @@ public class WebViewDialog extends Dialog {
     );
 
     if (_options.showArrow()) {
-      closeButton.setBackgroundResource(R.drawable.arrow_back_enabled);
+      closeButton.setBackgroundResource(R.drawable.arrow_forward_enabled);
     }
 
     if (_options.getShowReloadButton()) {
