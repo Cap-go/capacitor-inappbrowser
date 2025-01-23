@@ -55,7 +55,7 @@ importers:
         version: 3.4.2
       prettier-plugin-java:
         specifier: ^2.6.5
-        version: 2.6.5
+        version: 2.6.7(prettier@3.4.2)
       rimraf:
         specifier: ^6.0.1
         version: 6.0.1
@@ -1127,8 +1127,8 @@ packages:
     resolution: {integrity: sha512-bZsjR/iRjl1Nk1UkjGpAzLNfQtzuijhn2g+pbZb98HQ1Gk8vM9hfbxeMBP+M2/UUdwj0RqGG3mlvk2MsAqwvEw==}
     engines: {node: 20 || >=22}
 
-  java-parser@2.3.2:
-    resolution: {integrity: sha512-/O42UbEHy3VVJw8W0ruHkQjW75oWvQx4QisoUDRIGir6q3/IZ4JslDMPMYEqp7LU56PYJkH5uXdQiBaCXt/Opw==}
+  java-parser@2.3.3:
+    resolution: {integrity: sha512-9YY8OGlNGfq5TDDq2SBjtIEHMVLeV8vSSZrXDaQBhQ84hi1zc3/+5l3DF3wW8JGqQT2kNVha05dziSamvN8M/g==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -1355,13 +1355,10 @@ packages:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
 
-  prettier-plugin-java@2.6.5:
-    resolution: {integrity: sha512-2RkPNXyYpP5dRhr04pz45n+e5LXwYWTh1JXrztiCkZTGGokIGYrfwUuGa8csnDoGbP6CDPgVm8zZSIm/9I0SRQ==}
-
-  prettier@3.2.5:
-    resolution: {integrity: sha512-3/GWa9aOC0YeD7LUfvOG2NiDyhOWRvt1k+rcKhOuYnMY24iiCphgneUfJDyFXd6rZCAnuLBv6UeAULtrhT/F4A==}
-    engines: {node: '>=14'}
-    hasBin: true
+  prettier-plugin-java@2.6.7:
+    resolution: {integrity: sha512-AVm+X7fhAZpYKiUCdUIGZ8HJbkGkTUgYQIKVuCQEplcqpGw2ewVnNGcPb1Kc3+MYMfiEqzhd8ZYhMGVHw6tZdQ==}
+    peerDependencies:
+      prettier: ^3.0.0
 
   prettier@3.4.2:
     resolution: {integrity: sha512-e9MewbtFo+Fevyuxn/4rrcDAaq0IYxPGLvObpQjiZBMAzB9IGmzlnG9RZy3FFas+eBMu2vA0CszMeduow5dIuQ==}
@@ -2964,7 +2961,7 @@ snapshots:
     dependencies:
       '@isaacs/cliui': 8.0.2
 
-  java-parser@2.3.2:
+  java-parser@2.3.3:
     dependencies:
       chevrotain: 11.0.3
       chevrotain-allstar: 0.3.1(chevrotain@11.0.3)
@@ -3187,13 +3184,11 @@ snapshots:
 
   prelude-ls@1.2.1: {}
 
-  prettier-plugin-java@2.6.5:
+  prettier-plugin-java@2.6.7(prettier@3.4.2):
     dependencies:
-      java-parser: 2.3.2
+      java-parser: 2.3.3
       lodash: 4.17.21
-      prettier: 3.2.5
-
-  prettier@3.2.5: {}
+      prettier: 3.4.2
 
   prettier@3.4.2: {}
 
