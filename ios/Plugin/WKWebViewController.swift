@@ -838,7 +838,14 @@ fileprivate extension WKWebViewController {
 
 // MARK: - WKUIDelegate
 extension WKWebViewController: WKUIDelegate {
-
+    public func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        // Ensure UI updates are on the main thread
+        DispatchQueue.main.async {
+            let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            self.present(alertController, animated: true, completion: nil)
+        }
+        completionHandler()
+    }
 }
 
 // MARK: - WKNavigationDelegate
