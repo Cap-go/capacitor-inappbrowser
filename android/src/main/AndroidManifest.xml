@@ -7,6 +7,5 @@
         <data android:scheme="http" />
       </intent>
     </queries>
-  <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
   <uses-permission android:name="android.permission.CAMERA"/>
 </manifest>
