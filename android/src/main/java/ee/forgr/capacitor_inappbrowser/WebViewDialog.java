@@ -163,6 +163,14 @@ public class WebViewDialog extends Dialog {
       WindowManager.LayoutParams.FLAG_FULLSCREEN
     );
     setContentView(R.layout.activity_browser);
+    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+    WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+    insetsController.setAppearanceLightStatusBars(false);
+    getWindow().getDecorView().post(() -> {
+      getWindow().setStatusBarColor(Color.BLACK);
+    });
+
     getWindow()
       .setLayout(
         WindowManager.LayoutParams.MATCH_PARENT,
