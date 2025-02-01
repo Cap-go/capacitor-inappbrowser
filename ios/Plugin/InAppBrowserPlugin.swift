@@ -289,8 +289,10 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("Cannot get script to execute")
             return
         }
-        self.webViewController?.executeScript(script: script)
-        call.resolve()
+        DispatchQueue.main.async {
+            self.webViewController?.executeScript(script: script)
+            call.resolve()
+        }
     }
 
     @objc func postMessage(_ call: CAPPluginCall) {
@@ -302,7 +304,9 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
         print("Event data: \(eventData)")
 
-        self.webViewController?.postMessageToJS(message: eventData)
+        DispatchQueue.main.async {
+            self.webViewController?.postMessageToJS(message: eventData)
+        }
         call.resolve()
     }
 
