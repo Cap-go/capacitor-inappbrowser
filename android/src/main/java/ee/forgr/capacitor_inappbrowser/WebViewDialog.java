@@ -38,6 +38,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.annotation.RequiresApi;
+import androidx.core.view.WindowInsetsControllerCompat;
+
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
