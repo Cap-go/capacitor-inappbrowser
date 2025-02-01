@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.1.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.3...7.1.4) (2025-02-01)
+
+
+### Bug Fixes
+
+* remove READ_MEDIA_IMAGES ([e30874e](https://github.com/Cap-go/capacitor-inappbrowser/commit/e30874ebe18d44e39aef60c66bbdf61ad87a0608))
+
 ### [7.1.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.2...7.1.3) (2025-02-01)
 
 
