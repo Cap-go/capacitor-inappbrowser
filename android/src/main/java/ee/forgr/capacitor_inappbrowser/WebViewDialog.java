@@ -39,7 +39,6 @@ import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.annotation.RequiresApi;
 import androidx.core.view.WindowInsetsControllerCompat;
-
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
@@ -167,11 +166,14 @@ public class WebViewDialog extends Dialog {
     setContentView(R.layout.activity_browser);
     getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-    WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+    WindowInsetsControllerCompat insetsController =
+      new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
     insetsController.setAppearanceLightStatusBars(false);
-    getWindow().getDecorView().post(() -> {
-      getWindow().setStatusBarColor(Color.BLACK);
-    });
+    getWindow()
+      .getDecorView()
+      .post(() -> {
+        getWindow().setStatusBarColor(Color.BLACK);
+      });
 
     getWindow()
       .setLayout(
