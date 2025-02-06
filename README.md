@@ -38,6 +38,37 @@ Add the following to your `AndroidManifest.xml` file:
 
 Then the permission will be asked when the camera is used.
 
+#### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>We need access to the camera to record audio.</string>
+```
+
+### Microphone usage
+
+#### Android
+
+Add the following to your `AndroidManifest.xml` file:
+
+```xml
+<uses-permission android:name="android.permission.RECORD_AUDIO" />
+<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+```
+
+Then the permission will be asked when the microphone is used.
+
+#### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>We need access to the microphone to record audio.</string>
+```
+
 ### Two way communication
 
 With this plugin you can send events from the main app to the inappbrowser and vice versa.
@@ -70,37 +101,6 @@ window.mobileApp.postMessage({ detail: { message: "myMessage" } });
 window.addListener("messageFromWebview", (event) => {
   console.log(event);
 });
-```
-
-#### iOS
-
-Add the following to your `Info.plist` file:
-
-```xml
-<key>NSCameraUsageDescription</key>
-<string>We need access to the camera to record audio.</string>
-```
-
-### Microphone usage
-
-#### Android
-
-Add the following to your `AndroidManifest.xml` file:
-
-```xml
-<uses-permission android:name="android.permission.RECORD_AUDIO" />
-<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-```
-
-Then the permission will be asked when the microphone is used.
-
-#### iOS
-
-Add the following to your `Info.plist` file:
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>We need access to the microphone to record audio.</string>
 ```
 
 ## API
