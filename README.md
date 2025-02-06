@@ -38,6 +38,38 @@ Add the following to your `AndroidManifest.xml` file:
 
 Then the permission will be asked when the camera is used.
 
+### Two way communication
+
+With this plugin you can send events from the main app to the inappbrowser and vice versa.
+
+#### Main app to inappbrowser
+
+```js
+InAppBrowser.postMessage({ detail: { message: "myMessage" } });
+```
+
+#### Receive event from native in the inappbrowser
+
+```js
+window.addListener("messageFromNative", (event) => {
+  console.log(event);
+});
+```
+
+#### Send event from inappbrowser to main app
+
+```js
+window.mobileApp.postMessage({ detail: { message: "myMessage" } });
+```
+
+#### Receive event from inappbrowser in the main app
+
+```js
+window.addListener("messageFromWebview", (event) => {
+  console.log(event);
+});
+```
+
 #### iOS
 
 Add the following to your `Info.plist` file:
@@ -626,7 +658,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -640,7 +674,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
