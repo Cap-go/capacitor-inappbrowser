@@ -2,6 +2,66 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.1.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.5...7.1.6) (2025-02-02)
+
+
+### Bug Fixes
+
+* lint ([d3df47c](https://github.com/Cap-go/capacitor-inappbrowser/commit/d3df47cfef62a89da4f96e0db9d0010a5a4aa6ef))
+
+### [7.1.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.4...7.1.5) (2025-02-01)
+
+
+### Bug Fixes
+
+* build ([89cd832](https://github.com/Cap-go/capacitor-inappbrowser/commit/89cd832f9699e449e0df684fd2949e41991020f2))
+
+### [7.1.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.3...7.1.4) (2025-02-01)
+
+
+### Bug Fixes
+
+* remove READ_MEDIA_IMAGES ([e30874e](https://github.com/Cap-go/capacitor-inappbrowser/commit/e30874ebe18d44e39aef60c66bbdf61ad87a0608))
+
+### [7.1.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.2...7.1.3) (2025-02-01)
+
+
+### Bug Fixes
+
+* async thread ([df0bb19](https://github.com/Cap-go/capacitor-inappbrowser/commit/df0bb198a62cd776925b1622287760845560a7df))
+
+### [7.1.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.1...7.1.2) (2025-02-01)
+
+
+### Bug Fixes
+
+* Fixed back_arrow being displayed correctly instead of close_icon ([0516043](https://github.com/Cap-go/capacitor-inappbrowser/commit/05160433128222187fff8b12632b711cb7a99b12))
+* openWebView has stopped hiding the phone's status bar. ([465a035](https://github.com/Cap-go/capacitor-inappbrowser/commit/465a03561ff8b39b94a9d25396771bbdecf42bc3))
+* openWebView has stopped hiding the phone's status bar. ([6154e54](https://github.com/Cap-go/capacitor-inappbrowser/commit/6154e5422c470786d1402c45e432217675347742))
+* openWebView has stopped hiding the phone's status bar. ([ec6a9c2](https://github.com/Cap-go/capacitor-inappbrowser/commit/ec6a9c220580db66777f0a3886a29eba5d9d7aa4))
+
+### [7.1.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.0...7.1.1) (2025-01-27)
+
+## [7.1.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.36...7.1.0) (2025-01-27)
+
+
+### Features
+
+* migrate to capacitor v7 ([2a7fcc3](https://github.com/Cap-go/capacitor-inappbrowser/commit/2a7fcc35ede945da00aff6177dd81b85bc60aeb5))
+
+
+### Bug Fixes
+
+* pnpm lock ([8599575](https://github.com/Cap-go/capacitor-inappbrowser/commit/85995757dbeaf6013bd28e46f5a6b1d9e31ec2ce))
+
+### [6.9.36](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.35...6.9.36) (2025-01-23)
+
+### [6.9.35](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.34...6.9.35) (2025-01-20)
+
+### [6.9.34](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.33...6.9.34) (2025-01-20)
+
+### [6.9.33](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.32...6.9.33) (2025-01-13)
+
 ### [6.9.32](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.31...6.9.32) (2025-01-06)
 
 ### [6.9.31](https://github.com/Cap-go/capacitor-inappbrowser/compare/6.9.30...6.9.31) (2025-01-06)

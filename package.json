@@ -1,6 +1,6 @@
 {
   "name": "@capgo/inappbrowser",
-  "version": "6.9.32",
+  "version": "7.1.6",
   "description": "Capacitor plugin in app browser",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -45,29 +45,29 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
     "@capacitor/docgen": "^0.3.0",
-    "@capacitor/ios": "^6.1.2",
+    "@capacitor/ios": "^7.0.0",
     "@ionic/eslint-config": "^0.4.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@types/node": "^22.5.1",
     "@typescript-eslint/eslint-plugin": "^7.8.0",
     "@typescript-eslint/parser": "^7.8.0",
-    "eslint": "^9.9.1",
+    "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
     "husky": "^9.1.5",
-    "prettier": "^3.3.3",
-    "prettier-plugin-java": "^2.6.5",
+    "prettier": "^3.4.2",
+    "prettier-plugin-java": "^2.6.6",
     "rimraf": "^6.0.1",
-    "rollup": "^4.21.1",
+    "rollup": "^4.30.1",
     "swiftlint": "^2.0.0",
     "typescript": "^5.5.4"
   },
   "peerDependencies": {
-    "@capacitor/core": "^6.0.0"
+    "@capacitor/core": ">=7.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",
@@ -79,5 +79,5 @@
       "src": "android"
     }
   },
-  "packageManager": "pnpm@9.15.2+sha512.93e57b0126f0df74ce6bff29680394c0ba54ec47246b9cf321f0121d8d9bb03f750a705f24edc3c1180853afd7c2c3b94196d0a3d53d3e069d9e2793ef11f321"
+  "packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"
 }

@@ -239,7 +239,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
-            webView?.evaluateJavaScript(script, completionHandler: nil)
+            DispatchQueue.main.async {
+                self.webView?.evaluateJavaScript(script, completionHandler: nil)
+            }
         }
     }
 
@@ -305,6 +307,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
         userContentController.add(self, name: "close")
+        webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
@@ -844,7 +847,16 @@ fileprivate extension WKWebViewController {
 
 // MARK: - WKUIDelegate
 extension WKWebViewController: WKUIDelegate {
-
+    public func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        // Ensure UI updates are on the main thread
+        DispatchQueue.main.async {
+            let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
+                completionHandler()
+            }))
+            self.present(alertController, animated: true, completion: nil)
+        }
+    }
 }
 
 // MARK: - WKNavigationDelegate
