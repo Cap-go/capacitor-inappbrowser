@@ -42,6 +42,8 @@ Then the permission will be asked when the camera is used.
 
 With this plugin you can send events from the main app to the inappbrowser and vice versa.
 
+> The data is sent as a JSON object, so no functions or other non-JSON-serializable types are allowed.
+
 #### Main app to inappbrowser
 
 ```js
