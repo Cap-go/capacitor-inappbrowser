@@ -239,7 +239,7 @@ Injects JavaScript code into the InAppBrowser window.
 postMessage(options: { detail: Record<string, any>; }) => Promise<void>
 ```
 
-Sends an event to the webview. you can listen to this event with addListener("messageFromWebview", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
+Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addListener("messageFromNative", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
 detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
 Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
 
@@ -349,9 +349,9 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 addListener(eventName: "messageFromWebview", listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>
 ```
 
-Will be triggered when event is sent from webview, to send an event to the webview use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
-detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
-Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
+Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
+detail is the data you want to send to the main app, it's a requirement of Capacitor we cannot send direct objects
+Your object has to be serializable to JSON, no functions or other non-JSON-serializable types are allowed.
 
 This method is inject at runtime in the webview
 
