@@ -103,6 +103,12 @@ window.addListener("messageFromWebview", (event) => {
 });
 ```
 
+### Close inappbrowser from inappbrowser itself
+
+```js
+window.mobileApp.close();
+```
+
 ## API
 
 <docgen-index>
