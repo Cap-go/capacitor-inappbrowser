@@ -333,6 +333,9 @@ public class WebViewDialog extends Dialog {
       "            if (window.AndroidInterface) { " +
       "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
       "            } " +
+      "        }, " +
+      "        close: function() { " +
+      "            window.AndroidInterface.close(); " +
       "        } " +
       "    }; " +
       "}";

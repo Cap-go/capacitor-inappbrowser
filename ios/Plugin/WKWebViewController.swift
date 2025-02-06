@@ -280,6 +280,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
                                                 window.webkit.messageHandlers.messageHandler.postMessage(message);
                                         }
+                                },
+                                close: function() {
+                                        window.webkit.messageHandlers.close.postMessage(null);
                                 }
                         };
                 }
