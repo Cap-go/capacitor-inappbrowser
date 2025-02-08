@@ -13,7 +13,7 @@
     "ios/Plugin/",
     "CapgoInappbrowser.podspec"
   ],
-  "author": "Martin Donadieu",
+  "author": "Martin Donadieu <martin@capgo.app>",
   "license": "MIT",
   "repository": {
     "type": "git",
