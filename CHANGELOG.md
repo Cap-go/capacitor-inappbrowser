@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.0...7.2.1) (2025-02-08)
+
+
+### Bug Fixes
+
+* json typo ([b531feb](https://github.com/Cap-go/capacitor-inappbrowser/commit/b531feb62fce80d26ceb748447e2637752e9652a))
+* remove pnpm ([f587f10](https://github.com/Cap-go/capacitor-inappbrowser/commit/f587f102aa92c13e906d0993be79e1d788ec0507))
+
 ## [7.2.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.6...7.2.0) (2025-02-08)
 
 
