@@ -24,6 +24,24 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin {
+    public let identifier = "InAppBrowserPlugin"
+    public let jsName = "InAppBrowser"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "openWebView", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearAllCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearCache", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reload", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setUrl", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "insertCSS", returnType: CAPPluginReturnPromise)
+    ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
     private var isSetupDone = false
