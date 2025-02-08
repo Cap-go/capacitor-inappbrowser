@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.2.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.6...7.2.0) (2025-02-08)
+
+
+### Features
+
+* add ability to close webview from javascript on ios ([5034997](https://github.com/Cap-go/capacitor-inappbrowser/commit/50349975e5a0b81595f6f91ea0747910cf9c7aeb))
+* add close function to unified javascript interface ([c3d9079](https://github.com/Cap-go/capacitor-inappbrowser/commit/c3d9079cabf4b5c6ea6f6b722cd487cf47e74fa1))
+* close webview with window.AndroidInterface.close() from within ([c5eae97](https://github.com/Cap-go/capacitor-inappbrowser/commit/c5eae97a6aa207c9e36121e61530c395a28fffa8))
+
+
+### Bug Fixes
+
+* add better doc for 2 way com ([171ea27](https://github.com/Cap-go/capacitor-inappbrowser/commit/171ea27931b36b358c6e34ee80ed89380e0c0fb7))
+* add warning ([84470ae](https://github.com/Cap-go/capacitor-inappbrowser/commit/84470ae1c32dbdbcea0ab206367227c270f1b75d))
+* allow inline video ([1368f2a](https://github.com/Cap-go/capacitor-inappbrowser/commit/1368f2a4f0eb2b8cb95a91f7c5b23430ae129bce))
+* better definition ([588cc88](https://github.com/Cap-go/capacitor-inappbrowser/commit/588cc8843845b2d5c29212d8b767908109264555))
+* CICD ([ee7ef04](https://github.com/Cap-go/capacitor-inappbrowser/commit/ee7ef0430ae4b092717f825098db18a86ed07930))
+* order of doc ([71d8923](https://github.com/Cap-go/capacitor-inappbrowser/commit/71d892399685d4e67b67a02ee056c51c8f1d912f))
+* versions ([941aabe](https://github.com/Cap-go/capacitor-inappbrowser/commit/941aabee33049624f20030ae044a1fde20f8afb7))
+
 ### [7.1.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.1.5...7.1.6) (2025-02-02)
 
 
