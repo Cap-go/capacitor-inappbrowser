@@ -54,8 +54,6 @@
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@types/node": "^22.5.1",
-    "@typescript-eslint/eslint-plugin": "^7.8.0",
-    "@typescript-eslint/parser": "^7.8.0",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.31.0",
     "husky": "^9.1.5",
