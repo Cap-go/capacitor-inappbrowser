@@ -270,7 +270,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             print("[InAppBrowser - preShowScriptError]: Error!!!!")
             semaphore.signal()
         } else if message.name == "close" {
-          closeView()
+            closeView()
         }
     }
 
