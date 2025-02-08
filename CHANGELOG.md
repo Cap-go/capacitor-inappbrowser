@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.9...7.2.10) (2025-02-08)
+
+
+### Bug Fixes
+
+* eslint config ([2c7e3a3](https://github.com/Cap-go/capacitor-inappbrowser/commit/2c7e3a375088f2c6273d50b2189f5d8cc4cef6bf))
+
 ### [7.2.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.8...7.2.9) (2025-02-08)
 
 
