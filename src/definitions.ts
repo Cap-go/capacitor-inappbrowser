@@ -19,7 +19,7 @@ export interface BtnEvent {
 
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
-export type ButtonNearListener = (state: {}) => void;
+export type ButtonNearListener = (state: object) => void;
 
 export enum BackgroundColor {
   WHITE = "white",
@@ -233,13 +233,13 @@ export interface OpenWebViewOptions {
    *
    * @since 6.6.0
    */
-  preShowScript?: String;
+  preShowScript?: string;
   /**
    * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
    *
    * @since 6.9.0
    */
-  proxyRequests?: String;
+  proxyRequests?: string;
   /**
    * buttonNearDone allows for a creation of a custom button. Please see [buttonNearDone.md](/buttonNearDone.md) for more info.
    *
@@ -248,11 +248,11 @@ export interface OpenWebViewOptions {
   buttonNearDone?: {
     ios: {
       iconType: "sf-symbol" | "asset";
-      icon: String;
+      icon: string;
     };
     android: {
       iconType: "asset";
-      icon: String;
+      icon: string;
       width?: number;
       height?: number;
     };
