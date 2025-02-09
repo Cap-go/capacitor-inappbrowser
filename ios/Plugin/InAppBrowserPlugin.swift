@@ -23,7 +23,7 @@ extension UIColor {
  * here: https://capacitorjs.com/docs/plugins/ios
  */
 @objc(InAppBrowserPlugin)
-public class InAppBrowserPlugin: CAPPlugin {
+public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
