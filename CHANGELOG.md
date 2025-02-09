@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.14](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.13...7.2.14) (2025-02-09)
+
+
+### Bug Fixes
+
+* handle Android back button properly ([cffb6fe](https://github.com/Cap-go/capacitor-inappbrowser/commit/cffb6fe97c6e82982eddb92b2284ff22c135ec76))
+
 ### [7.2.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.12...7.2.13) (2025-02-09)
 
 
