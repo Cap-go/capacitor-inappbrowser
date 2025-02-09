@@ -1061,6 +1061,8 @@ public class WebViewDialog extends Dialog {
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
+      _options.getCallbacks().closeEvent(_webView.getUrl());
+      _webView.destroy();
       super.onBackPressed();
     }
   }
