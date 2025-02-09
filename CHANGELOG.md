@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.11...7.2.12) (2025-02-09)
+
+
+### Bug Fixes
+
+* add missing class ([78056b0](https://github.com/Cap-go/capacitor-inappbrowser/commit/78056b036d3c05e9c8085930ded5e6d89a3d37d0))
+
 ### [7.2.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.10...7.2.11) (2025-02-09)
 
 
