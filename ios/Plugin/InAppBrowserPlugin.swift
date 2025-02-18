@@ -212,9 +212,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async {
             let url = URL(string: urlString)
-
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank")
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
@@ -257,6 +256,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
+                self.webViewController?.blankNavigationTab = true
             }
             if showReloadButton {
                 let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)

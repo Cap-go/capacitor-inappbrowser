@@ -75,6 +75,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
+    
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool) {
+        super.init(nibName: nil, bundle: nil)
+        self.blankNavigationTab = blankNavigationTab
+        self.source = .remote(url)
+        self.credentials = credentials
+        self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
+        self.initWebview(isInspectable: isInspectable)
+    }
 
     open var hasDynamicTitle = false
     open var source: WKWebSource?
@@ -101,6 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
+    var blankNavigationTab: Bool = false;
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -295,7 +306,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     open func initWebview(isInspectable: Bool = true) {
-
         self.view.backgroundColor = UIColor.white
 
         self.extendedLayoutIncludesOpaqueBars = true
@@ -316,6 +326,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView.perform(Selector(("setInspectable:")), with: isInspectable)
         }
 
+        if (self.blankNavigationTab) {
+            // First add the webView to view hierarchy
+            self.view.addSubview(webView)
+            
+            // Then set up constraints
+            webView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+            ])
+        }
+
         webView.uiDelegate = self
         webView.navigationDelegate = self
 
@@ -327,9 +351,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView.addObserver(self, forKeyPath: titleKeyPath, options: .new, context: nil)
         }
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
-        //        NotificationCenter.default.addObserver(self, selector: #selector(restateViewHeight), name: UIDevice.orientationDidChangeNotification, object: nil)
 
-        self.view = webView
+        if (!self.blankNavigationTab) {
+            self.view = webView
+        }
         self.webView = webView
 
         self.webView?.customUserAgent = self.customUserAgent ?? self.userAgent ?? self.originalUserAgent
@@ -804,7 +829,6 @@ fileprivate extension WKWebViewController {
             self.present(alert, animated: true, completion: nil)
         } else {
             let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            #imageLiteral(resourceName: "simulator_screenshot_B8B44B8D-EB30-425C-9BF4-1F37697A8459.png")
             activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
             activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
             self.present(activityViewController, animated: true, completion: nil)
