@@ -75,6 +75,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
+    
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool) {
+        super.init(nibName: nil, bundle: nil)
+        self.blankNavigationTab = blankNavigationTab
+        self.source = .remote(url)
+        self.credentials = credentials
+        self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
+        self.initWebview(isInspectable: isInspectable)
+    }
 
     open var hasDynamicTitle = false
     open var source: WKWebSource?
@@ -101,6 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
+    var blankNavigationTab: Bool = false;
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -239,7 +250,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
            let jsonString = String(data: jsonData, encoding: .utf8) {
             let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
-            webView?.evaluateJavaScript(script, completionHandler: nil)
+            DispatchQueue.main.async {
+                self.webView?.evaluateJavaScript(script, completionHandler: nil)
+            }
         }
     }
 
@@ -267,6 +280,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             print("[InAppBrowser - preShowScriptError]: Error!!!!")
             semaphore.signal()
+        } else if message.name == "close" {
+            closeView()
         }
     }
 
@@ -278,6 +293,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
                                                 window.webkit.messageHandlers.messageHandler.postMessage(message);
                                         }
+                                },
+                                close: function() {
+                                        window.webkit.messageHandlers.close.postMessage(null);
                                 }
                         };
                 }
@@ -288,7 +306,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     open func initWebview(isInspectable: Bool = true) {
-
         self.view.backgroundColor = UIColor.white
 
         self.extendedLayoutIncludesOpaqueBars = true
@@ -299,12 +316,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(self, name: "messageHandler")
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
+        userContentController.add(self, name: "close")
+        webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
         if webView.responds(to: Selector(("setInspectable:"))) {
             // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
             webView.perform(Selector(("setInspectable:")), with: isInspectable)
+        }
+
+        if (self.blankNavigationTab) {
+            // First add the webView to view hierarchy
+            self.view.addSubview(webView)
+            
+            // Then set up constraints
+            webView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+            ])
         }
 
         webView.uiDelegate = self
@@ -318,9 +351,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView.addObserver(self, forKeyPath: titleKeyPath, options: .new, context: nil)
         }
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
-        //        NotificationCenter.default.addObserver(self, selector: #selector(restateViewHeight), name: UIDevice.orientationDidChangeNotification, object: nil)
 
-        self.view = webView
+        if (!self.blankNavigationTab) {
+            self.view = webView
+        }
         self.webView = webView
 
         self.webView?.customUserAgent = self.customUserAgent ?? self.userAgent ?? self.originalUserAgent
@@ -795,7 +829,6 @@ fileprivate extension WKWebViewController {
             self.present(alert, animated: true, completion: nil)
         } else {
             let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            #imageLiteral(resourceName: "simulator_screenshot_B8B44B8D-EB30-425C-9BF4-1F37697A8459.png")
             activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
             activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
             self.present(activityViewController, animated: true, completion: nil)
@@ -838,7 +871,16 @@ fileprivate extension WKWebViewController {
 
 // MARK: - WKUIDelegate
 extension WKWebViewController: WKUIDelegate {
-
+    public func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        // Ensure UI updates are on the main thread
+        DispatchQueue.main.async {
+            let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
+                completionHandler()
+            }))
+            self.present(alertController, animated: true, completion: nil)
+        }
+    }
 }
 
 // MARK: - WKNavigationDelegate

@@ -23,7 +23,23 @@ extension UIColor {
  * here: https://capacitorjs.com/docs/plugins/ios
  */
 @objc(InAppBrowserPlugin)
-public class InAppBrowserPlugin: CAPPlugin {
+public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "InAppBrowserPlugin"
+    public let jsName = "InAppBrowser"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openWebView", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearAllCookies", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearCache", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "reload", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setUrl", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise)
+    ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
     private var isSetupDone = false
@@ -196,9 +212,8 @@ public class InAppBrowserPlugin: CAPPlugin {
 
         DispatchQueue.main.async {
             let url = URL(string: urlString)
-
             if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink)
+                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank")
             } else {
                 self.webViewController = WKWebViewController.init()
                 self.webViewController?.setHeaders(headers: headers)
@@ -241,6 +256,7 @@ public class InAppBrowserPlugin: CAPPlugin {
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
+                self.webViewController?.blankNavigationTab = true
             }
             if showReloadButton {
                 let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
@@ -289,8 +305,10 @@ public class InAppBrowserPlugin: CAPPlugin {
             call.reject("Cannot get script to execute")
             return
         }
-        self.webViewController?.executeScript(script: script)
-        call.resolve()
+        DispatchQueue.main.async {
+            self.webViewController?.executeScript(script: script)
+            call.resolve()
+        }
     }
 
     @objc func postMessage(_ call: CAPPluginCall) {
@@ -302,7 +320,9 @@ public class InAppBrowserPlugin: CAPPlugin {
         }
         print("Event data: \(eventData)")
 
-        self.webViewController?.postMessageToJS(message: eventData)
+        DispatchQueue.main.async {
+            self.webViewController?.postMessageToJS(message: eventData)
+        }
         call.resolve()
     }
 

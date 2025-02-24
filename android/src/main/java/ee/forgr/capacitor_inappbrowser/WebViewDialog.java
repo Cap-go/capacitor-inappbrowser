@@ -38,6 +38,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.annotation.RequiresApi;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
@@ -132,6 +133,21 @@ public class WebViewDialog extends Dialog {
       // Handle message from JavaScript
       _options.getCallbacks().javascriptCallback(message);
     }
+
+    @JavascriptInterface
+    public void close() {
+      // close webview
+      activity.runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            dismiss();
+            _options.getCallbacks().closeEvent(_webView.getUrl());
+            _webView.destroy();
+          }
+        }
+      );
+    }
   }
 
   public class PreShowScriptInterface {
@@ -163,6 +179,17 @@ public class WebViewDialog extends Dialog {
       WindowManager.LayoutParams.FLAG_FULLSCREEN
     );
     setContentView(R.layout.activity_browser);
+    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+    WindowInsetsControllerCompat insetsController =
+      new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+    insetsController.setAppearanceLightStatusBars(false);
+    getWindow()
+      .getDecorView()
+      .post(() -> {
+        getWindow().setStatusBarColor(Color.BLACK);
+      });
+
     getWindow()
       .setLayout(
         WindowManager.LayoutParams.MATCH_PARENT,
@@ -318,6 +345,9 @@ public class WebViewDialog extends Dialog {
       "            if (window.AndroidInterface) { " +
       "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
       "            } " +
+      "        }, " +
+      "        close: function() { " +
+      "            window.AndroidInterface.close(); " +
       "        } " +
       "    }; " +
       "}";
@@ -487,7 +517,7 @@ public class WebViewDialog extends Dialog {
       }
     );
 
-    View closeButton = _toolbar.findViewById(R.id.closeButton);
+    ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
     closeButton.setOnClickListener(
       new View.OnClickListener() {
         @Override
@@ -520,7 +550,7 @@ public class WebViewDialog extends Dialog {
     );
 
     if (_options.showArrow()) {
-      closeButton.setBackgroundResource(R.drawable.arrow_forward_enabled);
+      closeButton.setImageResource(R.drawable.arrow_back_enabled);
     }
 
     if (_options.getShowReloadButton()) {
@@ -1031,6 +1061,8 @@ public class WebViewDialog extends Dialog {
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
+      _options.getCallbacks().closeEvent(_webView.getUrl());
+      _webView.destroy();
       super.onBackPressed();
     }
   }
