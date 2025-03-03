@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.19](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.18...7.2.19) (2025-03-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.constraintlayout:constraintlayout to v2.2.1 ([#287](https://github.com/Cap-go/capacitor-inappbrowser/issues/287)) ([df45e17](https://github.com/Cap-go/capacitor-inappbrowser/commit/df45e171ce432dac5078e6eecc57b9d83538f0fd))
+
 ### [7.2.18](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.17...7.2.18) (2025-02-27)
 
 
