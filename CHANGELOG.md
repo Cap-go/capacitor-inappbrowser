@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.2.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.20...7.2.21) (2025-03-10)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.coordinatorlayout:coordinatorlayout to v1.3.0 ([#290](https://github.com/Cap-go/capacitor-inappbrowser/issues/290)) ([61feebb](https://github.com/Cap-go/capacitor-inappbrowser/commit/61feebb67e5729b43de35d6b56b75837c35e1ef8))
+
 ### [7.2.20](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.19...7.2.20) (2025-03-03)
 
 ### [7.2.19](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.18...7.2.19) (2025-03-03)
