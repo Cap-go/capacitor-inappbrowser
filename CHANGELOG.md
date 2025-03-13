@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.3.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.21...7.3.0) (2025-03-13)
+
+
+### Features
+
+* make the plugin crash free the max possible ([8ac2a84](https://github.com/Cap-go/capacitor-inappbrowser/commit/8ac2a8455a43c7536c4c2f3dd829b0b5a37d4d13))
+
 ### [7.2.21](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.2.20...7.2.21) (2025-03-10)
 
 
