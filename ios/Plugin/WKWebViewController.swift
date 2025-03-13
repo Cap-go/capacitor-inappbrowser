@@ -75,7 +75,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
-    
+
     public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
@@ -111,7 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var ignoreUntrustedSSLError = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
-    var blankNavigationTab: Bool = false;
+    var blankNavigationTab: Bool = false
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -326,10 +326,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView.perform(Selector(("setInspectable:")), with: isInspectable)
         }
 
-        if (self.blankNavigationTab) {
+        if self.blankNavigationTab {
             // First add the webView to view hierarchy
             self.view.addSubview(webView)
-            
+
             // Then set up constraints
             webView.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
@@ -352,7 +352,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
 
-        if (!self.blankNavigationTab) {
+        if !self.blankNavigationTab {
             self.view = webView
         }
         self.webView = webView
@@ -841,7 +841,20 @@ fileprivate extension WKWebViewController {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
         }
         if canDismiss {
-            //            UIDevice.current.setValue(Int(UIInterfaceOrientation.portrait.rawValue), forKey: "orientation")
+            // Cleanup webView
+            webView?.stopLoading()
+            webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+            if websiteTitleInNavigationBar {
+                webView?.removeObserver(self, forKeyPath: titleKeyPath)
+            }
+            webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+            webView?.configuration.userContentController.removeAllUserScripts()
+            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+            webView = nil
+
             self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }

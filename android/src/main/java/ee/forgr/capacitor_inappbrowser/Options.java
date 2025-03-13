@@ -17,10 +17,10 @@ public class Options {
       ASSET,
     }
 
-    private AllIconTypes iconType;
-    private String icon;
-    private int height;
-    private int width;
+    private final AllIconTypes iconType;
+    private final String icon;
+    private final int height;
+    private final int width;
 
     private ButtonNearDone(
       AllIconTypes iconType,
@@ -80,14 +80,20 @@ public class Options {
           try {
             fileInputString.close();
           } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
           }
         }
       }
       Integer width = android.getInteger("width", 48);
 
       Integer height = android.getInteger("height", 48);
-      return new ButtonNearDone(AllIconTypes.ASSET, icon, height, width);
+      final ButtonNearDone buttonNearDone1 = new ButtonNearDone(
+        AllIconTypes.ASSET,
+        icon,
+        height,
+        width
+      );
+      return buttonNearDone1;
     }
 
     public AllIconTypes getIconType() {

@@ -15,7 +15,6 @@ import android.graphics.Picture;
 import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
-import android.os.Build;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
@@ -37,7 +36,6 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-import androidx.annotation.RequiresApi;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
@@ -45,15 +43,12 @@ import com.getcapacitor.JSObject;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.CookiePolicy;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -61,7 +56,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONException;
@@ -69,10 +63,10 @@ import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
 
-  private class ProxiedRequest {
+  private static class ProxiedRequest {
 
     private WebResourceResponse response;
-    private Semaphore semaphore;
+    private final Semaphore semaphore;
 
     public WebResourceResponse getResponse() {
       return response;
@@ -86,21 +80,23 @@ public class WebViewDialog extends Dialog {
 
   private WebView _webView;
   private Toolbar _toolbar;
-  private Options _options;
-  private Context _context;
+  private Options _options = null;
+  private final Context _context;
   public Activity activity;
   private boolean isInitialized = false;
-  private WebView capacitorWebView;
-  private HashMap<String, ProxiedRequest> proxiedRequestsHashmap;
+  private final WebView capacitorWebView;
+  private final Map<String, ProxiedRequest> proxiedRequestsHashmap =
+    new HashMap<>();
+  private final ExecutorService executorService =
+    Executors.newCachedThreadPool();
 
   Semaphore preShowSemaphore = null;
-  String preshowError = null;
+  String preShowError = null;
 
   public PermissionRequest currentPermissionRequest;
   public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
   public ValueCallback<Uri> mUploadMessage;
   public ValueCallback<Uri[]> mFilePathCallback;
-  ExecutorService executorService = Executors.newFixedThreadPool(1);
 
   public interface PermissionHandler {
     void handleCameraPermissionRequest(PermissionRequest request);
@@ -108,7 +104,7 @@ public class WebViewDialog extends Dialog {
     void handleMicrophonePermissionRequest(PermissionRequest request);
   }
 
-  private PermissionHandler permissionHandler;
+  private final PermissionHandler permissionHandler;
 
   public WebViewDialog(
     Context context,
@@ -123,30 +119,48 @@ public class WebViewDialog extends Dialog {
     this.permissionHandler = permissionHandler;
     this.isInitialized = false;
     this.capacitorWebView = capacitorWebView;
-    this.proxiedRequestsHashmap = new HashMap<>();
   }
 
-  public class JavaScriptInterface {
+  // Add this class to provide safer JavaScript interface
+  private class JavaScriptInterface {
 
     @JavascriptInterface
     public void postMessage(String message) {
-      // Handle message from JavaScript
-      _options.getCallbacks().javascriptCallback(message);
+      try {
+        // Handle message from JavaScript safely
+        if (message == null || message.isEmpty()) {
+          Log.e("InAppBrowser", "Received empty message from WebView");
+          return;
+        }
+        _options.getCallbacks().javascriptCallback(message);
+      } catch (Exception e) {
+        Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
+      }
     }
 
     @JavascriptInterface
     public void close() {
-      // close webview
-      activity.runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            dismiss();
-            _options.getCallbacks().closeEvent(_webView.getUrl());
-            _webView.destroy();
-          }
+      try {
+        // close webview safely
+        if (activity != null) {
+          activity.runOnUiThread(() -> {
+            try {
+              dismiss();
+              if (_webView != null) {
+                String currentUrl = _webView.getUrl();
+                if (_options != null && _options.getCallbacks() != null) {
+                  _options.getCallbacks().closeEvent(currentUrl);
+                }
+                _webView.destroy();
+              }
+            } catch (Exception e) {
+              Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
+            }
+          });
         }
-      );
+      } catch (Exception e) {
+        Log.e("InAppBrowser", "Error in close: " + e.getMessage());
+      }
     }
   }
 
@@ -154,23 +168,31 @@ public class WebViewDialog extends Dialog {
 
     @JavascriptInterface
     public void error(String error) {
-      // Handle message from JavaScript
-      if (preShowSemaphore != null) {
-        preshowError = error;
-        preShowSemaphore.release();
+      try {
+        // Handle message from JavaScript
+        if (preShowSemaphore != null) {
+          preShowError = error;
+          preShowSemaphore.release();
+        }
+      } catch (Exception e) {
+        Log.e("InAppBrowser", "Error in error callback: " + e.getMessage());
       }
     }
 
     @JavascriptInterface
     public void success() {
-      // Handle message from JavaScript
-      if (preShowSemaphore != null) {
-        preShowSemaphore.release();
+      try {
+        // Handle message from JavaScript
+        if (preShowSemaphore != null) {
+          preShowSemaphore.release();
+        }
+      } catch (Exception e) {
+        Log.e("InAppBrowser", "Error in success callback: " + e.getMessage());
       }
     }
   }
 
-  @SuppressLint("SetJavaScriptEnabled")
+  @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
     setCancelable(true);
@@ -210,9 +232,6 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setDatabaseEnabled(true);
     _webView.getSettings().setDomStorageEnabled(true);
     _webView.getSettings().setAllowFileAccess(true);
-    _webView
-      .getSettings()
-      .setPluginState(android.webkit.WebSettings.PluginState.ON);
     _webView.getSettings().setLoadWithOverviewMode(true);
     _webView.getSettings().setUseWideViewPort(true);
     _webView.getSettings().setAllowFileAccessFromFileURLs(true);
@@ -228,7 +247,7 @@ public class WebViewDialog extends Dialog {
         public boolean onShowFileChooser(
           WebView webView,
           ValueCallback<Uri[]> filePathCallback,
-          WebChromeClient.FileChooserParams fileChooserParams
+          FileChooserParams fileChooserParams
         ) {
           openFileChooser(
             filePathCallback,
@@ -392,10 +411,10 @@ public class WebViewDialog extends Dialog {
         );
         return;
       }
-      if (preshowError != null && !preshowError.isEmpty()) {
+      if (preShowError != null && !preShowError.isEmpty()) {
         Log.e(
           "InjectPreShowScript",
-          "Error within the user-provided preShowFunction: " + preshowError
+          "Error within the user-provided preShowFunction: " + preShowError
         );
       }
     } catch (InterruptedException e) {
@@ -405,7 +424,7 @@ public class WebViewDialog extends Dialog {
       );
     } finally {
       preShowSemaphore = null;
-      preshowError = null;
+      preShowError = null;
     }
   }
 
@@ -529,7 +548,7 @@ public class WebViewDialog extends Dialog {
               .setMessage(_options.getCloseModalDescription())
               .setPositiveButton(
                 _options.getCloseModalOk(),
-                new DialogInterface.OnClickListener() {
+                new OnClickListener() {
                   public void onClick(DialogInterface dialog, int which) {
                     // Close button clicked, do something
                     dismiss();
@@ -618,7 +637,7 @@ public class WebViewDialog extends Dialog {
             try {
               inputStream.close();
             } catch (IOException e) {
-              throw new RuntimeException(e);
+              e.printStackTrace();
             }
           }
         }
@@ -742,9 +761,7 @@ public class WebViewDialog extends Dialog {
               intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
               context.startActivity(intent);
               return true;
-            } catch (ActivityNotFoundException e) {
-              // Do nothing
-            } catch (URISyntaxException e) {
+            } catch (ActivityNotFoundException | URISyntaxException e) {
               // Do nothing
             }
           }
@@ -769,7 +786,6 @@ public class WebViewDialog extends Dialog {
         //          _webView.evaluateJavascript("");
         //        }
         //
-        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
         @Override
         public WebResourceResponse shouldInterceptRequest(
           WebView view,
@@ -798,7 +814,7 @@ public class WebViewDialog extends Dialog {
           // We need to call a JS function
           String requestId = randomRequestId();
           ProxiedRequest proxiedRequest = new ProxiedRequest();
-          proxiedRequestsHashmap.put(requestId, proxiedRequest);
+          addProxiedRequest(requestId, proxiedRequest);
 
           // lsuakdchgbbaHandleProxiedRequest
           activity.runOnUiThread(
@@ -841,7 +857,7 @@ public class WebViewDialog extends Dialog {
               return proxiedRequest.response;
             } else {
               Log.e("InAppBrowserProxy", "Semaphore timed out");
-              proxiedRequestsHashmap.remove(requestId); // prevent mem leak
+              removeProxiedRequest(requestId); // prevent mem leak
             }
           } catch (InterruptedException e) {
             Log.e("InAppBrowserProxy", "Semaphore wait error", e);
@@ -1068,99 +1084,97 @@ public class WebViewDialog extends Dialog {
   }
 
   public static String getReasonPhrase(int statusCode) {
-    switch (statusCode) {
-      case (200):
-        return "OK";
-      case (201):
-        return "Created";
-      case (202):
-        return "Accepted";
-      case (203):
-        return "Non Authoritative Information";
-      case (204):
-        return "No Content";
-      case (205):
-        return "Reset Content";
-      case (206):
-        return "Partial Content";
-      case (207):
-        return "Partial Update OK";
-      case (300):
-        return "Mutliple Choices";
-      case (301):
-        return "Moved Permanently";
-      case (302):
-        return "Moved Temporarily";
-      case (303):
-        return "See Other";
-      case (304):
-        return "Not Modified";
-      case (305):
-        return "Use Proxy";
-      case (307):
-        return "Temporary Redirect";
-      case (400):
-        return "Bad Request";
-      case (401):
-        return "Unauthorized";
-      case (402):
-        return "Payment Required";
-      case (403):
-        return "Forbidden";
-      case (404):
-        return "Not Found";
-      case (405):
-        return "Method Not Allowed";
-      case (406):
-        return "Not Acceptable";
-      case (407):
-        return "Proxy Authentication Required";
-      case (408):
-        return "Request Timeout";
-      case (409):
-        return "Conflict";
-      case (410):
-        return "Gone";
-      case (411):
-        return "Length Required";
-      case (412):
-        return "Precondition Failed";
-      case (413):
-        return "Request Entity Too Large";
-      case (414):
-        return "Request-URI Too Long";
-      case (415):
-        return "Unsupported Media Type";
-      case (416):
-        return "Requested Range Not Satisfiable";
-      case (417):
-        return "Expectation Failed";
-      case (418):
-        return "Reauthentication Required";
-      case (419):
-        return "Proxy Reauthentication Required";
-      case (422):
-        return "Unprocessable Entity";
-      case (423):
-        return "Locked";
-      case (424):
-        return "Failed Dependency";
-      case (500):
-        return "Server Error";
-      case (501):
-        return "Not Implemented";
-      case (502):
-        return "Bad Gateway";
-      case (503):
-        return "Service Unavailable";
-      case (504):
-        return "Gateway Timeout";
-      case (505):
-        return "HTTP Version Not Supported";
-      case (507):
-        return "Insufficient Storage";
-      default:
-        return "";
+    return switch (statusCode) {
+      case (200) -> "OK";
+      case (201) -> "Created";
+      case (202) -> "Accepted";
+      case (203) -> "Non Authoritative Information";
+      case (204) -> "No Content";
+      case (205) -> "Reset Content";
+      case (206) -> "Partial Content";
+      case (207) -> "Partial Update OK";
+      case (300) -> "Mutliple Choices";
+      case (301) -> "Moved Permanently";
+      case (302) -> "Moved Temporarily";
+      case (303) -> "See Other";
+      case (304) -> "Not Modified";
+      case (305) -> "Use Proxy";
+      case (307) -> "Temporary Redirect";
+      case (400) -> "Bad Request";
+      case (401) -> "Unauthorized";
+      case (402) -> "Payment Required";
+      case (403) -> "Forbidden";
+      case (404) -> "Not Found";
+      case (405) -> "Method Not Allowed";
+      case (406) -> "Not Acceptable";
+      case (407) -> "Proxy Authentication Required";
+      case (408) -> "Request Timeout";
+      case (409) -> "Conflict";
+      case (410) -> "Gone";
+      case (411) -> "Length Required";
+      case (412) -> "Precondition Failed";
+      case (413) -> "Request Entity Too Large";
+      case (414) -> "Request-URI Too Long";
+      case (415) -> "Unsupported Media Type";
+      case (416) -> "Requested Range Not Satisfiable";
+      case (417) -> "Expectation Failed";
+      case (418) -> "Reauthentication Required";
+      case (419) -> "Proxy Reauthentication Required";
+      case (422) -> "Unprocessable Entity";
+      case (423) -> "Locked";
+      case (424) -> "Failed Dependency";
+      case (500) -> "Server Error";
+      case (501) -> "Not Implemented";
+      case (502) -> "Bad Gateway";
+      case (503) -> "Service Unavailable";
+      case (504) -> "Gateway Timeout";
+      case (505) -> "HTTP Version Not Supported";
+      case (507) -> "Insufficient Storage";
+      default -> "";
+    };
+  }
+
+  @Override
+  public void dismiss() {
+    if (_webView != null) {
+      _webView.loadUrl("about:blank");
+      _webView.onPause();
+      _webView.removeAllViews();
+      _webView.destroy();
+      _webView = null;
+    }
+
+    if (executorService != null && !executorService.isShutdown()) {
+      executorService.shutdown();
+      try {
+        if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        executorService.shutdownNow();
+      }
+    }
+
+    super.dismiss();
+  }
+
+  public void addProxiedRequest(String key, ProxiedRequest request) {
+    synchronized (proxiedRequestsHashmap) {
+      proxiedRequestsHashmap.put(key, request);
+    }
+  }
+
+  public ProxiedRequest getProxiedRequest(String key) {
+    synchronized (proxiedRequestsHashmap) {
+      ProxiedRequest request = proxiedRequestsHashmap.get(key);
+      proxiedRequestsHashmap.remove(key);
+      return request;
+    }
+  }
+
+  public void removeProxiedRequest(String key) {
+    synchronized (proxiedRequestsHashmap) {
+      proxiedRequestsHashmap.remove(key);
     }
   }
 }
