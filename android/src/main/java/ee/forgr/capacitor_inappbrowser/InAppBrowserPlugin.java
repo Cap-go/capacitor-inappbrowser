@@ -28,6 +28,7 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
@@ -91,7 +92,9 @@ public class InAppBrowserPlugin
         currentPermissionRequest.deny();
         currentPermissionRequest = null;
       }
-      call.reject("Microphone permission is required");
+      if (call != null) {
+        call.reject("Microphone permission is required");
+      }
     }
   }
 
@@ -155,7 +158,7 @@ public class InAppBrowserPlugin
           webViewDialog.mFilePathCallback.onReceiveValue(results);
           webViewDialog.mFilePathCallback = null;
         } catch (Exception e) {
-          Log.e("ACTIVITYRESULT", e.getMessage());
+          Log.e("ACTIVITYRESULT", Objects.requireNonNull(e.getMessage()));
         }
       }
     }
@@ -723,15 +726,29 @@ public class InAppBrowserPlugin
         new CustomTabsCallback() {
           @Override
           public void onNavigationEvent(int navigationEvent, Bundle extras) {
-            switch (navigationEvent) {
-              case NAVIGATION_FINISHED:
-                notifyListeners("browserPageLoaded", new JSObject());
-                break;
+            if (navigationEvent == NAVIGATION_FINISHED) {
+              notifyListeners("browserPageLoaded", new JSObject());
             }
           }
         }
       );
     }
     return currentSession;
+  }
+
+  @Override
+  protected void handleOnDestroy() {
+    if (webViewDialog != null) {
+      try {
+        webViewDialog.dismiss();
+      } catch (Exception e) {
+        // Ignore, dialog may already be dismissed
+      }
+      webViewDialog = null;
+    }
+    currentPermissionRequest = null;
+    customTabsClient = null;
+    currentSession = null;
+    super.handleOnDestroy();
   }
 }

@@ -60,7 +60,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     func presentView(isAnimated: Bool = true) {
-        self.bridge?.viewController?.present(self.navigationWebViewController!, animated: isAnimated, completion: {
+        guard let navigationController = self.navigationWebViewController else {
+            self.currentPluginCall?.reject("Navigation controller is not initialized")
+            return
+        }
+
+        self.bridge?.viewController?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
     }
@@ -98,18 +103,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async {
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+                let group = DispatchGroup()
                 for cookie in cookies {
-
                     if cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain) {
-                        let semaphore = DispatchSemaphore(value: 1)
+                        group.enter()
                         WKWebsiteDataStore.default().httpCookieStore.delete(cookie) {
-                            semaphore.signal()
+                            group.leave()
                         }
-                        semaphore.wait()
                     }
                 }
 
-                call.resolve()
+                group.notify(queue: .main) {
+                    call.resolve()
+                }
             }
         }
     }
@@ -211,43 +217,45 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
-            let url = URL(string: urlString)
-            if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank")
-            } else {
-                self.webViewController = WKWebViewController.init()
-                self.webViewController?.setHeaders(headers: headers)
-                self.webViewController?.setCredentials(credentials: credentials)
-                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
+            guard let url = URL(string: urlString) else {
+                call.reject("Invalid URL format")
+                return
             }
 
-            self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
-            self.webViewController?.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType)
-            self.webViewController?.toolbarItemTypes = []
-            self.webViewController?.doneBarButtonItemPosition = .right
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank")
 
-            self.webViewController?.buttonNearDoneIcon = buttonNearDoneIcon
+            guard let webViewController = self.webViewController else {
+                call.reject("Failed to initialize WebViewController")
+                return
+            }
+
+            webViewController.source = .remote(url)
+            webViewController.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
+            webViewController.toolbarItemTypes = []
+            webViewController.doneBarButtonItemPosition = .right
+
+            webViewController.buttonNearDoneIcon = buttonNearDoneIcon
 
             if call.getBool("showArrow", false) {
-                self.webViewController?.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
+                webViewController.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
             }
 
-            self.webViewController?.capBrowserPlugin = self
-            self.webViewController?.title = call.getString("title", "New Window")
-            self.webViewController?.shareSubject = call.getString("shareSubject")
-            self.webViewController?.shareDisclaimer = disclaimerContent
-            self.webViewController?.preShowScript = call.getString("preShowScript")
-            self.webViewController?.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
+            webViewController.capBrowserPlugin = self
+            webViewController.title = call.getString("title", "New Window")
+            webViewController.shareSubject = call.getString("shareSubject")
+            webViewController.shareDisclaimer = disclaimerContent
+            webViewController.preShowScript = call.getString("preShowScript")
+            webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             if closeModal {
-                self.webViewController?.closeModal = true
-                self.webViewController?.closeModalTitle = closeModalTitle
-                self.webViewController?.closeModalDescription = closeModalDescription
-                self.webViewController?.closeModalOk = closeModalOk
-                self.webViewController?.closeModalCancel = closeModalCancel
+                webViewController.closeModal = true
+                webViewController.closeModalTitle = closeModalTitle
+                webViewController.closeModalDescription = closeModalDescription
+                webViewController.closeModalOk = closeModalOk
+                webViewController.closeModalCancel = closeModalCancel
             }
-            self.webViewController?.ignoreUntrustedSSLError = ignoreUntrustedSSLError
-            self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
+            webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
+
+            self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
@@ -256,11 +264,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
-                self.webViewController?.blankNavigationTab = true
+                webViewController.blankNavigationTab = true
             }
             if showReloadButton {
                 let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
-                self.webViewController?.leftNavigationBarItemTypes = toolbarItems + [.reload]
+                webViewController.leftNavigationBarItemTypes = toolbarItems + [.reload]
             }
             if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
