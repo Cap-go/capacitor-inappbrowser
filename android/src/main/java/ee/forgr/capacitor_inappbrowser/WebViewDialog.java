@@ -145,13 +145,10 @@ public class WebViewDialog extends Dialog {
         if (activity != null) {
           activity.runOnUiThread(() -> {
             try {
+              String currentUrl = _webView != null ? _webView.getUrl() : "";
               dismiss();
-              if (_webView != null) {
-                String currentUrl = _webView.getUrl();
-                if (_options != null && _options.getCallbacks() != null) {
-                  _options.getCallbacks().closeEvent(currentUrl);
-                }
-                _webView.destroy();
+              if (_options != null && _options.getCallbacks() != null) {
+                _options.getCallbacks().closeEvent(currentUrl);
               }
             } catch (Exception e) {
               Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
@@ -551,18 +548,22 @@ public class WebViewDialog extends Dialog {
                 new OnClickListener() {
                   public void onClick(DialogInterface dialog, int which) {
                     // Close button clicked, do something
+                    String currentUrl = _webView != null ? _webView.getUrl() : "";
                     dismiss();
-                    _options.getCallbacks().closeEvent(_webView.getUrl());
-                    _webView.destroy();
+                    if (_options != null && _options.getCallbacks() != null) {
+                      _options.getCallbacks().closeEvent(currentUrl);
+                    }
                   }
                 }
               )
               .setNegativeButton(_options.getCloseModalCancel(), null)
               .show();
           } else {
+            String currentUrl = _webView != null ? _webView.getUrl() : "";
             dismiss();
-            _options.getCallbacks().closeEvent(_webView.getUrl());
-            _webView.destroy();
+            if (_options != null && _options.getCallbacks() != null) {
+              _options.getCallbacks().closeEvent(currentUrl);
+            }
           }
         }
       }
