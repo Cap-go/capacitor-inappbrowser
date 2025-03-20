@@ -548,7 +548,9 @@ public class WebViewDialog extends Dialog {
                 new OnClickListener() {
                   public void onClick(DialogInterface dialog, int which) {
                     // Close button clicked, do something
-                    String currentUrl = _webView != null ? _webView.getUrl() : "";
+                    String currentUrl = _webView != null
+                      ? _webView.getUrl()
+                      : "";
                     dismiss();
                     if (_options != null && _options.getCallbacks() != null) {
                       _options.getCallbacks().closeEvent(currentUrl);
