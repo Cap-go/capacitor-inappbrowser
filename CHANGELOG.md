@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.4.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.4.0...7.4.1) (2025-03-22)
+
+
+### Bug Fixes
+
+* doc ([b269f4c](https://github.com/Cap-go/capacitor-inappbrowser/commit/b269f4c29b667d10c269fded59d6f215b8b9a7cb))
+
 ## [7.4.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.3.2...7.4.0) (2025-03-22)
 
 
