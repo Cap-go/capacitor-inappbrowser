@@ -26,6 +26,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Objects;
@@ -126,40 +127,35 @@ public class InAppBrowserPlugin
   }
 
   @Override
-  protected void handleOnActivityResult(
-    int requestCode,
-    int resultCode,
-    Intent data
-  ) {
+  public void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
     super.handleOnActivityResult(requestCode, resultCode, data);
-
-    // Check if the request code matches the file chooser request code
+    
+    // Handle file chooser result
     if (requestCode == WebViewDialog.FILE_CHOOSER_REQUEST_CODE) {
       if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
         Uri[] results = null;
-
+        
+        // Check if response is valid
         if (resultCode == Activity.RESULT_OK) {
           if (data != null) {
-            String dataString = data.getDataString();
-            if (data.getClipData() != null) { // If multiple file selected
+            // Get the data
+            if (data.getClipData() != null) {
+              // Handle multiple files
               int count = data.getClipData().getItemCount();
               results = new Uri[count];
               for (int i = 0; i < count; i++) {
                 results[i] = data.getClipData().getItemAt(i).getUri();
               }
-            } else if (dataString != null) { //if single file selected
-              results = new Uri[] { Uri.parse(dataString) };
+            } else if (data.getData() != null) {
+              // Handle single file
+              results = new Uri[] { data.getData() };
             }
           }
         }
-
-        // Pass the results back to the WebView
-        try {
-          webViewDialog.mFilePathCallback.onReceiveValue(results);
-          webViewDialog.mFilePathCallback = null;
-        } catch (Exception e) {
-          Log.e("ACTIVITYRESULT", Objects.requireNonNull(e.getMessage()));
-        }
+        
+        // Send the result to WebView
+        webViewDialog.mFilePathCallback.onReceiveValue(results);
+        webViewDialog.mFilePathCallback = null;
       }
     }
   }
@@ -422,7 +418,10 @@ public class InAppBrowserPlugin
       options.setTitle(call.getString("title", ""));
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
-    options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
+    options.setToolbarTextColor(call.getString("toolbarTextColor"));
+    options.setArrow(
+      Boolean.TRUE.equals(call.getBoolean("showArrow", false))
+    );
     options.setIgnoreUntrustedSSLError(
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
@@ -440,31 +439,106 @@ public class InAppBrowserPlugin
     }
 
     try {
-      Options.ButtonNearDone buttonNearDone =
-        Options.ButtonNearDone.generateFromPluginCall(
-          call,
-          getActivity().getAssets()
-        );
-      options.setButtonNearDone(buttonNearDone);
-    } catch (IllegalArgumentException illegalArgumentException) {
-      call.reject(
-        String.format(
-          "ButtonNearDone rejected: %s",
-          illegalArgumentException.getMessage()
-        )
-      );
-    } catch (RuntimeException e) {
-      Log.e(
-        "WebViewDialog",
-        String.format("ButtonNearDone runtime error: %s", e)
-      );
-      call.reject(String.format("ButtonNearDone RuntimeException: %s", e));
+      // Try to set buttonNearDone if present, with better error handling
+      JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
+      if (buttonNearDoneObj != null) {
+        try {
+          // Provide better debugging for buttonNearDone
+          JSObject androidObj = buttonNearDoneObj.getJSObject("android");
+          if (androidObj != null) {
+            String iconType = androidObj.getString("iconType", "asset");
+            String icon = androidObj.getString("icon", "");
+            Log.d("InAppBrowser", "ButtonNearDone config - iconType: " + iconType + ", icon: " + icon);
+            
+            // For vector type, verify if resource exists
+            if ("vector".equals(iconType)) {
+              int resourceId = getContext().getResources().getIdentifier(
+                icon, "drawable", getContext().getPackageName());
+              if (resourceId == 0) {
+                Log.e("InAppBrowser", "Vector resource not found: " + icon);
+                // List available drawable resources to help debugging
+                try {
+                  Field[] drawables = R.drawable.class.getFields();
+                  StringBuilder availableResources = new StringBuilder("Available resources: ");
+                  for (int i = 0; i < Math.min(10, drawables.length); i++) {
+                    availableResources.append(drawables[i].getName()).append(", ");
+                  }
+                  if (drawables.length > 10) {
+                    availableResources.append("... (").append(drawables.length - 10).append(" more)");
+                  }
+                  Log.d("InAppBrowser", availableResources.toString());
+                } catch (Exception e) {
+                  Log.e("InAppBrowser", "Error listing resources: " + e.getMessage());
+                }
+              } else {
+                Log.d("InAppBrowser", "Vector resource found with ID: " + resourceId);
+              }
+            }
+          }
+          
+          // Try to create the ButtonNearDone object
+          Options.ButtonNearDone buttonNearDone = Options.ButtonNearDone.generateFromPluginCall(
+            call,
+            getContext().getAssets()
+          );
+          options.setButtonNearDone(buttonNearDone);
+        } catch (Exception e) {
+          Log.e("InAppBrowser", "Error setting buttonNearDone: " + e.getMessage(), e);
+        }
+      }
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error processing buttonNearDone: " + e.getMessage(), e);
     }
 
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setPreShowScript(call.getString("preShowScript", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
+
+    // Validate preShowScript requires isPresentAfterPageLoad
+    if (call.hasOption("preShowScript") && !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))) {
+      call.reject("preShowScript requires isPresentAfterPageLoad to be true");
+      return;
+    }
+
+    // Validate closeModal options
+    if (Boolean.TRUE.equals(call.getBoolean("closeModal", false))) {
+      options.setCloseModal(true);
+      options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
+      options.setCloseModalDescription(
+        call.getString("closeModalDescription", "Are you sure ?")
+      );
+      options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
+      options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
+    } else {
+      // Reject if closeModal is false but closeModal options are provided
+      if (call.hasOption("closeModalTitle") || 
+          call.hasOption("closeModalDescription") || 
+          call.hasOption("closeModalOk") || 
+          call.hasOption("closeModalCancel")) {
+        call.reject("closeModal options require closeModal to be true");
+        return;
+      }
+      options.setCloseModal(false);
+    }
+
+    // Validate shareDisclaimer requires shareSubject
+    if (call.hasOption("shareDisclaimer") && !call.hasOption("shareSubject")) {
+      call.reject("shareDisclaimer requires shareSubject to be provided");
+      return;
+    }
+
+    // Validate buttonNearDone compatibility with toolbar type
+    if (call.hasOption("buttonNearDone")) {
+      String toolbarType = options.getToolbarType();
+      if (TextUtils.equals(toolbarType, "activity") || 
+          TextUtils.equals(toolbarType, "navigation") || 
+          TextUtils.equals(toolbarType, "blank")) {
+        call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType);
+        return;
+      }
+    }
+
     options.setActiveNativeNavigationForWebview(
       Boolean.TRUE.equals(
         call.getBoolean("activeNativeNavigationForWebview", false)
@@ -478,17 +552,6 @@ public class InAppBrowserPlugin
     options.setPresentAfterPageLoad(
       Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
     );
-    if (Boolean.TRUE.equals(call.getBoolean("closeModal", false))) {
-      options.setCloseModal(true);
-      options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
-      options.setCloseModalDescription(
-        call.getString("closeModalDescription", "Are you sure ?")
-      );
-      options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
-      options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
-    } else {
-      options.setCloseModal(false);
-    }
     options.setPluginCall(call);
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
@@ -516,6 +579,11 @@ public class InAppBrowserPlugin
         @Override
         public void buttonNearDoneClicked() {
           notifyListeners("buttonNearDoneClick", new JSObject());
+        }
+
+        @Override
+        public void confirmBtnClicked() {
+          notifyListeners("confirmBtnClicked", new JSObject());
         }
 
         @Override

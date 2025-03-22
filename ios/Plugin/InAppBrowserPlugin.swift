@@ -46,6 +46,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var currentPluginCall: CAPPluginCall?
     var isPresentAfterPageLoad = false
     var webViewController: WKWebViewController?
+    private var closeModalTitle: String?
+    private var closeModalDescription: String?
+    private var closeModalOk: String?
+    private var closeModalCancel: String?
 
     private func setup() {
         self.isSetupDone = true
@@ -186,10 +190,94 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             if iconType == "sf-symbol" {
-                buttonNearDoneIcon = UIImage(systemName: icon)
+                buttonNearDoneIcon = UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate)
+                print("[DEBUG] Set buttonNearDone SF Symbol icon: \(icon)")
             } else {
-                // UIImage(resource: ImageResource(name: "public/monkey.svg", bundle: Bundle.main))
-                buttonNearDoneIcon = UIImage(named: icon, in: Bundle.main, with: nil)
+                // Look in app's web assets/public directory
+                guard let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") else {
+                    print("[DEBUG] Failed to locate web assets directory")
+                    return
+                }
+                
+                // Try several path combinations to find the asset
+                let paths = [
+                    icon,                    // Just the icon name
+                    "public/\(icon)",        // With public/ prefix
+                    icon.replacingOccurrences(of: "public/", with: "")  // Without public/ prefix
+                ]
+                
+                var foundImage = false
+                
+                for path in paths {
+                    // Try as a direct path from web assets dir
+                    let assetPath = path.replacingOccurrences(of: "public/", with: "")
+                    let fileURL = webDir.appendingPathComponent(assetPath)
+                    
+                    print("[DEBUG] Trying to load from: \(fileURL.path)")
+                    
+                    if FileManager.default.fileExists(atPath: fileURL.path),
+                       let data = try? Data(contentsOf: fileURL),
+                       let img = UIImage(data: data) {
+                        buttonNearDoneIcon = img.withRenderingMode(.alwaysTemplate)
+                        print("[DEBUG] Successfully loaded buttonNearDone from web assets: \(fileURL.path)")
+                        foundImage = true
+                        break
+                    }
+                    
+                    // Try with www directory as an alternative
+                    if let wwwDir = Bundle.main.resourceURL?.appendingPathComponent("www") {
+                        let wwwFileURL = wwwDir.appendingPathComponent(assetPath)
+                        
+                        print("[DEBUG] Trying to load from www dir: \(wwwFileURL.path)")
+                        
+                        if FileManager.default.fileExists(atPath: wwwFileURL.path),
+                           let data = try? Data(contentsOf: wwwFileURL),
+                           let img = UIImage(data: data) {
+                            buttonNearDoneIcon = img.withRenderingMode(.alwaysTemplate)
+                            print("[DEBUG] Successfully loaded buttonNearDone from www dir: \(wwwFileURL.path)")
+                            foundImage = true
+                            break
+                        }
+                    }
+                    
+                    // Try looking in app bundle assets
+                    if let iconImage = UIImage(named: path) {
+                        buttonNearDoneIcon = iconImage.withRenderingMode(.alwaysTemplate)
+                        print("[DEBUG] Successfully loaded buttonNearDone from app bundle: \(path)")
+                        foundImage = true
+                        break
+                    }
+                }
+                
+                if !foundImage {
+                    print("[DEBUG] Failed to load buttonNearDone icon: \(icon)")
+                    
+                    // Debug info
+                    if let resourceURL = Bundle.main.resourceURL {
+                        print("[DEBUG] Resource URL: \(resourceURL.path)")
+                        
+                        // List directories to help debugging
+                        do {
+                            let contents = try FileManager.default.contentsOfDirectory(atPath: resourceURL.path)
+                            print("[DEBUG] Root bundle contents: \(contents)")
+                            
+                            // Check if public or www directories exist
+                            if contents.contains("public") {
+                                let publicContents = try FileManager.default.contentsOfDirectory(
+                                    atPath: resourceURL.appendingPathComponent("public").path)
+                                print("[DEBUG] Public dir contents: \(publicContents)")
+                            }
+                            
+                            if contents.contains("www") {
+                                let wwwContents = try FileManager.default.contentsOfDirectory(
+                                    atPath: resourceURL.appendingPathComponent("www").path)
+                                print("[DEBUG] WWW dir contents: \(wwwContents)")
+                            }
+                        } catch {
+                            print("[DEBUG] Error listing directories: \(error)")
+                        }
+                    }
+                }
             }
         }
 
@@ -203,12 +291,63 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
 
-        var disclaimerContent = call.getObject("shareDisclaimer")
+        // Validate preShowScript requires isPresentAfterPageLoad
+        if call.getString("preShowScript") != nil && !call.getBool("isPresentAfterPageLoad", false) {
+            call.reject("preShowScript requires isPresentAfterPageLoad to be true")
+            return
+        }
+
+        // Validate closeModal options
+        if closeModal {
+            if call.getString("closeModalTitle") != nil || 
+               call.getString("closeModalDescription") != nil || 
+               call.getString("closeModalOk") != nil || 
+               call.getString("closeModalCancel") != nil {
+                // Store the values to be set after proper initialization
+                self.closeModalTitle = closeModalTitle
+                self.closeModalDescription = closeModalDescription
+                self.closeModalOk = closeModalOk
+                self.closeModalCancel = closeModalCancel
+            }
+        } else {
+            // Reject if closeModal is false but closeModal options are provided
+            if call.getString("closeModalTitle") != nil || 
+               call.getString("closeModalDescription") != nil || 
+               call.getString("closeModalOk") != nil || 
+               call.getString("closeModalCancel") != nil {
+                call.reject("closeModal options require closeModal to be true")
+                return
+            }
+        }
+
+        // Validate shareDisclaimer requires shareSubject
+        if call.getString("shareSubject") == nil && call.getObject("shareDisclaimer") != nil {
+            call.reject("shareDisclaimer requires shareSubject to be provided")
+            return
+        }
+
+        // Validate buttonNearDone compatibility with toolbar type
+        if call.getString("buttonNearDone") != nil {
+            let toolbarType = call.getString("toolbarType", "")
+            if toolbarType == "activity" || toolbarType == "navigation" || toolbarType == "blank" {
+                call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType)
+                return
+            }
+        }
+
+        var disclaimerContent: JSObject?
+        if let shareDisclaimerRaw = call.getObject("shareDisclaimer"), !shareDisclaimerRaw.isEmpty {
+            disclaimerContent = shareDisclaimerRaw
+        }
+        
         let toolbarType = call.getString("toolbarType", "")
         let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
-        if toolbarType != "activity" {
-            disclaimerContent = nil
-        }
+        
+        // Don't null out shareDisclaimer regardless of toolbarType
+        // if toolbarType != "activity" {
+        //     disclaimerContent = nil
+        // }
+        
         let ignoreUntrustedSSLError = call.getBool("ignoreUntrustedSSLError", false)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
@@ -230,62 +369,227 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.source = .remote(url)
-            webViewController.leftNavigationBarItemTypes = self.getToolbarItems(toolbarType: toolbarType) + [.reload]
+            webViewController.leftNavigationBarItemTypes = []
             webViewController.toolbarItemTypes = []
-            webViewController.doneBarButtonItemPosition = .right
+            
+            // Configure close button based on showArrow
+            let showArrow = call.getBool("showArrow", false)
+            if showArrow {
+                // When showArrow is true, put arrow on left
+                webViewController.doneBarButtonItemPosition = .left
+                webViewController.showArrowAsClose = true
+            } else {
+                // Default X on right
+                webViewController.doneBarButtonItemPosition = toolbarType == "activity" ? .none : .right
+                webViewController.showArrowAsClose = false
+            }
 
-            webViewController.buttonNearDoneIcon = buttonNearDoneIcon
-
-            if call.getBool("showArrow", false) {
-                webViewController.stopBarButtonItemImage = UIImage(named: "Forward@3x", in: Bundle(for: InAppBrowserPlugin.self), compatibleWith: nil)
+            // Configure navigation buttons based on toolbarType
+            if toolbarType == "activity" {
+                // Activity mode should ONLY have:
+                // 1. Close button (if not hidden by doneBarButtonItemPosition)
+                // 2. Share button (if shareSubject is provided)
+                webViewController.leftNavigationBarItemTypes = []  // Clear any left items
+                webViewController.rightNavigaionBarItemTypes = []  // Clear any right items
+                
+                // Only add share button if subject is provided
+                if call.getString("shareSubject") != nil {
+                    // Add share button to right bar
+                    webViewController.rightNavigaionBarItemTypes.append(.activity)
+                    print("[DEBUG] Activity mode: Added share button, shareSubject: \(call.getString("shareSubject") ?? "nil")")
+                } else {
+                    // In activity mode, always make the share button visible by setting a default shareSubject
+                    webViewController.shareSubject = "Share"
+                    webViewController.rightNavigaionBarItemTypes.append(.activity)
+                    print("[DEBUG] Activity mode: Setting default shareSubject")
+                }
+                
+                // Set done button position based on showArrow
+                if showArrow {
+                    webViewController.doneBarButtonItemPosition = .left
+                } else {
+                    // In activity mode, keep the done button visible even when showArrow is false
+                    webViewController.doneBarButtonItemPosition = .right
+                }
+            } else if toolbarType == "navigation" {
+                // Navigation mode puts back/forward on the left
+                webViewController.leftNavigationBarItemTypes = [.back, .forward]
+                if showReloadButton {
+                    webViewController.leftNavigationBarItemTypes.append(.reload)
+                }
+                
+                // Only add share button if subject is provided
+                if call.getString("shareSubject") != nil {
+                    // Add share button to right navigation bar
+                    webViewController.rightNavigaionBarItemTypes.append(.activity)
+                }
+            } else {
+                // Other modes may have reload button
+                if showReloadButton {
+                    webViewController.leftNavigationBarItemTypes.append(.reload)
+                }
+                
+                // Only add share button if subject is provided
+                if call.getString("shareSubject") != nil {
+                    // Add share button to right navigation bar
+                    webViewController.rightNavigaionBarItemTypes.append(.activity)
+                }
+            }
+            
+            // Set buttonNearDoneIcon if provided
+            if let buttonNearDoneIcon = buttonNearDoneIcon {
+                webViewController.buttonNearDoneIcon = buttonNearDoneIcon
+                print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
             }
 
             webViewController.capBrowserPlugin = self
             webViewController.title = call.getString("title", "New Window")
-            webViewController.shareSubject = call.getString("shareSubject")
+            // Only set shareSubject if not already set for activity mode
+            if webViewController.shareSubject == nil {
+                webViewController.shareSubject = call.getString("shareSubject")
+            }
             webViewController.shareDisclaimer = disclaimerContent
+            
+            // Debug shareDisclaimer
+            if let disclaimer = disclaimerContent {
+                print("[DEBUG] Share disclaimer set: \(disclaimer)")
+            } else {
+                print("[DEBUG] No share disclaimer set")
+            }
+            
             webViewController.preShowScript = call.getString("preShowScript")
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
+            webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
+
+            // Set closeModal properties after proper initialization
             if closeModal {
                 webViewController.closeModal = true
-                webViewController.closeModalTitle = closeModalTitle
-                webViewController.closeModalDescription = closeModalDescription
-                webViewController.closeModalOk = closeModalOk
-                webViewController.closeModalCancel = closeModalCancel
+                webViewController.closeModalTitle = self.closeModalTitle ?? closeModalTitle
+                webViewController.closeModalDescription = self.closeModalDescription ?? closeModalDescription
+                webViewController.closeModalOk = self.closeModalOk ?? closeModalOk
+                webViewController.closeModalCancel = self.closeModalCancel ?? closeModalCancel
             }
-            webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
             self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
-            self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
-            self.navigationWebViewController?.toolbar.backgroundColor = backgroundColor
-            self.navigationWebViewController?.toolbar.tintColor = backgroundColor == UIColor.black ? UIColor.white : UIColor.black
+            
+            // Ensure no lines or borders appear by default
+            self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
+            self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
+            self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
+            self.navigationWebViewController?.toolbar.setShadowImage(UIImage(), forToolbarPosition: .any)
+
+            // Handle toolbar color
+            if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
+                // If specific color provided, use it
+                let color = UIColor(hexString: toolbarColor)
+                
+                // Apply to status bar and navigation bar area with a single colored view
+                webViewController.setupStatusBarBackground(color: color)
+                
+                // Set status bar style based on toolbar color
+                if #available(iOS 13.0, *) {
+                    let isDark = self.isDarkColor(color)
+                    webViewController.statusBarStyle = isDark ? .lightContent : .darkContent
+                    webViewController.updateStatusBarStyle()
+                    
+                    // Apply text color
+                    let textColor: UIColor
+                    if let toolbarTextColor = call.getString("toolbarTextColor"), self.isHexColorCode(toolbarTextColor) {
+                        textColor = UIColor(hexString: toolbarTextColor)
+                    } else {
+                        textColor = isDark ? UIColor.white : UIColor.black
+                    }
+                    
+                    // Apply tint color to all UI elements without changing background
+                    self.navigationWebViewController?.navigationBar.tintColor = textColor
+                    webViewController.tintColor = textColor
+                    self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
+                }
+            } else {
+                // Use system appearance
+                if #available(iOS 13.0, *) {
+                    let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
+                    let backgroundColor = isDarkMode ? UIColor.black : UIColor.white
+                    let textColor: UIColor
+                    
+                    if let toolbarTextColor = call.getString("toolbarTextColor"), self.isHexColorCode(toolbarTextColor) {
+                        textColor = UIColor(hexString: toolbarTextColor)
+                    } else {
+                        textColor = isDarkMode ? UIColor.white : UIColor.black
+                    }
+                    
+                    // Apply colors
+                    webViewController.setupStatusBarBackground(color: backgroundColor)
+                    webViewController.tintColor = textColor
+                    self.navigationWebViewController?.navigationBar.tintColor = textColor
+                    self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
+                    webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
+                    webViewController.updateStatusBarStyle()
+                } else {
+                    // Pre-iOS 13 defaults
+                    webViewController.setupStatusBarBackground(color: UIColor.white)
+                    webViewController.tintColor = UIColor.black
+                    self.navigationWebViewController?.navigationBar.tintColor = UIColor.black
+                    self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.black]
+                }
+            }
+
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
                 webViewController.blankNavigationTab = true
+                
+                // Even with hidden navigation bar, we need to set proper status bar appearance
+                if #available(iOS 13.0, *) {
+                    // If toolbarColor is explicitly set, use that for status bar style
+                    if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
+                        let color = UIColor(hexString: toolbarColor)
+                        let isDark = self.isDarkColor(color)
+                        webViewController.statusBarStyle = isDark ? .lightContent : .darkContent
+                        webViewController.updateStatusBarStyle()
+                        
+                        // Apply status bar background color via the special view
+                        webViewController.setupStatusBarBackground(color: color)
+                        
+                        // Apply background color to whole view to ensure no gaps
+                        webViewController.view.backgroundColor = color
+                        self.navigationWebViewController?.view.backgroundColor = color
+                        
+                        // Apply status bar background color
+                        if let navController = self.navigationWebViewController {
+                            navController.view.backgroundColor = color
+                        }
+                    } else {
+                        // Follow system appearance if no specific color
+                        let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
+                        let backgroundColor = isDarkMode ? UIColor.black : UIColor.white
+                        webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
+                        webViewController.updateStatusBarStyle()
+                        
+                        // Apply status bar background color via the special view
+                        webViewController.setupStatusBarBackground(color: backgroundColor)
+                        
+                        // Set appropriate background color
+                        if let navController = self.navigationWebViewController {
+                            navController.view.backgroundColor = backgroundColor
+                        }
+                    }
+                } else {
+                    // Pre-iOS 13 default
+                    webViewController.statusBarStyle = .default
+                }
             }
-            if showReloadButton {
-                let toolbarItems = self.getToolbarItems(toolbarType: toolbarType)
-                webViewController.leftNavigationBarItemTypes = toolbarItems + [.reload]
-            }
+            
+            // We don't use the toolbar anymore, always hide it
+            self.navigationWebViewController?.setToolbarHidden(true, animated: false)
+            
             if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
             call.resolve()
         }
-    }
-
-    func getToolbarItems(toolbarType: String) -> [BarButtonItemType] {
-        var result: [BarButtonItemType] = []
-        if toolbarType == "activity" {
-            result.append(.activity)
-        } else if toolbarType == "navigation" {
-            result.append(.back)
-            result.append(.forward)
-        }
-        return result
     }
 
     @objc func reload(_ call: CAPPluginCall) {
@@ -397,14 +701,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
             self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            let inputString: String = call.getString("toolbarColor", "#ffffff")
-            var color: UIColor = UIColor(hexString: "#ffffff")
-            if self.isHexColorCode(inputString) {
-                color = UIColor(hexString: inputString)
-            } else {
-                print("\(inputString) is not a valid hex color code.")
-            }
-            self.navigationWebViewController?.toolbar.backgroundColor = color
+            self.navigationWebViewController?.toolbar.backgroundColor = .white
+            self.navigationWebViewController?.toolbar.tintColor = .black
+
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
             if !self.isPresentAfterPageLoad {
                 self.presentView()
@@ -458,5 +757,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             credentials = WKWebViewCredentials(username: username, password: password)
         }
         return credentials
+    }
+
+    private func isDarkColor(_ color: UIColor) -> Bool {
+        let components = color.cgColor.components ?? []
+        let red = components[0]
+        let green = components[1]
+        let blue = components[2]
+        let brightness = (red * 299 + green * 587 + blue * 114) / 1000
+        return brightness < 0.5
     }
 }

@@ -161,10 +161,71 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     open var websiteTitleInNavigationBar = true
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
+    open var showArrowAsClose = false
     open var preShowScript: String?
     open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
-    open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .reload, .activity]
+    open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .activity]
+
+    // Status bar style to be applied
+    open var statusBarStyle: UIStatusBarStyle = .default
+    
+    // Status bar background view
+    private var statusBarBackgroundView: UIView?
+    
+    // Status bar height
+    private var statusBarHeight: CGFloat {
+        if #available(iOS 13.0, *) {
+            return UIApplication.shared.windows.first?.windowScene?.statusBarManager?.statusBarFrame.height ?? 0
+        } else {
+            return UIApplication.shared.statusBarFrame.height
+        }
+    }
+    
+    // Make status bar background with colored view underneath
+    open func setupStatusBarBackground(color: UIColor) {
+        // Remove any existing status bar view
+        statusBarBackgroundView?.removeFromSuperview()
+        
+        // Create a new view to cover both status bar and navigation bar
+        statusBarBackgroundView = UIView()
+        
+        if let navView = navigationController?.view {
+            // Add to back of view hierarchy
+            navView.insertSubview(statusBarBackgroundView!, at: 0)
+            statusBarBackgroundView?.translatesAutoresizingMaskIntoConstraints = false
+            
+            // Calculate total height - status bar + navigation bar
+            let navBarHeight = navigationController?.navigationBar.frame.height ?? 44
+            let totalHeight = statusBarHeight + navBarHeight
+            
+            // Position from top of screen to bottom of navigation bar
+            NSLayoutConstraint.activate([
+                statusBarBackgroundView!.topAnchor.constraint(equalTo: navView.topAnchor),
+                statusBarBackgroundView!.leadingAnchor.constraint(equalTo: navView.leadingAnchor),
+                statusBarBackgroundView!.trailingAnchor.constraint(equalTo: navView.trailingAnchor),
+                statusBarBackgroundView!.heightAnchor.constraint(equalToConstant: totalHeight)
+            ])
+            
+            // Set background color
+            statusBarBackgroundView?.backgroundColor = color
+            
+            // Make navigation bar transparent to show our view underneath
+            navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
+            navigationController?.navigationBar.shadowImage = UIImage()
+            navigationController?.navigationBar.isTranslucent = true
+        }
+    }
+    
+    // Override to use our custom status bar style
+    override open var preferredStatusBarStyle: UIStatusBarStyle {
+        return statusBarStyle
+    }
+    
+    // Force status bar style update when needed
+    open func updateStatusBarStyle() {
+        setNeedsStatusBarAppearanceUpdate()
+    }
 
     open var backBarButtonItemImage: UIImage?
     open var forwardBarButtonItemImage: UIImage?
@@ -183,13 +244,21 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     fileprivate var originalUserAgent: String?
 
     fileprivate lazy var backBarButtonItem: UIBarButtonItem = {
-        let bundle = Bundle(for: WKWebViewController.self)
-        return UIBarButtonItem(image: backBarButtonItemImage ?? UIImage(named: "Back", in: bundle, compatibleWith: nil), style: .plain, target: self, action: #selector(backDidClick(sender:)))
+        let navBackImage = UIImage(systemName: "chevron.backward")?.withRenderingMode(.alwaysTemplate)
+        let barButtonItem = UIBarButtonItem(image: navBackImage, style: .plain, target: self, action: #selector(backDidClick(sender:)))
+        if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+            barButtonItem.tintColor = tintColor
+        }
+        return barButtonItem
     }()
 
     fileprivate lazy var forwardBarButtonItem: UIBarButtonItem = {
-        let bundle = Bundle(for: WKWebViewController.self)
-        return UIBarButtonItem(image: forwardBarButtonItemImage ?? UIImage(named: "Forward", in: bundle, compatibleWith: nil), style: .plain, target: self, action: #selector(forwardDidClick(sender:)))
+        let forwardImage = UIImage(systemName: "chevron.forward")?.withRenderingMode(.alwaysTemplate)
+        let barButtonItem = UIBarButtonItem(image: forwardImage, style: .plain, target: self, action: #selector(forwardDidClick(sender:)))
+        if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+            barButtonItem.tintColor = tintColor
+        }
+        return barButtonItem
     }()
 
     fileprivate lazy var reloadBarButtonItem: UIBarButtonItem = {
@@ -209,15 +278,54 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }()
 
     fileprivate lazy var activityBarButtonItem: UIBarButtonItem = {
+        // Check if custom image is provided
         if let image = activityBarButtonItemImage {
-            return UIBarButtonItem(image: image, style: .plain, target: self, action: #selector(activityDidClick(sender:)))
+            let button = UIBarButtonItem(image: image.withRenderingMode(.alwaysTemplate), 
+                                        style: .plain, 
+                                        target: self, 
+                                        action: #selector(activityDidClick(sender:)))
+            
+            // Apply tint from navigation bar or from tintColor property
+            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                button.tintColor = tintColor
+            }
+            
+            print("[DEBUG] Created activity button with custom image")
+            return button
         } else {
-            return UIBarButtonItem(barButtonSystemItem: .action, target: self, action: #selector(activityDidClick(sender:)))
+            // Use system share icon
+            let button = UIBarButtonItem(barButtonSystemItem: .action, 
+                                        target: self, 
+                                        action: #selector(activityDidClick(sender:)))
+            
+            // Apply tint from navigation bar or from tintColor property
+            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                button.tintColor = tintColor
+            }
+            
+            print("[DEBUG] Created activity button with system action icon")
+            return button
         }
     }()
 
     fileprivate lazy var doneBarButtonItem: UIBarButtonItem = {
-        return UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(doneDidClick(sender:)))
+        if showArrowAsClose {
+            // Show chevron icon when showArrowAsClose is true (originally was arrow.left)
+            let chevronImage = UIImage(systemName: "chevron.left")?.withRenderingMode(.alwaysTemplate)
+            let barButtonItem = UIBarButtonItem(image: chevronImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
+            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                barButtonItem.tintColor = tintColor
+            }
+            return barButtonItem
+        } else {
+            // Show X icon by default
+            let xImage = UIImage(systemName: "xmark")?.withRenderingMode(.alwaysTemplate)
+            let barButtonItem = UIBarButtonItem(image: xImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
+            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                barButtonItem.tintColor = tintColor
+            }
+            return barButtonItem
+        }
     }()
 
     fileprivate lazy var flexibleSpaceBarButtonItem: UIBarButtonItem = {
@@ -238,6 +346,100 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         super.viewDidLoad()
         if self.webView == nil {
             self.initWebview()
+        }
+        
+        // Force all buttons to use tint color
+        updateButtonTintColors()
+        
+        // Extra call to ensure buttonNearDone is visible
+        if buttonNearDoneIcon != nil {
+            // Delay slightly to ensure navigation items are set up
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.updateButtonTintColors()
+                
+                // Force update UI if needed
+                self?.navigationController?.navigationBar.setNeedsLayout()
+            }
+        }
+    }
+
+    func updateButtonTintColors() {
+        // Ensure all button items use the navigation bar's tint color
+        if let tintColor = navigationController?.navigationBar.tintColor {
+            backBarButtonItem.tintColor = tintColor
+            forwardBarButtonItem.tintColor = tintColor
+            reloadBarButtonItem.tintColor = tintColor
+            stopBarButtonItem.tintColor = tintColor
+            activityBarButtonItem.tintColor = tintColor
+            doneBarButtonItem.tintColor = tintColor
+            flexibleSpaceBarButtonItem.tintColor = tintColor
+            
+            // Update toolbar items
+            if let items = toolbarItems {
+                for item in items {
+                    item.tintColor = tintColor
+                }
+            }
+            
+            // Update navigation items
+            if let leftItems = navigationItem.leftBarButtonItems {
+                for item in leftItems {
+                    item.tintColor = tintColor
+                }
+            }
+            
+            if let rightItems = navigationItem.rightBarButtonItems {
+                for item in rightItems {
+                    item.tintColor = tintColor
+                }
+            }
+            
+            // Create buttonNearDone button with the correct tint color if it doesn't already exist
+            if buttonNearDoneIcon != nil && 
+               navigationItem.rightBarButtonItems?.count == 1 && 
+               navigationItem.rightBarButtonItems?.first == doneBarButtonItem {
+                
+                // Create a properly tinted button
+                let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate), 
+                                                style: .plain, 
+                                                target: self, 
+                                                action: #selector(buttonNearDoneDidClick))
+                buttonItem.tintColor = tintColor
+                
+                // Add it to right items
+                navigationItem.rightBarButtonItems?.append(buttonItem)
+            }
+        }
+    }
+
+    override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        
+        // Update colors when appearance changes
+        if #available(iOS 13.0, *) {
+            if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+                // Update tint colors
+                let isDarkMode = traitCollection.userInterfaceStyle == .dark
+                let textColor = isDarkMode ? UIColor.white : UIColor.black
+                
+                if let navBar = navigationController?.navigationBar {
+                    if navBar.backgroundColor == UIColor.black || navBar.backgroundColor == UIColor.white {
+                        navBar.backgroundColor = isDarkMode ? UIColor.black : UIColor.white
+                        navBar.tintColor = textColor
+                        navBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
+                        
+                        // Update all buttons
+                        updateButtonTintColors()
+                    }
+                }
+                
+                if let toolbar = navigationController?.toolbar {
+                    if toolbar.backgroundColor == UIColor.black || toolbar.backgroundColor == UIColor.white {
+                        toolbar.backgroundColor = isDarkMode ? UIColor.black : UIColor.white
+                        toolbar.tintColor = textColor
+                    }
+                }
+            }
         }
     }
 
@@ -376,7 +578,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open func setupViewElements() {
         self.setUpProgressView()
         self.setUpConstraints()
+        self.setUpNavigationBarAppearance()
         self.addBarButtonItems()
+        self.updateBarButtonItems()
     }
 
     @objc func restateViewHeight() {
@@ -388,7 +592,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             topPadding = window?.safeAreaInsets.top ?? 0.0
         }
         if UIDevice.current.orientation.isPortrait {
-            self.navigationController?.toolbar.isHidden = false
+            // Don't force toolbar visibility
             if self.viewHeightPortrait == nil {
                 self.viewHeightPortrait = self.view.safeAreaLayoutGuide.layoutFrame.size.height
                 if toolbarItemTypes.count == 0 {
@@ -400,7 +604,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             self.currentViewHeight = self.viewHeightPortrait
         } else if UIDevice.current.orientation.isLandscape {
-            self.navigationController?.toolbar.isHidden = false
+            // Don't force toolbar visibility
             if self.viewHeightLandscape == nil {
                 self.viewHeightLandscape = self.view.safeAreaLayoutGuide.layoutFrame.size.height
                 if toolbarItemTypes.count == 0 {
@@ -431,6 +635,71 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             self.setupViewElements()
             setUpState()
             self.viewWasPresented = true
+        }
+        
+        // Force update button appearances
+        updateButtonTintColors()
+        
+        // Ensure status bar appearance is correct when view appears
+        if #available(iOS 13.0, *) {
+            // Make sure we have the latest tint color
+            if let tintColor = self.tintColor {
+                // Update the status bar background if needed
+                if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
+                    setupStatusBarBackground(color: backgroundColor)
+                } else {
+                    setupStatusBarBackground(color: UIColor.white)
+                }
+            }
+            
+            // Update status bar style
+            updateStatusBarStyle()
+            
+            // Special handling for blank toolbar mode
+            if blankNavigationTab && statusBarBackgroundView != nil {
+                if let color = statusBarBackgroundView?.backgroundColor {
+                    // Set view color to match status bar
+                    view.backgroundColor = color
+                }
+            }
+        }
+    }
+
+    override open func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Force add buttonNearDone if it's not visible yet
+        if buttonNearDoneIcon != nil {
+            // Check if button already exists in the navigation bar
+            let buttonExists = navigationItem.rightBarButtonItems?.contains { item in
+                return item.action == #selector(buttonNearDoneDidClick)
+            } ?? false
+            
+            if !buttonExists {
+                // Create and add the button directly
+                let buttonItem = UIBarButtonItem(
+                    image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
+                    style: .plain,
+                    target: self,
+                    action: #selector(buttonNearDoneDidClick)
+                )
+                
+                // Apply tint color
+                if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                    buttonItem.tintColor = tintColor
+                }
+                
+                // Add to right items
+                if navigationItem.rightBarButtonItems == nil {
+                    navigationItem.rightBarButtonItems = [buttonItem]
+                } else {
+                    var items = navigationItem.rightBarButtonItems ?? []
+                    items.append(buttonItem)
+                    navigationItem.rightBarButtonItems = items
+                }
+                
+                print("[DEBUG] Force added buttonNearDone in viewDidAppear")
+            }
         }
     }
 
@@ -595,7 +864,6 @@ fileprivate extension WKWebViewController {
             }
         }
 
-        //        if presentingViewController != nil {
         switch doneBarButtonItemPosition {
         case .left:
             if !leftNavigationBarItemTypes.contains(where: { type in
@@ -622,7 +890,6 @@ fileprivate extension WKWebViewController {
         case .none:
             break
         }
-        //        }
 
         navigationItem.leftBarButtonItems = leftNavigationBarItemTypes.map {
             barButtonItemType in
@@ -639,28 +906,128 @@ fileprivate extension WKWebViewController {
             }
             return UIBarButtonItem()
         }
-        if rightBarButtons.count == 1 && buttonNearDoneIcon != nil && rightBarButtons[0] == doneBarButtonItem {
-            rightBarButtons.append(UIBarButtonItem(image: buttonNearDoneIcon, style: .plain, target: self, action: #selector(buttonNearDoneDidClick)))
+        
+        // If we have buttonNearDoneIcon and the first (or only) right button is the done button
+        if buttonNearDoneIcon != nil && 
+           ((rightBarButtons.count == 1 && rightBarButtons[0] == doneBarButtonItem) ||
+            (rightBarButtons.isEmpty && doneBarButtonItemPosition == .right) ||
+            rightBarButtons.contains(doneBarButtonItem)) {
+            
+            // Check if button already exists to avoid duplicates
+            let buttonExists = rightBarButtons.contains { item in
+                let selector = #selector(buttonNearDoneDidClick)
+                return item.action == selector
+            }
+            
+            if !buttonExists {
+                // Create button with proper tint and template rendering mode
+                let buttonItem = UIBarButtonItem(
+                    image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
+                    style: .plain,
+                    target: self,
+                    action: #selector(buttonNearDoneDidClick)
+                )
+                
+                // Apply tint from navigation bar or from tintColor property
+                if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+                    buttonItem.tintColor = tintColor
+                }
+                
+                // Make sure the done button is there before adding this one
+                if rightBarButtons.isEmpty && doneBarButtonItemPosition == .right {
+                    rightBarButtons.append(doneBarButtonItem)
+                }
+                
+                // Add the button
+                rightBarButtons.append(buttonItem)
+                
+                print("[DEBUG] Added buttonNearDone to right bar buttons, icon: \(String(describing: buttonNearDoneIcon))")
+            } else {
+                print("[DEBUG] buttonNearDone already exists in right bar buttons")
+            }
         }
+        
         navigationItem.rightBarButtonItems = rightBarButtons
 
-        if toolbarItemTypes.count > 0 {
-            for index in 0..<toolbarItemTypes.count - 1 {
-                toolbarItemTypes.insert(.flexibleSpace, at: 2 * index + 1)
+        // Create toolbar items
+        if !toolbarItemTypes.isEmpty {
+            // Check if toolbar has back and forward buttons
+            let hasBackButton = toolbarItemTypes.contains(where: { 
+                if case .back = $0 { return true }
+                return false
+            })
+            
+            let hasForwardButton = toolbarItemTypes.contains(where: { 
+                if case .forward = $0 { return true }
+                return false
+            })
+            
+            let hasReloadButton = toolbarItemTypes.contains(where: { 
+                if case .reload = $0 { return true }
+                return false
+            })
+            
+            if hasBackButton && hasForwardButton {
+                // Create Android-like toolbar with evenly spaced buttons
+                var items: [UIBarButtonItem] = []
+                let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+                
+                // Add spacing before back button
+                items.append(flexSpace)
+                
+                // Add back button
+                items.append(backBarButtonItem)
+                
+                // Add spacing between buttons
+                items.append(flexSpace)
+                
+                // Add forward button
+                items.append(forwardBarButtonItem)
+                
+                // Add spacing between buttons
+                items.append(flexSpace)
+                
+                // Add reload button if present
+                if hasReloadButton {
+                    items.append(reloadBarButtonItem)
+                    items.append(flexSpace)
+                }
+                
+                setToolbarItems(items, animated: true)
+            } else {
+                // For other toolbar types, map the items directly
+                let items = toolbarItemTypes.map { type -> UIBarButtonItem in
+                    switch type {
+                    case .back:
+                        return backBarButtonItem
+                    case .forward:
+                        return forwardBarButtonItem
+                    case .reload:
+                        return reloadBarButtonItem
+                    case .stop:
+                        return stopBarButtonItem
+                    case .activity:
+                        return activityBarButtonItem
+                    case .done:
+                        return doneBarButtonItem
+                    case .flexibleSpace:
+                        return flexibleSpaceBarButtonItem
+                    case .custom:
+                        return UIBarButtonItem()
+                    }
+                }
+                setToolbarItems(items, animated: true)
             }
+        } else {
+            setToolbarItems([], animated: false)
         }
 
-        let gen = toolbarItemTypes.map {
-            barButtonItemType -> UIBarButtonItem in
-            if let barButtonItem = barButtonItem(barButtonItemType) {
-                return barButtonItem
-            }
-            return UIBarButtonItem()
-        }
-        setToolbarItems(gen, animated: true)
+        // After all buttons are set up, apply tint color
+        updateButtonTintColors()
     }
 
     func updateBarButtonItems() {
+        // Update navigation buttons (completely separate from close button)
         backBarButtonItem.isEnabled = webView?.canGoBack ?? false
         forwardBarButtonItem.isEnabled = webView?.canGoForward ?? false
 
@@ -696,9 +1063,28 @@ fileprivate extension WKWebViewController {
 
     func setUpState() {
         navigationController?.setNavigationBarHidden(false, animated: true)
-        navigationController?.setToolbarHidden(toolbarItemTypes.count == 0, animated: true)
+        
+        // Only show toolbar if there are toolbar items
+        let hideToolbar = toolbarItemTypes.isEmpty
+        navigationController?.setToolbarHidden(hideToolbar, animated: true)
 
-        if let tintColor = tintColor {
+        // Set tint colors but don't override specific colors
+        if tintColor == nil {
+            // Use system appearance if no specific tint color is set
+            if #available(iOS 13.0, *) {
+                let isDarkMode = traitCollection.userInterfaceStyle == .dark
+                let textColor = isDarkMode ? UIColor.white : UIColor.black
+                
+                navigationController?.navigationBar.tintColor = textColor
+                navigationController?.toolbar.tintColor = textColor
+                progressView?.progressTintColor = textColor
+            } else {
+                // Default for older iOS
+                navigationController?.navigationBar.tintColor = UIColor.black
+                navigationController?.toolbar.tintColor = UIColor.black
+                progressView?.progressTintColor = UIColor.blue
+            }
+        } else {
             progressView?.progressTintColor = tintColor
             navigationController?.navigationBar.tintColor = tintColor
             navigationController?.toolbar.tintColor = tintColor
@@ -769,7 +1155,10 @@ fileprivate extension WKWebViewController {
     }
 
     @objc func backDidClick(sender: AnyObject) {
-        webView?.goBack()
+        // Only handle back navigation, not closing
+        if webView?.canGoBack ?? false {
+            webView?.goBack()
+        }
     }
 
     @objc func forwardDidClick(sender: AnyObject) {
@@ -794,7 +1183,10 @@ fileprivate extension WKWebViewController {
     }
 
     @objc func activityDidClick(sender: AnyObject) {
+        print("[DEBUG] Activity button clicked, shareSubject: \(self.shareSubject ?? "nil")")
+        
         guard let s = self.source else {
+            print("[DEBUG] Activity button: No source available")
             return
         }
 
@@ -811,28 +1203,48 @@ fileprivate extension WKWebViewController {
     }
 
     func showDisclaimer(items: [Any], sender: AnyObject) {
-        let showDisclaimer: Bool = self.shareDisclaimer != nil
-        if showDisclaimer {
+        // Show disclaimer dialog before sharing if shareDisclaimer is set
+        if let disclaimer = self.shareDisclaimer, !disclaimer.isEmpty {
+            // Create and show the alert
             let alert = UIAlertController(
-                title: self.shareDisclaimer?["title"] as? String ?? "Title",
-                message: self.shareDisclaimer?["message"] as? String ?? "Message",
+                title: disclaimer["title"] as? String ?? "Title",
+                message: disclaimer["message"] as? String ?? "Message",
                 preferredStyle: UIAlertController.Style.alert)
-            alert.addAction(UIAlertAction(title: self.shareDisclaimer?["confirmBtn"] as? String ?? "Confirm", style: UIAlertAction.Style.default, handler: { _ in
-                self.shareDisclaimer = nil
-                self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: nil)
-                let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-                activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
-                activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
-                self.present(activityViewController, animated: true, completion: nil)
-            }))
-            alert.addAction(UIAlertAction(title: self.shareDisclaimer?["cancelBtn"] as? String ?? "Cancel", style: UIAlertAction.Style.default, handler: nil))
+                
+            // Add confirm button that continues with sharing
+            alert.addAction(UIAlertAction(
+                title: disclaimer["confirmBtn"] as? String ?? "Confirm", 
+                style: UIAlertAction.Style.default, 
+                handler: { _ in
+                    // Notify that confirm was clicked
+                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: nil)
+                    
+                    // Show the share dialog
+                    self.showShareSheet(items: items, sender: sender)
+                }
+            ))
+            
+            // Add cancel button
+            alert.addAction(UIAlertAction(
+                title: disclaimer["cancelBtn"] as? String ?? "Cancel", 
+                style: UIAlertAction.Style.cancel, 
+                handler: nil
+            ))
+            
+            // Present the alert
             self.present(alert, animated: true, completion: nil)
         } else {
-            let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
-            activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
-            self.present(activityViewController, animated: true, completion: nil)
+            // No disclaimer, directly show share sheet
+            showShareSheet(items: items, sender: sender)
         }
+    }
+    
+    // Separated the actual sharing functionality
+    private func showShareSheet(items: [Any], sender: AnyObject) {
+        let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
+        activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
+        self.present(activityViewController, animated: true, completion: nil)
     }
 
     func closeView () {
@@ -880,6 +1292,42 @@ fileprivate extension WKWebViewController {
     }
 
     func canRotate() {}
+
+    func close() {
+        let currentUrl = webView?.url?.absoluteString ?? ""
+        dismiss(animated: true, completion: nil)
+        capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+    }
+
+    open func setUpNavigationBarAppearance() {
+        // Set up basic bar appearance
+        if let navBar = navigationController?.navigationBar {
+            // Make navigation bar transparent
+            navBar.setBackgroundImage(UIImage(), for: .default)
+            navBar.shadowImage = UIImage()
+            navBar.isTranslucent = true
+            
+            // Ensure tint colors are applied properly
+            if navBar.tintColor == nil {
+                navBar.tintColor = tintColor ?? .black
+            }
+            
+            // Ensure text colors are set
+            if navBar.titleTextAttributes == nil {
+                navBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: tintColor ?? .black]
+            }
+            
+            // Ensure the navigation bar buttons are properly visible
+            for item in navBar.items ?? [] {
+                for barButton in (item.leftBarButtonItems ?? []) + (item.rightBarButtonItems ?? []) {
+                    barButton.tintColor = tintColor ?? navBar.tintColor ?? .black
+                }
+            }
+        }
+        
+        // Force button colors to update
+        updateButtonTintColors()
+    }
 }
 
 // MARK: - WKUIDelegate
