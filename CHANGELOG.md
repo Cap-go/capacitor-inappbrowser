@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.6.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.5.1...7.6.0) (2025-03-22)
+
+
+### Features
+
+* add textZoom option ([3e2c629](https://github.com/Cap-go/capacitor-inappbrowser/commit/3e2c629c6880d46721467ea2ebb313b90012b76a))
+
 ### [7.5.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.5.0...7.5.1) (2025-03-22)
 
 
