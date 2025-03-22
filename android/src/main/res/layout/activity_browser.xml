@@ -6,9 +6,17 @@
     android:layout_height="match_parent"
     tools:context="com.cap.browser.plugin.WebViewActivity">
 
+    <!-- Status bar color view that will be positioned at the top -->
+    <View
+        android:id="@+id/status_bar_color_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent" />
+
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="0dp"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
 
         <include

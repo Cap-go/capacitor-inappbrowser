@@ -9,15 +9,21 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Picture;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -33,6 +39,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -89,6 +96,7 @@ public class WebViewDialog extends Dialog {
     new HashMap<>();
   private final ExecutorService executorService =
     Executors.newCachedThreadPool();
+  private int iconColor = Color.BLACK; // Default icon color
 
   Semaphore preShowSemaphore = null;
   String preShowError = null;
@@ -200,14 +208,78 @@ public class WebViewDialog extends Dialog {
     setContentView(R.layout.activity_browser);
     getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+    // Make status bar transparent
+    if (getWindow() != null) {
+      getWindow().setStatusBarColor(Color.TRANSPARENT);
+
+      // Add FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS flag to the window
+      getWindow()
+        .addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+
+      // On Android 30+ clear FLAG_TRANSLUCENT_STATUS flag
+      getWindow()
+        .clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+    }
+
     WindowInsetsControllerCompat insetsController =
-      new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-    insetsController.setAppearanceLightStatusBars(false);
-    getWindow()
-      .getDecorView()
-      .post(() -> {
-        getWindow().setStatusBarColor(Color.BLACK);
-      });
+      new WindowInsetsControllerCompat(
+        getWindow(),
+        getWindow() != null ? getWindow().getDecorView() : null
+      );
+
+    if (getWindow() != null) {
+      getWindow()
+        .getDecorView()
+        .post(() -> {
+          // Get status bar height
+          int statusBarHeight = 0;
+          int resourceId = getContext()
+            .getResources()
+            .getIdentifier("status_bar_height", "dimen", "android");
+          if (resourceId > 0) {
+            statusBarHeight = getContext()
+              .getResources()
+              .getDimensionPixelSize(resourceId);
+          }
+
+          // Find the status bar color view
+          View statusBarColorView = findViewById(R.id.status_bar_color_view);
+
+          // Set the height of the status bar color view
+          if (statusBarColorView != null) {
+            statusBarColorView.getLayoutParams().height = statusBarHeight;
+            statusBarColorView.requestLayout();
+
+            // Set color based on toolbar color or dark mode
+            if (
+              _options.getToolbarColor() != null &&
+              !_options.getToolbarColor().isEmpty()
+            ) {
+              try {
+                // Use explicitly provided toolbar color for status bar
+                int toolbarColor = Color.parseColor(_options.getToolbarColor());
+                statusBarColorView.setBackgroundColor(toolbarColor);
+
+                // Set status bar text to white or black based on background
+                boolean isDarkBackground = isDarkColor(toolbarColor);
+                insetsController.setAppearanceLightStatusBars(
+                  !isDarkBackground
+                );
+              } catch (IllegalArgumentException e) {
+                // Fallback to default black if color parsing fails
+                statusBarColorView.setBackgroundColor(Color.BLACK);
+                insetsController.setAppearanceLightStatusBars(false);
+              }
+            } else {
+              // Follow system dark mode if no toolbar color provided
+              boolean isDarkTheme = isDarkThemeEnabled();
+              int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+              statusBarColorView.setBackgroundColor(statusBarColor);
+              insetsController.setAppearanceLightStatusBars(!isDarkTheme);
+            }
+          }
+        });
+    }
 
     getWindow()
       .setLayout(
@@ -246,9 +318,25 @@ public class WebViewDialog extends Dialog {
           ValueCallback<Uri[]> filePathCallback,
           FileChooserParams fileChooserParams
         ) {
+          // Get the accept type safely
+          String acceptType = "*/*"; // Default to all file types
+          if (
+            fileChooserParams.getAcceptTypes() != null &&
+            fileChooserParams.getAcceptTypes().length > 0 &&
+            !TextUtils.isEmpty(fileChooserParams.getAcceptTypes()[0])
+          ) {
+            acceptType = fileChooserParams.getAcceptTypes()[0];
+          }
+
+          // Check if the file chooser is already open
+          if (mFilePathCallback != null) {
+            mFilePathCallback.onReceiveValue(null);
+            mFilePathCallback = null;
+          }
+
           openFileChooser(
             filePathCallback,
-            fileChooserParams.getAcceptTypes()[0],
+            acceptType,
             fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE
           );
           return true;
@@ -433,16 +521,100 @@ public class WebViewDialog extends Dialog {
     mFilePathCallback = filePathCallback;
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
-    intent.setType(acceptType); // Default to */*
+
+    // Fix MIME type handling
+    if (
+      acceptType == null ||
+      acceptType.isEmpty() ||
+      acceptType.equals("undefined")
+    ) {
+      acceptType = "*/*";
+    } else {
+      // Handle common web input accept types
+      if (acceptType.equals("image/*")) {
+        // Keep as is - image/*
+      } else if (acceptType.contains("image/")) {
+        // Specific image type requested but keep it general for better compatibility
+        acceptType = "image/*";
+      } else if (
+        acceptType.equals("audio/*") || acceptType.contains("audio/")
+      ) {
+        acceptType = "audio/*";
+      } else if (
+        acceptType.equals("video/*") || acceptType.contains("video/")
+      ) {
+        acceptType = "video/*";
+      } else if (acceptType.startsWith(".") || acceptType.contains(",")) {
+        // Handle file extensions like ".pdf, .docx" by using a general mime type
+        if (acceptType.contains(".pdf")) {
+          acceptType = "application/pdf";
+        } else if (
+          acceptType.contains(".doc") || acceptType.contains(".docx")
+        ) {
+          acceptType = "application/msword";
+        } else if (
+          acceptType.contains(".xls") || acceptType.contains(".xlsx")
+        ) {
+          acceptType = "application/vnd.ms-excel";
+        } else if (
+          acceptType.contains(".txt") || acceptType.contains(".text")
+        ) {
+          acceptType = "text/plain";
+        } else {
+          // Default for extension lists
+          acceptType = "*/*";
+        }
+      }
+    }
+
+    Log.d("InAppBrowser", "File picker using MIME type: " + acceptType);
+    intent.setType(acceptType);
     intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
-    activity.startActivityForResult(
-      Intent.createChooser(intent, "Select File"),
-      FILE_CHOOSER_REQUEST_CODE
-    );
+
+    try {
+      activity.startActivityForResult(
+        Intent.createChooser(intent, "Select File"),
+        FILE_CHOOSER_REQUEST_CODE
+      );
+    } catch (ActivityNotFoundException e) {
+      // If no app can handle the specific MIME type, try with a more generic one
+      Log.e(
+        "InAppBrowser",
+        "No app available for type: " + acceptType + ", trying with */*"
+      );
+      intent.setType("*/*");
+      try {
+        activity.startActivityForResult(
+          Intent.createChooser(intent, "Select File"),
+          FILE_CHOOSER_REQUEST_CODE
+        );
+      } catch (ActivityNotFoundException ex) {
+        // If still failing, report error
+        Log.e("InAppBrowser", "No app can handle file picker", ex);
+        if (mFilePathCallback != null) {
+          mFilePathCallback.onReceiveValue(null);
+          mFilePathCallback = null;
+        }
+      }
+    }
   }
 
   public void reload() {
-    _webView.reload();
+    if (_webView != null) {
+      // First stop any ongoing loading
+      _webView.stopLoading();
+
+      // Check if there's a URL to reload
+      if (_webView.getUrl() != null) {
+        // Reload the current page
+        _webView.reload();
+        Log.d("InAppBrowser", "Reloading page: " + _webView.getUrl());
+      } else if (_options != null && _options.getUrl() != null) {
+        // If webView URL is null but we have an initial URL, load that
+        setUrl(_options.getUrl());
+        Log.d("InAppBrowser", "Loading initial URL: " + _options.getUrl());
+      }
+    }
   }
 
   public void destroy() {
@@ -485,56 +657,72 @@ public class WebViewDialog extends Dialog {
   }
 
   private void setupToolbar() {
-    _toolbar = this.findViewById(R.id.tool_bar);
-    int color = Color.parseColor("#ffffff");
-    try {
-      color = Color.parseColor(_options.getToolbarColor());
-    } catch (IllegalArgumentException e) {
-      // Do nothing
-    }
-    _toolbar.setBackgroundColor(color);
-    _toolbar.findViewById(R.id.backButton).setBackgroundColor(color);
-    _toolbar.findViewById(R.id.forwardButton).setBackgroundColor(color);
-    _toolbar.findViewById(R.id.closeButton).setBackgroundColor(color);
-    _toolbar.findViewById(R.id.reloadButton).setBackgroundColor(color);
+    _toolbar = findViewById(R.id.tool_bar);
 
-    if (!TextUtils.isEmpty(_options.getTitle())) {
-      this.setTitle(_options.getTitle());
-    } else {
+    // Apply toolbar color early, for ALL toolbar types, before any view configuration
+    if (
+      _options.getToolbarColor() != null &&
+      !_options.getToolbarColor().isEmpty()
+    ) {
       try {
-        URI uri = new URI(_options.getUrl());
-        this.setTitle(uri.getHost());
-      } catch (URISyntaxException e) {
-        this.setTitle(_options.getTitle());
+        int toolbarColor = Color.parseColor(_options.getToolbarColor());
+        _toolbar.setBackgroundColor(toolbarColor);
+
+        // Get toolbar title and ensure it gets the right color
+        TextView titleText = _toolbar.findViewById(R.id.titleText);
+
+        // Determine icon and text color
+        int iconColor;
+        if (
+          _options.getToolbarTextColor() != null &&
+          !_options.getToolbarTextColor().isEmpty()
+        ) {
+          try {
+            iconColor = Color.parseColor(_options.getToolbarTextColor());
+          } catch (IllegalArgumentException e) {
+            // Fallback to automatic detection if parsing fails
+            boolean isDarkBackground = isDarkColor(toolbarColor);
+            iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
+          }
+        } else {
+          // No explicit toolbarTextColor, use automatic detection based on background
+          boolean isDarkBackground = isDarkColor(toolbarColor);
+          iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
+        }
+
+        // Store for later use with navigation buttons
+        this.iconColor = iconColor;
+
+        // Set title text color directly
+        titleText.setTextColor(iconColor);
+
+        // Apply colors to all buttons
+        applyColorToAllButtons(toolbarColor, iconColor);
+
+        // Also ensure status bar gets the color
+        if (getWindow() != null) {
+          // Set status bar color
+          getWindow().setStatusBarColor(toolbarColor);
+
+          // Determine proper status bar text color (light or dark icons)
+          boolean isDarkBackground = isDarkColor(toolbarColor);
+          WindowInsetsControllerCompat insetsController =
+            new WindowInsetsControllerCompat(
+              getWindow(),
+              getWindow().getDecorView()
+            );
+          insetsController.setAppearanceLightStatusBars(!isDarkBackground);
+        }
+      } catch (IllegalArgumentException e) {
+        Log.e(
+          "InAppBrowser",
+          "Invalid toolbar color: " + _options.getToolbarColor()
+        );
       }
     }
 
-    View backButton = _toolbar.findViewById(R.id.backButton);
-    backButton.setOnClickListener(
-      new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-          if (_webView.canGoBack()) {
-            _webView.goBack();
-          }
-        }
-      }
-    );
-
-    View forwardButton = _toolbar.findViewById(R.id.forwardButton);
-    forwardButton.setOnClickListener(
-      new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-          if (_webView.canGoForward()) {
-            _webView.goForward();
-          }
-        }
-      }
-    );
-
-    ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
-    closeButton.setOnClickListener(
+    ImageButton closeButtonView = _toolbar.findViewById(R.id.closeButton);
+    closeButtonView.setOnClickListener(
       new View.OnClickListener() {
         @Override
         public void onClick(View view) {
@@ -572,78 +760,292 @@ public class WebViewDialog extends Dialog {
     );
 
     if (_options.showArrow()) {
-      closeButton.setImageResource(R.drawable.arrow_back_enabled);
+      closeButtonView.setImageResource(R.drawable.arrow_back_enabled);
     }
 
-    if (_options.getShowReloadButton()) {
-      View reloadButton = _toolbar.findViewById(R.id.reloadButton);
-      reloadButton.setVisibility(View.VISIBLE);
-      reloadButton.setOnClickListener(
+    // Handle reload button visibility
+    if (
+      _options.getShowReloadButton() &&
+      !TextUtils.equals(_options.getToolbarType(), "activity")
+    ) {
+      View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
+      reloadButtonView.setVisibility(View.VISIBLE);
+      reloadButtonView.setOnClickListener(
         new View.OnClickListener() {
           @Override
           public void onClick(View view) {
-            _webView.reload();
+            if (_webView != null) {
+              // First stop any ongoing loading
+              _webView.stopLoading();
+
+              // Check if there's a URL to reload
+              if (_webView.getUrl() != null) {
+                // Reload the current page
+                _webView.reload();
+                Log.d("InAppBrowser", "Reloading page: " + _webView.getUrl());
+              } else if (_options.getUrl() != null) {
+                // If webView URL is null but we have an initial URL, load that
+                setUrl(_options.getUrl());
+                Log.d(
+                  "InAppBrowser",
+                  "Loading initial URL: " + _options.getUrl()
+                );
+              }
+            }
           }
         }
       );
+    } else {
+      View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
+      reloadButtonView.setVisibility(View.GONE);
     }
 
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {
+      // Activity mode should ONLY have:
+      // 1. Close button
+      // 2. Share button (if shareSubject is provided)
+
+      // Hide all navigation buttons
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
       _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
+
+      // Hide buttonNearDone
       ImageButton buttonNearDoneView = _toolbar.findViewById(
         R.id.buttonNearDone
       );
       buttonNearDoneView.setVisibility(View.GONE);
-      //TODO: Add share button functionality
+
+      // In activity mode, always make the share button visible by setting a default shareSubject if not provided
+      if (
+        _options.getShareSubject() == null ||
+        _options.getShareSubject().isEmpty()
+      ) {
+        _options.setShareSubject("Share");
+        Log.d("InAppBrowser", "Activity mode: Setting default shareSubject");
+      }
+      // Status bar color is already set at the top of this method, no need to set again
+
+      // Share button visibility is handled separately later
     } else if (TextUtils.equals(_options.getToolbarType(), "navigation")) {
       ImageButton buttonNearDoneView = _toolbar.findViewById(
         R.id.buttonNearDone
       );
       buttonNearDoneView.setVisibility(View.GONE);
-      //TODO: Remove share button when implemented
+      // Status bar color is already set at the top of this method, no need to set again
     } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
       _toolbar.setVisibility(View.GONE);
+
+      // Also set window background color to match status bar for blank toolbar
+      View statusBarColorView = findViewById(R.id.status_bar_color_view);
+      if (
+        _options.getToolbarColor() != null &&
+        !_options.getToolbarColor().isEmpty()
+      ) {
+        try {
+          int toolbarColor = Color.parseColor(_options.getToolbarColor());
+          if (getWindow() != null) {
+            getWindow().getDecorView().setBackgroundColor(toolbarColor);
+          }
+          // Also set status bar color view background if available
+          if (statusBarColorView != null) {
+            statusBarColorView.setBackgroundColor(toolbarColor);
+          }
+        } catch (IllegalArgumentException e) {
+          // Fallback to system default if color parsing fails
+          boolean isDarkTheme = isDarkThemeEnabled();
+          int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+          if (getWindow() != null) {
+            getWindow()
+              .getDecorView()
+              .setBackgroundColor(windowBackgroundColor);
+          }
+          // Also set status bar color view background if available
+          if (statusBarColorView != null) {
+            statusBarColorView.setBackgroundColor(windowBackgroundColor);
+          }
+        }
+      } else {
+        // Follow system dark mode
+        boolean isDarkTheme = isDarkThemeEnabled();
+        int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+        if (getWindow() != null) {
+          getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
+        }
+        // Also set status bar color view background if available
+        if (statusBarColorView != null) {
+          statusBarColorView.setBackgroundColor(windowBackgroundColor);
+        }
+      }
     } else {
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
       _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
 
+      // Status bar color is already set at the top of this method, no need to set again
+
       Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
       if (buttonNearDone != null) {
-        AssetManager assetManager = _context.getAssets();
+        ImageButton buttonNearDoneView = _toolbar.findViewById(
+          R.id.buttonNearDone
+        );
+        buttonNearDoneView.setVisibility(View.VISIBLE);
 
-        // Open the SVG file from assets
-        InputStream inputStream = null;
-        try {
-          ImageButton buttonNearDoneView = _toolbar.findViewById(
-            R.id.buttonNearDone
-          );
-          buttonNearDoneView.setVisibility(View.VISIBLE);
+        // Handle different icon types
+        String iconType = buttonNearDone.getIconType();
+        if ("vector".equals(iconType)) {
+          // Use native Android vector drawable
+          try {
+            String iconName = buttonNearDone.getIcon();
+            // Convert name to Android resource ID (remove file extension if present)
+            if (iconName.endsWith(".xml")) {
+              iconName = iconName.substring(0, iconName.length() - 4);
+            }
 
-          inputStream = assetManager.open(buttonNearDone.getIcon());
+            // Get resource ID
+            int resourceId = _context
+              .getResources()
+              .getIdentifier(iconName, "drawable", _context.getPackageName());
 
-          SVG svg = SVG.getFromInputStream(inputStream);
-          Picture picture = svg.renderToPicture(
-            buttonNearDone.getWidth(),
-            buttonNearDone.getHeight()
-          );
-          PictureDrawable pictureDrawable = new PictureDrawable(picture);
-
-          buttonNearDoneView.setImageDrawable(pictureDrawable);
-          buttonNearDoneView.setOnClickListener(view ->
-            _options.getCallbacks().buttonNearDoneClicked()
-          );
-        } catch (IOException | SVGParseException e) {
-          throw new RuntimeException(e);
-        } finally {
-          if (inputStream != null) {
+            if (resourceId != 0) {
+              // Set the vector drawable
+              buttonNearDoneView.setImageResource(resourceId);
+              // Apply color filter
+              buttonNearDoneView.setColorFilter(iconColor);
+              Log.d(
+                "InAppBrowser",
+                "Successfully loaded vector drawable: " + iconName
+              );
+            } else {
+              Log.e(
+                "InAppBrowser",
+                "Vector drawable not found: " + iconName + ", using fallback"
+              );
+              // Fallback to a common system icon
+              buttonNearDoneView.setImageResource(
+                android.R.drawable.ic_menu_info_details
+              );
+              buttonNearDoneView.setColorFilter(iconColor);
+            }
+          } catch (Exception e) {
+            Log.e(
+              "InAppBrowser",
+              "Error loading vector drawable: " + e.getMessage()
+            );
+            // Fallback to a common system icon
+            buttonNearDoneView.setImageResource(
+              android.R.drawable.ic_menu_info_details
+            );
+            buttonNearDoneView.setColorFilter(iconColor);
+          }
+        } else if ("asset".equals(iconType)) {
+          // Handle SVG from assets
+          AssetManager assetManager = _context.getAssets();
+          InputStream inputStream = null;
+          try {
+            // Try to load from public folder first
+            String iconPath = "public/" + buttonNearDone.getIcon();
             try {
-              inputStream.close();
+              inputStream = assetManager.open(iconPath);
             } catch (IOException e) {
-              e.printStackTrace();
+              // If not found in public, try root assets
+              try {
+                inputStream = assetManager.open(buttonNearDone.getIcon());
+              } catch (IOException e2) {
+                Log.e(
+                  "InAppBrowser",
+                  "SVG file not found in assets: " + buttonNearDone.getIcon()
+                );
+                buttonNearDoneView.setVisibility(View.GONE);
+                return;
+              }
+            }
+
+            if (inputStream == null) {
+              Log.e(
+                "InAppBrowser",
+                "Failed to load SVG icon: " + buttonNearDone.getIcon()
+              );
+              buttonNearDoneView.setVisibility(View.GONE);
+              return;
+            }
+
+            // Parse and render SVG
+            SVG svg = SVG.getFromInputStream(inputStream);
+            if (svg == null) {
+              Log.e(
+                "InAppBrowser",
+                "Failed to parse SVG icon: " + buttonNearDone.getIcon()
+              );
+              buttonNearDoneView.setVisibility(View.GONE);
+              return;
+            }
+
+            // Get the dimensions from options or use SVG's size
+            float width = buttonNearDone.getWidth() > 0
+              ? buttonNearDone.getWidth()
+              : 24;
+            float height = buttonNearDone.getHeight() > 0
+              ? buttonNearDone.getHeight()
+              : 24;
+
+            // Get density for proper scaling
+            float density = _context.getResources().getDisplayMetrics().density;
+            int targetWidth = Math.round(width * density);
+            int targetHeight = Math.round(height * density);
+
+            // Set document size
+            svg.setDocumentWidth(targetWidth);
+            svg.setDocumentHeight(targetHeight);
+
+            // Create a bitmap and render SVG to it for better quality
+            Bitmap bitmap = Bitmap.createBitmap(
+              targetWidth,
+              targetHeight,
+              Bitmap.Config.ARGB_8888
+            );
+            Canvas canvas = new Canvas(bitmap);
+            svg.renderToCanvas(canvas);
+
+            // Apply color filter to the bitmap
+            Paint paint = new Paint();
+            paint.setColorFilter(
+              new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN)
+            );
+            Canvas colorFilterCanvas = new Canvas(bitmap);
+            colorFilterCanvas.drawBitmap(bitmap, 0, 0, paint);
+
+            // Set the colored bitmap as image
+            buttonNearDoneView.setImageBitmap(bitmap);
+            buttonNearDoneView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            buttonNearDoneView.setPadding(12, 12, 12, 12); // Standard button padding
+          } catch (SVGParseException e) {
+            Log.e(
+              "InAppBrowser",
+              "Error loading SVG icon: " + e.getMessage(),
+              e
+            );
+            buttonNearDoneView.setVisibility(View.GONE);
+          } finally {
+            if (inputStream != null) {
+              try {
+                inputStream.close();
+              } catch (IOException e) {
+                Log.e(
+                  "InAppBrowser",
+                  "Error closing input stream: " + e.getMessage()
+                );
+              }
             }
           }
+        } else {
+          // Default fallback or unsupported type
+          Log.e("InAppBrowser", "Unsupported icon type: " + iconType);
+          buttonNearDoneView.setVisibility(View.GONE);
         }
+
+        // Set the click listener
+        buttonNearDoneView.setOnClickListener(view ->
+          _options.getCallbacks().buttonNearDoneClicked()
+        );
       } else {
         ImageButton buttonNearDoneView = _toolbar.findViewById(
           R.id.buttonNearDone
@@ -651,6 +1053,94 @@ public class WebViewDialog extends Dialog {
         buttonNearDoneView.setVisibility(View.GONE);
       }
     }
+
+    // Add share button functionality
+    ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
+    if (
+      _options.getShareSubject() != null &&
+      !_options.getShareSubject().isEmpty()
+    ) {
+      shareButton.setVisibility(View.VISIBLE);
+      Log.d(
+        "InAppBrowser",
+        "Share button should be visible, shareSubject: " +
+        _options.getShareSubject()
+      );
+
+      // Apply the same color filter as other buttons to ensure visibility
+      shareButton.setColorFilter(iconColor);
+
+      // The color filter is now applied in applyColorToAllButtons
+      shareButton.setOnClickListener(view -> {
+        JSObject shareDisclaimer = _options.getShareDisclaimer();
+        if (shareDisclaimer != null) {
+          new AlertDialog.Builder(_context)
+            .setTitle(shareDisclaimer.getString("title", "Title"))
+            .setMessage(shareDisclaimer.getString("message", "Message"))
+            .setPositiveButton(
+              shareDisclaimer.getString("confirmBtn", "Confirm"),
+              (dialog, which) -> {
+                _options.getCallbacks().confirmBtnClicked();
+                shareUrl();
+              }
+            )
+            .setNegativeButton(
+              shareDisclaimer.getString("cancelBtn", "Cancel"),
+              null
+            )
+            .show();
+        } else {
+          shareUrl();
+        }
+      });
+    } else {
+      shareButton.setVisibility(View.GONE);
+    }
+
+    // Also color the title text
+    TextView titleText = _toolbar.findViewById(R.id.titleText);
+    if (titleText != null) {
+      titleText.setTextColor(iconColor);
+
+      // Set the title text
+      if (!TextUtils.isEmpty(_options.getTitle())) {
+        this.setTitle(_options.getTitle());
+      } else {
+        try {
+          URI uri = new URI(_options.getUrl());
+          this.setTitle(uri.getHost());
+        } catch (URISyntaxException e) {
+          this.setTitle(_options.getTitle());
+        }
+      }
+    }
+  }
+
+  /**
+   * Applies background and tint colors to all buttons in the toolbar
+   */
+  private void applyColorToAllButtons(int backgroundColor, int iconColor) {
+    // Get all buttons
+    ImageButton backButton = _toolbar.findViewById(R.id.backButton);
+    ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
+    ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
+    ImageButton reloadButton = _toolbar.findViewById(R.id.reloadButton);
+    ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
+    ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
+
+    // Set button backgrounds
+    backButton.setBackgroundColor(backgroundColor);
+    forwardButton.setBackgroundColor(backgroundColor);
+    closeButton.setBackgroundColor(backgroundColor);
+    reloadButton.setBackgroundColor(backgroundColor);
+
+    // Apply tint colors to buttons
+    backButton.setColorFilter(iconColor);
+    forwardButton.setColorFilter(iconColor);
+    closeButton.setColorFilter(iconColor);
+    reloadButton.setColorFilter(iconColor);
+    shareButton.setColorFilter(iconColor);
+    buttonNearDoneView.setColorFilter(iconColor);
   }
 
   public void handleProxyResultError(String result, String id) {
@@ -840,7 +1330,7 @@ public class WebViewDialog extends Dialog {
                   );
                 }
                 String s = String.format(
-                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'}))} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})}",
+                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})}",
                   headers,
                   toBase64(request.getUrl().toString()),
                   request.getMethod(),
@@ -1023,18 +1513,36 @@ public class WebViewDialog extends Dialog {
           if (_webView.canGoBack()) {
             backButton.setImageResource(R.drawable.arrow_back_enabled);
             backButton.setEnabled(true);
+            backButton.setColorFilter(iconColor);
           } else {
             backButton.setImageResource(R.drawable.arrow_back_disabled);
             backButton.setEnabled(false);
+            backButton.setColorFilter(
+              Color.argb(
+                128,
+                Color.red(iconColor),
+                Color.green(iconColor),
+                Color.blue(iconColor)
+              )
+            );
           }
 
           ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
           if (_webView.canGoForward()) {
             forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
             forwardButton.setEnabled(true);
+            forwardButton.setColorFilter(iconColor);
           } else {
             forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
             forwardButton.setEnabled(false);
+            forwardButton.setColorFilter(
+              Color.argb(
+                128,
+                Color.red(iconColor),
+                Color.green(iconColor),
+                Color.blue(iconColor)
+              )
+            );
           }
 
           _options.getCallbacks().pageLoaded();
@@ -1179,5 +1687,52 @@ public class WebViewDialog extends Dialog {
     synchronized (proxiedRequestsHashmap) {
       proxiedRequestsHashmap.remove(key);
     }
+  }
+
+  private void shareUrl() {
+    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+    shareIntent.setType("text/plain");
+    shareIntent.putExtra(Intent.EXTRA_SUBJECT, _options.getShareSubject());
+    shareIntent.putExtra(Intent.EXTRA_TEXT, _options.getUrl());
+    _context.startActivity(Intent.createChooser(shareIntent, "Share"));
+  }
+
+  private boolean isDarkColor(int color) {
+    int red = Color.red(color);
+    int green = Color.green(color);
+    int blue = Color.blue(color);
+    double luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0;
+    return luminance < 0.5;
+  }
+
+  private boolean isDarkThemeEnabled() {
+    // This method checks if dark theme is currently enabled without using Configuration class
+    try {
+      // On Android 10+, check via resources for night mode
+      Resources.Theme theme = _context.getTheme();
+      TypedValue typedValue = new TypedValue();
+
+      if (
+        theme.resolveAttribute(android.R.attr.isLightTheme, typedValue, true)
+      ) {
+        // isLightTheme exists - returns true if light, false if dark
+        return typedValue.data != 1;
+      }
+
+      // Fallback method - check background color of window
+      if (
+        theme.resolveAttribute(
+          android.R.attr.windowBackground,
+          typedValue,
+          true
+        )
+      ) {
+        int backgroundColor = typedValue.data;
+        return isDarkColor(backgroundColor);
+      }
+    } catch (Exception e) {
+      // Ignore and fallback to light theme
+    }
+    return false;
   }
 }
