@@ -208,7 +208,7 @@ export interface OpenWebViewOptions {
    */
   title?: string;
   /**
-   * Background color of the browser, only on IOS
+   * Background color of the browser
    * @since 0.1.0
    * @default BackgroundColor.BLACK
    */
@@ -484,7 +484,7 @@ export interface InAppBrowserPlugin {
     listenerFunc: UrlChangeListener,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
+   * Will be triggered when user clicks on confirm button when disclaimer is required
    *
    * @since 0.0.1
    */
