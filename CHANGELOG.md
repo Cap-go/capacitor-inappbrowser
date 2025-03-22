@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.4.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.3.2...7.4.0) (2025-03-22)
+
+
+### Features
+
+* align Android and IOS of option behaviors ([3cd0a97](https://github.com/Cap-go/capacitor-inappbrowser/commit/3cd0a971a1aabbb4b2daa6c134a789d9906c2e98))
+
 ### [7.3.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.3.1...7.3.2) (2025-03-20)
 
 
