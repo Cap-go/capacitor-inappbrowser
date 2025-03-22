@@ -172,6 +172,15 @@ public class Options {
   private String preShowScript;
   private String toolbarTextColor;
   private Pattern proxyRequestsPattern = null;
+  private boolean materialPicker = false;
+
+  public boolean getMaterialPicker() {
+    return materialPicker;
+  }
+
+  public void setMaterialPicker(boolean materialPicker) {
+    this.materialPicker = materialPicker;
+  }
 
   public Pattern getProxyRequestsPattern() {
     return proxyRequestsPattern;

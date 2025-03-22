@@ -593,6 +593,12 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
     );
     options.setPluginCall(call);
+
+    // Set Material Design picker option
+    options.setMaterialPicker(
+      Boolean.TRUE.equals(call.getBoolean("materialPicker", false))
+    );
+
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {
