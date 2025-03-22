@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.5.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.4.1...7.5.0) (2025-03-22)
+
+
+### Features
+
+* add material picker android ([7e9228d](https://github.com/Cap-go/capacitor-inappbrowser/commit/7e9228d53c0e3523963582b24d5fccfb6c380619))
+
 ### [7.4.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.4.0...7.4.1) (2025-03-22)
 
 
