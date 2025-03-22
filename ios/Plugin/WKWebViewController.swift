@@ -330,6 +330,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     fileprivate var credentials: WKWebViewCredentials?
 
+    var textZoom: Int?
+
+    var capableWebView: WKWebView? {
+        return webView
+    }
+
     deinit {
         webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
@@ -774,6 +780,15 @@ public extension WKWebViewController {
         DispatchQueue.main.async { [weak self] in
             self?.webView?.evaluateJavaScript(script, completionHandler: completion)
         }
+    }
+
+    func applyTextZoom(_ zoomPercent: Int) {
+        let script = """
+        document.getElementsByTagName('body')[0].style.webkitTextSizeAdjust = '\(zoomPercent)%';
+        document.getElementsByTagName('body')[0].style.textSizeAdjust = '\(zoomPercent)%';
+        """
+
+        executeScript(script: script)
     }
 }
 
@@ -1398,6 +1413,12 @@ extension WKWebViewController: WKNavigationDelegate {
                 self.injectPreShowScript()
             }
         }
+
+        // Apply text zoom if set
+        if let zoom = self.textZoom {
+            applyTextZoom(zoom)
+        }
+
         didpageInit = true
         updateBarButtonItems()
         self.progressView?.progress = 0

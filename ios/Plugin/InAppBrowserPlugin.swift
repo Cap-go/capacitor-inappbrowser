@@ -461,6 +461,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
+            // Set text zoom if specified
+            if let textZoom = call.getInt("textZoom") {
+                webViewController.textZoom = textZoom
+            }
+
             // Set closeModal properties after proper initialization
             if closeModal {
                 webViewController.closeModal = true

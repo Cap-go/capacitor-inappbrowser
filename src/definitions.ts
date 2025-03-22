@@ -404,6 +404,16 @@ export interface OpenWebViewOptions {
       height?: number;
     };
   };
+  /**
+   * textZoom: sets the text zoom of the page in percent.
+   * Allows users to increase or decrease the text size for better readability.
+   * @since 7.6.0
+   * @default 100
+   * @example
+   * textZoom: 120
+   * Test URL: https://capgo.app
+   */
+  textZoom?: number;
 }
 
 export interface InAppBrowserPlugin {
