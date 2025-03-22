@@ -146,16 +146,16 @@ export interface OpenWebViewOptions {
    * The webview automatically injects a JavaScript interface providing:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event)
-   * 
+   *
    * @example
    * // In your webpage loaded in the webview:
    * document.getElementById('closeBtn').addEventListener('click', () => {
    *   window.mobileApp.close();
    * });
-   * 
+   *
    * // Send data to the app
    * window.mobileApp.postMessage({ action: 'login', data: { user: 'test' }});
-   * 
+   *
    * @since 6.10.0
    */
   jsInterface?: never; // This property doesn't exist, it's just for documentation
@@ -166,7 +166,7 @@ export interface OpenWebViewOptions {
    * - Getting user consent before sharing
    * - Explaining what will be shared
    * - Complying with privacy regulations
-   * 
+   *
    * Note: shareSubject is required when using shareDisclaimer
    * @since 0.1.0
    * @example
@@ -208,7 +208,7 @@ export interface OpenWebViewOptions {
    */
   title?: string;
   /**
-   * Background color of the browser, only on IOS
+   * Background color of the browser
    * @since 0.1.0
    * @default BackgroundColor.BLACK
    */
@@ -355,13 +355,13 @@ export interface OpenWebViewOptions {
   /**
    * buttonNearDone allows for a creation of a custom button near the done/close button.
    * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
-   * 
+   *
    * For Android:
    * - iconType must be "asset"
    * - icon path should be in the public folder (e.g. "monkey.svg")
    * - width and height are optional, defaults to 48dp
    * - button is positioned at the end of toolbar with 8dp margin
-   * 
+   *
    * For iOS:
    * - iconType can be "sf-symbol" or "asset"
    * - for sf-symbol, icon should be the symbol name
@@ -436,7 +436,7 @@ export interface InAppBrowserPlugin {
   close(): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
-   * 
+   *
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
@@ -484,7 +484,7 @@ export interface InAppBrowserPlugin {
     listenerFunc: UrlChangeListener,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when user clicks on confirm button when disclaimer is required, works only on iOS
+   * Will be triggered when user clicks on confirm button when disclaimer is required
    *
    * @since 0.0.1
    */
@@ -536,16 +536,16 @@ export interface InAppBrowserPlugin {
 
 /**
  * JavaScript APIs available in the InAppBrowser WebView.
- * 
+ *
  * These APIs are automatically injected into all webpages loaded in the InAppBrowser WebView.
- * 
+ *
  * @example
  * // Closing the webview from JavaScript
  * window.mobileApp.close();
- * 
+ *
  * // Sending a message from webview to the native app
  * window.mobileApp.postMessage({ key: 'value' });
- * 
+ *
  * @since 6.10.0
  */
 export interface InAppBrowserWebViewAPIs {
@@ -555,7 +555,7 @@ export interface InAppBrowserWebViewAPIs {
   mobileApp: {
     /**
      * Close the WebView from JavaScript
-     * 
+     *
      * @example
      * // Add a button to close the webview
      * const closeButton = document.createElement('button');
@@ -564,25 +564,25 @@ export interface InAppBrowserWebViewAPIs {
      *   window.mobileApp.close();
      * });
      * document.body.appendChild(closeButton);
-     * 
+     *
      * @since 6.10.0
      */
     close(): void;
-    
+
     /**
      * Send a message from the WebView to the native app
      * The native app can listen for these messages with the "messageFromWebview" event
-     * 
+     *
      * @param message Object to send to the native app
      * @example
      * // Send data to native app
-     * window.mobileApp.postMessage({ 
+     * window.mobileApp.postMessage({
      *   action: 'dataSubmitted',
      *   data: { username: 'test', email: 'test@example.com' }
      * });
-     * 
+     *
      * @since 6.10.0
      */
     postMessage(message: Record<string, any>): void;
-  }
+  };
 }

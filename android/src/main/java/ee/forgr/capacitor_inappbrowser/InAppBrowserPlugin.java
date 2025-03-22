@@ -127,14 +127,18 @@ public class InAppBrowserPlugin
   }
 
   @Override
-  public void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+  public void handleOnActivityResult(
+    int requestCode,
+    int resultCode,
+    Intent data
+  ) {
     super.handleOnActivityResult(requestCode, resultCode, data);
-    
+
     // Handle file chooser result
     if (requestCode == WebViewDialog.FILE_CHOOSER_REQUEST_CODE) {
       if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
         Uri[] results = null;
-        
+
         // Check if response is valid
         if (resultCode == Activity.RESULT_OK) {
           if (data != null) {
@@ -152,7 +156,7 @@ public class InAppBrowserPlugin
             }
           }
         }
-        
+
         // Send the result to WebView
         webViewDialog.mFilePathCallback.onReceiveValue(results);
         webViewDialog.mFilePathCallback = null;
@@ -419,9 +423,7 @@ public class InAppBrowserPlugin
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
     options.setToolbarTextColor(call.getString("toolbarTextColor"));
-    options.setArrow(
-      Boolean.TRUE.equals(call.getBoolean("showArrow", false))
-    );
+    options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
     options.setIgnoreUntrustedSSLError(
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
@@ -448,46 +450,75 @@ public class InAppBrowserPlugin
           if (androidObj != null) {
             String iconType = androidObj.getString("iconType", "asset");
             String icon = androidObj.getString("icon", "");
-            Log.d("InAppBrowser", "ButtonNearDone config - iconType: " + iconType + ", icon: " + icon);
-            
+            Log.d(
+              "InAppBrowser",
+              "ButtonNearDone config - iconType: " +
+              iconType +
+              ", icon: " +
+              icon
+            );
+
             // For vector type, verify if resource exists
             if ("vector".equals(iconType)) {
-              int resourceId = getContext().getResources().getIdentifier(
-                icon, "drawable", getContext().getPackageName());
+              int resourceId = getContext()
+                .getResources()
+                .getIdentifier(icon, "drawable", getContext().getPackageName());
               if (resourceId == 0) {
                 Log.e("InAppBrowser", "Vector resource not found: " + icon);
                 // List available drawable resources to help debugging
                 try {
                   Field[] drawables = R.drawable.class.getFields();
-                  StringBuilder availableResources = new StringBuilder("Available resources: ");
+                  StringBuilder availableResources = new StringBuilder(
+                    "Available resources: "
+                  );
                   for (int i = 0; i < Math.min(10, drawables.length); i++) {
-                    availableResources.append(drawables[i].getName()).append(", ");
+                    availableResources
+                      .append(drawables[i].getName())
+                      .append(", ");
                   }
                   if (drawables.length > 10) {
-                    availableResources.append("... (").append(drawables.length - 10).append(" more)");
+                    availableResources
+                      .append("... (")
+                      .append(drawables.length - 10)
+                      .append(" more)");
                   }
                   Log.d("InAppBrowser", availableResources.toString());
                 } catch (Exception e) {
-                  Log.e("InAppBrowser", "Error listing resources: " + e.getMessage());
+                  Log.e(
+                    "InAppBrowser",
+                    "Error listing resources: " + e.getMessage()
+                  );
                 }
               } else {
-                Log.d("InAppBrowser", "Vector resource found with ID: " + resourceId);
+                Log.d(
+                  "InAppBrowser",
+                  "Vector resource found with ID: " + resourceId
+                );
               }
             }
           }
-          
+
           // Try to create the ButtonNearDone object
-          Options.ButtonNearDone buttonNearDone = Options.ButtonNearDone.generateFromPluginCall(
-            call,
-            getContext().getAssets()
-          );
+          Options.ButtonNearDone buttonNearDone =
+            Options.ButtonNearDone.generateFromPluginCall(
+              call,
+              getContext().getAssets()
+            );
           options.setButtonNearDone(buttonNearDone);
         } catch (Exception e) {
-          Log.e("InAppBrowser", "Error setting buttonNearDone: " + e.getMessage(), e);
+          Log.e(
+            "InAppBrowser",
+            "Error setting buttonNearDone: " + e.getMessage(),
+            e
+          );
         }
       }
     } catch (Exception e) {
-      Log.e("InAppBrowser", "Error processing buttonNearDone: " + e.getMessage(), e);
+      Log.e(
+        "InAppBrowser",
+        "Error processing buttonNearDone: " + e.getMessage(),
+        e
+      );
     }
 
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
@@ -496,7 +527,10 @@ public class InAppBrowserPlugin
     options.setToolbarType(call.getString("toolbarType", ""));
 
     // Validate preShowScript requires isPresentAfterPageLoad
-    if (call.hasOption("preShowScript") && !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))) {
+    if (
+      call.hasOption("preShowScript") &&
+      !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
+    ) {
       call.reject("preShowScript requires isPresentAfterPageLoad to be true");
       return;
     }
@@ -512,10 +546,12 @@ public class InAppBrowserPlugin
       options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
     } else {
       // Reject if closeModal is false but closeModal options are provided
-      if (call.hasOption("closeModalTitle") || 
-          call.hasOption("closeModalDescription") || 
-          call.hasOption("closeModalOk") || 
-          call.hasOption("closeModalCancel")) {
+      if (
+        call.hasOption("closeModalTitle") ||
+        call.hasOption("closeModalDescription") ||
+        call.hasOption("closeModalOk") ||
+        call.hasOption("closeModalCancel")
+      ) {
         call.reject("closeModal options require closeModal to be true");
         return;
       }
@@ -531,10 +567,14 @@ public class InAppBrowserPlugin
     // Validate buttonNearDone compatibility with toolbar type
     if (call.hasOption("buttonNearDone")) {
       String toolbarType = options.getToolbarType();
-      if (TextUtils.equals(toolbarType, "activity") || 
-          TextUtils.equals(toolbarType, "navigation") || 
-          TextUtils.equals(toolbarType, "blank")) {
-        call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType);
+      if (
+        TextUtils.equals(toolbarType, "activity") ||
+        TextUtils.equals(toolbarType, "navigation") ||
+        TextUtils.equals(toolbarType, "blank")
+      ) {
+        call.reject(
+          "buttonNearDone is not compatible with toolbarType: " + toolbarType
+        );
         return;
       }
     }

@@ -15,7 +15,7 @@ public class Options {
 
     public enum AllIconTypes {
       ASSET,
-      VECTOR
+      VECTOR,
     }
 
     private final AllIconTypes iconTypeEnum;
@@ -56,7 +56,7 @@ public class Options {
 
       String iconType = android.getString("iconType", "asset");
       AllIconTypes iconTypeEnum;
-      
+
       // Validate and process icon type
       if ("asset".equals(iconType)) {
         iconTypeEnum = AllIconTypes.ASSET;
@@ -78,7 +78,7 @@ public class Options {
       // For asset type, verify the file exists
       if (iconTypeEnum == AllIconTypes.ASSET) {
         InputStream fileInputString = null;
-        
+
         try {
           // Try to find in public folder first
           try {
@@ -108,12 +108,14 @@ public class Options {
       // For vector type, we don't validate here since resources are checked at runtime
       else if (iconTypeEnum == AllIconTypes.VECTOR) {
         // Vector resources will be validated when used
-        System.out.println("Vector resource will be validated at runtime: " + icon);
+        System.out.println(
+          "Vector resource will be validated at runtime: " + icon
+        );
       }
-      
+
       Integer width = android.getInteger("width", 24);
       Integer height = android.getInteger("height", 24);
-      
+
       final ButtonNearDone buttonNearDone1 = new ButtonNearDone(
         iconTypeEnum,
         iconType,
@@ -127,7 +129,7 @@ public class Options {
     public AllIconTypes getIconTypeEnum() {
       return iconTypeEnum;
     }
-    
+
     public String getIconType() {
       return iconType;
     }
