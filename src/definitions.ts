@@ -142,6 +142,16 @@ export interface OpenWebViewOptions {
    */
   credentials?: Credentials;
   /**
+   * materialPicker: if true, uses Material Design theme for date and time pickers on Android.
+   * This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.
+   * @since 6.11.0
+   * @default false
+   * @example
+   * materialPicker: true
+   * Test URL: https://show-picker.glitch.me/demo.html
+   */
+  materialPicker?: boolean;
+  /**
    * JavaScript Interface:
    * The webview automatically injects a JavaScript interface providing:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme with Material Components -->
+    <style name="InAppBrowserMaterialTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Customize your theme here -->
+        <item name="colorPrimary">@android:color/holo_blue_dark</item>
+        <item name="colorPrimaryDark">@android:color/holo_blue_dark</item>
+        <item name="colorAccent">@android:color/holo_blue_dark</item>
+        
+        <!-- Force Material Design date and time pickers -->
+        <item name="android:datePickerStyle">@style/MaterialDatePickerStyle</item>
+        <item name="android:timePickerStyle">@style/MaterialTimePickerStyle</item>
+        <item name="materialCalendarStyle">@style/Widget.MaterialComponents.MaterialCalendar</item>
+        <item name="materialCalendarFullscreenTheme">@style/ThemeOverlay.MaterialComponents.MaterialCalendar.Fullscreen</item>
+        <item name="materialCalendarTheme">@style/ThemeOverlay.MaterialComponents.MaterialCalendar</item>
+    </style>
+
+    <!-- Date Picker Style -->
+    <style name="MaterialDatePickerStyle" parent="@android:style/Widget.Material.DatePicker">
+        <item name="android:datePickerMode">calendar</item>
+    </style>
+
+    <!-- Time Picker Style -->
+    <style name="MaterialTimePickerStyle" parent="@android:style/Widget.Material.TimePicker">
+        <item name="android:timePickerMode">clock</item>
+    </style>
+</resources> 

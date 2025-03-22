@@ -14,10 +14,8 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Picture;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
-import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.text.TextUtils;
@@ -91,6 +89,7 @@ public class WebViewDialog extends Dialog {
   private final Context _context;
   public Activity activity;
   private boolean isInitialized = false;
+  private boolean datePickerInjected = false; // Track if we've injected date picker fixes
   private final WebView capacitorWebView;
   private final Map<String, ProxiedRequest> proxiedRequestsHashmap =
     new HashMap<>();
@@ -121,7 +120,11 @@ public class WebViewDialog extends Dialog {
     PermissionHandler permissionHandler,
     WebView capacitorWebView
   ) {
-    super(context, theme);
+    // Use Material theme only if materialPicker is enabled
+    super(
+      context,
+      options.getMaterialPicker() ? R.style.InAppBrowserMaterialTheme : theme
+    );
     this._options = options;
     this._context = context;
     this.permissionHandler = permissionHandler;
@@ -388,6 +391,22 @@ public class WebViewDialog extends Dialog {
           if (currentPermissionRequest != null) {
             currentPermissionRequest.deny();
             currentPermissionRequest = null;
+          }
+        }
+
+        // This method will be called at page load, a good place to inject customizations
+        @Override
+        public void onProgressChanged(WebView view, int newProgress) {
+          super.onProgressChanged(view, newProgress);
+
+          // When the page is almost loaded, inject our date picker customization
+          // Only if materialPicker option is enabled
+          if (
+            newProgress > 75 &&
+            !datePickerInjected &&
+            _options.getMaterialPicker()
+          ) {
+            injectDatePickerFixes();
           }
         }
       }
@@ -1734,5 +1753,36 @@ public class WebViewDialog extends Dialog {
       // Ignore and fallback to light theme
     }
     return false;
+  }
+
+  private void injectDatePickerFixes() {
+    if (_webView == null || datePickerInjected) {
+      return;
+    }
+
+    datePickerInjected = true;
+
+    // This script adds minimal fixes for date inputs to use Material Design
+    String script =
+      "(function() {\n" +
+      "  // Find all date inputs\n" +
+      "  const dateInputs = document.querySelectorAll('input[type=\"date\"]');\n" +
+      "  dateInputs.forEach(input => {\n" +
+      "    // Ensure change events propagate correctly\n" +
+      "    let lastValue = input.value;\n" +
+      "    input.addEventListener('change', () => {\n" +
+      "      if (input.value !== lastValue) {\n" +
+      "        lastValue = input.value;\n" +
+      "        // Dispatch an input event to ensure frameworks detect the change\n" +
+      "        input.dispatchEvent(new Event('input', { bubbles: true }));\n" +
+      "      }\n" +
+      "    });\n" +
+      "  });\n" +
+      "})();";
+
+    // Execute the script in the WebView
+    _webView.post(() -> _webView.evaluateJavascript(script, null));
+
+    Log.d("InAppBrowser", "Applied minimal date picker fixes");
   }
 }
