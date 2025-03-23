@@ -173,6 +173,15 @@ public class Options {
   private String toolbarTextColor;
   private Pattern proxyRequestsPattern = null;
   private boolean materialPicker = false;
+  private int textZoom = 100; // Default text zoom is 100%
+
+  public int getTextZoom() {
+    return textZoom;
+  }
+
+  public void setTextZoom(int textZoom) {
+    this.textZoom = textZoom;
+  }
 
   public boolean getMaterialPicker() {
     return materialPicker;

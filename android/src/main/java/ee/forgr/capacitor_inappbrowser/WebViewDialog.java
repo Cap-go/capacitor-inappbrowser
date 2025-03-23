@@ -310,6 +310,11 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
     _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+    // Set text zoom if specified in options
+    if (_options.getTextZoom() > 0) {
+      _webView.getSettings().setTextZoom(_options.getTextZoom());
+    }
+
     _webView.setWebViewClient(new WebViewClient());
 
     _webView.setWebChromeClient(

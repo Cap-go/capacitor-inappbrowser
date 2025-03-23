@@ -461,6 +461,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
+            // Set text zoom if specified
+            if let textZoom = call.getInt("textZoom") {
+                webViewController.textZoom = textZoom
+            }
+
             // Set closeModal properties after proper initialization
             if closeModal {
                 webViewController.closeModal = true
@@ -524,6 +529,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
                 webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
                 webViewController.updateStatusBarStyle()
+
             }
 
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
@@ -565,6 +571,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                         navController.view.backgroundColor = backgroundColor
                     }
                 }
+
             }
 
             // We don't use the toolbar anymore, always hide it

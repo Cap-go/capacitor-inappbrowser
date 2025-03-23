@@ -144,7 +144,7 @@ export interface OpenWebViewOptions {
   /**
    * materialPicker: if true, uses Material Design theme for date and time pickers on Android.
    * This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.
-   * @since 6.11.0
+   * @since 7.4.1
    * @default false
    * @example
    * materialPicker: true
@@ -404,6 +404,16 @@ export interface OpenWebViewOptions {
       height?: number;
     };
   };
+  /**
+   * textZoom: sets the text zoom of the page in percent.
+   * Allows users to increase or decrease the text size for better readability.
+   * @since 7.6.0
+   * @default 100
+   * @example
+   * textZoom: 120
+   * Test URL: https://capgo.app
+   */
+  textZoom?: number;
 }
 
 export interface InAppBrowserPlugin {
