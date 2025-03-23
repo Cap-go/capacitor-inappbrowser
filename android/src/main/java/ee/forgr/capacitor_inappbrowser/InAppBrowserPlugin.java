@@ -792,7 +792,6 @@ public class InAppBrowserPlugin
                 new JSObject().put("url", webViewDialog.getUrl())
               );
               webViewDialog.dismiss();
-              webViewDialog.destroy();
               webViewDialog = null;
             } else {
               Intent intent = new Intent(
