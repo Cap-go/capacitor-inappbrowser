@@ -470,7 +470,7 @@ export interface InAppBrowserPlugin {
    */
   executeScript({ code }: { code: string }): Promise<void>;
   /**
-   * Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addListener("messageFromNative", listenerFunc: (event: Record<string, any>) => void)
+   * Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener("messageFromNative", listenerFunc: (event: Record<string, any>) => void)
    * detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
    * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
    */
