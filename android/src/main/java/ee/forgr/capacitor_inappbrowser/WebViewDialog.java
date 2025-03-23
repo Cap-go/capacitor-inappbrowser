@@ -18,11 +18,13 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.net.Uri;
 import android.net.http.SslError;
+import android.os.Build;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.HttpAuthHandler;
@@ -41,6 +43,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
@@ -291,6 +296,10 @@ public class WebViewDialog extends Dialog {
       );
 
     this._webView = findViewById(R.id.browser_view);
+
+    // Apply insets to fix edge-to-edge issues on Android 15+
+    applyInsets();
+
     _webView.addJavascriptInterface(
       new JavaScriptInterface(),
       "AndroidInterface"
@@ -442,6 +451,205 @@ public class WebViewDialog extends Dialog {
     if (!this._options.isPresentAfterPageLoad()) {
       show();
       _options.getPluginCall().resolve();
+    }
+  }
+
+  /**
+   * Apply window insets to the WebView to properly handle edge-to-edge display
+   * and fix status bar overlap issues on Android 15+
+   */
+  private void applyInsets() {
+    if (_webView == null) {
+      return;
+    }
+
+    // Check if we need Android 15+ specific fixes
+    boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
+
+    // Get parent view
+    ViewGroup parent = (ViewGroup) _webView.getParent();
+
+    // Find status bar color view and toolbar for Android 15+ specific handling
+    View statusBarColorView = findViewById(R.id.status_bar_color_view);
+    View toolbarView = findViewById(R.id.tool_bar);
+
+    // Special handling for Android 15+
+    if (isAndroid15Plus) {
+      // Get AppBarLayout which contains the toolbar
+      if (
+        toolbarView != null &&
+        toolbarView.getParent() instanceof
+        com.google.android.material.appbar.AppBarLayout
+      ) {
+        com.google.android.material.appbar.AppBarLayout appBarLayout =
+          (com.google.android.material.appbar.AppBarLayout) toolbarView.getParent();
+
+        // Remove elevation to eliminate shadows (only on Android 15+)
+        appBarLayout.setElevation(0);
+        appBarLayout.setStateListAnimator(null);
+        appBarLayout.setOutlineProvider(null);
+
+        // Determine background color to use
+        int backgroundColor = Color.BLACK; // Default fallback
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            backgroundColor = Color.parseColor(_options.getToolbarColor());
+          } catch (IllegalArgumentException e) {
+            Log.e(
+              "InAppBrowser",
+              "Invalid toolbar color, using black: " + e.getMessage()
+            );
+          }
+        } else {
+          // Follow system theme if no color specified
+          boolean isDarkTheme = isDarkThemeEnabled();
+          backgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+        }
+
+        // Apply fixes for Android 15+ using a delayed post
+        final int finalBgColor = backgroundColor;
+        _webView.post(() -> {
+          // Get status bar height
+          int statusBarHeight = 0;
+          int resourceId = getContext()
+            .getResources()
+            .getIdentifier("status_bar_height", "dimen", "android");
+          if (resourceId > 0) {
+            statusBarHeight = getContext()
+              .getResources()
+              .getDimensionPixelSize(resourceId);
+          }
+
+          // Fix status bar view
+          if (statusBarColorView != null) {
+            ViewGroup.LayoutParams params =
+              statusBarColorView.getLayoutParams();
+            params.height = statusBarHeight;
+            statusBarColorView.setLayoutParams(params);
+            statusBarColorView.setBackgroundColor(finalBgColor);
+            statusBarColorView.setVisibility(View.VISIBLE);
+          }
+
+          // Fix AppBarLayout position
+          ViewGroup.MarginLayoutParams params =
+            (ViewGroup.MarginLayoutParams) appBarLayout.getLayoutParams();
+          params.topMargin = statusBarHeight;
+          appBarLayout.setLayoutParams(params);
+          appBarLayout.setBackgroundColor(finalBgColor);
+        });
+      }
+    }
+
+    // Apply system insets to WebView (compatible with all Android versions)
+    ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
+      Insets insets = windowInsets.getInsets(
+        WindowInsetsCompat.Type.systemBars()
+      );
+      Boolean keyboardVisible = windowInsets.isVisible(
+        WindowInsetsCompat.Type.ime()
+      );
+
+      ViewGroup.MarginLayoutParams mlp =
+        (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+
+      // Apply margins based on Android version
+      if (isAndroid15Plus) {
+        // Android 15+ specific handling
+        if (keyboardVisible) {
+          mlp.bottomMargin = 0;
+        } else {
+          mlp.bottomMargin = insets.bottom;
+        }
+        // On Android 15+, don't add top margin as it's handled by AppBarLayout
+        mlp.topMargin = 0;
+      } else {
+        // Original behavior for older Android versions
+        mlp.topMargin = insets.top;
+        mlp.bottomMargin = insets.bottom;
+      }
+
+      // These stay the same for all Android versions
+      mlp.leftMargin = insets.left;
+      mlp.rightMargin = insets.right;
+      v.setLayoutParams(mlp);
+
+      return WindowInsetsCompat.CONSUMED;
+    });
+
+    // Handle window decoration - version-specific window settings
+    if (getWindow() != null) {
+      if (isAndroid15Plus) {
+        // Only for Android 15+: Set window to draw behind status bar
+        getWindow().setDecorFitsSystemWindows(false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+
+        // Set status bar text color
+        int backgroundColor;
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            backgroundColor = Color.parseColor(_options.getToolbarColor());
+            boolean isDarkBackground = isDarkColor(backgroundColor);
+            WindowInsetsControllerCompat controller =
+              new WindowInsetsControllerCompat(
+                getWindow(),
+                getWindow().getDecorView()
+              );
+            controller.setAppearanceLightStatusBars(!isDarkBackground);
+          } catch (IllegalArgumentException e) {
+            // Ignore color parsing errors
+          }
+        }
+      } else if (Build.VERSION.SDK_INT >= 30) {
+        // Android 11-14: Use original behavior
+        WindowInsetsControllerCompat controller =
+          new WindowInsetsControllerCompat(
+            getWindow(),
+            getWindow().getDecorView()
+          );
+
+        // Original behavior for status bar color
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            int toolbarColor = Color.parseColor(_options.getToolbarColor());
+            getWindow().setStatusBarColor(toolbarColor);
+
+            boolean isDarkBackground = isDarkColor(toolbarColor);
+            controller.setAppearanceLightStatusBars(!isDarkBackground);
+          } catch (IllegalArgumentException e) {
+            // Ignore color parsing errors
+          }
+        }
+      } else {
+        // Pre-Android 11: Original behavior with deprecated flags
+        getWindow()
+          .getDecorView()
+          .setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+          );
+
+        // Apply original status bar color logic
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            int toolbarColor = Color.parseColor(_options.getToolbarColor());
+            getWindow().setStatusBarColor(toolbarColor);
+          } catch (IllegalArgumentException e) {
+            // Ignore color parsing errors
+          }
+        }
+      }
     }
   }
 
