@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.6.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.4...7.6.5) (2025-03-24)
+
+
+### Bug Fixes
+
+* android media capture + ios open ([a65ad30](https://github.com/Cap-go/capacitor-inappbrowser/commit/a65ad30e128123836ecfd2c1f537d6b65f985542))
+
 ### [7.6.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.3...7.6.4) (2025-03-24)
 
 
