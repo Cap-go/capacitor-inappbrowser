@@ -460,7 +460,7 @@ export interface InAppBrowserPlugin {
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
-   * - `window.mobileApp.postMessage(obj)`: Sends a message from the webview to the app
+   * - `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
    * @since 0.1.0
    */

@@ -75,7 +75,7 @@ With this plugin you can send events from the main app to the inappbrowser and v
 
 > The data is sent as a JSON object, so no functions or other non-JSON-serializable types are allowed.
 
-#### Main app to inappbrowser
+#### Main app to inappbrowser, detail object is mendatory
 
 ```js
 InAppBrowser.postMessage({ detail: { message: "myMessage" } });
@@ -89,7 +89,7 @@ window.addEventListener("messageFromNative", (event) => {
 });
 ```
 
-#### Send event from inappbrowser to main app
+#### Send event from inappbrowser to main app, detail object is mendatory
 
 ```js
 window.mobileApp.postMessage({ detail: { message: "myMessage" } });
@@ -250,7 +250,7 @@ Open url in a new webview with toolbars, and enhanced capabilities, like camera 
 JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
 - `window.mobileApp.close()`: Closes the webview from JavaScript
-- `window.mobileApp.postMessage(obj)`: Sends a message from the webview to the app
+- `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
