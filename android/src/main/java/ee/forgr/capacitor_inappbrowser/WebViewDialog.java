@@ -611,8 +611,13 @@ public class WebViewDialog extends Dialog {
          */
         private void launchCameraWithPermission(boolean useFrontCamera) {
           try {
-            Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            if (takePictureIntent.resolveActivity(activity.getPackageManager()) != null) {
+            Intent takePictureIntent = new Intent(
+              MediaStore.ACTION_IMAGE_CAPTURE
+            );
+            if (
+              takePictureIntent.resolveActivity(activity.getPackageManager()) !=
+              null
+            ) {
               File photoFile = null;
               try {
                 photoFile = createImageFile();
@@ -628,30 +633,42 @@ public class WebViewDialog extends Dialog {
                   activity.getPackageName() + ".fileprovider",
                   photoFile
                 );
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
+                takePictureIntent.putExtra(
+                  MediaStore.EXTRA_OUTPUT,
+                  tempCameraUri
+                );
 
                 if (useFrontCamera) {
-                  takePictureIntent.putExtra("android.intent.extras.CAMERA_FACING", 1);
+                  takePictureIntent.putExtra(
+                    "android.intent.extras.CAMERA_FACING",
+                    1
+                  );
                 }
 
                 try {
                   if (activity instanceof androidx.activity.ComponentActivity) {
-                    androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-                    componentActivity.getActivityResultRegistry().register(
-                      "camera_capture",
-                      new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                      result -> {
-                        if (result.getResultCode() == Activity.RESULT_OK) {
-                          if (tempCameraUri != null) {
-                            mFilePathCallback.onReceiveValue(new Uri[] { tempCameraUri });
+                    androidx.activity.ComponentActivity componentActivity =
+                      (androidx.activity.ComponentActivity) activity;
+                    componentActivity
+                      .getActivityResultRegistry()
+                      .register(
+                        "camera_capture",
+                        new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                        result -> {
+                          if (result.getResultCode() == Activity.RESULT_OK) {
+                            if (tempCameraUri != null) {
+                              mFilePathCallback.onReceiveValue(
+                                new Uri[] { tempCameraUri }
+                              );
+                            }
+                          } else {
+                            mFilePathCallback.onReceiveValue(null);
                           }
-                        } else {
-                          mFilePathCallback.onReceiveValue(null);
+                          mFilePathCallback = null;
+                          tempCameraUri = null;
                         }
-                        mFilePathCallback = null;
-                        tempCameraUri = null;
-                      }
-                    ).launch(takePictureIntent);
+                      )
+                      .launch(takePictureIntent);
                   } else {
                     // Fallback for non-ComponentActivity
                     activity.startActivityForResult(
@@ -809,10 +826,10 @@ public class WebViewDialog extends Dialog {
       // Get AppBarLayout which contains the toolbar
       if (
         toolbarView != null &&
-                toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout
+        toolbarView.getParent() instanceof
+        com.google.android.material.appbar.AppBarLayout appBarLayout
       ) {
-
-          // Remove elevation to eliminate shadows (only on Android 15+)
+        // Remove elevation to eliminate shadows (only on Android 15+)
         appBarLayout.setElevation(0);
         appBarLayout.setStateListAnimator(null);
         appBarLayout.setOutlineProvider(null);
@@ -1133,51 +1150,11 @@ public class WebViewDialog extends Dialog {
 
     try {
       if (activity instanceof androidx.activity.ComponentActivity) {
-        androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-        componentActivity.getActivityResultRegistry().register(
-          "file_chooser",
-          new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-          result -> {
-            if (result.getResultCode() == Activity.RESULT_OK) {
-              Intent data = result.getData();
-              if (data != null) {
-                if (data.getClipData() != null) {
-                  // Handle multiple files
-                  int count = data.getClipData().getItemCount();
-                  Uri[] results = new Uri[count];
-                  for (int i = 0; i < count; i++) {
-                    results[i] = data.getClipData().getItemAt(i).getUri();
-                  }
-                  mFilePathCallback.onReceiveValue(results);
-                } else if (data.getData() != null) {
-                  // Handle single file
-                  mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
-                }
-              }
-            } else {
-              mFilePathCallback.onReceiveValue(null);
-            }
-            mFilePathCallback = null;
-          }
-        ).launch(Intent.createChooser(intent, "Select File"));
-      } else {
-        // Fallback for non-ComponentActivity
-        activity.startActivityForResult(
-          Intent.createChooser(intent, "Select File"),
-          FILE_CHOOSER_REQUEST_CODE
-        );
-      }
-    } catch (ActivityNotFoundException e) {
-      // If no app can handle the specific MIME type, try with a more generic one
-      Log.e(
-        "InAppBrowser",
-        "No app available for type: " + acceptType + ", trying with */*"
-      );
-      intent.setType("*/*");
-      try {
-        if (activity instanceof androidx.activity.ComponentActivity) {
-          androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-          componentActivity.getActivityResultRegistry().register(
+        androidx.activity.ComponentActivity componentActivity =
+          (androidx.activity.ComponentActivity) activity;
+        componentActivity
+          .getActivityResultRegistry()
+          .register(
             "file_chooser",
             new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
             result -> {
@@ -1194,7 +1171,9 @@ public class WebViewDialog extends Dialog {
                     mFilePathCallback.onReceiveValue(results);
                   } else if (data.getData() != null) {
                     // Handle single file
-                    mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
+                    mFilePathCallback.onReceiveValue(
+                      new Uri[] { data.getData() }
+                    );
                   }
                 }
               } else {
@@ -1202,7 +1181,57 @@ public class WebViewDialog extends Dialog {
               }
               mFilePathCallback = null;
             }
-          ).launch(Intent.createChooser(intent, "Select File"));
+          )
+          .launch(Intent.createChooser(intent, "Select File"));
+      } else {
+        // Fallback for non-ComponentActivity
+        activity.startActivityForResult(
+          Intent.createChooser(intent, "Select File"),
+          FILE_CHOOSER_REQUEST_CODE
+        );
+      }
+    } catch (ActivityNotFoundException e) {
+      // If no app can handle the specific MIME type, try with a more generic one
+      Log.e(
+        "InAppBrowser",
+        "No app available for type: " + acceptType + ", trying with */*"
+      );
+      intent.setType("*/*");
+      try {
+        if (activity instanceof androidx.activity.ComponentActivity) {
+          androidx.activity.ComponentActivity componentActivity =
+            (androidx.activity.ComponentActivity) activity;
+          componentActivity
+            .getActivityResultRegistry()
+            .register(
+              "file_chooser",
+              new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+              result -> {
+                if (result.getResultCode() == Activity.RESULT_OK) {
+                  Intent data = result.getData();
+                  if (data != null) {
+                    if (data.getClipData() != null) {
+                      // Handle multiple files
+                      int count = data.getClipData().getItemCount();
+                      Uri[] results = new Uri[count];
+                      for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
+                      }
+                      mFilePathCallback.onReceiveValue(results);
+                    } else if (data.getData() != null) {
+                      // Handle single file
+                      mFilePathCallback.onReceiveValue(
+                        new Uri[] { data.getData() }
+                      );
+                    }
+                  }
+                } else {
+                  mFilePathCallback.onReceiveValue(null);
+                }
+                mFilePathCallback = null;
+              }
+            )
+            .launch(Intent.createChooser(intent, "Select File"));
         } else {
           // Fallback for non-ComponentActivity
           activity.startActivityForResult(
@@ -1581,7 +1610,7 @@ public class WebViewDialog extends Dialog {
               }
             }
 
-              // Parse and render SVG
+            // Parse and render SVG
             SVG svg = SVG.getFromInputStream(inputStream);
             if (svg == null) {
               Log.e(
@@ -2370,22 +2399,22 @@ public class WebViewDialog extends Dialog {
 
     // This script adds minimal fixes for date inputs to use Material Design
     String script =
-            """
-                    (function() {
-                      // Find all date inputs
-                      const dateInputs = document.querySelectorAll('input[type="date"]');
-                      dateInputs.forEach(input => {
-                        // Ensure change events propagate correctly
-                        let lastValue = input.value;
-                        input.addEventListener('change', () => {
-                          if (input.value !== lastValue) {
-                            lastValue = input.value;
-                            // Dispatch an input event to ensure frameworks detect the change
-                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                          }
-                        });
-                      });
-                    })();""";
+      """
+      (function() {
+        // Find all date inputs
+        const dateInputs = document.querySelectorAll('input[type="date"]');
+        dateInputs.forEach(input => {
+          // Ensure change events propagate correctly
+          let lastValue = input.value;
+          input.addEventListener('change', () => {
+            if (input.value !== lastValue) {
+              lastValue = input.value;
+              // Dispatch an input event to ensure frameworks detect the change
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+        });
+      })();""";
 
     // Execute the script in the WebView
     _webView.post(() -> _webView.evaluateJavascript(script, null));
@@ -2444,13 +2473,17 @@ public class WebViewDialog extends Dialog {
 
   private File createImageFile() throws IOException {
     // Create an image file name
-    String timeStamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+    String timeStamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(
+      new java.util.Date()
+    );
     String imageFileName = "JPEG_" + timeStamp + "_";
-    File storageDir = activity.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+    File storageDir = activity.getExternalFilesDir(
+      Environment.DIRECTORY_PICTURES
+    );
     File image = File.createTempFile(
-      imageFileName,  /* prefix */
-      ".jpg",         /* suffix */
-      storageDir      /* directory */
+      imageFileName,/* prefix */
+      ".jpg",/* suffix */
+      storageDir/* directory */
     );
     return image;
   }

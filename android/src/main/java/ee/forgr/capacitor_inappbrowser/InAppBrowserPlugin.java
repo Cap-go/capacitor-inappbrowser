@@ -69,10 +69,11 @@ public class InAppBrowserPlugin
   @Override
   public void load() {
     super.load();
-    fileChooserLauncher = getActivity().registerForActivityResult(
-      new ActivityResultContracts.StartActivityForResult(),
-      this::handleFileChooserResult
-    );
+    fileChooserLauncher = getActivity()
+      .registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        this::handleFileChooserResult
+      );
   }
 
   private void handleFileChooserResult(ActivityResult result) {
@@ -175,8 +176,6 @@ public class InAppBrowserPlugin
     }
   }
 
-
-
   @PermissionCallback
   private void cameraPermissionCallback(PluginCall call) {
     if (getPermissionState("camera") == PermissionState.GRANTED) {
@@ -276,7 +275,10 @@ public class InAppBrowserPlugin
 
     // get the deeplink prevention, if provided
     Boolean preventDeeplink = call.getBoolean("preventDeeplink", null);
-    Boolean isPresentAfterPageLoad = call.getBoolean("isPresentAfterPageLoad", false);
+    Boolean isPresentAfterPageLoad = call.getBoolean(
+      "isPresentAfterPageLoad",
+      false
+    );
 
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
@@ -577,7 +579,10 @@ public class InAppBrowserPlugin
     }
 
     // Validate shareDisclaimer requires shareSubject
-    if (call.getData().has("shareDisclaimer") && !call.getData().has("shareSubject")) {
+    if (
+      call.getData().has("shareDisclaimer") &&
+      !call.getData().has("shareSubject")
+    ) {
       call.reject("shareDisclaimer requires shareSubject to be provided");
       return;
     }
@@ -714,9 +719,7 @@ public class InAppBrowserPlugin
       "Available resources: "
     );
     for (int i = 0; i < Math.min(10, drawables.length); i++) {
-      availableResources
-        .append(drawables[i].getName())
-        .append(", ");
+      availableResources.append(drawables[i].getName()).append(", ");
     }
     if (drawables.length > 10) {
       availableResources
