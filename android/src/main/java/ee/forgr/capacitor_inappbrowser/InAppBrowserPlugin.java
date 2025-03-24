@@ -12,6 +12,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
@@ -29,7 +32,6 @@ import com.getcapacitor.annotation.PermissionCallback;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
@@ -61,6 +63,53 @@ public class InAppBrowserPlugin
   private String currentUrl = "";
 
   private PermissionRequest currentPermissionRequest;
+
+  private ActivityResultLauncher<Intent> fileChooserLauncher;
+
+  @Override
+  public void load() {
+    super.load();
+    fileChooserLauncher = getActivity().registerForActivityResult(
+      new ActivityResultContracts.StartActivityForResult(),
+      this::handleFileChooserResult
+    );
+  }
+
+  private void handleFileChooserResult(ActivityResult result) {
+    if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
+      Uri[] results = null;
+      Intent data = result.getData();
+
+      if (result.getResultCode() == Activity.RESULT_OK) {
+        // Handle camera capture result
+        if (
+          webViewDialog.tempCameraUri != null &&
+          (data == null || data.getData() == null)
+        ) {
+          results = new Uri[] { webViewDialog.tempCameraUri };
+        }
+        // Handle regular file picker result
+        else if (data != null) {
+          if (data.getClipData() != null) {
+            // Handle multiple files
+            int count = data.getClipData().getItemCount();
+            results = new Uri[count];
+            for (int i = 0; i < count; i++) {
+              results[i] = data.getClipData().getItemAt(i).getUri();
+            }
+          } else if (data.getData() != null) {
+            // Handle single file
+            results = new Uri[] { data.getData() };
+          }
+        }
+      }
+
+      // Send the result to WebView and clean up
+      webViewDialog.mFilePathCallback.onReceiveValue(results);
+      webViewDialog.mFilePathCallback = null;
+      webViewDialog.tempCameraUri = null;
+    }
+  }
 
   public void handleMicrophonePermissionRequest(PermissionRequest request) {
     this.currentPermissionRequest = request;
@@ -126,56 +175,7 @@ public class InAppBrowserPlugin
     }
   }
 
-  @Override
-  public void handleOnActivityResult(
-    int requestCode,
-    int resultCode,
-    Intent data
-  ) {
-    super.handleOnActivityResult(requestCode, resultCode, data);
 
-    // Handle file chooser result
-    if (requestCode == WebViewDialog.FILE_CHOOSER_REQUEST_CODE) {
-      if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
-        Uri[] results = null;
-
-        // Check if response is valid
-        if (resultCode == Activity.RESULT_OK) {
-          if (data != null) {
-            // Get the data
-            if (data.getClipData() != null) {
-              // Handle multiple files
-              int count = data.getClipData().getItemCount();
-              results = new Uri[count];
-              for (int i = 0; i < count; i++) {
-                results[i] = data.getClipData().getItemAt(i).getUri();
-              }
-            } else if (data.getData() != null) {
-              // Handle single file
-              results = new Uri[] { data.getData() };
-            }
-          }
-        }
-
-        // Send the result to WebView
-        webViewDialog.mFilePathCallback.onReceiveValue(results);
-        webViewDialog.mFilePathCallback = null;
-      }
-    }
-  }
-
-  @PermissionCallback
-  private void cameraPermissionCallback() {
-    if (getPermissionState("camera") == PermissionState.GRANTED) {
-      grantCameraPermission();
-    } else {
-      if (currentPermissionRequest != null) {
-        currentPermissionRequest.deny();
-        currentPermissionRequest = null;
-      }
-      // Handle the case where permission was not granted
-    }
-  }
 
   @PermissionCallback
   private void cameraPermissionCallback(PluginCall call) {
@@ -194,7 +194,23 @@ public class InAppBrowserPlugin
         currentPermissionRequest.deny();
         currentPermissionRequest = null;
       }
-      call.reject("Camera permission is required");
+
+      // Reject only if there's a call - could be null for WebViewDialog flow
+      if (call != null) {
+        call.reject("Camera permission is required");
+      }
+    }
+  }
+
+  @PermissionCallback
+  private void cameraPermissionCallback() {
+    if (getPermissionState("camera") == PermissionState.GRANTED) {
+      grantCameraPermission();
+    } else {
+      if (currentPermissionRequest != null) {
+        currentPermissionRequest.deny();
+        currentPermissionRequest = null;
+      }
     }
   }
 
@@ -210,15 +226,16 @@ public class InAppBrowserPlugin
   CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
     @Override
     public void onCustomTabsServiceConnected(
-      @NonNull ComponentName name,
+      ComponentName name,
       CustomTabsClient client
     ) {
       customTabsClient = client;
-      client.warmup(0);
     }
 
     @Override
-    public void onServiceDisconnected(ComponentName name) {}
+    public void onServiceDisconnected(ComponentName name) {
+      customTabsClient = null;
+    }
   };
 
   @PluginMethod
@@ -252,9 +269,14 @@ public class InAppBrowserPlugin
   @PluginMethod
   public void open(PluginCall call) {
     String url = call.getString("url");
+    if (url == null) {
+      call.reject("URL is required");
+      return;
+    }
 
     // get the deeplink prevention, if provided
     Boolean preventDeeplink = call.getBoolean("preventDeeplink", null);
+    Boolean isPresentAfterPageLoad = call.getBoolean("isPresentAfterPageLoad", false);
 
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
@@ -292,6 +314,10 @@ public class InAppBrowserPlugin
           tabsIntent.intent.setPackage(browserPackageName);
         }
       }
+    }
+
+    if (isPresentAfterPageLoad) {
+      tabsIntent.intent.putExtra("isPresentAfterPageLoad", true);
     }
 
     tabsIntent.launchUrl(getContext(), Uri.parse(url));
@@ -473,21 +499,7 @@ public class InAppBrowserPlugin
                 Log.e("InAppBrowser", "Vector resource not found: " + icon);
                 // List available drawable resources to help debugging
                 try {
-                  Field[] drawables = R.drawable.class.getFields();
-                  StringBuilder availableResources = new StringBuilder(
-                    "Available resources: "
-                  );
-                  for (int i = 0; i < Math.min(10, drawables.length); i++) {
-                    availableResources
-                      .append(drawables[i].getName())
-                      .append(", ");
-                  }
-                  if (drawables.length > 10) {
-                    availableResources
-                      .append("... (")
-                      .append(drawables.length - 10)
-                      .append(" more)");
-                  }
+                  final StringBuilder availableResources = getStringBuilder();
                   Log.d("InAppBrowser", availableResources.toString());
                 } catch (Exception e) {
                   Log.e(
@@ -534,7 +546,7 @@ public class InAppBrowserPlugin
 
     // Validate preShowScript requires isPresentAfterPageLoad
     if (
-      call.hasOption("preShowScript") &&
+      call.getData().has("preShowScript") &&
       !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
     ) {
       call.reject("preShowScript requires isPresentAfterPageLoad to be true");
@@ -553,10 +565,10 @@ public class InAppBrowserPlugin
     } else {
       // Reject if closeModal is false but closeModal options are provided
       if (
-        call.hasOption("closeModalTitle") ||
-        call.hasOption("closeModalDescription") ||
-        call.hasOption("closeModalOk") ||
-        call.hasOption("closeModalCancel")
+        call.getData().has("closeModalTitle") ||
+        call.getData().has("closeModalDescription") ||
+        call.getData().has("closeModalOk") ||
+        call.getData().has("closeModalCancel")
       ) {
         call.reject("closeModal options require closeModal to be true");
         return;
@@ -565,13 +577,13 @@ public class InAppBrowserPlugin
     }
 
     // Validate shareDisclaimer requires shareSubject
-    if (call.hasOption("shareDisclaimer") && !call.hasOption("shareSubject")) {
+    if (call.getData().has("shareDisclaimer") && !call.getData().has("shareSubject")) {
       call.reject("shareDisclaimer requires shareSubject to be provided");
       return;
     }
 
     // Validate buttonNearDone compatibility with toolbar type
-    if (call.hasOption("buttonNearDone")) {
+    if (call.getData().has("buttonNearDone")) {
       String toolbarType = options.getToolbarType();
       if (
         TextUtils.equals(toolbarType, "activity") ||
@@ -693,6 +705,26 @@ public class InAppBrowserPlugin
           }
         }
       );
+  }
+
+  @NonNull
+  private static StringBuilder getStringBuilder() {
+    Field[] drawables = R.drawable.class.getFields();
+    StringBuilder availableResources = new StringBuilder(
+      "Available resources: "
+    );
+    for (int i = 0; i < Math.min(10, drawables.length); i++) {
+      availableResources
+        .append(drawables[i].getName())
+        .append(", ");
+    }
+    if (drawables.length > 10) {
+      availableResources
+        .append("... (")
+        .append(drawables.length - 10)
+        .append(" more)");
+    }
+    return availableResources;
   }
 
   @PluginMethod

@@ -68,16 +68,6 @@ export interface OpenOptions {
    */
   url: string;
   /**
-   * Headers to send with the request.
-   * @since 0.1.0
-   */
-  headers?: Headers;
-  /**
-   * Credentials to send with the request and all subsequent requests for the same host.
-   * @since 6.1.0
-   */
-  credentials?: Credentials;
-  /**
    * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
    * @since 0.1.0
    */
@@ -418,7 +408,7 @@ export interface OpenWebViewOptions {
 
 export interface InAppBrowserPlugin {
   /**
-   * Open url in a new window fullscreen
+   * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
    * @since 0.1.0
    */
