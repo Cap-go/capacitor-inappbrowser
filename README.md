@@ -147,7 +147,7 @@ window.mobileApp.close();
 open(options: OpenOptions) => Promise<any>
 ```
 
-Open url in a new window fullscreen
+Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
 
 | Param         | Type                                                |
 | ------------- | --------------------------------------------------- |
@@ -479,24 +479,11 @@ Reload the current web page.
 
 #### OpenOptions
 
-| Prop                         | Type                                                | Description                                                                                                           | Since |
-| ---------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`url`**                    | <code>string</code>                                 | Target URL to load.                                                                                                   | 0.1.0 |
-| **`headers`**                | <code><a href="#headers">Headers</a></code>         | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
-| **`credentials`**            | <code><a href="#credentials">Credentials</a></code> | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.        | 6.1.0 |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                                | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
-| **`preventDeeplink`**        | <code>boolean</code>                                | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                | 0.1.0 |
-
-
-#### Headers
-
-
-#### Credentials
-
-| Prop           | Type                |
-| -------------- | ------------------- |
-| **`username`** | <code>string</code> |
-| **`password`** | <code>string</code> |
+| Prop                         | Type                 | Description                                                                                                           | Since |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **`url`**                    | <code>string</code>  | Target URL to load.                                                                                                   | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code> | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
+| **`preventDeeplink`**        | <code>boolean</code> | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                | 0.1.0 |
 
 
 #### ClearCookieOptions
@@ -557,6 +544,17 @@ Reload the current web page.
 | **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                            |                                                            | 6.9.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name |                                                            | 6.7.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                               | <code>100</code>                                           | 7.6.0  |
+
+
+#### Headers
+
+
+#### Credentials
+
+| Prop           | Type                |
+| -------------- | ------------------- |
+| **`username`** | <code>string</code> |
+| **`password`** | <code>string</code> |
 
 
 #### DisclaimerOptions
