@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.6.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.7...7.6.8) (2025-03-26)
+
+
+### Bug Fixes
+
+* deeplink issue ios and android ([9088de8](https://github.com/Cap-go/capacitor-inappbrowser/commit/9088de86a88a7c4424ba03ea4543ecbea707e94e))
+
 ### [7.6.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.6...7.6.7) (2025-03-24)
 
 
