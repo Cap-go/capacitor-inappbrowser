@@ -370,7 +370,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.source = .remote(url)
             webViewController.leftNavigationBarItemTypes = []
-            webViewController.toolbarItemTypes = []
 
             // Configure close button based on showArrow
             let showArrow = call.getBool("showArrow", false)
@@ -653,6 +652,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
+        self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
 
         self.currentPluginCall = call
 
@@ -667,36 +667,52 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
-
-        self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
-
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
-            let url = URL(string: urlString)
-
-            if self.isPresentAfterPageLoad {
-                self.webViewController = WKWebViewController.init(url: url!, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink)
-            } else {
-                self.webViewController = WKWebViewController.init()
-                self.webViewController?.setHeaders(headers: headers)
-                self.webViewController?.setCredentials(credentials: credentials)
-                self.webViewController?.setPreventDeeplink(preventDeeplink: preventDeeplink)
+            guard let url = URL(string: urlString) else {
+                call.reject("Invalid URL format")
+                return
             }
 
-            self.webViewController?.source = .remote(url!)
-            self.webViewController?.leftNavigationBarItemTypes = [.reload]
-            self.webViewController?.toolbarItemTypes = [.back, .forward, .activity]
-            self.webViewController?.capBrowserPlugin = self
-            self.webViewController?.hasDynamicTitle = true
-            self.navigationWebViewController = UINavigationController.init(rootViewController: self.webViewController!)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true)
+
+            guard let webViewController = self.webViewController else {
+                call.reject("Failed to initialize WebViewController")
+                return
+            }
+
+            webViewController.source = .remote(url)
+            webViewController.leftNavigationBarItemTypes = [.back, .forward, .reload]
+            webViewController.capBrowserPlugin = self
+            webViewController.hasDynamicTitle = true
+
+            self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
             self.navigationWebViewController?.navigationBar.isTranslucent = false
-            self.navigationWebViewController?.toolbar.isTranslucent = false
-            self.navigationWebViewController?.navigationBar.backgroundColor = .white
-            self.navigationWebViewController?.toolbar.backgroundColor = .white
-            self.navigationWebViewController?.toolbar.tintColor = .black
+
+            // Ensure no lines or borders appear by default
+            self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
+            self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
+            self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
+
+            // Use system appearance
+            let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
+            let backgroundColor = isDarkMode ? UIColor.black : UIColor.white
+            let textColor = isDarkMode ? UIColor.white : UIColor.black
+
+            // Apply colors
+            webViewController.setupStatusBarBackground(color: backgroundColor)
+            webViewController.tintColor = textColor
+            self.navigationWebViewController?.navigationBar.tintColor = textColor
+            self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
+            webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
+            webViewController.updateStatusBarStyle()
+
+            // Always hide toolbar to ensure no bottom bar
+            self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
+
             if !self.isPresentAfterPageLoad {
                 self.presentView()
             }

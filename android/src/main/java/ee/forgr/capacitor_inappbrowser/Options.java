@@ -174,6 +174,7 @@ public class Options {
   private Pattern proxyRequestsPattern = null;
   private boolean materialPicker = false;
   private int textZoom = 100; // Default text zoom is 100%
+  private boolean preventDeeplink = false;
 
   public int getTextZoom() {
     return textZoom;
@@ -403,5 +404,13 @@ public class Options {
 
   public void setPreShowScript(String preLoadScript) {
     this.preShowScript = preLoadScript;
+  }
+
+  public boolean getPreventDeeplink() {
+    return preventDeeplink;
+  }
+
+  public void setPreventDeeplink(boolean preventDeeplink) {
+    this.preventDeeplink = preventDeeplink;
   }
 }

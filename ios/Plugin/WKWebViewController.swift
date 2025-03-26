@@ -165,7 +165,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var preShowScript: String?
     open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
-    open var toolbarItemTypes: [BarButtonItemType] = [.back, .forward, .activity]
 
     // Status bar style to be applied
     open var statusBarStyle: UIStatusBarStyle = .default
@@ -374,14 +373,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             stopBarButtonItem.tintColor = tintColor
             activityBarButtonItem.tintColor = tintColor
             doneBarButtonItem.tintColor = tintColor
-            flexibleSpaceBarButtonItem.tintColor = tintColor
-
-            // Update toolbar items
-            if let items = toolbarItems {
-                for item in items {
-                    item.tintColor = tintColor
-                }
-            }
 
             // Update navigation items
             if let leftItems = navigationItem.leftBarButtonItems {
@@ -431,13 +422,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
                     // Update all buttons
                     updateButtonTintColors()
-                }
-            }
-
-            if let toolbar = navigationController?.toolbar {
-                if toolbar.backgroundColor == UIColor.black || toolbar.backgroundColor == UIColor.white {
-                    toolbar.backgroundColor = isDarkMode ? UIColor.black : UIColor.white
-                    toolbar.tintColor = textColor
                 }
             }
         }
@@ -595,9 +579,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Don't force toolbar visibility
             if self.viewHeightPortrait == nil {
                 self.viewHeightPortrait = self.view.safeAreaLayoutGuide.layoutFrame.size.height
-                if toolbarItemTypes.count == 0 {
-                    self.viewHeightPortrait! += bottomPadding
-                }
+                self.viewHeightPortrait! += bottomPadding
                 if self.navigationController?.navigationBar.isHidden == true {
                     self.viewHeightPortrait! += topPadding
                 }
@@ -607,9 +589,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Don't force toolbar visibility
             if self.viewHeightLandscape == nil {
                 self.viewHeightLandscape = self.view.safeAreaLayoutGuide.layoutFrame.size.height
-                if toolbarItemTypes.count == 0 {
-                    self.viewHeightLandscape! += bottomPadding
-                }
+                self.viewHeightLandscape! += bottomPadding
                 if self.navigationController?.navigationBar.isHidden == true {
                     self.viewHeightLandscape! += topPadding
                 }
@@ -956,79 +936,6 @@ fileprivate extension WKWebViewController {
 
         navigationItem.rightBarButtonItems = rightBarButtons
 
-        // Create toolbar items
-        if !toolbarItemTypes.isEmpty {
-            // Check if toolbar has back and forward buttons
-            let hasBackButton = toolbarItemTypes.contains(where: {
-                if case .back = $0 { return true }
-                return false
-            })
-
-            let hasForwardButton = toolbarItemTypes.contains(where: {
-                if case .forward = $0 { return true }
-                return false
-            })
-
-            let hasReloadButton = toolbarItemTypes.contains(where: {
-                if case .reload = $0 { return true }
-                return false
-            })
-
-            if hasBackButton && hasForwardButton {
-                // Create Android-like toolbar with evenly spaced buttons
-                var items: [UIBarButtonItem] = []
-                let flexSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-
-                // Add spacing before back button
-                items.append(flexSpace)
-
-                // Add back button
-                items.append(backBarButtonItem)
-
-                // Add spacing between buttons
-                items.append(flexSpace)
-
-                // Add forward button
-                items.append(forwardBarButtonItem)
-
-                // Add spacing between buttons
-                items.append(flexSpace)
-
-                // Add reload button if present
-                if hasReloadButton {
-                    items.append(reloadBarButtonItem)
-                    items.append(flexSpace)
-                }
-
-                setToolbarItems(items, animated: true)
-            } else {
-                // For other toolbar types, map the items directly
-                let items = toolbarItemTypes.map { type -> UIBarButtonItem in
-                    switch type {
-                    case .back:
-                        return backBarButtonItem
-                    case .forward:
-                        return forwardBarButtonItem
-                    case .reload:
-                        return reloadBarButtonItem
-                    case .stop:
-                        return stopBarButtonItem
-                    case .activity:
-                        return activityBarButtonItem
-                    case .done:
-                        return doneBarButtonItem
-                    case .flexibleSpace:
-                        return flexibleSpaceBarButtonItem
-                    case .custom:
-                        return UIBarButtonItem()
-                    }
-                }
-                setToolbarItems(items, animated: true)
-            }
-        } else {
-            setToolbarItems([], animated: false)
-        }
-
         // After all buttons are set up, apply tint color
         updateButtonTintColors()
     }
@@ -1052,11 +959,6 @@ fileprivate extension WKWebViewController {
         }
 
         let isLoading = webView?.isLoading ?? false
-        toolbarItems = toolbarItems?.map {
-            barButtonItem -> UIBarButtonItem in
-            return updateReloadBarButtonItem(barButtonItem, isLoading)
-        }
-
         navigationItem.leftBarButtonItems = navigationItem.leftBarButtonItems?.map {
             barButtonItem -> UIBarButtonItem in
             return updateReloadBarButtonItem(barButtonItem, isLoading)
@@ -1071,9 +973,8 @@ fileprivate extension WKWebViewController {
     func setUpState() {
         navigationController?.setNavigationBarHidden(false, animated: true)
 
-        // Only show toolbar if there are toolbar items
-        let hideToolbar = toolbarItemTypes.isEmpty
-        navigationController?.setToolbarHidden(hideToolbar, animated: true)
+        // Always hide toolbar since we never want it
+        navigationController?.setToolbarHidden(true, animated: true)
 
         // Set tint colors but don't override specific colors
         if tintColor == nil {
@@ -1082,12 +983,10 @@ fileprivate extension WKWebViewController {
             let textColor = isDarkMode ? UIColor.white : UIColor.black
 
             navigationController?.navigationBar.tintColor = textColor
-            navigationController?.toolbar.tintColor = textColor
             progressView?.progressTintColor = textColor
         } else {
             progressView?.progressTintColor = tintColor
             navigationController?.navigationBar.tintColor = tintColor
-            navigationController?.toolbar.tintColor = tintColor
         }
     }
 
@@ -1095,9 +994,7 @@ fileprivate extension WKWebViewController {
         progressView?.progress = 0
 
         navigationController?.navigationBar.tintColor = previousNavigationBarState.tintColor
-        navigationController?.toolbar.tintColor = previousToolbarState.tintColor
 
-        navigationController?.setToolbarHidden(previousToolbarState.hidden, animated: true)
         navigationController?.setNavigationBarHidden(previousNavigationBarState.hidden, animated: true)
     }
 
@@ -1136,11 +1033,23 @@ fileprivate extension WKWebViewController {
     }
 
     func handleURLWithApp(_ url: URL, targetFrame: WKFrameInfo?) -> Bool {
+        // If preventDeeplink is true, don't try to open URLs in external apps
+        if self.preventDeeplink {
+            return false
+        }
+
         let hosts = UrlsHandledByApp.hosts
         let schemes = UrlsHandledByApp.schemes
         let blank = UrlsHandledByApp.blank
 
         var tryToOpenURLWithApp = false
+
+        // Handle all non-http(s) schemes by default
+        if let scheme = url.scheme?.lowercased(), !scheme.hasPrefix("http") {
+            tryToOpenURLWithApp = true
+        }
+
+        // Also handle specific hosts and schemes from UrlsHandledByApp
         if let host = url.host, hosts.contains(host) {
             tryToOpenURLWithApp = true
         }
