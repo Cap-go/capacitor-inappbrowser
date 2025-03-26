@@ -1878,11 +1878,16 @@ public class WebViewDialog extends Dialog {
           WebView view,
           WebResourceRequest request
         ) {
-          //          HashMap<String, String> map = new HashMap<>();
-          //          map.put("x-requested-with", null);
-          //          view.loadUrl(request.getUrl().toString(), map);
           Context context = view.getContext();
           String url = request.getUrl().toString();
+          Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
+          // If preventDeeplink is true, don't handle any non-http(s) URLs
+          if (_options.getPreventDeeplink()) {
+            Log.d("InAppBrowser", "preventDeeplink is true");
+            if (!url.startsWith("https://") && !url.startsWith("http://")) {
+              return true;
+            }
+          }
 
           if (!url.startsWith("https://") && !url.startsWith("http://")) {
             try {

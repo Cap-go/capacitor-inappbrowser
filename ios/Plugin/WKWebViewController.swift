@@ -1033,11 +1033,23 @@ fileprivate extension WKWebViewController {
     }
 
     func handleURLWithApp(_ url: URL, targetFrame: WKFrameInfo?) -> Bool {
+        // If preventDeeplink is true, don't try to open URLs in external apps
+        if self.preventDeeplink {
+            return false
+        }
+
         let hosts = UrlsHandledByApp.hosts
         let schemes = UrlsHandledByApp.schemes
         let blank = UrlsHandledByApp.blank
 
         var tryToOpenURLWithApp = false
+
+        // Handle all non-http(s) schemes by default
+        if let scheme = url.scheme?.lowercased(), !scheme.hasPrefix("http") {
+            tryToOpenURLWithApp = true
+        }
+
+        // Also handle specific hosts and schemes from UrlsHandledByApp
         if let host = url.host, hosts.contains(host) {
             tryToOpenURLWithApp = true
         }

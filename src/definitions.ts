@@ -404,6 +404,15 @@ export interface OpenWebViewOptions {
    * Test URL: https://capgo.app
    */
   textZoom?: number;
+  /**
+   * preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.
+   * @since 0.1.0
+   * @default false
+   * @example
+   * preventDeeplink: true
+   * Test URL: https://aasa-tester.capgo.app/
+   */
+  preventDeeplink?: boolean;
 }
 
 export interface InAppBrowserPlugin {
