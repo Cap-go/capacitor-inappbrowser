@@ -68,16 +68,6 @@ export interface OpenOptions {
    */
   url: string;
   /**
-   * Headers to send with the request.
-   * @since 0.1.0
-   */
-  headers?: Headers;
-  /**
-   * Credentials to send with the request and all subsequent requests for the same host.
-   * @since 6.1.0
-   */
-  credentials?: Credentials;
-  /**
    * if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
    * @since 0.1.0
    */
@@ -414,11 +404,20 @@ export interface OpenWebViewOptions {
    * Test URL: https://capgo.app
    */
   textZoom?: number;
+  /**
+   * preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.
+   * @since 0.1.0
+   * @default false
+   * @example
+   * preventDeeplink: true
+   * Test URL: https://aasa-tester.capgo.app/
+   */
+  preventDeeplink?: boolean;
 }
 
 export interface InAppBrowserPlugin {
   /**
-   * Open url in a new window fullscreen
+   * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
    * @since 0.1.0
    */
@@ -460,7 +459,7 @@ export interface InAppBrowserPlugin {
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
-   * - `window.mobileApp.postMessage(obj)`: Sends a message from the webview to the app
+   * - `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
    * @since 0.1.0
    */
@@ -470,7 +469,7 @@ export interface InAppBrowserPlugin {
    */
   executeScript({ code }: { code: string }): Promise<void>;
   /**
-   * Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addListener("messageFromNative", listenerFunc: (event: Record<string, any>) => void)
+   * Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener("messageFromNative", listenerFunc: (event: Record<string, any>) => void)
    * detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
    * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
    */

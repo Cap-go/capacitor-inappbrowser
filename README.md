@@ -107,7 +107,7 @@ Add the following to your `Info.plist` file:
 open(options: OpenOptions) => Promise<any>
 ```
 
-Open url in a new window fullscreen
+Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
 
 | Param         | Type                                                |
 | ------------- | --------------------------------------------------- |
@@ -210,7 +210,7 @@ Open url in a new webview with toolbars, and enhanced capabilities, like camera 
 JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
 - `window.mobileApp.close()`: Closes the webview from JavaScript
-- `window.mobileApp.postMessage(obj)`: Sends a message from the webview to the app
+- `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
@@ -244,7 +244,7 @@ Injects JavaScript code into the InAppBrowser window.
 postMessage(options: { detail: Record<string, any>; }) => Promise<void>
 ```
 
-Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addListener("messageFromNative", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
+Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener("messageFromNative", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
 detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
 Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
 
@@ -439,24 +439,11 @@ Reload the current web page.
 
 #### OpenOptions
 
-| Prop                         | Type                                                | Description                                                                                                           | Since |
-| ---------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`url`**                    | <code>string</code>                                 | Target URL to load.                                                                                                   | 0.1.0 |
-| **`headers`**                | <code><a href="#headers">Headers</a></code>         | <a href="#headers">Headers</a> to send with the request.                                                              | 0.1.0 |
-| **`credentials`**            | <code><a href="#credentials">Credentials</a></code> | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.        | 6.1.0 |
-| **`isPresentAfterPageLoad`** | <code>boolean</code>                                | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
-| **`preventDeeplink`**        | <code>boolean</code>                                | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                | 0.1.0 |
-
-
-#### Headers
-
-
-#### Credentials
-
-| Prop           | Type                |
-| -------------- | ------------------- |
-| **`username`** | <code>string</code> |
-| **`password`** | <code>string</code> |
+| Prop                         | Type                 | Description                                                                                                           | Since |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **`url`**                    | <code>string</code>  | Target URL to load.                                                                                                   | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code> | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
+| **`preventDeeplink`**        | <code>boolean</code> | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                | 0.1.0 |
 
 
 #### ClearCookieOptions
@@ -517,6 +504,18 @@ Reload the current web page.
 | **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                            |                                                            | 6.9.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name |                                                            | 6.7.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                               | <code>100</code>                                           | 7.6.0  |
+| **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                | <code>false</code>                                         | 0.1.0  |
+
+
+#### Headers
+
+
+#### Credentials
+
+| Prop           | Type                |
+| -------------- | ------------------- |
+| **`username`** | <code>string</code> |
+| **`password`** | <code>string</code> |
 
 
 #### DisclaimerOptions
