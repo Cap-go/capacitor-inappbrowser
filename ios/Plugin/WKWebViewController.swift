@@ -112,6 +112,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
+    var capacitorStatusBar: UIView?
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -1179,6 +1180,10 @@ fileprivate extension WKWebViewController {
             self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }
+        if let capacitorStatusBar = capacitorStatusBar {
+			capBrowserPlugin?.bridge?.webView?.addSubview(capacitorStatusBar)
+			capBrowserPlugin?.bridge?.webView?.frame.origin.y = capacitorStatusBar.frame.height
+		}
     }
 
     @objc func doneDidClick(sender: AnyObject) {
