@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.6.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.9...7.6.10) (2025-03-29)
+
+
+### Bug Fixes
+
+* actually implement background color of the browser ([5b73513](https://github.com/Cap-go/capacitor-inappbrowser/commit/5b735133b1eb747a4cd1d150f89d3d1758378e13))
+
 ### [7.6.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.8...7.6.9) (2025-03-29)
 
 
