@@ -494,6 +494,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
             self.navigationWebViewController?.toolbar.setShadowImage(UIImage(), forToolbarPosition: .any)
 
+            // Handle web view background color
+            webViewController.view.backgroundColor = backgroundColor
+
             // Handle toolbar color
             if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
                 // If specific color provided, use it
