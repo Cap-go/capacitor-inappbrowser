@@ -20,6 +20,9 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Environment;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.Base64;
@@ -214,6 +217,36 @@ public class WebViewDialog extends Dialog {
     }
   }
 
+	public class PrintInterface {
+		private Context context;
+		private WebView webView;
+
+		public PrintInterface(Context context, WebView webView) {
+			this.context = context;
+			this.webView = webView;
+		}
+
+		@JavascriptInterface
+		public void print() {
+			// Run on UI thread since printing requires UI operations
+			((Activity) context).runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					// Create a print job from the WebView content
+					PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
+					String jobName = "Document_" + System.currentTimeMillis();
+
+					PrintDocumentAdapter printAdapter;
+
+					// For API 21+ (Lollipop and above)
+					printAdapter = webView.createPrintDocumentAdapter(jobName);
+
+					printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
+				}
+			});
+		}
+	}
+
   @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
   public void presentWebView() {
     requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -317,6 +350,7 @@ public class WebViewDialog extends Dialog {
       new PreShowScriptInterface(),
       "PreShowScriptInterface"
     );
+	_webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
     _webView.getSettings().setDatabaseEnabled(true);
@@ -1024,22 +1058,28 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-  private void injectJavaScriptInterface() {
-    String script =
-      "if (!window.mobileApp) { " +
-      "    window.mobileApp = { " +
-      "        postMessage: function(message) { " +
-      "            if (window.AndroidInterface) { " +
-      "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
-      "            } " +
-      "        }, " +
-      "        close: function() { " +
-      "            window.AndroidInterface.close(); " +
-      "        } " +
-      "    }; " +
-      "}";
-    _webView.evaluateJavascript(script, null);
-  }
+	private void injectJavaScriptInterface() {
+		String script =
+			"if (!window.mobileApp) { " +
+				"    window.mobileApp = { " +
+				"        postMessage: function(message) { " +
+				"            if (window.AndroidInterface) { " +
+				"                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
+				"            } " +
+				"        }, " +
+				"        close: function() { " +
+				"            window.AndroidInterface.close(); " +
+				"        } " +
+				"    }; " +
+				"} " +
+				// Override the window.print function to use our PrintInterface
+				"window.print = function() { " +
+				"    if (window.PrintInterface) { " +
+				"        window.PrintInterface.print(); " +
+				"    } " +
+				"};";
+		_webView.evaluateJavascript(script, null);
+	}
 
   private void injectPreShowScript() {
     //    String script =
