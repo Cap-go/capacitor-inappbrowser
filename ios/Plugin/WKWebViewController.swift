@@ -277,9 +277,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         // Check if custom image is provided
         if let image = activityBarButtonItemImage {
             let button = UIBarButtonItem(image: image.withRenderingMode(.alwaysTemplate),
-                                         style: .plain,
-                                         target: self,
-                                         action: #selector(activityDidClick(sender:)))
+                                            style: .plain,
+                                            target: self,
+                                            action: #selector(activityDidClick(sender:)))
 
             // Apply tint from navigation bar or from tintColor property
             if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
@@ -291,8 +291,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         } else {
             // Use system share icon
             let button = UIBarButtonItem(barButtonSystemItem: .action,
-                                         target: self,
-                                         action: #selector(activityDidClick(sender:)))
+                                            target: self,
+                                            action: #selector(activityDidClick(sender:)))
 
             // Apply tint from navigation bar or from tintColor property
             if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
@@ -342,6 +342,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView?.removeObserver(self, forKeyPath: titleKeyPath)
         }
         webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+    }
+        
+    override open func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        
+        if let capacitorStatusBar = capacitorStatusBar {
+            self.capBrowserPlugin?.bridge?.webView?.superview?.addSubview(capacitorStatusBar)
+            self.capBrowserPlugin?.bridge?.webView?.frame.origin.y = capacitorStatusBar.frame.height
+        }
     }
 
     override open func viewDidLoad() {
@@ -395,9 +404,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
                 // Create a properly tinted button
                 let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                                                 style: .plain,
-                                                 target: self,
-                                                 action: #selector(buttonNearDoneDidClick))
+                                                    style: .plain,
+                                                    target: self,
+                                                    action: #selector(buttonNearDoneDidClick))
                 buttonItem.tintColor = tintColor
 
                 // Add it to right items
@@ -435,7 +444,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     // Method to send a message from Swift to JavaScript
     open func postMessageToJS(message: [String: Any]) {
         if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let jsonString = String(data: jsonData, encoding: .utf8) {
             let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
             DispatchQueue.main.async {
                 self.webView?.evaluateJavaScript(script, completionHandler: nil)
@@ -1180,10 +1189,6 @@ fileprivate extension WKWebViewController {
             self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             dismiss(animated: true, completion: nil)
         }
-        if let capacitorStatusBar = capacitorStatusBar {
-			capBrowserPlugin?.bridge?.webView?.addSubview(capacitorStatusBar)
-			capBrowserPlugin?.bridge?.webView?.frame.origin.y = capacitorStatusBar.frame.height
-		}
     }
 
     @objc func doneDidClick(sender: AnyObject) {
@@ -1366,8 +1371,8 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         if let credentials = credentials,
-           challenge.protectionSpace.receivesCredentialSecurely,
-           let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
+            challenge.protectionSpace.receivesCredentialSecurely,
+            let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
             let urlCredential = URLCredential(user: credentials.username, password: credentials.password, persistence: .none)
             completionHandler(.useCredential, urlCredential)
         } else if let bypassedSSLHosts = bypassedSSLHosts, bypassedSSLHosts.contains(challenge.protectionSpace.host) {
@@ -1379,8 +1384,8 @@ extension WKWebViewController: WKNavigationDelegate {
                 return
             }
             /* allows to open links with self-signed certificates
-             Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
-             */
+                Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
+                */
             guard let serverTrust = challenge.protectionSpace.serverTrust  else {
                 completionHandler(.useCredential, nil)
                 return
