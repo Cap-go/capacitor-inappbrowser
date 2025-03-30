@@ -343,10 +343,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
         webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
     }
-        
+
     override open func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        
+
         if let capacitorStatusBar = capacitorStatusBar {
             self.capBrowserPlugin?.bridge?.webView?.superview?.addSubview(capacitorStatusBar)
             self.capBrowserPlugin?.bridge?.webView?.frame.origin.y = capacitorStatusBar.frame.height

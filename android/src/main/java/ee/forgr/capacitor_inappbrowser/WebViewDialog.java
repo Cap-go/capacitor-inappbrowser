@@ -329,7 +329,9 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
     // Set web view background color
-    int backgroundColor = _options.getBackgroundColor().equals("white") ? Color.WHITE : Color.BLACK;
+    int backgroundColor = _options.getBackgroundColor().equals("white")
+      ? Color.WHITE
+      : Color.BLACK;
     _webView.setBackgroundColor(backgroundColor);
 
     // Set text zoom if specified in options
