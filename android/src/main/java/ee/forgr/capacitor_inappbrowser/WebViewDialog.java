@@ -217,35 +217,43 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-	public class PrintInterface {
-		private Context context;
-		private WebView webView;
+  public class PrintInterface {
 
-		public PrintInterface(Context context, WebView webView) {
-			this.context = context;
-			this.webView = webView;
-		}
+    private Context context;
+    private WebView webView;
 
-		@JavascriptInterface
-		public void print() {
-			// Run on UI thread since printing requires UI operations
-			((Activity) context).runOnUiThread(new Runnable() {
-				@Override
-				public void run() {
-					// Create a print job from the WebView content
-					PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
-					String jobName = "Document_" + System.currentTimeMillis();
+    public PrintInterface(Context context, WebView webView) {
+      this.context = context;
+      this.webView = webView;
+    }
 
-					PrintDocumentAdapter printAdapter;
+    @JavascriptInterface
+    public void print() {
+      // Run on UI thread since printing requires UI operations
+      ((Activity) context).runOnUiThread(
+          new Runnable() {
+            @Override
+            public void run() {
+              // Create a print job from the WebView content
+              PrintManager printManager =
+                (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
+              String jobName = "Document_" + System.currentTimeMillis();
 
-					// For API 21+ (Lollipop and above)
-					printAdapter = webView.createPrintDocumentAdapter(jobName);
+              PrintDocumentAdapter printAdapter;
 
-					printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
-				}
-			});
-		}
-	}
+              // For API 21+ (Lollipop and above)
+              printAdapter = webView.createPrintDocumentAdapter(jobName);
+
+              printManager.print(
+                jobName,
+                printAdapter,
+                new PrintAttributes.Builder().build()
+              );
+            }
+          }
+        );
+    }
+  }
 
   @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
   public void presentWebView() {
@@ -350,7 +358,10 @@ public class WebViewDialog extends Dialog {
       new PreShowScriptInterface(),
       "PreShowScriptInterface"
     );
-	_webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
+    _webView.addJavascriptInterface(
+      new PrintInterface(this._context, _webView),
+      "PrintInterface"
+    );
     _webView.getSettings().setJavaScriptEnabled(true);
     _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
     _webView.getSettings().setDatabaseEnabled(true);
@@ -1058,28 +1069,28 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-	private void injectJavaScriptInterface() {
-		String script =
-			"if (!window.mobileApp) { " +
-				"    window.mobileApp = { " +
-				"        postMessage: function(message) { " +
-				"            if (window.AndroidInterface) { " +
-				"                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
-				"            } " +
-				"        }, " +
-				"        close: function() { " +
-				"            window.AndroidInterface.close(); " +
-				"        } " +
-				"    }; " +
-				"} " +
-				// Override the window.print function to use our PrintInterface
-				"window.print = function() { " +
-				"    if (window.PrintInterface) { " +
-				"        window.PrintInterface.print(); " +
-				"    } " +
-				"};";
-		_webView.evaluateJavascript(script, null);
-	}
+  private void injectJavaScriptInterface() {
+    String script =
+      "if (!window.mobileApp) { " +
+      "    window.mobileApp = { " +
+      "        postMessage: function(message) { " +
+      "            if (window.AndroidInterface) { " +
+      "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
+      "            } " +
+      "        }, " +
+      "        close: function() { " +
+      "            window.AndroidInterface.close(); " +
+      "        } " +
+      "    }; " +
+      "} " +
+      // Override the window.print function to use our PrintInterface
+      "window.print = function() { " +
+      "    if (window.PrintInterface) { " +
+      "        window.PrintInterface.print(); " +
+      "    } " +
+      "};";
+    _webView.evaluateJavascript(script, null);
+  }
 
   private void injectPreShowScript() {
     //    String script =
