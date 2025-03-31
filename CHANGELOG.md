@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.7.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.1...7.7.2) (2025-03-31)
+
+
+### Bug Fixes
+
+* printing in iOS ([5bba983](https://github.com/Cap-go/capacitor-inappbrowser/commit/5bba9837771d602a9ffd6cb6433c68ff310d7355))
+
 ### [7.7.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.0...7.7.1) (2025-03-30)
 
 ## [7.7.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.12...7.7.0) (2025-03-30)
