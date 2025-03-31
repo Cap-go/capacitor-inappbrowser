@@ -478,7 +478,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             semaphore.signal()
         } else if message.name == "close" {
             closeView()
-        }
+		} else if message.name == "magicPrint" {
+			if let webView = self.webView {
+				let printController = UIPrintInteractionController.shared
+
+				let printInfo = UIPrintInfo(dictionary: nil)
+				printInfo.outputType = .general
+				printInfo.jobName = "Print Job"
+
+				printController.printInfo = printInfo
+				printController.printFormatter = webView.viewPrintFormatter()
+
+				printController.present(animated: true, completionHandler: nil)
+			}
+		}
     }
 
     func injectJavaScriptInterface() {
@@ -496,9 +509,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         };
                 }
                 """
-        DispatchQueue.main.async {
-            self.webView?.evaluateJavaScript(script, completionHandler: nil)
-        }
+		DispatchQueue.main.async {
+			self.webView?.evaluateJavaScript(script) { result, error in
+				if let error = error {
+					print("JavaScript evaluation error: \(error)")
+				} else if let result = result {
+					print("JavaScript result: \(result)")
+				} else {
+					print("JavaScript executed with no result")
+				}
+			}
+		}
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -513,14 +534,35 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
         userContentController.add(self, name: "close")
+		 userContentController.add(self, name: "magicPrint")
+
+		// Inject JavaScript to override window.print
+		let script = WKUserScript(
+			source: """
+			window.print = function() {
+				window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
+			};
+			""",
+			injectionTime: .atDocumentStart,
+			forMainFrameOnly: false
+		)
+		userContentController.addUserScript(script)
+
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
+
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
-        if webView.responds(to: Selector(("setInspectable:"))) {
-            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
-            webView.perform(Selector(("setInspectable:")), with: isInspectable)
-        }
+//        if webView.responds(to: Selector(("setInspectable:"))) {
+//            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
+//            webView.perform(Selector(("setInspectable:")), with: isInspectable)
+//        }
+
+		if #available(iOS 16.4, *) {
+			webView.isInspectable = true
+		} else {
+			// Fallback on earlier versions
+		}
 
         if self.blankNavigationTab {
             // First add the webView to view hierarchy
