@@ -32,6 +32,11 @@ export enum ToolBarType {
    */
   ACTIVITY = "activity",
   /**
+   * Shows a simple toolbar with just a close button
+   * @since 7.6.8
+   */
+  COMPACT = "compact",
+  /**
    * Shows a full navigation toolbar with back/forward buttons
    * @since 0.1.0
    */
