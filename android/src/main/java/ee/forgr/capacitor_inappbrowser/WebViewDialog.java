@@ -76,6 +76,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
+import androidx.activity.result.ActivityResultLauncher;
 
 public class WebViewDialog extends Dialog {
 
@@ -127,12 +128,17 @@ public class WebViewDialog extends Dialog {
 
   private final PermissionHandler permissionHandler;
 
+  private final ActivityResultLauncher<Intent> fileChooserLauncher;
+  private final ActivityResultLauncher<Intent> cameraLauncher;
+
   public WebViewDialog(
     Context context,
     int theme,
     Options options,
     PermissionHandler permissionHandler,
-    WebView capacitorWebView
+    WebView capacitorWebView,
+    ActivityResultLauncher<Intent> fileChooserLauncher,
+    ActivityResultLauncher<Intent> cameraLauncher
   ) {
     // Use Material theme only if materialPicker is enabled
     super(
@@ -144,6 +150,8 @@ public class WebViewDialog extends Dialog {
     this.permissionHandler = permissionHandler;
     this.isInitialized = false;
     this.capacitorWebView = capacitorWebView;
+    this.fileChooserLauncher = fileChooserLauncher;
+    this.cameraLauncher = cameraLauncher;
   }
 
   // Add this class to provide safer JavaScript interface
@@ -270,7 +278,7 @@ public class WebViewDialog extends Dialog {
             // Set color based on toolbar color or dark mode
             if (
               _options.getToolbarColor() != null &&
-              !_options.getToolbarColor().isEmpty()
+                !_options.getToolbarColor().isEmpty()
             ) {
               try {
                 // Use explicitly provided toolbar color for status bar
@@ -336,7 +344,7 @@ public class WebViewDialog extends Dialog {
     _webView.setWebViewClient(new WebViewClient());
 
     _webView.setWebChromeClient(
-      new WebChromeClient() {
+      new MyWebChromeClient() {
         // Enable file open dialog
         @Override
         public boolean onShowFileChooser(
@@ -344,212 +352,15 @@ public class WebViewDialog extends Dialog {
           ValueCallback<Uri[]> filePathCallback,
           FileChooserParams fileChooserParams
         ) {
-          // Get the accept type safely
-          String acceptType;
-          if (
-            fileChooserParams.getAcceptTypes() != null &&
-            fileChooserParams.getAcceptTypes().length > 0 &&
-            !TextUtils.isEmpty(fileChooserParams.getAcceptTypes()[0])
-          ) {
-            acceptType = fileChooserParams.getAcceptTypes()[0];
-          } else {
-            acceptType = "*/*";
-          }
-
-          // DEBUG: Log details about the file chooser request
-          Log.d("InAppBrowser", "onShowFileChooser called");
-          Log.d("InAppBrowser", "Accept type: " + acceptType);
-          Log.d(
-            "InAppBrowser",
-            "Current URL: " +
-            (webView.getUrl() != null ? webView.getUrl() : "null")
-          );
-          Log.d(
-            "InAppBrowser",
-            "Original URL: " +
-            (webView.getOriginalUrl() != null
-                ? webView.getOriginalUrl()
-                : "null")
-          );
-          Log.d(
-            "InAppBrowser",
-            "Has camera permission: " +
-            (activity != null &&
-              activity.checkSelfPermission(
-                android.Manifest.permission.CAMERA
-              ) ==
-              android.content.pm.PackageManager.PERMISSION_GRANTED)
-          );
-
-          // Check if the file chooser is already open
-          if (mFilePathCallback != null) {
-            mFilePathCallback.onReceiveValue(null);
-            mFilePathCallback = null;
-          }
-
           mFilePathCallback = filePathCallback;
-
-          // Direct check for capture attribute in URL (fallback method)
-          boolean isCaptureInUrl;
-          String captureMode;
-          String currentUrl = webView.getUrl();
-
-          // Look for capture in URL parameters - sometimes the attribute shows up in URL
-          if (currentUrl != null && currentUrl.contains("capture=")) {
-            isCaptureInUrl = true;
-            captureMode = currentUrl.contains("capture=user")
-              ? "user"
-              : "environment";
-            Log.d("InAppBrowser", "Found capture in URL: " + captureMode);
-          } else {
-            captureMode = null;
-            isCaptureInUrl = false;
+          Intent intent = fileChooserParams.createIntent();
+          try {
+            openFileChooser(filePathCallback);
+          } catch (ActivityNotFoundException e) {
+            mFilePathCallback = null;
+            Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
+            return false;
           }
-
-          // For image inputs, try to detect capture attribute using JavaScript
-          if (acceptType.equals("image/*")) {
-            // Check if HTML content contains capture attribute on file inputs (synchronous check)
-            webView.evaluateJavascript(
-              "document.querySelector('input[type=\"file\"][capture]') !== null",
-              hasCaptureValue -> {
-                Log.d(
-                  "InAppBrowser",
-                  "Quick capture check: " + hasCaptureValue
-                );
-                if (Boolean.parseBoolean(hasCaptureValue.replace("\"", ""))) {
-                  Log.d(
-                    "InAppBrowser",
-                    "Found capture attribute in quick check"
-                  );
-                }
-              }
-            );
-
-            // Fixed JavaScript with proper error handling
-            String js =
-              "try {" +
-              "  (function() {" +
-              "    var captureAttr = null;" +
-              "    // Check active element first" +
-              "    if (document.activeElement && " +
-              "        document.activeElement.tagName === 'INPUT' && " +
-              "        document.activeElement.type === 'file') {" +
-              "      if (document.activeElement.hasAttribute('capture')) {" +
-              "        captureAttr = document.activeElement.getAttribute('capture') || 'environment';" +
-              "        return captureAttr;" +
-              "      }" +
-              "    }" +
-              "    // Try to find any input with capture attribute" +
-              "    var inputs = document.querySelectorAll('input[type=\"file\"][capture]');" +
-              "    if (inputs && inputs.length > 0) {" +
-              "      captureAttr = inputs[0].getAttribute('capture') || 'environment';" +
-              "      return captureAttr;" +
-              "    }" +
-              "    // Try to extract from HTML attributes" +
-              "    var allInputs = document.getElementsByTagName('input');" +
-              "    for (var i = 0; i < allInputs.length; i++) {" +
-              "      var input = allInputs[i];" +
-              "      if (input.type === 'file') {" +
-              "        if (input.hasAttribute('capture')) {" +
-              "          captureAttr = input.getAttribute('capture') || 'environment';" +
-              "          return captureAttr;" +
-              "        }" +
-              "        // Look for the accept attribute containing image/* as this might be a camera input" +
-              "        var acceptAttr = input.getAttribute('accept');" +
-              "        if (acceptAttr && acceptAttr.indexOf('image/*') >= 0) {" +
-              "          console.log('Found input with image/* accept');" +
-              "        }" +
-              "      }" +
-              "    }" +
-              "    return '';" +
-              "  })();" +
-              "} catch(e) { console.error('Capture detection error:', e); return ''; }";
-
-            webView.evaluateJavascript(js, value -> {
-              Log.d("InAppBrowser", "Capture attribute JS result: " + value);
-
-              // If we already found capture in URL, use that directly
-              if (isCaptureInUrl) {
-                Log.d("InAppBrowser", "Using capture from URL: " + captureMode);
-                launchCamera(captureMode.equals("user"));
-                return;
-              }
-
-              // Process JavaScript result
-              if (value != null && value.length() > 2) {
-                // Clean up the value (remove quotes)
-                String captureValue = value.replace("\"", "");
-                Log.d(
-                  "InAppBrowser",
-                  "Found capture attribute: " + captureValue
-                );
-
-                if (!captureValue.isEmpty()) {
-                  activity.runOnUiThread(() ->
-                    launchCamera(captureValue.equals("user"))
-                  );
-                  return;
-                }
-              }
-
-              // Look for hints in the web page source
-              Log.d("InAppBrowser", "Looking for camera hints in page content");
-              webView.evaluateJavascript(
-                "(function() { return document.documentElement.innerHTML; })()",
-                htmlSource -> {
-                  if (htmlSource != null && htmlSource.length() > 10) {
-                    boolean hasCameraOrSelfieKeyword =
-                      htmlSource.contains("capture=") ||
-                      htmlSource.contains("camera") ||
-                      htmlSource.contains("selfie");
-
-                    Log.d(
-                      "InAppBrowser",
-                      "Page contains camera keywords: " +
-                      hasCameraOrSelfieKeyword
-                    );
-
-                    if (
-                      hasCameraOrSelfieKeyword &&
-                      currentUrl != null &&
-                      (currentUrl.contains("selfie") ||
-                        currentUrl.contains("camera") ||
-                        currentUrl.contains("photo"))
-                    ) {
-                      Log.d(
-                        "InAppBrowser",
-                        "URL suggests camera usage, launching camera"
-                      );
-                      activity.runOnUiThread(() ->
-                        launchCamera(currentUrl.contains("selfie"))
-                      );
-                      return;
-                    }
-                  }
-
-                  // If all detection methods fail, fall back to regular file picker
-                  Log.d(
-                    "InAppBrowser",
-                    "No capture attribute detected, using file picker"
-                  );
-                  openFileChooser(
-                    filePathCallback,
-                    acceptType,
-                    fileChooserParams.getMode() ==
-                    FileChooserParams.MODE_OPEN_MULTIPLE
-                  );
-                }
-              );
-            });
-            return true;
-          }
-
-          // For non-image types, use regular file picker
-          openFileChooser(
-            filePathCallback,
-            acceptType,
-            fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE
-          );
           return true;
         }
 
@@ -558,52 +369,34 @@ public class WebViewDialog extends Dialog {
          * @param useFrontCamera true to use front camera, false for back camera
          */
         private void launchCamera(boolean useFrontCamera) {
-          Log.d(
-            "InAppBrowser",
-            "Launching camera, front camera: " + useFrontCamera
-          );
+          Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+          if (takePictureIntent.resolveActivity(_context.getPackageManager()) != null) {
+            File photoFile = null;
+            try {
+              photoFile = createImageFile();
+            } catch (IOException ex) {
+              Toast.makeText(_context, "Error creating image file", Toast.LENGTH_SHORT).show();
+            }
 
-          // First check if we have camera permission
-          if (activity != null && permissionHandler != null) {
-            // Create a temporary permission request to check camera permission
-            android.webkit.PermissionRequest tempRequest =
-              new android.webkit.PermissionRequest() {
-                @Override
-                public Uri getOrigin() {
-                  return Uri.parse("file:///android_asset/");
-                }
+            if (photoFile != null) {
+              tempCameraUri = FileProvider.getUriForFile(
+                _context,
+                _context.getPackageName() + ".fileprovider",
+                photoFile
+              );
+              takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
+              if (useFrontCamera) {
+                takePictureIntent.putExtra("android.intent.extras.CAMERA_FACING", 1);
+              }
 
-                @Override
-                public String[] getResources() {
-                  return new String[] {
-                    PermissionRequest.RESOURCE_VIDEO_CAPTURE,
-                  };
-                }
-
-                @Override
-                public void grant(String[] resources) {
-                  // Permission granted, now launch the camera
-                  launchCameraWithPermission(useFrontCamera);
-                }
-
-                @Override
-                public void deny() {
-                  // Permission denied, fall back to file picker
-                  Log.e(
-                    "InAppBrowser",
-                    "Camera permission denied, falling back to file picker"
-                  );
-                  fallbackToFilePicker();
-                }
-              };
-
-            // Request camera permission through the plugin
-            permissionHandler.handleCameraPermissionRequest(tempRequest);
-            return;
+              if (cameraLauncher != null) {
+                cameraLauncher.launch(takePictureIntent);
+              } else {
+                // Fallback for older Android versions
+                activity.startActivityForResult(takePictureIntent, FILE_CHOOSER_REQUEST_CODE);
+              }
+            }
           }
-
-          // If we can't request permission, try launching directly
-          launchCameraWithPermission(useFrontCamera);
         }
 
         /**
@@ -616,7 +409,7 @@ public class WebViewDialog extends Dialog {
             );
             if (
               takePictureIntent.resolveActivity(activity.getPackageManager()) !=
-              null
+                null
             ) {
               File photoFile = null;
               try {
@@ -710,35 +503,13 @@ public class WebViewDialog extends Dialog {
         // Grant permissions for cam
         @Override
         public void onPermissionRequest(final PermissionRequest request) {
-          Log.i(
-            "INAPPBROWSER",
-            "onPermissionRequest " + Arrays.toString(request.getResources())
-          );
-          final String[] requestedResources = request.getResources();
-          for (String r : requestedResources) {
-            Log.i("INAPPBROWSER", "requestedResources " + r);
-            if (r.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-              Log.i("INAPPBROWSER", "RESOURCE_VIDEO_CAPTURE req");
-              // Store the permission request
-              currentPermissionRequest = request;
-              // Initiate the permission request through the plugin
-              if (permissionHandler != null) {
-                permissionHandler.handleCameraPermissionRequest(request);
-              }
-              return; // Return here to avoid denying the request
-            } else if (r.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
-              Log.i("INAPPBROWSER", "RESOURCE_AUDIO_CAPTURE req");
-              // Store the permission request
-              currentPermissionRequest = request;
-              // Initiate the permission request through the plugin
-              if (permissionHandler != null) {
-                permissionHandler.handleMicrophonePermissionRequest(request);
-              }
-              return; // Return here to avoid denying the request
+          activity.runOnUiThread(() -> {
+            if (request.getResources()[0].equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+              permissionHandler.handleCameraPermissionRequest(request);
+            } else if (request.getResources()[0].equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+              permissionHandler.handleMicrophonePermissionRequest(request);
             }
-          }
-          // If no matching permission is found, deny the request
-          request.deny();
+          });
         }
 
         @Override
@@ -765,8 +536,8 @@ public class WebViewDialog extends Dialog {
           // Only if materialPicker option is enabled
           if (
             newProgress > 75 &&
-            !datePickerInjected &&
-            _options.getMaterialPicker()
+              !datePickerInjected &&
+              _options.getMaterialPicker()
           ) {
             injectDatePickerFixes();
           }
@@ -824,11 +595,9 @@ public class WebViewDialog extends Dialog {
     // Special handling for Android 15+
     if (isAndroid15Plus) {
       // Get AppBarLayout which contains the toolbar
-      if (
-        toolbarView != null &&
-        toolbarView.getParent() instanceof
-        com.google.android.material.appbar.AppBarLayout appBarLayout
-      ) {
+      if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout) {
+        com.google.android.material.appbar.AppBarLayout appBarLayout =
+          (com.google.android.material.appbar.AppBarLayout) toolbarView.getParent();
         // Remove elevation to eliminate shadows (only on Android 15+)
         appBarLayout.setElevation(0);
         appBarLayout.setStateListAnimator(null);
@@ -836,17 +605,11 @@ public class WebViewDialog extends Dialog {
 
         // Determine background color to use
         int backgroundColor = Color.BLACK; // Default fallback
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
+        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
           try {
             backgroundColor = Color.parseColor(_options.getToolbarColor());
           } catch (IllegalArgumentException e) {
-            Log.e(
-              "InAppBrowser",
-              "Invalid toolbar color, using black: " + e.getMessage()
-            );
+            Log.e("InAppBrowser", "Invalid toolbar color, using black: " + e.getMessage());
           }
         } else {
           // Follow system theme if no color specified
@@ -935,7 +698,7 @@ public class WebViewDialog extends Dialog {
         int backgroundColor;
         if (
           _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
+            !_options.getToolbarColor().isEmpty()
         ) {
           try {
             backgroundColor = Color.parseColor(_options.getToolbarColor());
@@ -961,7 +724,7 @@ public class WebViewDialog extends Dialog {
         // Original behavior for status bar color
         if (
           _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
+            !_options.getToolbarColor().isEmpty()
         ) {
           try {
             int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -979,13 +742,13 @@ public class WebViewDialog extends Dialog {
           .getDecorView()
           .setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+              View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
           );
 
         // Apply original status bar color logic
         if (
           _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
+            !_options.getToolbarColor().isEmpty()
         ) {
           try {
             int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -1006,8 +769,8 @@ public class WebViewDialog extends Dialog {
         String jsonDetail = jsonObject.toString();
         String script =
           "window.dispatchEvent(new CustomEvent('messageFromNative', " +
-          jsonDetail +
-          "));";
+            jsonDetail +
+            "));";
         _webView.post(() -> _webView.evaluateJavascript(script, null));
       } catch (Exception e) {
         Log.e(
@@ -1021,17 +784,17 @@ public class WebViewDialog extends Dialog {
   private void injectJavaScriptInterface() {
     String script =
       "if (!window.mobileApp) { " +
-      "    window.mobileApp = { " +
-      "        postMessage: function(message) { " +
-      "            if (window.AndroidInterface) { " +
-      "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
-      "            } " +
-      "        }, " +
-      "        close: function() { " +
-      "            window.AndroidInterface.close(); " +
-      "        } " +
-      "    }; " +
-      "}";
+        "    window.mobileApp = { " +
+        "        postMessage: function(message) { " +
+        "            if (window.AndroidInterface) { " +
+        "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
+        "            } " +
+        "        }, " +
+        "        close: function() { " +
+        "            window.AndroidInterface.close(); " +
+        "        } " +
+        "    }; " +
+        "}";
     _webView.evaluateJavascript(script, null);
   }
 
@@ -1045,10 +808,10 @@ public class WebViewDialog extends Dialog {
 
     String script =
       "async function preShowFunction() {\n" +
-      _options.getPreShowScript() +
-      '\n' +
-      "};\n" +
-      "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Pre show error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
+        _options.getPreShowScript() +
+        '\n' +
+        "};\n" +
+        "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Pre show error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
 
     Log.i(
       "InjectPreShowScript",
@@ -1090,162 +853,42 @@ public class WebViewDialog extends Dialog {
     }
   }
 
-  private void openFileChooser(
-    ValueCallback<Uri[]> filePathCallback,
-    String acceptType,
-    boolean isMultiple
-  ) {
-    mFilePathCallback = filePathCallback;
+  private void openFileChooser(ValueCallback<Uri[]> filePathCallback) {
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
     intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("*/*");
 
-    // Fix MIME type handling
-    if (
-      acceptType == null ||
-      acceptType.isEmpty() ||
-      acceptType.equals("undefined")
-    ) {
-      acceptType = "*/*";
+    if (fileChooserLauncher != null) {
+      fileChooserLauncher.launch(Intent.createChooser(intent, "Select File"));
     } else {
-      // Handle common web input accept types
-      if (acceptType.equals("image/*")) {
-        // Keep as is - image/*
-      } else if (acceptType.contains("image/")) {
-        // Specific image type requested but keep it general for better compatibility
-        acceptType = "image/*";
-      } else if (
-        acceptType.equals("audio/*") || acceptType.contains("audio/")
-      ) {
-        acceptType = "audio/*";
-      } else if (
-        acceptType.equals("video/*") || acceptType.contains("video/")
-      ) {
-        acceptType = "video/*";
-      } else if (acceptType.startsWith(".") || acceptType.contains(",")) {
-        // Handle file extensions like ".pdf, .docx" by using a general mime type
-        if (acceptType.contains(".pdf")) {
-          acceptType = "application/pdf";
-        } else if (
-          acceptType.contains(".doc") || acceptType.contains(".docx")
-        ) {
-          acceptType = "application/msword";
-        } else if (
-          acceptType.contains(".xls") || acceptType.contains(".xlsx")
-        ) {
-          acceptType = "application/vnd.ms-excel";
-        } else if (
-          acceptType.contains(".txt") || acceptType.contains(".text")
-        ) {
-          acceptType = "text/plain";
-        } else {
-          // Default for extension lists
-          acceptType = "*/*";
-        }
+      // Fallback for older Android versions
+      try {
+        activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
+      } catch (ActivityNotFoundException e) {
+        Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
       }
     }
+  }
 
-    Log.d("InAppBrowser", "File picker using MIME type: " + acceptType);
-    intent.setType(acceptType);
-    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
+  private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
+    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
+    intent.setType("*/*");
+    if (isMultiple) {
+      intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+    }
+    if (acceptType != null && !acceptType.isEmpty()) {
+      intent.setType(acceptType);
+    }
 
-    try {
-      if (activity instanceof androidx.activity.ComponentActivity) {
-        androidx.activity.ComponentActivity componentActivity =
-          (androidx.activity.ComponentActivity) activity;
-        componentActivity
-          .getActivityResultRegistry()
-          .register(
-            "file_chooser",
-            new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-            result -> {
-              if (result.getResultCode() == Activity.RESULT_OK) {
-                Intent data = result.getData();
-                if (data != null) {
-                  if (data.getClipData() != null) {
-                    // Handle multiple files
-                    int count = data.getClipData().getItemCount();
-                    Uri[] results = new Uri[count];
-                    for (int i = 0; i < count; i++) {
-                      results[i] = data.getClipData().getItemAt(i).getUri();
-                    }
-                    mFilePathCallback.onReceiveValue(results);
-                  } else if (data.getData() != null) {
-                    // Handle single file
-                    mFilePathCallback.onReceiveValue(
-                      new Uri[] { data.getData() }
-                    );
-                  }
-                }
-              } else {
-                mFilePathCallback.onReceiveValue(null);
-              }
-              mFilePathCallback = null;
-            }
-          )
-          .launch(Intent.createChooser(intent, "Select File"));
-      } else {
-        // Fallback for non-ComponentActivity
-        activity.startActivityForResult(
-          Intent.createChooser(intent, "Select File"),
-          FILE_CHOOSER_REQUEST_CODE
-        );
-      }
-    } catch (ActivityNotFoundException e) {
-      // If no app can handle the specific MIME type, try with a more generic one
-      Log.e(
-        "InAppBrowser",
-        "No app available for type: " + acceptType + ", trying with */*"
-      );
-      intent.setType("*/*");
+    if (fileChooserLauncher != null) {
+      fileChooserLauncher.launch(Intent.createChooser(intent, "Select File"));
+    } else {
+      // Fallback for older Android versions
       try {
-        if (activity instanceof androidx.activity.ComponentActivity) {
-          androidx.activity.ComponentActivity componentActivity =
-            (androidx.activity.ComponentActivity) activity;
-          componentActivity
-            .getActivityResultRegistry()
-            .register(
-              "file_chooser",
-              new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-              result -> {
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                  Intent data = result.getData();
-                  if (data != null) {
-                    if (data.getClipData() != null) {
-                      // Handle multiple files
-                      int count = data.getClipData().getItemCount();
-                      Uri[] results = new Uri[count];
-                      for (int i = 0; i < count; i++) {
-                        results[i] = data.getClipData().getItemAt(i).getUri();
-                      }
-                      mFilePathCallback.onReceiveValue(results);
-                    } else if (data.getData() != null) {
-                      // Handle single file
-                      mFilePathCallback.onReceiveValue(
-                        new Uri[] { data.getData() }
-                      );
-                    }
-                  }
-                } else {
-                  mFilePathCallback.onReceiveValue(null);
-                }
-                mFilePathCallback = null;
-              }
-            )
-            .launch(Intent.createChooser(intent, "Select File"));
-        } else {
-          // Fallback for non-ComponentActivity
-          activity.startActivityForResult(
-            Intent.createChooser(intent, "Select File"),
-            FILE_CHOOSER_REQUEST_CODE
-          );
-        }
-      } catch (ActivityNotFoundException ex) {
-        // If still failing, report error
-        Log.e("InAppBrowser", "No app can handle file picker", ex);
-        if (mFilePathCallback != null) {
-          mFilePathCallback.onReceiveValue(null);
-          mFilePathCallback = null;
-        }
+        activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
+      } catch (ActivityNotFoundException e) {
+        Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
       }
     }
   }
@@ -1313,7 +956,7 @@ public class WebViewDialog extends Dialog {
     // Apply toolbar color early, for ALL toolbar types, before any view configuration
     if (
       _options.getToolbarColor() != null &&
-      !_options.getToolbarColor().isEmpty()
+        !_options.getToolbarColor().isEmpty()
     ) {
       try {
         int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -1326,7 +969,7 @@ public class WebViewDialog extends Dialog {
         int iconColor;
         if (
           _options.getToolbarTextColor() != null &&
-          !_options.getToolbarTextColor().isEmpty()
+            !_options.getToolbarTextColor().isEmpty()
         ) {
           try {
             iconColor = Color.parseColor(_options.getToolbarTextColor());
@@ -1417,7 +1060,7 @@ public class WebViewDialog extends Dialog {
     // Handle reload button visibility
     if (
       _options.getShowReloadButton() &&
-      !TextUtils.equals(_options.getToolbarType(), "activity")
+        !TextUtils.equals(_options.getToolbarType(), "activity")
     ) {
       View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
       reloadButtonView.setVisibility(View.VISIBLE);
@@ -1469,7 +1112,7 @@ public class WebViewDialog extends Dialog {
       // In activity mode, always make the share button visible by setting a default shareSubject if not provided
       if (
         _options.getShareSubject() == null ||
-        _options.getShareSubject().isEmpty()
+          _options.getShareSubject().isEmpty()
       ) {
         _options.setShareSubject("Share");
         Log.d("InAppBrowser", "Activity mode: Setting default shareSubject");
@@ -1490,7 +1133,7 @@ public class WebViewDialog extends Dialog {
       View statusBarColorView = findViewById(R.id.status_bar_color_view);
       if (
         _options.getToolbarColor() != null &&
-        !_options.getToolbarColor().isEmpty()
+          !_options.getToolbarColor().isEmpty()
       ) {
         try {
           int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -1700,13 +1343,13 @@ public class WebViewDialog extends Dialog {
     ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
     if (
       _options.getShareSubject() != null &&
-      !_options.getShareSubject().isEmpty()
+        !_options.getShareSubject().isEmpty()
     ) {
       shareButton.setVisibility(View.VISIBLE);
       Log.d(
         "InAppBrowser",
         "Share button should be visible, shareSubject: " +
-        _options.getShareSubject()
+          _options.getShareSubject()
       );
 
       // Apply the same color filter as other buttons to ensure visibility
@@ -1783,6 +1426,41 @@ public class WebViewDialog extends Dialog {
     reloadButton.setColorFilter(iconColor);
     shareButton.setColorFilter(iconColor);
     buttonNearDoneView.setColorFilter(iconColor);
+  }
+
+  public void handleFileChooserResult(ActivityResult result) {
+    if (mFilePathCallback != null) {
+      Uri[] results = null;
+      if (result.getResultCode() == Activity.RESULT_OK) {
+        Intent data = result.getData();
+        if (data != null) {
+          String dataString = data.getDataString();
+          if (dataString != null) {
+            results = new Uri[] { Uri.parse(dataString) };
+          } else if (data.getClipData() != null) {
+            final int numSelectedFiles = data.getClipData().getItemCount();
+            results = new Uri[numSelectedFiles];
+            for (int i = 0; i < numSelectedFiles; i++) {
+              results[i] = data.getClipData().getItemAt(i).getUri();
+            }
+          }
+        }
+      }
+      mFilePathCallback.onReceiveValue(results);
+      mFilePathCallback = null;
+    }
+  }
+
+  public void handleCameraResult(ActivityResult result) {
+    if (mFilePathCallback != null) {
+      Uri[] results = null;
+      if (result.getResultCode() == Activity.RESULT_OK && tempCameraUri != null) {
+        results = new Uri[] { tempCameraUri };
+      }
+      mFilePathCallback.onReceiveValue(results);
+      mFilePathCallback = null;
+      tempCameraUri = null;
+    }
   }
 
   public void handleProxyResultError(String result, String id) {
@@ -1962,7 +1640,7 @@ public class WebViewDialog extends Dialog {
                 for (Map.Entry<
                   String,
                   String
-                > header : requestHeaders.entrySet()) {
+                  > header : requestHeaders.entrySet()) {
                   headers.append(
                     String.format(
                       "h[atob('%s')]=atob('%s');",
@@ -2013,10 +1691,10 @@ public class WebViewDialog extends Dialog {
 
           if (
             credentials != null &&
-            credentials.getString("username") != null &&
-            credentials.getString("password") != null &&
-            sourceUrl != null &&
-            url != null
+              credentials.getString("username") != null &&
+              credentials.getString("password") != null &&
+              sourceUrl != null &&
+              url != null
           ) {
             String sourceProtocol = "";
             String sourceHost = "";
@@ -2051,8 +1729,8 @@ public class WebViewDialog extends Dialog {
 
             if (
               Objects.equals(sourceHost, host) &&
-              Objects.equals(sourceProtocol, protocol) &&
-              sourcePort == port
+                Objects.equals(sourceProtocol, protocol) &&
+                sourcePort == port
             ) {
               final String username = Objects.requireNonNull(
                 credentials.getString("username")
@@ -2107,7 +1785,7 @@ public class WebViewDialog extends Dialog {
             if (_options.isPresentAfterPageLoad()) {
               boolean usePreShowScript =
                 _options.getPreShowScript() != null &&
-                !_options.getPreShowScript().isEmpty();
+                  !_options.getPreShowScript().isEmpty();
               if (!usePreShowScript) {
                 show();
                 _options.getPluginCall().resolve();
@@ -2118,7 +1796,7 @@ public class WebViewDialog extends Dialog {
                     public void run() {
                       if (
                         _options.getPreShowScript() != null &&
-                        !_options.getPreShowScript().isEmpty()
+                          !_options.getPreShowScript().isEmpty()
                       ) {
                         injectPreShowScript();
                       }
@@ -2139,7 +1817,7 @@ public class WebViewDialog extends Dialog {
             }
           } else if (
             _options.getPreShowScript() != null &&
-            !_options.getPreShowScript().isEmpty()
+              !_options.getPreShowScript().isEmpty()
           ) {
             executorService.execute(
               new Runnable() {
@@ -2211,7 +1889,7 @@ public class WebViewDialog extends Dialog {
           boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
           if (
             ignoreSSLUntrustedError &&
-            error.getPrimaryError() == SslError.SSL_UNTRUSTED
+              error.getPrimaryError() == SslError.SSL_UNTRUSTED
           ) handler.proceed();
           else {
             super.onReceivedSslError(view, handler, error);
@@ -2225,8 +1903,8 @@ public class WebViewDialog extends Dialog {
   public void onBackPressed() {
     if (
       _webView.canGoBack() &&
-      (TextUtils.equals(_options.getToolbarType(), "navigation") ||
-        _options.getActiveNativeNavigationForWebview())
+        (TextUtils.equals(_options.getToolbarType(), "navigation") ||
+          _options.getActiveNativeNavigationForWebview())
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
@@ -2237,54 +1915,54 @@ public class WebViewDialog extends Dialog {
   }
 
   public static String getReasonPhrase(int statusCode) {
-    return switch (statusCode) {
-      case (200) -> "OK";
-      case (201) -> "Created";
-      case (202) -> "Accepted";
-      case (203) -> "Non Authoritative Information";
-      case (204) -> "No Content";
-      case (205) -> "Reset Content";
-      case (206) -> "Partial Content";
-      case (207) -> "Partial Update OK";
-      case (300) -> "Mutliple Choices";
-      case (301) -> "Moved Permanently";
-      case (302) -> "Moved Temporarily";
-      case (303) -> "See Other";
-      case (304) -> "Not Modified";
-      case (305) -> "Use Proxy";
-      case (307) -> "Temporary Redirect";
-      case (400) -> "Bad Request";
-      case (401) -> "Unauthorized";
-      case (402) -> "Payment Required";
-      case (403) -> "Forbidden";
-      case (404) -> "Not Found";
-      case (405) -> "Method Not Allowed";
-      case (406) -> "Not Acceptable";
-      case (407) -> "Proxy Authentication Required";
-      case (408) -> "Request Timeout";
-      case (409) -> "Conflict";
-      case (410) -> "Gone";
-      case (411) -> "Length Required";
-      case (412) -> "Precondition Failed";
-      case (413) -> "Request Entity Too Large";
-      case (414) -> "Request-URI Too Long";
-      case (415) -> "Unsupported Media Type";
-      case (416) -> "Requested Range Not Satisfiable";
-      case (417) -> "Expectation Failed";
-      case (418) -> "Reauthentication Required";
-      case (419) -> "Proxy Reauthentication Required";
-      case (422) -> "Unprocessable Entity";
-      case (423) -> "Locked";
-      case (424) -> "Failed Dependency";
-      case (500) -> "Server Error";
-      case (501) -> "Not Implemented";
-      case (502) -> "Bad Gateway";
-      case (503) -> "Service Unavailable";
-      case (504) -> "Gateway Timeout";
-      case (505) -> "HTTP Version Not Supported";
-      case (507) -> "Insufficient Storage";
-      default -> "";
-    };
+    switch (statusCode) {
+      case 200: return "OK";
+      case 201: return "Created";
+      case 202: return "Accepted";
+      case 203: return "Non Authoritative Information";
+      case 204: return "No Content";
+      case 205: return "Reset Content";
+      case 206: return "Partial Content";
+      case 207: return "Partial Update OK";
+      case 300: return "Mutliple Choices";
+      case 301: return "Moved Permanently";
+      case 302: return "Moved Temporarily";
+      case 303: return "See Other";
+      case 304: return "Not Modified";
+      case 305: return "Use Proxy";
+      case 307: return "Temporary Redirect";
+      case 400: return "Bad Request";
+      case 401: return "Unauthorized";
+      case 402: return "Payment Required";
+      case 403: return "Forbidden";
+      case 404: return "Not Found";
+      case 405: return "Method Not Allowed";
+      case 406: return "Not Acceptable";
+      case 407: return "Proxy Authentication Required";
+      case 408: return "Request Timeout";
+      case 409: return "Conflict";
+      case 410: return "Gone";
+      case 411: return "Length Required";
+      case 412: return "Precondition Failed";
+      case 413: return "Request Entity Too Large";
+      case 414: return "Request-URI Too Long";
+      case 415: return "Unsupported Media Type";
+      case 416: return "Requested Range Not Satisfiable";
+      case 417: return "Expectation Failed";
+      case 418: return "Reauthentication Required";
+      case 419: return "Proxy Reauthentication Required";
+      case 422: return "Unprocessable Entity";
+      case 423: return "Locked";
+      case 424: return "Failed Dependency";
+      case 500: return "Server Error";
+      case 501: return "Not Implemented";
+      case 502: return "Bad Gateway";
+      case 503: return "Service Unavailable";
+      case 504: return "Gateway Timeout";
+      case 505: return "HTTP Version Not Supported";
+      case 507: return "Insufficient Storage";
+      default: return "";
+    }
   }
 
   @Override
@@ -2293,12 +1971,12 @@ public class WebViewDialog extends Dialog {
       // Reset file inputs to prevent WebView from caching them
       _webView.evaluateJavascript(
         "(function() {" +
-        "  var inputs = document.querySelectorAll('input[type=\"file\"]');" +
-        "  for (var i = 0; i < inputs.length; i++) {" +
-        "    inputs[i].value = '';" +
-        "  }" +
-        "  return true;" +
-        "})();",
+          "  var inputs = document.querySelectorAll('input[type=\"file\"]');" +
+          "  for (var i = 0; i < inputs.length; i++) {" +
+          "    inputs[i].value = '';" +
+          "  }" +
+          "  return true;" +
+          "})();",
         null
       );
 
@@ -2399,22 +2077,21 @@ public class WebViewDialog extends Dialog {
 
     // This script adds minimal fixes for date inputs to use Material Design
     String script =
-      """
-      (function() {
-        // Find all date inputs
-        const dateInputs = document.querySelectorAll('input[type="date"]');
-        dateInputs.forEach(input => {
-          // Ensure change events propagate correctly
-          let lastValue = input.value;
-          input.addEventListener('change', () => {
-            if (input.value !== lastValue) {
-              lastValue = input.value;
-              // Dispatch an input event to ensure frameworks detect the change
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-          });
-        });
-      })();""";
+      "(function() {\n" +
+      "  // Find all date inputs\n" +
+      "  const dateInputs = document.querySelectorAll('input[type=\"date\"]');\n" +
+      "  dateInputs.forEach(input => {\n" +
+      "    // Ensure change events propagate correctly\n" +
+      "    let lastValue = input.value;\n" +
+      "    input.addEventListener('change', () => {\n" +
+      "      if (input.value !== lastValue) {\n" +
+      "        lastValue = input.value;\n" +
+      "        // Dispatch an input event to ensure frameworks detect the change\n" +
+      "        input.dispatchEvent(new Event('input', { bubbles: true }));\n" +
+      "      }\n" +
+      "    });\n" +
+      "  });\n" +
+      "})();";
 
     // Execute the script in the WebView
     _webView.post(() -> _webView.evaluateJavascript(script, null));
@@ -2486,5 +2163,36 @@ public class WebViewDialog extends Dialog {
       storageDir/* directory */
     );
     return image;
+  }
+
+  private class MyWebChromeClient extends WebChromeClient {
+    @Override
+    public boolean onShowFileChooser(
+      WebView webView,
+      ValueCallback<Uri[]> filePathCallback,
+      FileChooserParams fileChooserParams
+    ) {
+      mFilePathCallback = filePathCallback;
+      Intent intent = fileChooserParams.createIntent();
+      try {
+        openFileChooser(filePathCallback);
+      } catch (ActivityNotFoundException e) {
+        mFilePathCallback = null;
+        Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
+        return false;
+      }
+      return true;
+    }
+
+    @Override
+    public void onPermissionRequest(final PermissionRequest request) {
+      activity.runOnUiThread(() -> {
+        if (request.getResources()[0].equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+          permissionHandler.handleCameraPermissionRequest(request);
+        } else if (request.getResources()[0].equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+          permissionHandler.handleMicrophonePermissionRequest(request);
+        }
+      });
+    }
   }
 }

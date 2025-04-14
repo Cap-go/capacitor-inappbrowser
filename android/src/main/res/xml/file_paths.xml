@@ -2,13 +2,17 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Internal cache for most operations -->
     <cache-path name="camera_captures" path="." />
-    
+
     <!-- External cache for fallback -->
     <external-cache-path name="external_cache" path="." />
-    
+
     <!-- External files for additional compatibility -->
     <external-files-path name="external_files" path="." />
-    
+
     <!-- Allow sharing app-specific files if needed -->
     <files-path name="app_files" path="." />
-</paths> 
+
+    <external-path name="external_files" path="."/>
+    <cache-path name="cache_files" path="."/>
+    <files-path name="files" path="."/>
+</paths>

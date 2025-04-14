@@ -12,6 +12,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+
+import androidx.activity.ComponentActivity;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -65,50 +67,32 @@ public class InAppBrowserPlugin
   private PermissionRequest currentPermissionRequest;
 
   private ActivityResultLauncher<Intent> fileChooserLauncher;
+  private ActivityResultLauncher<Intent> cameraLauncher;
 
   @Override
   public void load() {
     super.load();
-    fileChooserLauncher = getActivity()
-      .registerForActivityResult(
+    // Register activity result launchers early in the lifecycle
+    if (getActivity() instanceof ComponentActivity) {
+      ComponentActivity activity = (ComponentActivity) getActivity();
+
+      fileChooserLauncher = activity.registerForActivityResult(
         new ActivityResultContracts.StartActivityForResult(),
-        this::handleFileChooserResult
-      );
-  }
-
-  private void handleFileChooserResult(ActivityResult result) {
-    if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
-      Uri[] results = null;
-      Intent data = result.getData();
-
-      if (result.getResultCode() == Activity.RESULT_OK) {
-        // Handle camera capture result
-        if (
-          webViewDialog.tempCameraUri != null &&
-          (data == null || data.getData() == null)
-        ) {
-          results = new Uri[] { webViewDialog.tempCameraUri };
-        }
-        // Handle regular file picker result
-        else if (data != null) {
-          if (data.getClipData() != null) {
-            // Handle multiple files
-            int count = data.getClipData().getItemCount();
-            results = new Uri[count];
-            for (int i = 0; i < count; i++) {
-              results[i] = data.getClipData().getItemAt(i).getUri();
-            }
-          } else if (data.getData() != null) {
-            // Handle single file
-            results = new Uri[] { data.getData() };
+        result -> {
+          if (webViewDialog != null) {
+            webViewDialog.handleFileChooserResult(result);
           }
         }
-      }
+      );
 
-      // Send the result to WebView and clean up
-      webViewDialog.mFilePathCallback.onReceiveValue(results);
-      webViewDialog.mFilePathCallback = null;
-      webViewDialog.tempCameraUri = null;
+      cameraLauncher = activity.registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        result -> {
+          if (webViewDialog != null) {
+            webViewDialog.handleCameraResult(result);
+          }
+        }
+      );
     }
   }
 
@@ -700,10 +684,12 @@ public class InAppBrowserPlugin
           public void run() {
             webViewDialog = new WebViewDialog(
               getContext(),
-              android.R.style.Theme_NoTitleBar,
+              android.R.style.Theme_DeviceDefault_Light_NoActionBar,
               options,
               InAppBrowserPlugin.this,
-              getBridge().getWebView()
+              getBridge().getWebView(),
+              fileChooserLauncher,
+              cameraLauncher
             );
             webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
             webViewDialog.presentWebView();
