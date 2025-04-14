@@ -8,14 +8,17 @@
     android:elevation="4dp"
     app:titleTextColor="#262626">
 
-    <ImageButton
-        android:id="@+id/closeButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_clear_24px"
-        android:layout_gravity="start"
-        android:background="#eeeeef"
-        android:contentDescription="@string/close_button" />
+	<ImageButton
+		android:id="@+id/closeButton"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="start"
+		android:background="#eeeeef"
+		android:contentDescription="@string/close_button"
+		android:minWidth="38dp"
+		android:minHeight="38dp"
+		android:src="@drawable/ic_clear_24px"
+		android:translationX="-8dp" />
 
     <ImageButton
         android:id="@+id/buttonNearDone"

@@ -167,6 +167,7 @@ public class Options {
   private PluginCall pluginCall;
   private boolean VisibleTitle;
   private String ToolbarColor;
+  private String BackgroundColor;
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
   private String preShowScript;
@@ -174,6 +175,7 @@ public class Options {
   private Pattern proxyRequestsPattern = null;
   private boolean materialPicker = false;
   private int textZoom = 100; // Default text zoom is 100%
+  private boolean preventDeeplink = false;
 
   public int getTextZoom() {
     return textZoom;
@@ -373,6 +375,14 @@ public class Options {
     this.ToolbarColor = toolbarColor;
   }
 
+  public String getBackgroundColor() {
+    return BackgroundColor;
+  }
+
+  public void setBackgroundColor(String backgroundColor) {
+    this.BackgroundColor = backgroundColor;
+  }
+
   public String getToolbarTextColor() {
     return toolbarTextColor;
   }
@@ -403,5 +413,13 @@ public class Options {
 
   public void setPreShowScript(String preLoadScript) {
     this.preShowScript = preLoadScript;
+  }
+
+  public boolean getPreventDeeplink() {
+    return preventDeeplink;
+  }
+
+  public void setPreventDeeplink(boolean preventDeeplink) {
+    this.preventDeeplink = preventDeeplink;
   }
 }

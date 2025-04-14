@@ -258,7 +258,7 @@ public class InAppBrowserPlugin
     }
 
     // get the deeplink prevention, if provided
-    Boolean preventDeeplink = call.getBoolean("preventDeeplink", null);
+    Boolean preventDeeplink = call.getBoolean("preventDeeplink", false);
     Boolean isPresentAfterPageLoad = call.getBoolean(
       "isPresentAfterPageLoad",
       false
@@ -283,7 +283,7 @@ public class InAppBrowserPlugin
       this.getHeaders(call)
     );
 
-    if (preventDeeplink != null) {
+    if (preventDeeplink != false) {
       String browserPackageName = "";
       Intent browserIntent = new Intent(
         Intent.ACTION_VIEW,
@@ -434,6 +434,7 @@ public class InAppBrowserPlugin
       options.setTitle(call.getString("title", ""));
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
+    options.setBackgroundColor(call.getString("backgroundColor", "black"));
     options.setToolbarTextColor(call.getString("toolbarTextColor"));
     options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
     options.setIgnoreUntrustedSSLError(
@@ -529,6 +530,9 @@ public class InAppBrowserPlugin
     options.setPreShowScript(call.getString("preShowScript", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
+    options.setPreventDeeplink(
+      Boolean.TRUE.equals(call.getBoolean("preventDeeplink", false))
+    );
 
     // Validate preShowScript requires isPresentAfterPageLoad
     if (
