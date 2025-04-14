@@ -500,11 +500,11 @@ Reload the current web page.
 
 #### HttpCookie
 
-| Prop        | Type                | Description              |
-| ----------- | ------------------- | ------------------------ |
-| **`url`**   | <code>string</code> | The URL of the cookie.   |
-| **`key`**   | <code>string</code> | The key of the cookie.   |
-| **`value`** | <code>string</code> | The value of the cookie. |
+| Prop        | Type                |
+| ----------- | ------------------- |
+| **`url`**   | <code>string</code> |
+| **`key`**   | <code>string</code> |
+| **`value`** | <code>string</code> |
 
 
 #### GetCookieOptions

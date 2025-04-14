@@ -1,0 +1,1404 @@
+{
+  "api": {
+    "name": "InAppBrowserPlugin",
+    "slug": "inappbrowserplugin",
+    "docs": "",
+    "tags": [],
+    "methods": [
+      {
+        "name": "open",
+        "signature": "(options: OpenOptions) => Promise<any>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "OpenOptions"
+          }
+        ],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController",
+        "complexTypes": [
+          "OpenOptions"
+        ],
+        "slug": "open"
+      },
+      {
+        "name": "clearCookies",
+        "signature": "(options: ClearCookieOptions) => Promise<any>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "ClearCookieOptions"
+          }
+        ],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.5.0"
+          }
+        ],
+        "docs": "Clear cookies of url",
+        "complexTypes": [
+          "ClearCookieOptions"
+        ],
+        "slug": "clearcookies"
+      },
+      {
+        "name": "clearAllCookies",
+        "signature": "() => Promise<any>",
+        "parameters": [],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "6.5.0"
+          }
+        ],
+        "docs": "Clear all cookies",
+        "complexTypes": [],
+        "slug": "clearallcookies"
+      },
+      {
+        "name": "clearCache",
+        "signature": "() => Promise<any>",
+        "parameters": [],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "6.5.0"
+          }
+        ],
+        "docs": "Clear cache",
+        "complexTypes": [],
+        "slug": "clearcache"
+      },
+      {
+        "name": "getCookies",
+        "signature": "(options: GetCookieOptions) => Promise<Record<string, string>>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "The options, including the URL to get cookies for.",
+            "type": "GetCookieOptions"
+          }
+        ],
+        "returns": "Promise<Record<string, string>>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options The options, including the URL to get cookies for."
+          },
+          {
+            "name": "returns",
+            "text": "A promise that resolves with the cookies."
+          }
+        ],
+        "docs": "Get cookies for a specific URL.",
+        "complexTypes": [
+          "Record",
+          "GetCookieOptions"
+        ],
+        "slug": "getcookies"
+      },
+      {
+        "name": "close",
+        "signature": "() => Promise<any>",
+        "parameters": [],
+        "returns": "Promise<any>",
+        "tags": [],
+        "docs": "Close the webview.",
+        "complexTypes": [],
+        "slug": "close"
+      },
+      {
+        "name": "openWebView",
+        "signature": "(options: OpenWebViewOptions) => Promise<any>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "OpenWebViewOptions"
+          }
+        ],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.1.0"
+          }
+        ],
+        "docs": "Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.\n\nJavaScript Interface:\nWhen you open a webview with this method, a JavaScript interface is automatically injected that provides:\n- `window.mobileApp.close()`: Closes the webview from JavaScript\n- `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview",
+        "complexTypes": [
+          "OpenWebViewOptions"
+        ],
+        "slug": "openwebview"
+      },
+      {
+        "name": "executeScript",
+        "signature": "({ code }: { code: string; }) => Promise<void>",
+        "parameters": [
+          {
+            "name": "__0",
+            "docs": "",
+            "type": "{ code: string; }"
+          }
+        ],
+        "returns": "Promise<void>",
+        "tags": [],
+        "docs": "Injects JavaScript code into the InAppBrowser window.",
+        "complexTypes": [],
+        "slug": "executescript"
+      },
+      {
+        "name": "postMessage",
+        "signature": "(options: { detail: Record<string, any>; }) => Promise<void>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "{ detail: Record<string, any>; }"
+          }
+        ],
+        "returns": "Promise<void>",
+        "tags": [],
+        "docs": "Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener(\"messageFromNative\", listenerFunc: (event: Record<string, any>) => void)\ndetail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects\nYour object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.",
+        "complexTypes": [
+          "Record"
+        ],
+        "slug": "postmessage"
+      },
+      {
+        "name": "setUrl",
+        "signature": "(options: { url: string; }) => Promise<any>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "",
+            "type": "{ url: string; }"
+          }
+        ],
+        "returns": "Promise<any>",
+        "tags": [],
+        "docs": "Sets the URL of the webview.",
+        "complexTypes": [],
+        "slug": "seturl"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"urlChangeEvent\", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'urlChangeEvent'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "UrlChangeListener"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.0.1"
+          }
+        ],
+        "docs": "Listen for url change, only for openWebView",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "UrlChangeListener"
+        ],
+        "slug": "addlistenerurlchangeevent-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"buttonNearDoneClick\", listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'buttonNearDoneClick'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "ButtonNearListener"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [],
+        "docs": "",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "ButtonNearListener"
+        ],
+        "slug": "addlistenerbuttonneardoneclick-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"closeEvent\", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'closeEvent'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "UrlChangeListener"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.4.0"
+          }
+        ],
+        "docs": "Listen for close click only for openWebView",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "UrlChangeListener"
+        ],
+        "slug": "addlistenercloseevent-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"confirmBtnClicked\", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'confirmBtnClicked'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "ConfirmBtnListener"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "0.0.1"
+          }
+        ],
+        "docs": "Will be triggered when user clicks on confirm button when disclaimer is required",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "ConfirmBtnListener"
+        ],
+        "slug": "addlistenerconfirmbtnclicked-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"messageFromWebview\", listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'messageFromWebview'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "(event: { detail: Record<string, any>; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [],
+        "docs": "Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ \"detail\": { \"message\": \"myMessage\" } })\ndetail is the data you want to send to the main app, it's a requirement of Capacitor we cannot send direct objects\nYour object has to be serializable to JSON, no functions or other non-JSON-serializable types are allowed.\n\nThis method is inject at runtime in the webview",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "Record"
+        ],
+        "slug": "addlistenermessagefromwebview-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"browserPageLoaded\", listenerFunc: () => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'browserPageLoaded'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "() => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [],
+        "docs": "Will be triggered when page is loaded",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenerbrowserpageloaded-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: \"pageLoadError\", listenerFunc: () => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "",
+            "type": "'pageLoadError'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "",
+            "type": "() => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [],
+        "docs": "Will be triggered when page load error",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenerpageloaderror-"
+      },
+      {
+        "name": "removeAllListeners",
+        "signature": "() => Promise<void>",
+        "parameters": [],
+        "returns": "Promise<void>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "1.0.0"
+          }
+        ],
+        "docs": "Remove all listeners for this plugin.",
+        "complexTypes": [],
+        "slug": "removealllisteners"
+      },
+      {
+        "name": "reload",
+        "signature": "() => Promise<any>",
+        "parameters": [],
+        "returns": "Promise<any>",
+        "tags": [
+          {
+            "name": "since",
+            "text": "1.0.0"
+          }
+        ],
+        "docs": "Reload the current web page.",
+        "complexTypes": [],
+        "slug": "reload"
+      }
+    ],
+    "properties": []
+  },
+  "interfaces": [
+    {
+      "name": "OpenOptions",
+      "slug": "openoptions",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Target URL to load.",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "isPresentAfterPageLoad",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "preventDeeplink",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        }
+      ]
+    },
+    {
+      "name": "ClearCookieOptions",
+      "slug": "clearcookieoptions",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "HttpCookie",
+      "slug": "httpcookie",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "key",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "GetCookieOptions",
+      "slug": "getcookieoptions",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "includeHttpOnly",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        }
+      ]
+    },
+    {
+      "name": "OpenWebViewOptions",
+      "slug": "openwebviewoptions",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "\"https://capgo.app\"",
+              "name": "example"
+            }
+          ],
+          "docs": "Target URL to load.",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "headers",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "headers: {\n  'Custom-Header': 'test-value',\n  'Authorization': 'Bearer test-token'\n}\nTest URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/",
+              "name": "example"
+            }
+          ],
+          "docs": "Headers to send with the request.",
+          "complexTypes": [
+            "Headers"
+          ],
+          "type": "Headers"
+        },
+        {
+          "name": "credentials",
+          "tags": [
+            {
+              "text": "6.1.0",
+              "name": "since"
+            },
+            {
+              "text": "credentials: {\n  username: 'test-user',\n  password: 'test-pass'\n}\nTest URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/",
+              "name": "example"
+            }
+          ],
+          "docs": "Credentials to send with the request and all subsequent requests for the same host.",
+          "complexTypes": [
+            "Credentials"
+          ],
+          "type": "Credentials"
+        },
+        {
+          "name": "materialPicker",
+          "tags": [
+            {
+              "text": "7.4.1",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "materialPicker: true\nTest URL: https://show-picker.glitch.me/demo.html",
+              "name": "example"
+            }
+          ],
+          "docs": "materialPicker: if true, uses Material Design theme for date and time pickers on Android.\nThis improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "jsInterface",
+          "tags": [
+            {
+              "text": "// In your webpage loaded in the webview:\ndocument.getElementById('closeBtn').addEventListener('click', () => {\n  window.mobileApp.close();\n});\n\n// Send data to the app\nwindow.mobileApp.postMessage({ action: 'login', data: { user: 'test' }});",
+              "name": "example"
+            },
+            {
+              "text": "6.10.0",
+              "name": "since"
+            }
+          ],
+          "docs": "JavaScript Interface:\nThe webview automatically injects a JavaScript interface providing:\n- `window.mobileApp.close()`: Closes the webview from JavaScript\n- `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via \"messageFromWebview\" event)",
+          "complexTypes": [],
+          "type": "undefined"
+        },
+        {
+          "name": "shareDisclaimer",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "shareDisclaimer: {\n  title: 'Disclaimer',\n  message: 'This is a test disclaimer',\n  confirmBtn: 'Accept',\n  cancelBtn: 'Decline'\n}\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "Share options for the webview. When provided, shows a disclaimer dialog before sharing content.\nThis is useful for:\n- Warning users about sharing sensitive information\n- Getting user consent before sharing\n- Explaining what will be shared\n- Complying with privacy regulations\n\nNote: shareSubject is required when using shareDisclaimer",
+          "complexTypes": [
+            "DisclaimerOptions"
+          ],
+          "type": "DisclaimerOptions"
+        },
+        {
+          "name": "toolbarType",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "ToolBarType.DEFAULT",
+              "name": "default"
+            },
+            {
+              "text": "toolbarType: ToolBarType.ACTIVITY,\ntitle: 'Activity Toolbar Test'\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "Toolbar type determines the appearance and behavior of the browser's toolbar\n- \"activity\": Shows a simple toolbar with just a close button and share button\n- \"navigation\": Shows a full navigation toolbar with back/forward buttons\n- \"blank\": Shows no toolbar\n- \"\": Default toolbar with close button",
+          "complexTypes": [
+            "ToolBarType"
+          ],
+          "type": "ToolBarType"
+        },
+        {
+          "name": "shareSubject",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "\"Share this page\"",
+              "name": "example"
+            }
+          ],
+          "docs": "Subject text for sharing. Required when using shareDisclaimer.\nThis text will be used as the subject line when sharing content.",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "title",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'New Window'",
+              "name": "default"
+            },
+            {
+              "text": "\"Camera Test\"",
+              "name": "example"
+            }
+          ],
+          "docs": "Title of the browser",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "backgroundColor",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "BackgroundColor.BLACK",
+              "name": "default"
+            }
+          ],
+          "docs": "Background color of the browser",
+          "complexTypes": [
+            "BackgroundColor"
+          ],
+          "type": "BackgroundColor"
+        },
+        {
+          "name": "activeNativeNavigationForWebview",
+          "tags": [
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "activeNativeNavigationForWebview: true,\ndisableGoBackOnNativeApplication: true\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "If true, active the native navigation within the webview, Android only",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "disableGoBackOnNativeApplication",
+          "tags": [
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "disableGoBackOnNativeApplication: true\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "Disable the possibility to go back on native application,\nuseful to force user to stay on the webview, Android only",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "isPresentAfterPageLoad",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "isPresentAfterPageLoad: true,\npreShowScript: \"await import('https://unpkg.com/darkreader@4.9.89/darkreader.js');\\nDarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });\"\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "Open url in a new window fullscreen\nisPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "isInspectable",
+          "tags": [
+            {
+              "text": "false",
+              "name": "default"
+            }
+          ],
+          "docs": "Whether the website in the webview is inspectable or not, ios only",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "isAnimated",
+          "tags": [
+            {
+              "text": "true",
+              "name": "default"
+            }
+          ],
+          "docs": "Whether the webview opening is animated or not, ios only",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "showReloadButton",
+          "tags": [
+            {
+              "text": "1.0.15",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "showReloadButton: true\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "Shows a reload button that reloads the web page",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "closeModal",
+          "tags": [
+            {
+              "text": "1.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "closeModal: true,\ncloseModalTitle: 'Close Window',\ncloseModalDescription: 'Are you sure you want to close?',\ncloseModalOk: 'Yes, close',\ncloseModalCancel: 'No, stay'\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "closeModalTitle",
+          "tags": [
+            {
+              "text": "1.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Close'",
+              "name": "default"
+            }
+          ],
+          "docs": "CloseModalTitle: title of the confirm when user clicks on close button",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "closeModalDescription",
+          "tags": [
+            {
+              "text": "1.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Are you sure you want to close this window?'",
+              "name": "default"
+            }
+          ],
+          "docs": "CloseModalDescription: description of the confirm when user clicks on close button",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "closeModalOk",
+          "tags": [
+            {
+              "text": "1.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Close'",
+              "name": "default"
+            }
+          ],
+          "docs": "CloseModalOk: text of the confirm button when user clicks on close button",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "closeModalCancel",
+          "tags": [
+            {
+              "text": "1.1.0",
+              "name": "since"
+            },
+            {
+              "text": "'Cancel'",
+              "name": "default"
+            }
+          ],
+          "docs": "CloseModalCancel: text of the cancel button when user clicks on close button",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "visibleTitle",
+          "tags": [
+            {
+              "text": "1.2.5",
+              "name": "since"
+            },
+            {
+              "text": "true",
+              "name": "default"
+            }
+          ],
+          "docs": "visibleTitle: if true the website title would be shown else shown empty",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "toolbarColor",
+          "tags": [
+            {
+              "text": "1.2.5",
+              "name": "since"
+            },
+            {
+              "text": "'#ffffff'",
+              "name": "default"
+            },
+            {
+              "text": "toolbarColor: '#FF5733'\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "toolbarColor: color of the toolbar in hex format",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "toolbarTextColor",
+          "tags": [
+            {
+              "text": "6.10.0",
+              "name": "since"
+            },
+            {
+              "text": "calculated based on toolbarColor brightness",
+              "name": "default"
+            },
+            {
+              "text": "toolbarTextColor: '#FFFFFF'\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "toolbarTextColor: color of the buttons and title in the toolbar in hex format\nWhen set, it overrides the automatic light/dark mode detection for text color",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "showArrow",
+          "tags": [
+            {
+              "text": "1.2.5",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "showArrow: true\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "showArrow: if true an arrow would be shown instead of cross for closing the window",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "ignoreUntrustedSSLError",
+          "tags": [
+            {
+              "text": "6.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            }
+          ],
+          "docs": "ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        },
+        {
+          "name": "preShowScript",
+          "tags": [
+            {
+              "text": "6.6.0",
+              "name": "since"
+            },
+            {
+              "text": "preShowScript: \"await import('https://unpkg.com/darkreader@4.9.89/darkreader.js');\\nDarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });\"\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser.\nThis script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "proxyRequests",
+          "tags": [
+            {
+              "text": "6.9.0",
+              "name": "since"
+            }
+          ],
+          "docs": "proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)",
+          "complexTypes": [],
+          "type": "string | undefined"
+        },
+        {
+          "name": "buttonNearDone",
+          "tags": [
+            {
+              "text": "6.7.0",
+              "name": "since"
+            },
+            {
+              "text": "buttonNearDone: {\n  ios: {\n    iconType: 'sf-symbol',\n    icon: 'star.fill'\n  },\n  android: {\n    iconType: 'asset',\n    icon: 'public/monkey.svg',\n    width: 24,\n    height: 24\n  }\n}\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "buttonNearDone allows for a creation of a custom button near the done/close button.\nThe button is only shown when toolbarType is not \"activity\", \"navigation\", or \"blank\".\n\nFor Android:\n- iconType must be \"asset\"\n- icon path should be in the public folder (e.g. \"monkey.svg\")\n- width and height are optional, defaults to 48dp\n- button is positioned at the end of toolbar with 8dp margin\n\nFor iOS:\n- iconType can be \"sf-symbol\" or \"asset\"\n- for sf-symbol, icon should be the symbol name\n- for asset, icon should be the asset name",
+          "complexTypes": [],
+          "type": "{ ios: { iconType: 'sf-symbol' | 'asset'; icon: string; }; android: { iconType: 'asset' | 'vector'; icon: string; width?: number | undefined; height?: number | undefined; }; } | undefined"
+        },
+        {
+          "name": "textZoom",
+          "tags": [
+            {
+              "text": "7.6.0",
+              "name": "since"
+            },
+            {
+              "text": "100",
+              "name": "default"
+            },
+            {
+              "text": "textZoom: 120\nTest URL: https://capgo.app",
+              "name": "example"
+            }
+          ],
+          "docs": "textZoom: sets the text zoom of the page in percent.\nAllows users to increase or decrease the text size for better readability.",
+          "complexTypes": [],
+          "type": "number | undefined"
+        },
+        {
+          "name": "preventDeeplink",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            },
+            {
+              "text": "false",
+              "name": "default"
+            },
+            {
+              "text": "preventDeeplink: true\nTest URL: https://aasa-tester.capgo.app/",
+              "name": "example"
+            }
+          ],
+          "docs": "preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.",
+          "complexTypes": [],
+          "type": "boolean | undefined"
+        }
+      ]
+    },
+    {
+      "name": "Headers",
+      "slug": "headers",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": []
+    },
+    {
+      "name": "Credentials",
+      "slug": "credentials",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "username",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "password",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DisclaimerOptions",
+      "slug": "disclaimeroptions",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "title",
+          "tags": [
+            {
+              "text": "\"Title\"",
+              "name": "default"
+            }
+          ],
+          "docs": "Title of the disclaimer dialog",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "tags": [
+            {
+              "text": "\"Message\"",
+              "name": "default"
+            }
+          ],
+          "docs": "Message shown in the disclaimer dialog",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "confirmBtn",
+          "tags": [
+            {
+              "text": "\"Confirm\"",
+              "name": "default"
+            }
+          ],
+          "docs": "Text for the confirm button",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "cancelBtn",
+          "tags": [
+            {
+              "text": "\"Cancel\"",
+              "name": "default"
+            }
+          ],
+          "docs": "Text for the cancel button",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "PluginListenerHandle",
+      "slug": "pluginlistenerhandle",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "remove",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "() => Promise<void>"
+        }
+      ]
+    },
+    {
+      "name": "UrlEvent",
+      "slug": "urlevent",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [
+            {
+              "text": "0.0.1",
+              "name": "since"
+            }
+          ],
+          "docs": "Emit when the url changes",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BtnEvent",
+      "slug": "btnevent",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "url",
+          "tags": [
+            {
+              "text": "0.0.1",
+              "name": "since"
+            }
+          ],
+          "docs": "Emit when a button is clicked.",
+          "complexTypes": [],
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "ToolBarType",
+      "slug": "toolbartype",
+      "members": [
+        {
+          "name": "ACTIVITY",
+          "value": "\"activity\"",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Shows a simple toolbar with just a close button and share button"
+        },
+        {
+          "name": "NAVIGATION",
+          "value": "\"navigation\"",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Shows a full navigation toolbar with back/forward buttons"
+        },
+        {
+          "name": "BLANK",
+          "value": "\"blank\"",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Shows no toolbar"
+        }
+      ]
+    },
+    {
+      "name": "BackgroundColor",
+      "slug": "backgroundcolor",
+      "members": [
+        {
+          "name": "WHITE",
+          "value": "\"white\"",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "BLACK",
+          "value": "\"black\"",
+          "tags": [],
+          "docs": ""
+        }
+      ]
+    }
+  ],
+  "typeAliases": [
+    {
+      "name": "ClearCookieOptions",
+      "slug": "clearcookieoptions",
+      "docs": "",
+      "types": [
+        {
+          "text": "Omit<HttpCookie, 'key' | 'value'>",
+          "complexTypes": [
+            "Omit",
+            "HttpCookie"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Omit",
+      "slug": "omit",
+      "docs": "Construct a type with the properties of T except for those in type K.",
+      "types": [
+        {
+          "text": "Pick<T, Exclude<keyof T, K>>",
+          "complexTypes": [
+            "Pick",
+            "T",
+            "Exclude",
+            "K"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pick",
+      "slug": "pick",
+      "docs": "From T, pick a set of properties whose keys are in the union K",
+      "types": [
+        {
+          "text": "{\r\n    [P in K]: T[P];\r\n}",
+          "complexTypes": [
+            "K",
+            "T",
+            "P"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Exclude",
+      "slug": "exclude",
+      "docs": "Exclude from T those types that are assignable to U",
+      "types": [
+        {
+          "text": "T extends U ? never : T",
+          "complexTypes": [
+            "T",
+            "U"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Record",
+      "slug": "record",
+      "docs": "Construct a type with a set of properties K of type T",
+      "types": [
+        {
+          "text": "{\r\n    [P in K]: T;\r\n}",
+          "complexTypes": [
+            "K",
+            "T"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GetCookieOptions",
+      "slug": "getcookieoptions",
+      "docs": "",
+      "types": [
+        {
+          "text": "Omit<HttpCookie, 'key' | 'value'>",
+          "complexTypes": [
+            "Omit",
+            "HttpCookie"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UrlChangeListener",
+      "slug": "urlchangelistener",
+      "docs": "",
+      "types": [
+        {
+          "text": "(state: UrlEvent): void",
+          "complexTypes": [
+            "UrlEvent"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ButtonNearListener",
+      "slug": "buttonnearlistener",
+      "docs": "",
+      "types": [
+        {
+          "text": "(state: object): void",
+          "complexTypes": []
+        }
+      ]
+    },
+    {
+      "name": "ConfirmBtnListener",
+      "slug": "confirmbtnlistener",
+      "docs": "",
+      "types": [
+        {
+          "text": "(state: BtnEvent): void",
+          "complexTypes": [
+            "BtnEvent"
+          ]
+        }
+      ]
+    }
+  ],
+  "pluginConfigs": []
+}
