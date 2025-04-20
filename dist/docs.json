@@ -194,7 +194,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"urlChangeEvent\", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -223,7 +223,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"buttonNearDoneClick\", listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -247,7 +247,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"closeEvent\", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -276,7 +276,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"confirmBtnClicked\", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -305,7 +305,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"messageFromWebview\", listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'messageFromWebview', listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -329,7 +329,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"browserPageLoaded\", listenerFunc: () => void) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'browserPageLoaded', listenerFunc: () => void) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -352,7 +352,7 @@
       },
       {
         "name": "addListener",
-        "signature": "(eventName: \"pageLoadError\", listenerFunc: () => void) => Promise<PluginListenerHandle>",
+        "signature": "(eventName: 'pageLoadError', listenerFunc: () => void) => Promise<PluginListenerHandle>",
         "parameters": [
           {
             "name": "eventName",
@@ -1222,7 +1222,7 @@
       "members": [
         {
           "name": "ACTIVITY",
-          "value": "\"activity\"",
+          "value": "'activity'",
           "tags": [
             {
               "text": "0.1.0",
@@ -1233,7 +1233,7 @@
         },
         {
           "name": "NAVIGATION",
-          "value": "\"navigation\"",
+          "value": "'navigation'",
           "tags": [
             {
               "text": "0.1.0",
@@ -1244,7 +1244,7 @@
         },
         {
           "name": "BLANK",
-          "value": "\"blank\"",
+          "value": "'blank'",
           "tags": [
             {
               "text": "0.1.0",
@@ -1252,6 +1252,17 @@
             }
           ],
           "docs": "Shows no toolbar"
+        },
+        {
+          "name": "DEFAULT",
+          "value": "'default'",
+          "tags": [
+            {
+              "text": "0.0.1",
+              "name": "since"
+            }
+          ],
+          "docs": "Shows a simple toolbar with just a close button"
         }
       ]
     },
@@ -1261,13 +1272,13 @@
       "members": [
         {
           "name": "WHITE",
-          "value": "\"white\"",
+          "value": "'white'",
           "tags": [],
           "docs": ""
         },
         {
           "name": "BLACK",
-          "value": "\"black\"",
+          "value": "'black'",
           "tags": [],
           "docs": ""
         }

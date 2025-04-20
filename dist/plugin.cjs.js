@@ -24,6 +24,11 @@ exports.ToolBarType = void 0;
      * @since 0.1.0
      */
     ToolBarType["BLANK"] = "blank";
+    /**
+     * Shows a simple toolbar with just a close button
+     * @since 0.0.1
+     */
+    ToolBarType["DEFAULT"] = "default";
 })(exports.ToolBarType || (exports.ToolBarType = {}));
 
 const InAppBrowser = core.registerPlugin("InAppBrowser", {

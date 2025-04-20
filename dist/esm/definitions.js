@@ -20,5 +20,10 @@ export var ToolBarType;
      * @since 0.1.0
      */
     ToolBarType["BLANK"] = "blank";
+    /**
+     * Shows a simple toolbar with just a close button
+     * @since 0.0.1
+     */
+    ToolBarType["DEFAULT"] = "default";
 })(ToolBarType || (ToolBarType = {}));
 //# sourceMappingURL=definitions.js.map

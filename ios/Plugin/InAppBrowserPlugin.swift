@@ -416,7 +416,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 // Set done button position based on showArrow
                 if showArrow {
                     webViewController.doneBarButtonItemPosition = .left
-                } else {
+                
                     // In activity mode, keep the done button visible even when showArrow is false
                     webViewController.doneBarButtonItemPosition = .right
                 }
@@ -431,6 +431,18 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if call.getString("shareSubject") != nil {
                     // Add share button to right navigation bar
                     webViewController.rightNavigaionBarItemTypes.append(.activity)
+                }
+            } else if toolbarType == "default" {
+                // Default mode should ONLY have:
+                // 1. Close button
+                webViewController.leftNavigationBarItemTypes = []  // Clear any left items
+                webViewController.rightNavigaionBarItemTypes = []  // Clear any right items
+                
+                // Set done button position based on showArrow
+                if showArrow {
+                    webViewController.doneBarButtonItemPosition = .left
+                } else {
+                    webViewController.doneBarButtonItemPosition = .right
                 }
             } else {
                 // Other modes may have reload button

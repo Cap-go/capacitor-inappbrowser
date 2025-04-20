@@ -1,4 +1,4 @@
-import type { PluginListenerHandle } from "@capacitor/core";
+import type { PluginListenerHandle } from '@capacitor/core';
 export interface UrlEvent {
     /**
      * Emit when the url changes
@@ -37,7 +37,12 @@ export declare enum ToolBarType {
      * Shows no toolbar
      * @since 0.1.0
      */
-    BLANK = "blank"
+    BLANK = "blank",
+    /**
+     * Shows a simple toolbar with just a close button
+     * @since 0.0.1
+     */
+    DEFAULT = "default"
 }
 export interface Headers {
     [key: string]: string;
@@ -374,11 +379,11 @@ export interface OpenWebViewOptions {
      */
     buttonNearDone?: {
         ios: {
-            iconType: "sf-symbol" | "asset";
+            iconType: 'sf-symbol' | 'asset';
             icon: string;
         };
         android: {
-            iconType: "asset" | "vector";
+            iconType: 'asset' | 'vector';
             icon: string;
             width?: number;
             height?: number;
@@ -475,20 +480,20 @@ export interface InAppBrowserPlugin {
      *
      * @since 0.0.1
      */
-    addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
-    addListener(eventName: "buttonNearDoneClick", listenerFunc: ButtonNearListener): Promise<PluginListenerHandle>;
+    addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
+    addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener): Promise<PluginListenerHandle>;
     /**
      * Listen for close click only for openWebView
      *
      * @since 0.4.0
      */
-    addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
+    addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
     /**
      * Will be triggered when user clicks on confirm button when disclaimer is required
      *
      * @since 0.0.1
      */
-    addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener): Promise<PluginListenerHandle>;
+    addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener): Promise<PluginListenerHandle>;
     /**
      * Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
      * detail is the data you want to send to the main app, it's a requirement of Capacitor we cannot send direct objects
@@ -496,17 +501,17 @@ export interface InAppBrowserPlugin {
      *
      * This method is inject at runtime in the webview
      */
-    addListener(eventName: "messageFromWebview", listenerFunc: (event: {
+    addListener(eventName: 'messageFromWebview', listenerFunc: (event: {
         detail: Record<string, any>;
     }) => void): Promise<PluginListenerHandle>;
     /**
      * Will be triggered when page is loaded
      */
-    addListener(eventName: "browserPageLoaded", listenerFunc: () => void): Promise<PluginListenerHandle>;
+    addListener(eventName: 'browserPageLoaded', listenerFunc: () => void): Promise<PluginListenerHandle>;
     /**
      * Will be triggered when page load error
      */
-    addListener(eventName: "pageLoadError", listenerFunc: () => void): Promise<PluginListenerHandle>;
+    addListener(eventName: 'pageLoadError', listenerFunc: () => void): Promise<PluginListenerHandle>;
     /**
      * Remove all listeners for this plugin.
      *

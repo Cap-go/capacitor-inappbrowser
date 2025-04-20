@@ -1053,47 +1053,6 @@ public class WebViewDialog extends Dialog {
       }
     );
 
-    if (_options.showArrow()) {
-      closeButtonView.setImageResource(R.drawable.arrow_back_enabled);
-    }
-
-    // Handle reload button visibility
-    if (
-      _options.getShowReloadButton() &&
-        !TextUtils.equals(_options.getToolbarType(), "activity")
-    ) {
-      View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
-      reloadButtonView.setVisibility(View.VISIBLE);
-      reloadButtonView.setOnClickListener(
-        new View.OnClickListener() {
-          @Override
-          public void onClick(View view) {
-            if (_webView != null) {
-              // First stop any ongoing loading
-              _webView.stopLoading();
-
-              // Check if there's a URL to reload
-              if (_webView.getUrl() != null) {
-                // Reload the current page
-                _webView.reload();
-                Log.d("InAppBrowser", "Reloading page: " + _webView.getUrl());
-              } else if (_options.getUrl() != null) {
-                // If webView URL is null but we have an initial URL, load that
-                setUrl(_options.getUrl());
-                Log.d(
-                  "InAppBrowser",
-                  "Loading initial URL: " + _options.getUrl()
-                );
-              }
-            }
-          }
-        }
-      );
-    } else {
-      View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
-      reloadButtonView.setVisibility(View.GONE);
-    }
-
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {
       // Activity mode should ONLY have:
       // 1. Close button
@@ -1120,6 +1079,25 @@ public class WebViewDialog extends Dialog {
       // Status bar color is already set at the top of this method, no need to set again
 
       // Share button visibility is handled separately later
+    } else if (TextUtils.equals(_options.getToolbarType(), "default")) {
+      // Default mode should ONLY have:
+      // 1. Close button
+
+      // Hide all navigation buttons
+      _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
+
+      // Hide share button
+      _toolbar.findViewById(R.id.shareButton).setVisibility(View.GONE);
+
+      // Hide buttonNearDone
+      ImageButton buttonNearDoneView = _toolbar.findViewById(
+        R.id.buttonNearDone
+      );
+      buttonNearDoneView.setVisibility(View.GONE);
+
+      // Hide reload button
+      _toolbar.findViewById(R.id.reloadButton).setVisibility(View.GONE);
     } else if (TextUtils.equals(_options.getToolbarType(), "navigation")) {
       ImageButton buttonNearDoneView = _toolbar.findViewById(
         R.id.buttonNearDone
