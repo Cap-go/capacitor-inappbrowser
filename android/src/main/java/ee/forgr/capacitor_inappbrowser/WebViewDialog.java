@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -1491,6 +1492,56 @@ public class WebViewDialog extends Dialog {
     buttonNearDoneView.setColorFilter(iconColor);
   }
 
+  private Uri convertHeicToJpeg(Uri heicUri) {
+    try {
+      // Get input stream
+      InputStream inputStream = activity.getContentResolver().openInputStream(heicUri);
+      if (inputStream == null) return heicUri;
+
+      // Create output file
+      File jpegFile = new File(activity.getCacheDir(), "converted_" + System.currentTimeMillis() + ".jpg");
+      FileOutputStream outputStream = new FileOutputStream(jpegFile);
+
+      // Get image dimensions
+      BitmapFactory.Options options = new BitmapFactory.Options();
+      options.inJustDecodeBounds = true;
+      BitmapFactory.decodeStream(inputStream, null, options);
+      inputStream.close();
+
+      // Calculate sample size to reduce memory usage
+      int maxSize = 2048; // Max dimension
+      int sampleSize = 1;
+      if (options.outHeight > maxSize || options.outWidth > maxSize) {
+        sampleSize = Math.round((float) Math.max(options.outHeight, options.outWidth) / maxSize);
+      }
+
+      // Read image with calculated sample size
+      options.inJustDecodeBounds = false;
+      options.inSampleSize = sampleSize;
+      inputStream = activity.getContentResolver().openInputStream(heicUri);
+      Bitmap bitmap = BitmapFactory.decodeStream(inputStream, null, options);
+      inputStream.close();
+
+      if (bitmap == null) return heicUri;
+
+      // Compress to JPEG with good quality
+      bitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream);
+      outputStream.flush();
+      outputStream.close();
+      bitmap.recycle();
+
+      // Get content URI for the converted file
+      return FileProvider.getUriForFile(
+        activity,
+        activity.getPackageName() + ".fileprovider",
+        jpegFile
+      );
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error converting HEIC to JPEG: " + e.getMessage());
+      return heicUri;
+    }
+  }
+
   public void handleFileChooserResult(ActivityResult result) {
     if (mFilePathCallback != null) {
       Uri[] results = null;
@@ -1499,12 +1550,26 @@ public class WebViewDialog extends Dialog {
         if (data != null) {
           String dataString = data.getDataString();
           if (dataString != null) {
-            results = new Uri[] { Uri.parse(dataString) };
+            Uri originalUri = Uri.parse(dataString);
+            // Check if the file is HEIC format
+            String mimeType = activity.getContentResolver().getType(originalUri);
+            if (mimeType != null && mimeType.equals("image/heic")) {
+              results = new Uri[] { convertHeicToJpeg(originalUri) };
+            } else {
+              results = new Uri[] { originalUri };
+            }
           } else if (data.getClipData() != null) {
             final int numSelectedFiles = data.getClipData().getItemCount();
             results = new Uri[numSelectedFiles];
             for (int i = 0; i < numSelectedFiles; i++) {
-              results[i] = data.getClipData().getItemAt(i).getUri();
+              Uri originalUri = data.getClipData().getItemAt(i).getUri();
+              // Check if the file is HEIC format
+              String mimeType = activity.getContentResolver().getType(originalUri);
+              if (mimeType != null && mimeType.equals("image/heic")) {
+                results[i] = convertHeicToJpeg(originalUri);
+              } else {
+                results[i] = originalUri;
+              }
             }
           }
         }
