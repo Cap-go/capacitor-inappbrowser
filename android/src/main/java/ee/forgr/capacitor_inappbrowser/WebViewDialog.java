@@ -40,6 +40,7 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -57,6 +58,7 @@ import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -77,6 +79,8 @@ import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
 import androidx.activity.result.ActivityResultLauncher;
+import android.os.Handler;
+import android.os.Looper;
 
 public class WebViewDialog extends Dialog {
 
@@ -159,38 +163,104 @@ public class WebViewDialog extends Dialog {
 
     @JavascriptInterface
     public void postMessage(String message) {
-      try {
-        // Handle message from JavaScript safely
-        if (message == null || message.isEmpty()) {
-          Log.e("InAppBrowser", "Received empty message from WebView");
-          return;
-        }
-        _options.getCallbacks().javascriptCallback(message);
-      } catch (Exception e) {
-        Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
-      }
+      // Handle postMessage
     }
 
     @JavascriptInterface
     public void close() {
-      try {
-        // close webview safely
-        if (activity != null) {
-          activity.runOnUiThread(() -> {
-            try {
-              String currentUrl = _webView != null ? _webView.getUrl() : "";
-              dismiss();
-              if (_options != null && _options.getCallbacks() != null) {
-                _options.getCallbacks().closeEvent(currentUrl);
-              }
-            } catch (Exception e) {
-              Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
-            }
-          });
-        }
-      } catch (Exception e) {
-        Log.e("InAppBrowser", "Error in close: " + e.getMessage());
+      // Handle close
+    }
+
+    @JavascriptInterface
+    public void share(String title, String text, String url, String fileData, String fileName, String fileType) {
+      Log.d("InAppBrowser", "Native share method called with params: " + 
+        "title=" + title + ", " +
+        "text=" + text + ", " +
+        "url=" + url + ", " +
+        "fileData=" + (fileData != null ? "present" : "null") + ", " +
+        "fileName=" + fileName + ", " +
+        "fileType=" + fileType);
+
+      if (activity == null) {
+        Log.e("InAppBrowser", "Activity is null, cannot share");
+        return;
       }
+
+      activity.runOnUiThread(() -> {
+        try {
+          // Create the sharing intent
+          Intent shareIntent = new Intent();
+          shareIntent.setAction(Intent.ACTION_SEND);
+          
+          // Handle file sharing
+          if (fileData != null && !fileData.isEmpty()) {
+            try {
+              Log.d("InAppBrowser", "Processing file share");
+              // Decode base64 data
+              byte[] fileBytes = Base64.decode(fileData, Base64.DEFAULT);
+              
+              // Create temporary file
+              File tempFile = new File(activity.getCacheDir(), fileName);
+              FileOutputStream fos = new FileOutputStream(tempFile);
+              fos.write(fileBytes);
+              fos.close();
+              
+              // Get content URI
+              Uri fileUri = FileProvider.getUriForFile(
+                activity,
+                activity.getPackageName() + ".fileprovider",
+                tempFile
+              );
+              
+              // Set up share intent for file
+              shareIntent.setType(fileType);
+              shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+              shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+              Log.d("InAppBrowser", "File share intent prepared");
+            } catch (Exception e) {
+              Log.e("InAppBrowser", "Error handling file share: " + e.getMessage());
+              e.printStackTrace();
+              return;
+            }
+          } else {
+            Log.d("InAppBrowser", "Processing text share");
+            // Handle text sharing
+            shareIntent.setType("text/plain");
+            
+            // Combine title, text and url
+            StringBuilder shareText = new StringBuilder();
+            if (title != null && !title.isEmpty()) {
+              shareText.append(title).append("\n");
+            }
+            if (text != null && !text.isEmpty()) {
+              shareText.append(text).append("\n");
+            }
+            if (url != null && !url.isEmpty()) {
+              shareText.append(url);
+            }
+            
+            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
+            Log.d("InAppBrowser", "Text share intent prepared");
+          }
+
+          // Verify that we can resolve the intent
+          if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
+            Log.d("InAppBrowser", "Found activity to handle share intent");
+            // Create chooser dialog
+            Intent chooser = Intent.createChooser(shareIntent, "Share with");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            
+            // Start the activity
+            activity.startActivity(chooser);
+            Log.d("InAppBrowser", "Share intent started successfully");
+          } else {
+            Log.e("InAppBrowser", "No activity found to handle share intent");
+          }
+        } catch (Exception e) {
+          Log.e("InAppBrowser", "Error sharing content: " + e.getMessage());
+          e.printStackTrace();
+        }
+      });
     }
   }
 
@@ -236,14 +306,8 @@ public class WebViewDialog extends Dialog {
     // Make status bar transparent
     if (getWindow() != null) {
       getWindow().setStatusBarColor(Color.TRANSPARENT);
-
-      // Add FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS flag to the window
-      getWindow()
-        .addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-
-      // On Android 30+ clear FLAG_TRANSLUCENT_STATUS flag
-      getWindow()
-        .clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+      getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+      getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
     }
 
     WindowInsetsControllerCompat insetsController =
@@ -317,257 +381,141 @@ public class WebViewDialog extends Dialog {
     // Apply insets to fix edge-to-edge issues on Android 15+
     applyInsets();
 
-    _webView.addJavascriptInterface(
-      new JavaScriptInterface(),
-      "AndroidInterface"
-    );
-    _webView.addJavascriptInterface(
-      new PreShowScriptInterface(),
-      "PreShowScriptInterface"
-    );
-    _webView.getSettings().setJavaScriptEnabled(true);
-    _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-    _webView.getSettings().setDatabaseEnabled(true);
-    _webView.getSettings().setDomStorageEnabled(true);
-    _webView.getSettings().setAllowFileAccess(true);
-    _webView.getSettings().setLoadWithOverviewMode(true);
-    _webView.getSettings().setUseWideViewPort(true);
-    _webView.getSettings().setAllowFileAccessFromFileURLs(true);
-    _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
-    _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+    // Add JavaScript interfaces
+    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+    _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
+
+    // Configure WebView settings
+    WebSettings webSettings = _webView.getSettings();
+    webSettings.setJavaScriptEnabled(true);
+    webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+    webSettings.setDatabaseEnabled(true);
+    webSettings.setDomStorageEnabled(true);
+    webSettings.setAllowFileAccess(true);
+    webSettings.setLoadWithOverviewMode(true);
+    webSettings.setUseWideViewPort(true);
+    webSettings.setAllowFileAccessFromFileURLs(true);
+    webSettings.setAllowUniversalAccessFromFileURLs(true);
+    webSettings.setMediaPlaybackRequiresUserGesture(false);
 
     // Set text zoom if specified in options
     if (_options.getTextZoom() > 0) {
-      _webView.getSettings().setTextZoom(_options.getTextZoom());
+      webSettings.setTextZoom(_options.getTextZoom());
     }
 
-    _webView.setWebViewClient(new WebViewClient());
-
-    _webView.setWebChromeClient(
-      new MyWebChromeClient() {
-        // Enable file open dialog
-        @Override
-        public boolean onShowFileChooser(
-          WebView webView,
-          ValueCallback<Uri[]> filePathCallback,
-          FileChooserParams fileChooserParams
-        ) {
-          mFilePathCallback = filePathCallback;
-          Intent intent = fileChooserParams.createIntent();
-          try {
-            openFileChooser(filePathCallback);
-          } catch (ActivityNotFoundException e) {
-            mFilePathCallback = null;
-            Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
-            return false;
-          }
-          return true;
-        }
-
-        /**
-         * Launch the camera app for capturing images
-         * @param useFrontCamera true to use front camera, false for back camera
-         */
-        private void launchCamera(boolean useFrontCamera) {
-          Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-          if (takePictureIntent.resolveActivity(_context.getPackageManager()) != null) {
-            File photoFile = null;
-            try {
-              photoFile = createImageFile();
-            } catch (IOException ex) {
-              Toast.makeText(_context, "Error creating image file", Toast.LENGTH_SHORT).show();
-            }
-
-            if (photoFile != null) {
-              tempCameraUri = FileProvider.getUriForFile(
-                _context,
-                _context.getPackageName() + ".fileprovider",
-                photoFile
-              );
-              takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
-              if (useFrontCamera) {
-                takePictureIntent.putExtra("android.intent.extras.CAMERA_FACING", 1);
-              }
-
-              if (cameraLauncher != null) {
-                cameraLauncher.launch(takePictureIntent);
-              } else {
-                // Fallback for older Android versions
-                activity.startActivityForResult(takePictureIntent, FILE_CHOOSER_REQUEST_CODE);
-              }
-            }
-          }
-        }
-
-        /**
-         * Launch camera after permission is granted
-         */
-        private void launchCameraWithPermission(boolean useFrontCamera) {
-          try {
-            Intent takePictureIntent = new Intent(
-              MediaStore.ACTION_IMAGE_CAPTURE
-            );
-            if (
-              takePictureIntent.resolveActivity(activity.getPackageManager()) !=
-                null
-            ) {
-              File photoFile = null;
-              try {
-                photoFile = createImageFile();
-              } catch (IOException ex) {
-                Log.e("InAppBrowser", "Error creating image file", ex);
-                fallbackToFilePicker();
-                return;
-              }
-
-              if (photoFile != null) {
-                tempCameraUri = FileProvider.getUriForFile(
-                  activity,
-                  activity.getPackageName() + ".fileprovider",
-                  photoFile
-                );
-                takePictureIntent.putExtra(
-                  MediaStore.EXTRA_OUTPUT,
-                  tempCameraUri
-                );
-
-                if (useFrontCamera) {
-                  takePictureIntent.putExtra(
-                    "android.intent.extras.CAMERA_FACING",
-                    1
-                  );
-                }
-
-                try {
-                  if (activity instanceof androidx.activity.ComponentActivity) {
-                    androidx.activity.ComponentActivity componentActivity =
-                      (androidx.activity.ComponentActivity) activity;
-                    componentActivity
-                      .getActivityResultRegistry()
-                      .register(
-                        "camera_capture",
-                        new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                        result -> {
-                          if (result.getResultCode() == Activity.RESULT_OK) {
-                            if (tempCameraUri != null) {
-                              mFilePathCallback.onReceiveValue(
-                                new Uri[] { tempCameraUri }
-                              );
-                            }
-                          } else {
-                            mFilePathCallback.onReceiveValue(null);
-                          }
-                          mFilePathCallback = null;
-                          tempCameraUri = null;
-                        }
-                      )
-                      .launch(takePictureIntent);
-                  } else {
-                    // Fallback for non-ComponentActivity
-                    activity.startActivityForResult(
-                      takePictureIntent,
-                      FILE_CHOOSER_REQUEST_CODE
-                    );
-                  }
-                } catch (SecurityException e) {
-                  Log.e(
-                    "InAppBrowser",
-                    "Security exception launching camera: " + e.getMessage(),
-                    e
-                  );
-                  fallbackToFilePicker();
-                }
-              } else {
-                Log.e(
-                  "InAppBrowser",
-                  "Failed to create photo URI, falling back to file picker"
-                );
-                fallbackToFilePicker();
-              }
-            }
-          } catch (Exception e) {
-            Log.e("InAppBrowser", "Camera launch failed: " + e.getMessage(), e);
-            fallbackToFilePicker();
-          }
-        }
-
-        /**
-         * Fall back to file picker when camera launch fails
-         */
-        private void fallbackToFilePicker() {
-          if (mFilePathCallback != null) {
-            openFileChooser(mFilePathCallback, "image/*", false);
-          }
-        }
-
-        // Grant permissions for cam
-        @Override
-        public void onPermissionRequest(final PermissionRequest request) {
-          activity.runOnUiThread(() -> {
-            if (request.getResources()[0].equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-              permissionHandler.handleCameraPermissionRequest(request);
-            } else if (request.getResources()[0].equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
-              permissionHandler.handleMicrophonePermissionRequest(request);
-            }
-          });
-        }
-
-        @Override
-        public void onPermissionRequestCanceled(PermissionRequest request) {
-          super.onPermissionRequestCanceled(request);
-          Toast.makeText(
-            WebViewDialog.this.activity,
-            "Permission Denied",
-            Toast.LENGTH_SHORT
-          ).show();
-          // Handle the denied permission
-          if (currentPermissionRequest != null) {
-            currentPermissionRequest.deny();
-            currentPermissionRequest = null;
-          }
-        }
-
-        // This method will be called at page load, a good place to inject customizations
-        @Override
-        public void onProgressChanged(WebView view, int newProgress) {
-          super.onProgressChanged(view, newProgress);
-
-          // When the page is almost loaded, inject our date picker customization
-          // Only if materialPicker option is enabled
-          if (
-            newProgress > 75 &&
-              !datePickerInjected &&
-              _options.getMaterialPicker()
-          ) {
-            injectDatePickerFixes();
-          }
-        }
+    // Set up WebView client with interface injection
+    _webView.setWebViewClient(new WebViewClient() {
+      @Override
+      public void onPageStarted(WebView view, String url, Bitmap favicon) {
+        super.onPageStarted(view, url, favicon);
+        Log.d("InAppBrowser", "Page started loading: " + url);
       }
-    );
 
+      @Override
+      public void onPageFinished(WebView view, String url) {
+        super.onPageFinished(view, url);
+        Log.d("InAppBrowser", "Page finished loading: " + url);
+        
+        // Inject the share polyfill after page load
+        String initScript = """
+          (function() {
+            console.log('Initializing Web Share API polyfill...');
+            
+            // Function to check if mobileApp is available
+            function isMobileAppAvailable() {
+              return typeof window.mobileApp !== 'undefined' && 
+                     typeof window.mobileApp.share === 'function';
+            }
+            
+            // Initialize Web Share API polyfill
+            if (typeof navigator.share === 'undefined') {
+              console.log('navigator.share is undefined, adding polyfill');
+              navigator.share = function(shareData) {
+                console.log('Share called with data:', shareData);
+                return new Promise((resolve, reject) => {
+                  try {
+                    const title = shareData.title || '';
+                    const text = shareData.text || '';
+                    const url = shareData.url || '';
+                    
+                    console.log('Preparing to share:', {title, text, url});
+                    
+                    if (shareData.files && shareData.files.length > 0) {
+                      console.log('Sharing file:', shareData.files[0]);
+                      const file = shareData.files[0];
+                      const reader = new FileReader();
+                      
+                      reader.onload = function() {
+                        try {
+                          console.log('File loaded, converting to base64');
+                          const base64Data = reader.result.split(',')[1];
+                          console.log('Calling native share with file');
+                          window.mobileApp.share(title, text, url, base64Data, file.name, file.type);
+                          resolve();
+                        } catch (error) {
+                          console.error('Error in file share:', error);
+                          reject(error);
+                        }
+                      };
+                      
+                      reader.onerror = function(error) {
+                        console.error('Error reading file:', error);
+                        reject(error);
+                      };
+                      
+                      reader.readAsDataURL(file);
+                    } else {
+                      console.log('Sharing text/url');
+                      window.mobileApp.share(title, text, url, '', '', '');
+                      resolve();
+                    }
+                  } catch (error) {
+                    console.error('Error in share polyfill:', error);
+                    reject(error);
+                  }
+                });
+              };
+              console.log('Web Share API polyfill added successfully');
+            } else {
+              console.log('navigator.share already exists');
+            }
+          })();
+        """;
+
+        view.evaluateJavascript(initScript, new ValueCallback<String>() {
+          @Override
+          public void onReceiveValue(String value) {
+            Log.d("InAppBrowser", "Web Share API polyfill initialized with result: " + value);
+          }
+        });
+      }
+    });
+
+    // Set up WebChromeClient
+    _webView.setWebChromeClient(new MyWebChromeClient());
+
+    // Load the URL with headers
     Map<String, String> requestHeaders = new HashMap<>();
     if (_options.getHeaders() != null) {
       Iterator<String> keys = _options.getHeaders().keys();
       while (keys.hasNext()) {
         String key = keys.next();
         if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
-          _webView
-            .getSettings()
-            .setUserAgentString(_options.getHeaders().getString(key));
+          _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
         } else {
           requestHeaders.put(key, _options.getHeaders().getString(key));
         }
       }
     }
 
-    _webView.loadUrl(this._options.getUrl(), requestHeaders);
+    _webView.loadUrl(_options.getUrl(), requestHeaders);
     _webView.requestFocus();
     _webView.requestFocusFromTouch();
 
     setupToolbar();
     setWebViewClient();
 
-    if (!this._options.isPresentAfterPageLoad()) {
+    if (!_options.isPresentAfterPageLoad()) {
       show();
       _options.getPluginCall().resolve();
     }
@@ -782,20 +730,157 @@ public class WebViewDialog extends Dialog {
   }
 
   private void injectJavaScriptInterface() {
-    String script =
-      "if (!window.mobileApp) { " +
-        "    window.mobileApp = { " +
-        "        postMessage: function(message) { " +
-        "            if (window.AndroidInterface) { " +
-        "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
-        "            } " +
-        "        }, " +
-        "        close: function() { " +
-        "            window.AndroidInterface.close(); " +
-        "        } " +
-        "    }; " +
-        "}";
-    _webView.evaluateJavascript(script, null);
+    // Add JavaScript interface for message handling
+    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+    Log.d("InAppBrowser", "JavaScript interface added");
+
+    // Initialize the interface with a delay
+    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+      // First, verify that the interface is accessible
+      String verifyScript = """
+        (function() {
+          console.log('Verifying mobileApp interface...');
+          if (typeof window.mobileApp === 'undefined') {
+            console.error('mobileApp is undefined');
+            return false;
+          }
+          if (typeof window.mobileApp.share !== 'function') {
+            console.error('mobileApp.share is not a function');
+            return false;
+          }
+          console.log('mobileApp interface verified successfully');
+          return true;
+        })();
+      """;
+
+      _webView.evaluateJavascript(verifyScript, new ValueCallback<String>() {
+        @Override
+        public void onReceiveValue(String value) {
+          Log.d("InAppBrowser", "Interface verification result: " + value);
+          
+          if ("true".equals(value)) {
+            // Only initialize the share polyfill if the interface is verified
+            initializeSharePolyfill();
+          } else {
+            Log.e("InAppBrowser", "JavaScript interface verification failed");
+            // Try to re-add the interface
+            _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+            Log.d("InAppBrowser", "Re-added JavaScript interface");
+            
+            // Try verification again after a delay
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+              _webView.evaluateJavascript(verifyScript, new ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String value) {
+                  if ("true".equals(value)) {
+                    initializeSharePolyfill();
+                  } else {
+                    Log.e("InAppBrowser", "JavaScript interface still not available after retry");
+                  }
+                }
+              });
+            }, 1000);
+          }
+        }
+      });
+    }, 1000);
+  }
+
+  private void initializeSharePolyfill() {
+    String initScript = """
+      (function() {
+        console.log('Initializing Web Share API polyfill...');
+        
+        // Function to check if mobileApp is available
+        function isMobileAppAvailable() {
+          return typeof window.mobileApp !== 'undefined' && 
+                 typeof window.mobileApp.share === 'function';
+        }
+        
+        // Function to wait for mobileApp to be available
+        function waitForMobileApp(callback, maxAttempts = 20) {
+          let attempts = 0;
+          const checkInterval = setInterval(() => {
+            attempts++;
+            if (isMobileAppAvailable()) {
+              clearInterval(checkInterval);
+              callback();
+            } else if (attempts >= maxAttempts) {
+              clearInterval(checkInterval);
+              console.error('mobileApp interface not available after ' + maxAttempts + ' attempts');
+            }
+          }, 100);
+        }
+        
+        // Initialize Web Share API polyfill
+        if (typeof navigator.share === 'undefined') {
+          console.log('navigator.share is undefined, adding polyfill');
+          navigator.share = function(shareData) {
+            console.log('Share called with data:', shareData);
+            return new Promise((resolve, reject) => {
+              try {
+                const title = shareData.title || '';
+                const text = shareData.text || '';
+                const url = shareData.url || '';
+                
+                console.log('Preparing to share:', {title, text, url});
+                
+                if (shareData.files && shareData.files.length > 0) {
+                  console.log('Sharing file:', shareData.files[0]);
+                  const file = shareData.files[0];
+                  const reader = new FileReader();
+                  
+                  reader.onload = function() {
+                    try {
+                      console.log('File loaded, converting to base64');
+                      const base64Data = reader.result.split(',')[1];
+                      
+                      // Wait for mobileApp to be available before sharing
+                      waitForMobileApp(() => {
+                        console.log('mobileApp available, calling share');
+                        window.mobileApp.share(title, text, url, base64Data, file.name, file.type);
+                        resolve();
+                      }, 20);
+                    } catch (error) {
+                      console.error('Error in file share:', error);
+                      reject(error);
+                    }
+                  };
+                  
+                  reader.onerror = function(error) {
+                    console.error('Error reading file:', error);
+                    reject(error);
+                  };
+                  
+                  reader.readAsDataURL(file);
+                } else {
+                  console.log('Sharing text/url');
+                  // Wait for mobileApp to be available before sharing
+                  waitForMobileApp(() => {
+                    console.log('mobileApp available, calling share');
+                    window.mobileApp.share(title, text, url, '', '', '');
+                    resolve();
+                  }, 20);
+                }
+              } catch (error) {
+                console.error('Error in share polyfill:', error);
+                reject(error);
+              }
+            });
+          };
+          console.log('Web Share API polyfill added successfully');
+        } else {
+          console.log('navigator.share already exists');
+        }
+      })();
+    """;
+
+    _webView.evaluateJavascript(initScript, new ValueCallback<String>() {
+      @Override
+      public void onReceiveValue(String value) {
+        Log.d("InAppBrowser", "Web Share API polyfill initialized with result: " + value);
+      }
+    });
   }
 
   private void injectPreShowScript() {
@@ -1527,354 +1612,19 @@ public class WebViewDialog extends Dialog {
   }
 
   private void setWebViewClient() {
-    _webView.setWebViewClient(
-      new WebViewClient() {
-        @Override
-        public boolean shouldOverrideUrlLoading(
-          WebView view,
-          WebResourceRequest request
-        ) {
-          //          HashMap<String, String> map = new HashMap<>();
-          //          map.put("x-requested-with", null);
-          //          view.loadUrl(request.getUrl().toString(), map);
-          Context context = view.getContext();
-          String url = request.getUrl().toString();
-
-          if (!url.startsWith("https://") && !url.startsWith("http://")) {
-            try {
-              Intent intent;
-              if (url.startsWith("intent://")) {
-                intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-              } else {
-                intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-              }
-
-              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-              context.startActivity(intent);
-              return true;
-            } catch (ActivityNotFoundException | URISyntaxException e) {
-              // Do nothing
-            }
-          }
-          return false;
-        }
-
-        private String randomRequestId() {
-          return UUID.randomUUID().toString();
-        }
-
-        private String toBase64(String raw) {
-          String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
-          if (s.endsWith("=")) {
-            s = s.substring(0, s.length() - 2);
-          }
-          return s;
-        }
-
-        //
-        //        void handleRedirect(String currentUrl, Response response) {
-        //          String loc = response.header("Location");
-        //          _webView.evaluateJavascript("");
-        //        }
-        //
-        @Override
-        public WebResourceResponse shouldInterceptRequest(
-          WebView view,
-          WebResourceRequest request
-        ) {
-          Pattern pattern = _options.getProxyRequestsPattern();
-          if (pattern == null) {
-            return null;
-          }
-          Matcher matcher = pattern.matcher(request.getUrl().toString());
-          if (!matcher.find()) {
-            return null;
-          }
-
-          // Requests matches the regex
-          if (Objects.equals(request.getMethod(), "POST")) {
-            // Log.e("HTTP", String.format("returned null (ok) %s", request.getUrl().toString()));
-            return null;
-          }
-
-          Log.i(
-            "InAppBrowserProxy",
-            String.format("Proxying request: %s", request.getUrl().toString())
-          );
-
-          // We need to call a JS function
-          String requestId = randomRequestId();
-          ProxiedRequest proxiedRequest = new ProxiedRequest();
-          addProxiedRequest(requestId, proxiedRequest);
-
-          // lsuakdchgbbaHandleProxiedRequest
-          activity.runOnUiThread(
-            new Runnable() {
-              @Override
-              public void run() {
-                StringBuilder headers = new StringBuilder();
-                Map<String, String> requestHeaders =
-                  request.getRequestHeaders();
-                for (Map.Entry<
-                  String,
-                  String
-                  > header : requestHeaders.entrySet()) {
-                  headers.append(
-                    String.format(
-                      "h[atob('%s')]=atob('%s');",
-                      toBase64(header.getKey()),
-                      toBase64(header.getValue())
-                    )
-                  );
-                }
-                String s = String.format(
-                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})}",
-                  headers,
-                  toBase64(request.getUrl().toString()),
-                  request.getMethod(),
-                  requestId,
-                  requestId,
-                  requestId
-                );
-                // Log.i("HTTP", s);
-                capacitorWebView.evaluateJavascript(s, null);
-              }
-            }
-          );
-
-          // 10 seconds wait max
-          try {
-            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-              return proxiedRequest.response;
-            } else {
-              Log.e("InAppBrowserProxy", "Semaphore timed out");
-              removeProxiedRequest(requestId); // prevent mem leak
-            }
-          } catch (InterruptedException e) {
-            Log.e("InAppBrowserProxy", "Semaphore wait error", e);
-          }
-          return null;
-        }
-
-        @Override
-        public void onReceivedHttpAuthRequest(
-          WebView view,
-          HttpAuthHandler handler,
-          String host,
-          String realm
-        ) {
-          final String sourceUrl = _options.getUrl();
-          final String url = view.getUrl();
-          final JSObject credentials = _options.getCredentials();
-
-          if (
-            credentials != null &&
-              credentials.getString("username") != null &&
-              credentials.getString("password") != null &&
-              sourceUrl != null &&
-              url != null
-          ) {
-            String sourceProtocol = "";
-            String sourceHost = "";
-            int sourcePort = -1;
-            try {
-              URI uri = new URI(sourceUrl);
-              sourceProtocol = uri.getScheme();
-              sourceHost = uri.getHost();
-              sourcePort = uri.getPort();
-              if (
-                sourcePort == -1 && Objects.equals(sourceProtocol, "https")
-              ) sourcePort = 443;
-              else if (
-                sourcePort == -1 && Objects.equals(sourceProtocol, "http")
-              ) sourcePort = 80;
-            } catch (URISyntaxException e) {
-              e.printStackTrace();
-            }
-
-            String protocol = "";
-            int port = -1;
-            try {
-              URI uri = new URI(url);
-              protocol = uri.getScheme();
-              port = uri.getPort();
-              if (port == -1 && Objects.equals(protocol, "https")) port = 443;
-              else if (port == -1 && Objects.equals(protocol, "http")) port =
-                80;
-            } catch (URISyntaxException e) {
-              e.printStackTrace();
-            }
-
-            if (
-              Objects.equals(sourceHost, host) &&
-                Objects.equals(sourceProtocol, protocol) &&
-                sourcePort == port
-            ) {
-              final String username = Objects.requireNonNull(
-                credentials.getString("username")
-              );
-              final String password = Objects.requireNonNull(
-                credentials.getString("password")
-              );
-              handler.proceed(username, password);
-              return;
-            }
-          }
-
-          super.onReceivedHttpAuthRequest(view, handler, host, realm);
-        }
-
-        @Override
-        public void onLoadResource(WebView view, String url) {
-          super.onLoadResource(view, url);
-        }
-
-        @Override
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
-          super.onPageStarted(view, url, favicon);
-          try {
-            URI uri = new URI(url);
-            if (TextUtils.isEmpty(_options.getTitle())) {
-              setTitle(uri.getHost());
-            }
-          } catch (URISyntaxException e) {
-            // Do nothing
-          }
-        }
-
-        public void doUpdateVisitedHistory(
-          WebView view,
-          String url,
-          boolean isReload
-        ) {
-          if (!isReload) {
-            _options.getCallbacks().urlChangeEvent(url);
-          }
-          super.doUpdateVisitedHistory(view, url, isReload);
-          injectJavaScriptInterface();
-        }
-
-        @Override
-        public void onPageFinished(WebView view, String url) {
-          super.onPageFinished(view, url);
-          if (!isInitialized) {
-            isInitialized = true;
-            _webView.clearHistory();
-            if (_options.isPresentAfterPageLoad()) {
-              boolean usePreShowScript =
-                _options.getPreShowScript() != null &&
-                  !_options.getPreShowScript().isEmpty();
-              if (!usePreShowScript) {
-                show();
-                _options.getPluginCall().resolve();
-              } else {
-                executorService.execute(
-                  new Runnable() {
-                    @Override
-                    public void run() {
-                      if (
-                        _options.getPreShowScript() != null &&
-                          !_options.getPreShowScript().isEmpty()
-                      ) {
-                        injectPreShowScript();
-                      }
-
-                      activity.runOnUiThread(
-                        new Runnable() {
-                          @Override
-                          public void run() {
-                            show();
-                            _options.getPluginCall().resolve();
-                          }
-                        }
-                      );
-                    }
-                  }
-                );
-              }
-            }
-          } else if (
-            _options.getPreShowScript() != null &&
-              !_options.getPreShowScript().isEmpty()
-          ) {
-            executorService.execute(
-              new Runnable() {
-                @Override
-                public void run() {
-                  injectPreShowScript();
-                }
-              }
-            );
-          }
-
-          ImageButton backButton = _toolbar.findViewById(R.id.backButton);
-          if (_webView.canGoBack()) {
-            backButton.setImageResource(R.drawable.arrow_back_enabled);
-            backButton.setEnabled(true);
-            backButton.setColorFilter(iconColor);
-          } else {
-            backButton.setImageResource(R.drawable.arrow_back_disabled);
-            backButton.setEnabled(false);
-            backButton.setColorFilter(
-              Color.argb(
-                128,
-                Color.red(iconColor),
-                Color.green(iconColor),
-                Color.blue(iconColor)
-              )
-            );
-          }
-
-          ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
-          if (_webView.canGoForward()) {
-            forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
-            forwardButton.setEnabled(true);
-            forwardButton.setColorFilter(iconColor);
-          } else {
-            forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
-            forwardButton.setEnabled(false);
-            forwardButton.setColorFilter(
-              Color.argb(
-                128,
-                Color.red(iconColor),
-                Color.green(iconColor),
-                Color.blue(iconColor)
-              )
-            );
-          }
-
-          _options.getCallbacks().pageLoaded();
-          injectJavaScriptInterface();
-        }
-
-        @Override
-        public void onReceivedError(
-          WebView view,
-          WebResourceRequest request,
-          WebResourceError error
-        ) {
-          super.onReceivedError(view, request, error);
-          _options.getCallbacks().pageLoadError();
-        }
-
-        @SuppressLint("WebViewClientOnReceivedSslError")
-        @Override
-        public void onReceivedSslError(
-          WebView view,
-          SslErrorHandler handler,
-          SslError error
-        ) {
-          boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
-          if (
-            ignoreSSLUntrustedError &&
-              error.getPrimaryError() == SslError.SSL_UNTRUSTED
-          ) handler.proceed();
-          else {
-            super.onReceivedSslError(view, handler, error);
-          }
-        }
+    _webView.setWebViewClient(new WebViewClient() {
+      @Override
+      public void onPageStarted(WebView view, String url, Bitmap favicon) {
+        super.onPageStarted(view, url, favicon);
+        injectJavaScriptInterface();
       }
-    );
+
+      @Override
+      public void onPageFinished(WebView view, String url) {
+        super.onPageFinished(view, url);
+        injectJavaScriptInterface();
+      }
+    });
   }
 
   @Override
