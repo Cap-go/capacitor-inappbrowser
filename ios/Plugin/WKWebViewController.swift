@@ -112,6 +112,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
+    var capacitorStatusBar: UIView?
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -276,9 +277,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         // Check if custom image is provided
         if let image = activityBarButtonItemImage {
             let button = UIBarButtonItem(image: image.withRenderingMode(.alwaysTemplate),
-                                         style: .plain,
-                                         target: self,
-                                         action: #selector(activityDidClick(sender:)))
+                                            style: .plain,
+                                            target: self,
+                                            action: #selector(activityDidClick(sender:)))
 
             // Apply tint from navigation bar or from tintColor property
             if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
@@ -290,8 +291,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         } else {
             // Use system share icon
             let button = UIBarButtonItem(barButtonSystemItem: .action,
-                                         target: self,
-                                         action: #selector(activityDidClick(sender:)))
+                                            target: self,
+                                            action: #selector(activityDidClick(sender:)))
 
             // Apply tint from navigation bar or from tintColor property
             if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
@@ -341,6 +342,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webView?.removeObserver(self, forKeyPath: titleKeyPath)
         }
         webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+    }
+
+    override open func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+
+        if let capacitorStatusBar = capacitorStatusBar {
+            self.capBrowserPlugin?.bridge?.webView?.superview?.addSubview(capacitorStatusBar)
+            self.capBrowserPlugin?.bridge?.webView?.frame.origin.y = capacitorStatusBar.frame.height
+        }
     }
 
     override open func viewDidLoad() {
@@ -394,9 +404,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
                 // Create a properly tinted button
                 let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                                                 style: .plain,
-                                                 target: self,
-                                                 action: #selector(buttonNearDoneDidClick))
+                                                    style: .plain,
+                                                    target: self,
+                                                    action: #selector(buttonNearDoneDidClick))
                 buttonItem.tintColor = tintColor
 
                 // Add it to right items
@@ -434,7 +444,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     // Method to send a message from Swift to JavaScript
     open func postMessageToJS(message: [String: Any]) {
         if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
+            let jsonString = String(data: jsonData, encoding: .utf8) {
             let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
             DispatchQueue.main.async {
                 self.webView?.evaluateJavaScript(script, completionHandler: nil)
@@ -468,7 +478,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             semaphore.signal()
         } else if message.name == "close" {
             closeView()
-        }
+		} else if message.name == "magicPrint" {
+			if let webView = self.webView {
+				let printController = UIPrintInteractionController.shared
+
+				let printInfo = UIPrintInfo(dictionary: nil)
+				printInfo.outputType = .general
+				printInfo.jobName = "Print Job"
+
+				printController.printInfo = printInfo
+				printController.printFormatter = webView.viewPrintFormatter()
+
+				printController.present(animated: true, completionHandler: nil)
+			}
+		}
     }
 
     func injectJavaScriptInterface() {
@@ -486,9 +509,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         };
                 }
                 """
-        DispatchQueue.main.async {
-            self.webView?.evaluateJavaScript(script, completionHandler: nil)
-        }
+		DispatchQueue.main.async {
+			self.webView?.evaluateJavaScript(script) { result, error in
+				if let error = error {
+					print("JavaScript evaluation error: \(error)")
+				} else if let result = result {
+					print("JavaScript result: \(result)")
+				} else {
+					print("JavaScript executed with no result")
+				}
+			}
+		}
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -503,15 +534,35 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
         userContentController.add(self, name: "close")
+		 userContentController.add(self, name: "magicPrint")
+
+		// Inject JavaScript to override window.print
+		let script = WKUserScript(
+			source: """
+			window.print = function() {
+				window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
+			};
+			""",
+			injectionTime: .atDocumentStart,
+			forMainFrameOnly: false
+		)
+		userContentController.addUserScript(script)
+
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
-        webConfiguration.allowsInlineMediaPlayback = true
+
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
-        if webView.responds(to: Selector(("setInspectable:"))) {
-            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
-            webView.perform(Selector(("setInspectable:")), with: isInspectable)
-        }
+//        if webView.responds(to: Selector(("setInspectable:"))) {
+//            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
+//            webView.perform(Selector(("setInspectable:")), with: isInspectable)
+//        }
+
+		if #available(iOS 16.4, *) {
+			webView.isInspectable = true
+		} else {
+			// Fallback on earlier versions
+		}
 
         if self.blankNavigationTab {
             // First add the webView to view hierarchy
@@ -1387,8 +1438,8 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         if let credentials = credentials,
-           challenge.protectionSpace.receivesCredentialSecurely,
-           let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
+            challenge.protectionSpace.receivesCredentialSecurely,
+            let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {
             let urlCredential = URLCredential(user: credentials.username, password: credentials.password, persistence: .none)
             completionHandler(.useCredential, urlCredential)
         } else if let bypassedSSLHosts = bypassedSSLHosts, bypassedSSLHosts.contains(challenge.protectionSpace.host) {
@@ -1400,8 +1451,8 @@ extension WKWebViewController: WKNavigationDelegate {
                 return
             }
             /* allows to open links with self-signed certificates
-             Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
-             */
+                Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
+                */
             guard let serverTrust = challenge.protectionSpace.serverTrust  else {
                 completionHandler(.useCredential, nil)
                 return
