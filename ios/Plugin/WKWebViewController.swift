@@ -674,7 +674,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Ensure status bar appearance is correct when view appears
         // Make sure we have the latest tint color
-        if let tintColor = self.tintColor {
+        if self.tintColor != nil {
             // Update the status bar background if needed
             if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
                 setupStatusBarBackground(color: backgroundColor)
@@ -1260,7 +1260,7 @@ fileprivate extension WKWebViewController {
         capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
     }
 
-    open func setUpNavigationBarAppearance() {
+    func setUpNavigationBarAppearance() {
         // Set up basic bar appearance
         if let navBar = navigationController?.navigationBar {
             // Make navigation bar transparent
