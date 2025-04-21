@@ -1294,13 +1294,38 @@ fileprivate extension WKWebViewController {
 // MARK: - WKUIDelegate
 extension WKWebViewController: WKUIDelegate {
     public func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        // Create a strong reference to the completion handler to ensure it's called
+        let strongCompletionHandler = completionHandler
+
         // Ensure UI updates are on the main thread
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                // View controller was deallocated
+                strongCompletionHandler()
+                return
+            }
+
+            // Check if view is available and ready for presentation
+            guard self.view.window != nil, !self.isBeingDismissed, !self.isMovingFromParent else {
+                print("[InAppBrowser] Cannot present alert - view not in window hierarchy or being dismissed")
+                strongCompletionHandler()
+                return
+            }
+
             let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
             alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
-                completionHandler()
+                strongCompletionHandler()
             }))
-            self.present(alertController, animated: true, completion: nil)
+
+            // Try to present the alert
+            do {
+                self.present(alertController, animated: true, completion: nil)
+            } catch {
+                // This won't typically be triggered as present doesn't throw,
+                // but adding as a safeguard
+                print("[InAppBrowser] Error presenting alert: \(error)")
+                strongCompletionHandler()
+            }
         }
     }
 }
