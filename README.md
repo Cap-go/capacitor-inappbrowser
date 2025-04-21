@@ -613,6 +613,7 @@ Construct a type with a set of properties K of type T
 | Members          | Value                     | Description                                                      | Since |
 | ---------------- | ------------------------- | ---------------------------------------------------------------- | ----- |
 | **`ACTIVITY`**   | <code>"activity"</code>   | Shows a simple toolbar with just a close button and share button | 0.1.0 |
+| **`COMPACT`**    | <code>"compact"</code>    | Shows a simple toolbar with just a close button                  | 7.6.8 |
 | **`NAVIGATION`** | <code>"navigation"</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
 | **`BLANK`**      | <code>"blank"</code>      | Shows no toolbar                                                 | 0.1.0 |
 
