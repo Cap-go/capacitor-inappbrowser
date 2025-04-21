@@ -167,6 +167,7 @@ public class Options {
   private PluginCall pluginCall;
   private boolean VisibleTitle;
   private String ToolbarColor;
+  private String BackgroundColor;
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
   private String preShowScript;
@@ -372,6 +373,14 @@ public class Options {
 
   public void setToolbarColor(String toolbarColor) {
     this.ToolbarColor = toolbarColor;
+  }
+
+  public String getBackgroundColor() {
+    return BackgroundColor;
+  }
+
+  public void setBackgroundColor(String backgroundColor) {
+    this.BackgroundColor = backgroundColor;
   }
 
   public String getToolbarTextColor() {

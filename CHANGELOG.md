@@ -2,6 +2,59 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.8.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.3...7.8.0) (2025-04-21)
+
+
+### Features
+
+* add an explicit mode for a toolbar with just a close button ([df78b97](https://github.com/Cap-go/capacitor-inappbrowser/commit/df78b9747ed8af26c2be3d40a8d6b10de099d0f3)), closes [#272](https://github.com/Cap-go/capacitor-inappbrowser/issues/272)
+
+### [7.7.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.2...7.7.3) (2025-04-21)
+
+
+### Bug Fixes
+
+* JS alert ([0ab11ad](https://github.com/Cap-go/capacitor-inappbrowser/commit/0ab11ad14539dafe176c1c59b9ee92a134b45375))
+
+### [7.7.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.1...7.7.2) (2025-03-31)
+
+
+### Bug Fixes
+
+* printing in iOS ([5bba983](https://github.com/Cap-go/capacitor-inappbrowser/commit/5bba9837771d602a9ffd6cb6433c68ff310d7355))
+
+### [7.7.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.0...7.7.1) (2025-03-30)
+
+## [7.7.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.12...7.7.0) (2025-03-30)
+
+
+### Features
+
+* print on Android and bigger close button ([6d07486](https://github.com/Cap-go/capacitor-inappbrowser/commit/6d0748644e8316144819842741971071ebe0212c))
+
+### [7.6.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.11...7.6.12) (2025-03-30)
+
+### [7.6.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.10...7.6.11) (2025-03-30)
+
+
+### Bug Fixes
+
+* integration with @capacitor/status-bar (again) ([4c96488](https://github.com/Cap-go/capacitor-inappbrowser/commit/4c964882e0787a2c738d0a6fc07847b28e50c228))
+
+### [7.6.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.9...7.6.10) (2025-03-29)
+
+
+### Bug Fixes
+
+* actually implement background color of the browser ([5b73513](https://github.com/Cap-go/capacitor-inappbrowser/commit/5b735133b1eb747a4cd1d150f89d3d1758378e13))
+
+### [7.6.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.8...7.6.9) (2025-03-29)
+
+
+### Bug Fixes
+
+* integration with @capacitor/status-bar ([49f0240](https://github.com/Cap-go/capacitor-inappbrowser/commit/49f0240f639cdb91fe8d3787300cb032f7559207))
+
 ### [7.6.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.6.7...7.6.8) (2025-03-26)
 
 
