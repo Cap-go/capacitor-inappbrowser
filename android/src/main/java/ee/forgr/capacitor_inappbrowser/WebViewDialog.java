@@ -1901,13 +1901,67 @@ public class WebViewDialog extends Dialog {
       FileChooserParams fileChooserParams
     ) {
       mFilePathCallback = filePathCallback;
-      Intent intent = fileChooserParams.createIntent();
-      try {
-        openFileChooser(filePathCallback);
-      } catch (ActivityNotFoundException e) {
-        mFilePathCallback = null;
-        Toast.makeText(activity, "Cannot open file chooser", Toast.LENGTH_LONG).show();
-        return false;
+      
+      // Check if this is a camera capture request
+      String[] acceptTypes = fileChooserParams.getAcceptTypes();
+      boolean isCameraCapture = false;
+      
+      // Check for capture="camera" attribute
+      if (fileChooserParams.getMode() == FileChooserParams.MODE_OPEN) {
+        isCameraCapture = true;
+      } else if (acceptTypes != null && acceptTypes.length > 0) {
+        for (String acceptType : acceptTypes) {
+          if (acceptType.contains("image/*") || acceptType.contains("video/*")) {
+            isCameraCapture = true;
+            break;
+          }
+        }
+      }
+
+      if (isCameraCapture) {
+        // Handle camera capture
+        try {
+          // Create a temporary file to store the camera capture
+          tempCameraUri = createTempImageUri();
+          if (tempCameraUri != null) {
+            Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
+            cameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            
+            // Check if there's a camera app available
+            if (cameraIntent.resolveActivity(activity.getPackageManager()) != null) {
+              cameraLauncher.launch(cameraIntent);
+            } else {
+              Toast.makeText(activity, "No camera app found", Toast.LENGTH_LONG).show();
+              mFilePathCallback = null;
+              return false;
+            }
+          } else {
+            Toast.makeText(activity, "Cannot create temporary file for camera capture", Toast.LENGTH_LONG).show();
+            mFilePathCallback = null;
+            return false;
+          }
+        } catch (Exception e) {
+          mFilePathCallback = null;
+          Toast.makeText(activity, "Error opening camera: " + e.getMessage(), Toast.LENGTH_LONG).show();
+          return false;
+        }
+      } else {
+        // Handle regular file selection
+        try {
+          Intent intent = fileChooserParams.createIntent();
+          if (intent.resolveActivity(activity.getPackageManager()) != null) {
+            fileChooserLauncher.launch(intent);
+          } else {
+            Toast.makeText(activity, "No file chooser app found", Toast.LENGTH_LONG).show();
+            mFilePathCallback = null;
+            return false;
+          }
+        } catch (Exception e) {
+          mFilePathCallback = null;
+          Toast.makeText(activity, "Error opening file chooser: " + e.getMessage(), Toast.LENGTH_LONG).show();
+          return false;
+        }
       }
       return true;
     }
