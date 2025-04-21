@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.8.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.3...7.8.0) (2025-04-21)
+
+
+### Features
+
+* add an explicit mode for a toolbar with just a close button ([df78b97](https://github.com/Cap-go/capacitor-inappbrowser/commit/df78b9747ed8af26c2be3d40a8d6b10de099d0f3)), closes [#272](https://github.com/Cap-go/capacitor-inappbrowser/issues/272)
+
 ### [7.7.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.7.2...7.7.3) (2025-04-21)
 
 
