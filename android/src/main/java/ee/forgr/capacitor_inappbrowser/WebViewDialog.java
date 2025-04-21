@@ -1908,12 +1908,19 @@ public class WebViewDialog extends Dialog {
       
       // Check for capture="camera" attribute
       if (fileChooserParams.getMode() == FileChooserParams.MODE_OPEN) {
-        isCameraCapture = true;
-      } else if (acceptTypes != null && acceptTypes.length > 0) {
-        for (String acceptType : acceptTypes) {
-          if (acceptType.contains("image/*") || acceptType.contains("video/*")) {
-            isCameraCapture = true;
-            break;
+        // Check if it's specifically a camera capture request
+        if (acceptTypes != null && acceptTypes.length > 0) {
+          for (String acceptType : acceptTypes) {
+            // If it's a video capture, it's definitely a camera request
+            if (acceptType.contains("video/*")) {
+              isCameraCapture = true;
+              break;
+            }
+            // For images, only use camera if explicitly requested
+            if (acceptType.contains("image/*") && fileChooserParams.isCaptureEnabled()) {
+              isCameraCapture = true;
+              break;
+            }
           }
         }
       }
