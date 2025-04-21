@@ -661,6 +661,7 @@ Construct a type with a set of properties K of type T
 | **`NAVIGATION`** | <code>'navigation'</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
 | **`BLANK`**      | <code>'blank'</code>      | Shows no toolbar                                                 | 0.1.0 |
 | **`DEFAULT`**    | <code>'default'</code>    | Shows a simple toolbar with just a close button                  | 0.0.1 |
+| **`HIDDEN`**     | <code>'hidden'</code>     | Completely hides the toolbar                                     | 0.1.0 |
 
 
 #### BackgroundColor

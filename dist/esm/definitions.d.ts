@@ -42,7 +42,12 @@ export declare enum ToolBarType {
      * Shows a simple toolbar with just a close button
      * @since 0.0.1
      */
-    DEFAULT = "default"
+    DEFAULT = "default",
+    /**
+     * Completely hides the toolbar
+     * @since 0.1.0
+     */
+    HIDDEN = "hidden"
 }
 export interface Headers {
     [key: string]: string;

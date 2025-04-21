@@ -1263,6 +1263,17 @@
             }
           ],
           "docs": "Shows a simple toolbar with just a close button"
+        },
+        {
+          "name": "HIDDEN",
+          "value": "'hidden'",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Completely hides the toolbar"
         }
       ]
     },

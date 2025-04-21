@@ -580,22 +580,31 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     if let navController = self.navigationWebViewController {
                         navController.view.backgroundColor = color
                     }
-                } else {
-                    // Follow system appearance if no specific color
-                    let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
-                    let backgroundColor = isDarkMode ? UIColor.black : UIColor.white
-                    webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
-                    webViewController.updateStatusBarStyle()
-
-                    // Apply status bar background color via the special view
-                    webViewController.setupStatusBarBackground(color: backgroundColor)
-
-                    // Set appropriate background color
-                    if let navController = self.navigationWebViewController {
-                        navController.view.backgroundColor = backgroundColor
-                    }
                 }
-
+            } else if toolbarType == "hidden" {
+                // Completely hide the navigation bar
+                self.navigationWebViewController?.navigationBar.isHidden = true
+                webViewController.blankNavigationTab = true
+                
+                // Hide all navigation items
+                webViewController.leftNavigationBarItemTypes = []
+                webViewController.rightNavigaionBarItemTypes = []
+                webViewController.doneBarButtonItemPosition = .none
+                
+                // Apply background color if specified
+                if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
+                    let color = UIColor(hexString: toolbarColor)
+                    webViewController.view.backgroundColor = color
+                    self.navigationWebViewController?.view.backgroundColor = color
+                    
+                    // Set status bar style based on toolbar color
+                    let isDark = self.isDarkColor(color)
+                    webViewController.statusBarStyle = isDark ? .lightContent : .darkContent
+                    webViewController.updateStatusBarStyle()
+                    
+                    // Apply status bar background color
+                    webViewController.setupStatusBarBackground(color: color)
+                }
             }
 
             // We don't use the toolbar anymore, always hide it

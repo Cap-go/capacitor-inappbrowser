@@ -82,6 +82,7 @@ import org.json.JSONObject;
 import androidx.activity.result.ActivityResultLauncher;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.RelativeLayout;
 
 public class WebViewDialog extends Dialog {
 
@@ -1191,48 +1192,26 @@ public class WebViewDialog extends Dialog {
       buttonNearDoneView.setVisibility(View.GONE);
       // Status bar color is already set at the top of this method, no need to set again
     } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
+      // Hide all navigation buttons
+      _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.backButton).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.shareButton).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.reloadButton).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.buttonNearDone).setVisibility(View.GONE);
+      _toolbar.findViewById(R.id.closeButton).setVisibility(View.GONE);
+    } else if (TextUtils.equals(_options.getToolbarType(), "hidden")) {
+      // Hide the entire toolbar
       _toolbar.setVisibility(View.GONE);
-
-      // Also set window background color to match status bar for blank toolbar
-      View statusBarColorView = findViewById(R.id.status_bar_color_view);
-      if (
-        _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-      ) {
-        try {
-          int toolbarColor = Color.parseColor(_options.getToolbarColor());
-          if (getWindow() != null) {
-            getWindow().getDecorView().setBackgroundColor(toolbarColor);
-          }
-          // Also set status bar color view background if available
-          if (statusBarColorView != null) {
-            statusBarColorView.setBackgroundColor(toolbarColor);
-          }
-        } catch (IllegalArgumentException e) {
-          // Fallback to system default if color parsing fails
-          boolean isDarkTheme = isDarkThemeEnabled();
-          int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-          if (getWindow() != null) {
-            getWindow()
-              .getDecorView()
-              .setBackgroundColor(windowBackgroundColor);
-          }
-          // Also set status bar color view background if available
-          if (statusBarColorView != null) {
-            statusBarColorView.setBackgroundColor(windowBackgroundColor);
-          }
-        }
-      } else {
-        // Follow system dark mode
-        boolean isDarkTheme = isDarkThemeEnabled();
-        int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-        if (getWindow() != null) {
-          getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
-        }
-        // Also set status bar color view background if available
-        if (statusBarColorView != null) {
-          statusBarColorView.setBackgroundColor(windowBackgroundColor);
-        }
+      
+      // Adjust the WebView layout to take full space
+      if (_webView.getLayoutParams() instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) {
+        androidx.constraintlayout.widget.ConstraintLayout.LayoutParams params = 
+          (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) _webView.getLayoutParams();
+        params.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        params.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        params.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        params.rightToRight = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        _webView.setLayoutParams(params);
       }
     } else {
       _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);

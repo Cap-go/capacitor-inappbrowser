@@ -46,6 +46,11 @@ export enum ToolBarType {
    * @since 0.0.1
    */
   DEFAULT = 'default',
+  /**
+   * Completely hides the toolbar
+   * @since 0.1.0
+   */
+  HIDDEN = 'hidden',
 }
 
 export interface Headers {

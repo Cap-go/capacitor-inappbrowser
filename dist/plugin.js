@@ -28,6 +28,11 @@ var capacitorInAppBrowser = (function (exports, core) {
          * @since 0.0.1
          */
         ToolBarType["DEFAULT"] = "default";
+        /**
+         * Completely hides the toolbar
+         * @since 0.1.0
+         */
+        ToolBarType["HIDDEN"] = "hidden";
     })(exports.ToolBarType || (exports.ToolBarType = {}));
 
     const InAppBrowser = core.registerPlugin("InAppBrowser", {
