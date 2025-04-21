@@ -12,6 +12,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
@@ -26,6 +29,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.regex.Pattern;
@@ -60,6 +64,54 @@ public class InAppBrowserPlugin
 
   private PermissionRequest currentPermissionRequest;
 
+  private ActivityResultLauncher<Intent> fileChooserLauncher;
+
+  @Override
+  public void load() {
+    super.load();
+    fileChooserLauncher = getActivity()
+      .registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        this::handleFileChooserResult
+      );
+  }
+
+  private void handleFileChooserResult(ActivityResult result) {
+    if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
+      Uri[] results = null;
+      Intent data = result.getData();
+
+      if (result.getResultCode() == Activity.RESULT_OK) {
+        // Handle camera capture result
+        if (
+          webViewDialog.tempCameraUri != null &&
+          (data == null || data.getData() == null)
+        ) {
+          results = new Uri[] { webViewDialog.tempCameraUri };
+        }
+        // Handle regular file picker result
+        else if (data != null) {
+          if (data.getClipData() != null) {
+            // Handle multiple files
+            int count = data.getClipData().getItemCount();
+            results = new Uri[count];
+            for (int i = 0; i < count; i++) {
+              results[i] = data.getClipData().getItemAt(i).getUri();
+            }
+          } else if (data.getData() != null) {
+            // Handle single file
+            results = new Uri[] { data.getData() };
+          }
+        }
+      }
+
+      // Send the result to WebView and clean up
+      webViewDialog.mFilePathCallback.onReceiveValue(results);
+      webViewDialog.mFilePathCallback = null;
+      webViewDialog.tempCameraUri = null;
+    }
+  }
+
   public void handleMicrophonePermissionRequest(PermissionRequest request) {
     this.currentPermissionRequest = request;
     if (getPermissionState("microphone") != PermissionState.GRANTED) {
@@ -91,7 +143,9 @@ public class InAppBrowserPlugin
         currentPermissionRequest.deny();
         currentPermissionRequest = null;
       }
-      call.reject("Microphone permission is required");
+      if (call != null) {
+        call.reject("Microphone permission is required");
+      }
     }
   }
 
@@ -122,58 +176,6 @@ public class InAppBrowserPlugin
     }
   }
 
-  @Override
-  protected void handleOnActivityResult(
-    int requestCode,
-    int resultCode,
-    Intent data
-  ) {
-    super.handleOnActivityResult(requestCode, resultCode, data);
-
-    // Check if the request code matches the file chooser request code
-    if (requestCode == WebViewDialog.FILE_CHOOSER_REQUEST_CODE) {
-      if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
-        Uri[] results = null;
-
-        if (resultCode == Activity.RESULT_OK) {
-          if (data != null) {
-            String dataString = data.getDataString();
-            if (data.getClipData() != null) { // If multiple file selected
-              int count = data.getClipData().getItemCount();
-              results = new Uri[count];
-              for (int i = 0; i < count; i++) {
-                results[i] = data.getClipData().getItemAt(i).getUri();
-              }
-            } else if (dataString != null) { //if single file selected
-              results = new Uri[] { Uri.parse(dataString) };
-            }
-          }
-        }
-
-        // Pass the results back to the WebView
-        try {
-          webViewDialog.mFilePathCallback.onReceiveValue(results);
-          webViewDialog.mFilePathCallback = null;
-        } catch (Exception e) {
-          Log.e("ACTIVITYRESULT", e.getMessage());
-        }
-      }
-    }
-  }
-
-  @PermissionCallback
-  private void cameraPermissionCallback() {
-    if (getPermissionState("camera") == PermissionState.GRANTED) {
-      grantCameraPermission();
-    } else {
-      if (currentPermissionRequest != null) {
-        currentPermissionRequest.deny();
-        currentPermissionRequest = null;
-      }
-      // Handle the case where permission was not granted
-    }
-  }
-
   @PermissionCallback
   private void cameraPermissionCallback(PluginCall call) {
     if (getPermissionState("camera") == PermissionState.GRANTED) {
@@ -191,7 +193,23 @@ public class InAppBrowserPlugin
         currentPermissionRequest.deny();
         currentPermissionRequest = null;
       }
-      call.reject("Camera permission is required");
+
+      // Reject only if there's a call - could be null for WebViewDialog flow
+      if (call != null) {
+        call.reject("Camera permission is required");
+      }
+    }
+  }
+
+  @PermissionCallback
+  private void cameraPermissionCallback() {
+    if (getPermissionState("camera") == PermissionState.GRANTED) {
+      grantCameraPermission();
+    } else {
+      if (currentPermissionRequest != null) {
+        currentPermissionRequest.deny();
+        currentPermissionRequest = null;
+      }
     }
   }
 
@@ -207,15 +225,16 @@ public class InAppBrowserPlugin
   CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
     @Override
     public void onCustomTabsServiceConnected(
-      @NonNull ComponentName name,
+      ComponentName name,
       CustomTabsClient client
     ) {
       customTabsClient = client;
-      client.warmup(0);
     }
 
     @Override
-    public void onServiceDisconnected(ComponentName name) {}
+    public void onServiceDisconnected(ComponentName name) {
+      customTabsClient = null;
+    }
   };
 
   @PluginMethod
@@ -249,9 +268,17 @@ public class InAppBrowserPlugin
   @PluginMethod
   public void open(PluginCall call) {
     String url = call.getString("url");
+    if (url == null) {
+      call.reject("URL is required");
+      return;
+    }
 
     // get the deeplink prevention, if provided
-    Boolean preventDeeplink = call.getBoolean("preventDeeplink", null);
+    Boolean preventDeeplink = call.getBoolean("preventDeeplink", false);
+    Boolean isPresentAfterPageLoad = call.getBoolean(
+      "isPresentAfterPageLoad",
+      false
+    );
 
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
@@ -272,7 +299,7 @@ public class InAppBrowserPlugin
       this.getHeaders(call)
     );
 
-    if (preventDeeplink != null) {
+    if (preventDeeplink != false) {
       String browserPackageName = "";
       Intent browserIntent = new Intent(
         Intent.ACTION_VIEW,
@@ -289,6 +316,10 @@ public class InAppBrowserPlugin
           tabsIntent.intent.setPackage(browserPackageName);
         }
       }
+    }
+
+    if (isPresentAfterPageLoad) {
+      tabsIntent.intent.putExtra("isPresentAfterPageLoad", true);
     }
 
     tabsIntent.launchUrl(getContext(), Uri.parse(url));
@@ -419,10 +450,17 @@ public class InAppBrowserPlugin
       options.setTitle(call.getString("title", ""));
     }
     options.setToolbarColor(call.getString("toolbarColor", "#ffffff"));
+    options.setToolbarTextColor(call.getString("toolbarTextColor"));
     options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
     options.setIgnoreUntrustedSSLError(
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
+
+    // Set text zoom if specified in options (default is 100)
+    Integer textZoom = call.getInt("textZoom");
+    if (textZoom != null) {
+      options.setTextZoom(textZoom);
+    }
 
     String proxyRequestsStr = call.getString("proxyRequests");
     if (proxyRequestsStr != null) {
@@ -437,31 +475,136 @@ public class InAppBrowserPlugin
     }
 
     try {
-      Options.ButtonNearDone buttonNearDone =
-        Options.ButtonNearDone.generateFromPluginCall(
-          call,
-          getActivity().getAssets()
-        );
-      options.setButtonNearDone(buttonNearDone);
-    } catch (IllegalArgumentException illegalArgumentException) {
-      call.reject(
-        String.format(
-          "ButtonNearDone rejected: %s",
-          illegalArgumentException.getMessage()
-        )
-      );
-    } catch (RuntimeException e) {
+      // Try to set buttonNearDone if present, with better error handling
+      JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
+      if (buttonNearDoneObj != null) {
+        try {
+          // Provide better debugging for buttonNearDone
+          JSObject androidObj = buttonNearDoneObj.getJSObject("android");
+          if (androidObj != null) {
+            String iconType = androidObj.getString("iconType", "asset");
+            String icon = androidObj.getString("icon", "");
+            Log.d(
+              "InAppBrowser",
+              "ButtonNearDone config - iconType: " +
+              iconType +
+              ", icon: " +
+              icon
+            );
+
+            // For vector type, verify if resource exists
+            if ("vector".equals(iconType)) {
+              int resourceId = getContext()
+                .getResources()
+                .getIdentifier(icon, "drawable", getContext().getPackageName());
+              if (resourceId == 0) {
+                Log.e("InAppBrowser", "Vector resource not found: " + icon);
+                // List available drawable resources to help debugging
+                try {
+                  final StringBuilder availableResources = getStringBuilder();
+                  Log.d("InAppBrowser", availableResources.toString());
+                } catch (Exception e) {
+                  Log.e(
+                    "InAppBrowser",
+                    "Error listing resources: " + e.getMessage()
+                  );
+                }
+              } else {
+                Log.d(
+                  "InAppBrowser",
+                  "Vector resource found with ID: " + resourceId
+                );
+              }
+            }
+          }
+
+          // Try to create the ButtonNearDone object
+          Options.ButtonNearDone buttonNearDone =
+            Options.ButtonNearDone.generateFromPluginCall(
+              call,
+              getContext().getAssets()
+            );
+          options.setButtonNearDone(buttonNearDone);
+        } catch (Exception e) {
+          Log.e(
+            "InAppBrowser",
+            "Error setting buttonNearDone: " + e.getMessage(),
+            e
+          );
+        }
+      }
+    } catch (Exception e) {
       Log.e(
-        "WebViewDialog",
-        String.format("ButtonNearDone runtime error: %s", e)
+        "InAppBrowser",
+        "Error processing buttonNearDone: " + e.getMessage(),
+        e
       );
-      call.reject(String.format("ButtonNearDone RuntimeException: %s", e));
     }
 
     options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
     options.setPreShowScript(call.getString("preShowScript", null));
     options.setShareSubject(call.getString("shareSubject", null));
     options.setToolbarType(call.getString("toolbarType", ""));
+    options.setPreventDeeplink(
+      Boolean.TRUE.equals(call.getBoolean("preventDeeplink", false))
+    );
+
+    // Validate preShowScript requires isPresentAfterPageLoad
+    if (
+      call.getData().has("preShowScript") &&
+      !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
+    ) {
+      call.reject("preShowScript requires isPresentAfterPageLoad to be true");
+      return;
+    }
+
+    // Validate closeModal options
+    if (Boolean.TRUE.equals(call.getBoolean("closeModal", false))) {
+      options.setCloseModal(true);
+      options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
+      options.setCloseModalDescription(
+        call.getString("closeModalDescription", "Are you sure ?")
+      );
+      options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
+      options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
+    } else {
+      // Reject if closeModal is false but closeModal options are provided
+      if (
+        call.getData().has("closeModalTitle") ||
+        call.getData().has("closeModalDescription") ||
+        call.getData().has("closeModalOk") ||
+        call.getData().has("closeModalCancel")
+      ) {
+        call.reject("closeModal options require closeModal to be true");
+        return;
+      }
+      options.setCloseModal(false);
+    }
+
+    // Validate shareDisclaimer requires shareSubject
+    if (
+      call.getData().has("shareDisclaimer") &&
+      !call.getData().has("shareSubject")
+    ) {
+      call.reject("shareDisclaimer requires shareSubject to be provided");
+      return;
+    }
+
+    // Validate buttonNearDone compatibility with toolbar type
+    if (call.getData().has("buttonNearDone")) {
+      String toolbarType = options.getToolbarType();
+      if (
+        TextUtils.equals(toolbarType, "activity") ||
+        TextUtils.equals(toolbarType, "navigation") ||
+        TextUtils.equals(toolbarType, "blank")
+      ) {
+        call.reject(
+          "buttonNearDone is not compatible with toolbarType: " + toolbarType
+        );
+        return;
+      }
+    }
+
     options.setActiveNativeNavigationForWebview(
       Boolean.TRUE.equals(
         call.getBoolean("activeNativeNavigationForWebview", false)
@@ -475,18 +618,13 @@ public class InAppBrowserPlugin
     options.setPresentAfterPageLoad(
       Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))
     );
-    if (Boolean.TRUE.equals(call.getBoolean("closeModal", false))) {
-      options.setCloseModal(true);
-      options.setCloseModalTitle(call.getString("closeModalTitle", "Close"));
-      options.setCloseModalDescription(
-        call.getString("closeModalDescription", "Are you sure ?")
-      );
-      options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
-      options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
-    } else {
-      options.setCloseModal(false);
-    }
     options.setPluginCall(call);
+
+    // Set Material Design picker option
+    options.setMaterialPicker(
+      Boolean.TRUE.equals(call.getBoolean("materialPicker", false))
+    );
+
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {
@@ -513,6 +651,11 @@ public class InAppBrowserPlugin
         @Override
         public void buttonNearDoneClicked() {
           notifyListeners("buttonNearDoneClick", new JSObject());
+        }
+
+        @Override
+        public void confirmBtnClicked() {
+          notifyListeners("confirmBtnClicked", new JSObject());
         }
 
         @Override
@@ -570,6 +713,24 @@ public class InAppBrowserPlugin
           }
         }
       );
+  }
+
+  @NonNull
+  private static StringBuilder getStringBuilder() {
+    Field[] drawables = R.drawable.class.getFields();
+    StringBuilder availableResources = new StringBuilder(
+      "Available resources: "
+    );
+    for (int i = 0; i < Math.min(10, drawables.length); i++) {
+      availableResources.append(drawables[i].getName()).append(", ");
+    }
+    if (drawables.length > 10) {
+      availableResources
+        .append("... (")
+        .append(drawables.length - 10)
+        .append(" more)");
+    }
+    return availableResources;
   }
 
   @PluginMethod
@@ -669,7 +830,6 @@ public class InAppBrowserPlugin
                 new JSObject().put("url", webViewDialog.getUrl())
               );
               webViewDialog.dismiss();
-              webViewDialog.destroy();
               webViewDialog = null;
             } else {
               Intent intent = new Intent(
@@ -723,15 +883,29 @@ public class InAppBrowserPlugin
         new CustomTabsCallback() {
           @Override
           public void onNavigationEvent(int navigationEvent, Bundle extras) {
-            switch (navigationEvent) {
-              case NAVIGATION_FINISHED:
-                notifyListeners("browserPageLoaded", new JSObject());
-                break;
+            if (navigationEvent == NAVIGATION_FINISHED) {
+              notifyListeners("browserPageLoaded", new JSObject());
             }
           }
         }
       );
     }
     return currentSession;
+  }
+
+  @Override
+  protected void handleOnDestroy() {
+    if (webViewDialog != null) {
+      try {
+        webViewDialog.dismiss();
+      } catch (Exception e) {
+        // Ignore, dialog may already be dismissed
+      }
+      webViewDialog = null;
+    }
+    currentPermissionRequest = null;
+    customTabsClient = null;
+    currentSession = null;
+    super.handleOnDestroy();
   }
 }

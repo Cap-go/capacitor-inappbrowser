@@ -15,19 +15,23 @@ public class Options {
 
     public enum AllIconTypes {
       ASSET,
+      VECTOR,
     }
 
-    private AllIconTypes iconType;
-    private String icon;
-    private int height;
-    private int width;
+    private final AllIconTypes iconTypeEnum;
+    private final String iconType;
+    private final String icon;
+    private final int height;
+    private final int width;
 
     private ButtonNearDone(
-      AllIconTypes iconType,
+      AllIconTypes iconTypeEnum,
+      String iconType,
       String icon,
       int height,
       int width
     ) {
+      this.iconTypeEnum = iconTypeEnum;
       this.iconType = iconType;
       this.icon = icon;
       this.height = height;
@@ -51,9 +55,16 @@ public class Options {
       }
 
       String iconType = android.getString("iconType", "asset");
-      if (!Objects.equals(iconType, "asset")) {
+      AllIconTypes iconTypeEnum;
+
+      // Validate and process icon type
+      if ("asset".equals(iconType)) {
+        iconTypeEnum = AllIconTypes.ASSET;
+      } else if ("vector".equals(iconType)) {
+        iconTypeEnum = AllIconTypes.VECTOR;
+      } else {
         throw new IllegalArgumentException(
-          "buttonNearDone.android.iconType is not equal to \"asset\""
+          "buttonNearDone.android.iconType must be 'asset' or 'vector'"
         );
       }
 
@@ -64,33 +75,62 @@ public class Options {
         );
       }
 
-      InputStream fileInputString = null;
+      // For asset type, verify the file exists
+      if (iconTypeEnum == AllIconTypes.ASSET) {
+        InputStream fileInputString = null;
 
-      try {
-        // Try to open the file
-        fileInputString = assetManager.open(icon);
-        // do nothing
-      } catch (IOException e) {
-        throw new IllegalArgumentException(
-          "buttonNearDone.android.icon cannot be found in the assetManager"
-        );
-      } finally {
-        // Close the input stream if it was opened
-        if (fileInputString != null) {
+        try {
+          // Try to find in public folder first
           try {
-            fileInputString.close();
+            fileInputString = assetManager.open("public/" + icon);
           } catch (IOException e) {
-            throw new RuntimeException(e);
+            // If not in public, try in root assets
+            try {
+              fileInputString = assetManager.open(icon);
+            } catch (IOException e2) {
+              throw new IllegalArgumentException(
+                "buttonNearDone.android.icon cannot be found in the assetManager"
+              );
+            }
+          }
+          // File exists, do nothing
+        } finally {
+          // Close the input stream if it was opened
+          if (fileInputString != null) {
+            try {
+              fileInputString.close();
+            } catch (IOException e) {
+              e.printStackTrace();
+            }
           }
         }
       }
-      Integer width = android.getInteger("width", 48);
+      // For vector type, we don't validate here since resources are checked at runtime
+      else if (iconTypeEnum == AllIconTypes.VECTOR) {
+        // Vector resources will be validated when used
+        System.out.println(
+          "Vector resource will be validated at runtime: " + icon
+        );
+      }
 
-      Integer height = android.getInteger("height", 48);
-      return new ButtonNearDone(AllIconTypes.ASSET, icon, height, width);
+      Integer width = android.getInteger("width", 24);
+      Integer height = android.getInteger("height", 24);
+
+      final ButtonNearDone buttonNearDone1 = new ButtonNearDone(
+        iconTypeEnum,
+        iconType,
+        icon,
+        height,
+        width
+      );
+      return buttonNearDone1;
     }
 
-    public AllIconTypes getIconType() {
+    public AllIconTypes getIconTypeEnum() {
+      return iconTypeEnum;
+    }
+
+    public String getIconType() {
       return iconType;
     }
 
@@ -130,7 +170,27 @@ public class Options {
   private boolean ShowArrow;
   private boolean ignoreUntrustedSSLError;
   private String preShowScript;
+  private String toolbarTextColor;
   private Pattern proxyRequestsPattern = null;
+  private boolean materialPicker = false;
+  private int textZoom = 100; // Default text zoom is 100%
+  private boolean preventDeeplink = false;
+
+  public int getTextZoom() {
+    return textZoom;
+  }
+
+  public void setTextZoom(int textZoom) {
+    this.textZoom = textZoom;
+  }
+
+  public boolean getMaterialPicker() {
+    return materialPicker;
+  }
+
+  public void setMaterialPicker(boolean materialPicker) {
+    this.materialPicker = materialPicker;
+  }
 
   public Pattern getProxyRequestsPattern() {
     return proxyRequestsPattern;
@@ -314,6 +374,14 @@ public class Options {
     this.ToolbarColor = toolbarColor;
   }
 
+  public String getToolbarTextColor() {
+    return toolbarTextColor;
+  }
+
+  public void setToolbarTextColor(String toolbarTextColor) {
+    this.toolbarTextColor = toolbarTextColor;
+  }
+
   public boolean showArrow() {
     return ShowArrow;
   }
@@ -336,5 +404,13 @@ public class Options {
 
   public void setPreShowScript(String preLoadScript) {
     this.preShowScript = preLoadScript;
+  }
+
+  public boolean getPreventDeeplink() {
+    return preventDeeplink;
+  }
+
+  public void setPreventDeeplink(boolean preventDeeplink) {
+    this.preventDeeplink = preventDeeplink;
   }
 }
