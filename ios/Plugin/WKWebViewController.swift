@@ -117,6 +117,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
 
+    private var isInjecting = false
+    private let injectionQueue = DispatchQueue(label: "com.inappbrowser.injection")
+
     func setHeaders(headers: [String: String]) {
         self.headers = headers
         let lowercasedHeaders = headers.mapKeys { $0.lowercased() }
@@ -493,44 +496,88 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    func injectJavaScriptInterface() {
-        let script = """
-            if (!window.mobileApp) {
-                window.mobileApp = {
-                    postMessage: function(message) {
-                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                            try {
-                                window.webkit.messageHandlers.messageHandler.postMessage(message);
-                            } catch (e) {
-                                console.error('Error posting message:', e);
-                            }
-                        }
-                    },
-                    close: function() {
-                        console.log('Attempting to close WebView...');
-                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
-                            try {
-                                window.webkit.messageHandlers.close.postMessage({});
-                                console.log('Close message sent');
-                            } catch (e) {
-                                console.error('Error closing WebView:', e);
-                            }
-                        } else {
-                            console.error('Close handler not found');
-                        }
-                    }
-                };
-                console.log('Mobile app interface injected successfully');
-            }
-        """
+    func injectWKJavaScriptInterface() {
+        // Предотвращаем повторные вызовы во время инъекции
+        guard !isInjecting else {
+            print("[InAppBrowser] Injection already in progress")
+            return
+        }
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.webView?.evaluateJavaScript(script) { result, error in
-                if let error = error {
-                    print("[InAppBrowser] Error injecting JavaScript interface: \(error)")
-                } else {
-                    print("[InAppBrowser] JavaScript interface injected successfully")
+        injectionQueue.async { [weak self] in
+            guard let self = self else {
+                print("[InAppBrowser] Self is nil during injection")
+                return
+            }
+
+            // Устанавливаем флаг инъекции
+            self.isInjecting = true
+            defer { self.isInjecting = false }
+
+            // Проверяем состояние WebView
+            guard let webView = self.webView else {
+                print("[InAppBrowser] WebView is nil during injection")
+                return
+            }
+
+            // Проверяем, что webView все еще прикреплен к view hierarchy
+            guard webView.superview != nil else {
+                print("[InAppBrowser] WebView is not in view hierarchy")
+                return
+            }
+
+            // Проверяем, что webView не уничтожен и не в процессе загрузки
+            guard !webView.isLoading else {
+                print("[InAppBrowser] WebView is loading")
+                return
+            }
+
+            let script = """
+                if (!window.mobileApp) {
+                    window.mobileApp = {
+                        postMessage: function(message) {
+                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                                try {
+                                    window.webkit.messageHandlers.messageHandler.postMessage(message);
+                                } catch (e) {
+                                    console.error('Error posting message:', e);
+                                }
+                            }
+                        },
+                        close: function() {
+                            console.log('Attempting to close WebView...');
+                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
+                                try {
+                                    window.webkit.messageHandlers.close.postMessage({});
+                                    console.log('Close message sent');
+                                } catch (e) {
+                                    console.error('Error closing WebView:', e);
+                                }
+                            } else {
+                                console.error('Close handler not found');
+                            }
+                        }
+                    };
+                    console.log('Mobile app interface injected successfully');
+                }
+            """
+
+            // Выполняем JavaScript в главном потоке
+            DispatchQueue.main.async {
+                // Повторная проверка состояния WebView перед выполнением
+                guard let self = self,
+                      let webView = self.webView,
+                      webView.superview != nil,
+                      !webView.isLoading else {
+                    print("[InAppBrowser] WebView state changed during injection")
+                    return
+                }
+
+                webView.evaluateJavaScript(script) { result, error in
+                    if let error = error {
+                        print("[InAppBrowser] Error injecting JavaScript interface: \(error)")
+                    } else {
+                        print("[InAppBrowser] JavaScript interface injected successfully")
+                    }
                 }
             }
         }
@@ -789,7 +836,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         case "URL":
 
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
-            self.injectJavaScriptInterface()
+            self.injectWKJavaScriptInterface()
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
@@ -1235,6 +1282,8 @@ fileprivate extension WKWebViewController {
 
     public func closeView() {
         print("[InAppBrowser] Starting closeView")
+        
+        // Проверяем, можно ли закрыть view
         var canDismiss = true
         if let url = self.source?.url {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
@@ -1243,8 +1292,16 @@ fileprivate extension WKWebViewController {
         if canDismiss {
             print("[InAppBrowser] Proceeding with dismissal")
             
-            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            // Сохраняем URL перед очисткой
+            let currentUrl = webView?.url?.absoluteString ?? ""
             
+            // Сначала уведомляем о закрытии
+            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+            
+            // Затем очищаем WebView
+            cleanupWebView()
+            
+            // И наконец закрываем view controller
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 
@@ -1322,22 +1379,29 @@ fileprivate extension WKWebViewController {
 
     private func cleanupWebView() {
         print("[InAppBrowser] Starting cleanup")
+        
+        // Проверяем, что webView существует
+        guard let webView = self.webView else {
+            print("[InAppBrowser] WebView is already nil during cleanup")
+            return
+        }
+        
         // Останавливаем загрузку
-        webView?.stopLoading()
+        webView.stopLoading()
         
         // Удаляем наблюдатели
-        webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+        webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
-            webView?.removeObserver(self, forKeyPath: titleKeyPath)
+            webView.removeObserver(self, forKeyPath: titleKeyPath)
         }
-        webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+        webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
         
         // Очищаем все скрипты и обработчики
-        webView?.configuration.userContentController.removeAllUserScripts()
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        webView.configuration.userContentController.removeAllUserScripts()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
         
         // Очищаем кэш и данные
         WKWebsiteDataStore.default().removeData(
@@ -1345,6 +1409,7 @@ fileprivate extension WKWebViewController {
             modifiedSince: Date(timeIntervalSince1970: 0)
         ) { [weak self] in
             print("[InAppBrowser] Cache cleared")
+            // Очищаем ссылку на webView только после завершения всех операций
             self?.webView = nil
         }
     }
@@ -1446,7 +1511,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFinish: url)
         }
-        self.injectJavaScriptInterface()
+        self.injectWKJavaScriptInterface()
         self.capBrowserPlugin?.notifyListeners("browserPageLoaded", data: [:])
     }
 
@@ -1494,7 +1559,7 @@ extension WKWebViewController: WKNavigationDelegate {
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
         }
-        self.injectJavaScriptInterface()
+        self.injectWKJavaScriptInterface()
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {

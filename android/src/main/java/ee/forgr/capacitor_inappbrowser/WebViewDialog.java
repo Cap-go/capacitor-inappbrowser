@@ -179,7 +179,7 @@ public class WebViewDialog extends Dialog {
 
     @JavascriptInterface
     public void share(String title, String text, String url, String fileData, String fileName, String fileType) {
-      Log.d("InAppBrowser", "Native share method called with params: " + 
+      Log.d("InAppBrowser", "Native share method called with params: " +
         "title=" + title + ", " +
         "text=" + text + ", " +
         "url=" + url + ", " +
@@ -197,27 +197,27 @@ public class WebViewDialog extends Dialog {
           // Create the sharing intent
           Intent shareIntent = new Intent();
           shareIntent.setAction(Intent.ACTION_SEND);
-          
+
           // Handle file sharing
           if (fileData != null && !fileData.isEmpty()) {
             try {
               Log.d("InAppBrowser", "Processing file share");
               // Decode base64 data
               byte[] fileBytes = Base64.decode(fileData, Base64.DEFAULT);
-              
+
               // Create temporary file
               File tempFile = new File(activity.getCacheDir(), fileName);
               FileOutputStream fos = new FileOutputStream(tempFile);
               fos.write(fileBytes);
               fos.close();
-              
+
               // Get content URI
               Uri fileUri = FileProvider.getUriForFile(
                 activity,
                 activity.getPackageName() + ".fileprovider",
                 tempFile
               );
-              
+
               // Set up share intent for file
               shareIntent.setType(fileType);
               shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
@@ -232,7 +232,7 @@ public class WebViewDialog extends Dialog {
             Log.d("InAppBrowser", "Processing text share");
             // Handle text sharing
             shareIntent.setType("text/plain");
-            
+
             // Combine title, text and url
             StringBuilder shareText = new StringBuilder();
             if (title != null && !title.isEmpty()) {
@@ -244,7 +244,7 @@ public class WebViewDialog extends Dialog {
             if (url != null && !url.isEmpty()) {
               shareText.append(url);
             }
-            
+
             shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
             Log.d("InAppBrowser", "Text share intent prepared");
           }
@@ -255,7 +255,7 @@ public class WebViewDialog extends Dialog {
             // Create chooser dialog
             Intent chooser = Intent.createChooser(shareIntent, "Share with");
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            
+
             // Start the activity
             activity.startActivity(chooser);
             Log.d("InAppBrowser", "Share intent started successfully");
@@ -297,236 +297,126 @@ public class WebViewDialog extends Dialog {
       }
     }
   }
+//////ююююююююююююююююююю
+@SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
+public void presentWebView() {
+  requestWindowFeature(Window.FEATURE_NO_TITLE);
+  setCancelable(true);
+  Objects.requireNonNull(getWindow()).setFlags(
+          WindowManager.LayoutParams.FLAG_FULLSCREEN,
+          WindowManager.LayoutParams.FLAG_FULLSCREEN
+  );
+  setContentView(R.layout.activity_browser);
+  getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-  @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
-  public void presentWebView() {
-    requestWindowFeature(Window.FEATURE_NO_TITLE);
-    setCancelable(true);
-    Objects.requireNonNull(getWindow()).setFlags(
-      WindowManager.LayoutParams.FLAG_FULLSCREEN,
-      WindowManager.LayoutParams.FLAG_FULLSCREEN
-    );
-    setContentView(R.layout.activity_browser);
-    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+  // ... [КОД УСТАНОВКИ STATUS BAR И ПРОЧЕГО] ...
 
-    // Make status bar transparent
-    if (getWindow() != null) {
-      getWindow().setStatusBarColor(Color.TRANSPARENT);
-      getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-      getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-    }
+  this._webView = findViewById(R.id.browser_view);
 
-    WindowInsetsControllerCompat insetsController =
-      new WindowInsetsControllerCompat(
-        getWindow(),
-        getWindow() != null ? getWindow().getDecorView() : null
-      );
+  applyInsets();
 
-    if (getWindow() != null) {
-      getWindow()
-        .getDecorView()
-        .post(() -> {
-          // Get status bar height
-          int statusBarHeight = 0;
-          int resourceId = getContext()
-            .getResources()
-            .getIdentifier("status_bar_height", "dimen", "android");
-          if (resourceId > 0) {
-            statusBarHeight = getContext()
-              .getResources()
-              .getDimensionPixelSize(resourceId);
-          }
+  // Add JavaScript interfaces
+  _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+  _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
 
-          // Find the status bar color view
-          View statusBarColorView = findViewById(R.id.status_bar_color_view);
+  // WebView settings
+  WebSettings webSettings = _webView.getSettings();
+  webSettings.setJavaScriptEnabled(true);
+  webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+  webSettings.setDatabaseEnabled(true);
+  webSettings.setDomStorageEnabled(true);
+  webSettings.setAllowFileAccess(true);
+  webSettings.setLoadWithOverviewMode(true);
+  webSettings.setUseWideViewPort(true);
+  webSettings.setAllowFileAccessFromFileURLs(true);
+  webSettings.setAllowUniversalAccessFromFileURLs(true);
+  webSettings.setMediaPlaybackRequiresUserGesture(false);
 
-          // Set the height of the status bar color view
-          if (statusBarColorView != null) {
-            statusBarColorView.getLayoutParams().height = statusBarHeight;
-            statusBarColorView.requestLayout();
-
-            // Set color based on toolbar color or dark mode
-            if (
-              _options.getToolbarColor() != null &&
-                !_options.getToolbarColor().isEmpty()
-            ) {
-              try {
-                // Use explicitly provided toolbar color for status bar
-                int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                statusBarColorView.setBackgroundColor(toolbarColor);
-
-                // Set status bar text to white or black based on background
-                boolean isDarkBackground = isDarkColor(toolbarColor);
-                insetsController.setAppearanceLightStatusBars(
-                  !isDarkBackground
-                );
-              } catch (IllegalArgumentException e) {
-                // Fallback to default black if color parsing fails
-                statusBarColorView.setBackgroundColor(Color.BLACK);
-                insetsController.setAppearanceLightStatusBars(false);
-              }
-            } else {
-              // Follow system dark mode if no toolbar color provided
-              boolean isDarkTheme = isDarkThemeEnabled();
-              int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-              statusBarColorView.setBackgroundColor(statusBarColor);
-              insetsController.setAppearanceLightStatusBars(!isDarkTheme);
-            }
-          }
-        });
-    }
-
-    getWindow()
-      .setLayout(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT
-      );
-
-    this._webView = findViewById(R.id.browser_view);
-
-    // Apply insets to fix edge-to-edge issues on Android 15+
-    applyInsets();
-
-    // Add JavaScript interfaces
-    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-    _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
-
-    // Configure WebView settings
-    WebSettings webSettings = _webView.getSettings();
-    webSettings.setJavaScriptEnabled(true);
-    webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
-    webSettings.setDatabaseEnabled(true);
-    webSettings.setDomStorageEnabled(true);
-    webSettings.setAllowFileAccess(true);
-    webSettings.setLoadWithOverviewMode(true);
-    webSettings.setUseWideViewPort(true);
-    webSettings.setAllowFileAccessFromFileURLs(true);
-    webSettings.setAllowUniversalAccessFromFileURLs(true);
-    webSettings.setMediaPlaybackRequiresUserGesture(false);
-
-    // Set text zoom if specified in options
-    if (_options.getTextZoom() > 0) {
-      webSettings.setTextZoom(_options.getTextZoom());
-    }
-
-    // Set up WebView client with interface injection
-    _webView.setWebViewClient(new WebViewClient() {
-      @Override
-      public void onPageStarted(WebView view, String url, Bitmap favicon) {
-        super.onPageStarted(view, url, favicon);
-        Log.d("InAppBrowser", "Page started loading: " + url);
-      }
-
-      @Override
-      public void onPageFinished(WebView view, String url) {
-        super.onPageFinished(view, url);
-        Log.d("InAppBrowser", "Page finished loading: " + url);
-        
-        // Inject the share polyfill after page load
-        String initScript = """
-          (function() {
-            console.log('Initializing Web Share API polyfill...');
-            
-            // Function to check if mobileApp is available
-            function isMobileAppAvailable() {
-              return typeof window.mobileApp !== 'undefined' && 
-                     typeof window.mobileApp.share === 'function';
-            }
-            
-            // Initialize Web Share API polyfill
-            if (typeof navigator.share === 'undefined') {
-              console.log('navigator.share is undefined, adding polyfill');
-              navigator.share = function(shareData) {
-                console.log('Share called with data:', shareData);
-                return new Promise((resolve, reject) => {
-                  try {
-                    const title = shareData.title || '';
-                    const text = shareData.text || '';
-                    const url = shareData.url || '';
-                    
-                    console.log('Preparing to share:', {title, text, url});
-                    
-                    if (shareData.files && shareData.files.length > 0) {
-                      console.log('Sharing file:', shareData.files[0]);
-                      const file = shareData.files[0];
-                      const reader = new FileReader();
-                      
-                      reader.onload = function() {
-                        try {
-                          console.log('File loaded, converting to base64');
-                          const base64Data = reader.result.split(',')[1];
-                          console.log('Calling native share with file');
-                          window.mobileApp.share(title, text, url, base64Data, file.name, file.type);
-                          resolve();
-                        } catch (error) {
-                          console.error('Error in file share:', error);
-                          reject(error);
-                        }
-                      };
-                      
-                      reader.onerror = function(error) {
-                        console.error('Error reading file:', error);
-                        reject(error);
-                      };
-                      
-                      reader.readAsDataURL(file);
-                    } else {
-                      console.log('Sharing text/url');
-                      window.mobileApp.share(title, text, url, '', '', '');
-                      resolve();
-                    }
-                  } catch (error) {
-                    console.error('Error in share polyfill:', error);
-                    reject(error);
-                  }
-                });
-              };
-              console.log('Web Share API polyfill added successfully');
-            } else {
-              console.log('navigator.share already exists');
-            }
-          })();
-        """;
-
-        view.evaluateJavascript(initScript, new ValueCallback<String>() {
-          @Override
-          public void onReceiveValue(String value) {
-            Log.d("InAppBrowser", "Web Share API polyfill initialized with result: " + value);
-          }
-        });
-      }
-    });
-
-    // Set up WebChromeClient
-    _webView.setWebChromeClient(new MyWebChromeClient());
-
-    // Load the URL with headers
-    Map<String, String> requestHeaders = new HashMap<>();
-    if (_options.getHeaders() != null) {
-      Iterator<String> keys = _options.getHeaders().keys();
-      while (keys.hasNext()) {
-        String key = keys.next();
-        if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
-          _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
-        } else {
-          requestHeaders.put(key, _options.getHeaders().getString(key));
-        }
-      }
-    }
-
-    _webView.loadUrl(_options.getUrl(), requestHeaders);
-    _webView.requestFocus();
-    _webView.requestFocusFromTouch();
-
-    setupToolbar();
-    setWebViewClient();
-
-    if (!_options.isPresentAfterPageLoad()) {
-      show();
-      _options.getPluginCall().resolve();
-    }
+  if (_options.getTextZoom() > 0) {
+    webSettings.setTextZoom(_options.getTextZoom());
   }
 
+  // Set WebViewClient only AFTER _webView is initialized
+  setWebViewClient();
+
+  _webView.setWebChromeClient(new MyWebChromeClient());
+
+  // Load URL and headers
+  Map<String, String> requestHeaders = new HashMap<>();
+  if (_options.getHeaders() != null) {
+    Iterator<String> keys = _options.getHeaders().keys();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
+        _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
+      } else {
+        requestHeaders.put(key, _options.getHeaders().getString(key));
+      }
+    }
+  }
+  _webView.loadUrl(_options.getUrl(), requestHeaders);
+  _webView.requestFocus();
+  _webView.requestFocusFromTouch();
+
+  setupToolbar();
+
+  if (!_options.isPresentAfterPageLoad()) {
+    show();
+    _options.getPluginCall().resolve();
+  }
+}
+
+  private void injectAndroidJavaScriptInterface() {
+    if (_webView == null) {
+      Log.e("InAppBrowser", "injectJavaScriptInterface called before WebView is ready");
+      return;
+    }
+
+    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+    Log.d("InAppBrowser", "JavaScript interface added");
+
+    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+      if (_webView == null) return;
+      String verifyScript = """
+      (function() {
+        console.log('Verifying mobileApp interface...');
+        if (typeof window.mobileApp === 'undefined') {
+          console.error('mobileApp is undefined');
+          return false;
+        }
+        if (typeof window.mobileApp.share !== 'function') {
+          console.error('mobileApp.share is not a function');
+          return false;
+        }
+        console.log('mobileApp interface verified successfully');
+        return true;
+      })();
+    """;
+
+      _webView.evaluateJavascript(verifyScript, value -> {
+        Log.d("InAppBrowser", "Interface verification result: " + value);
+        if ("true".equals(value)) {
+          initializeSharePolyfill();
+        } else {
+          Log.e("InAppBrowser", "JavaScript interface verification failed");
+          _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+          Log.d("InAppBrowser", "Re-added JavaScript interface");
+
+          new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (_webView == null) return;
+            _webView.evaluateJavascript(verifyScript, retryValue -> {
+              if ("true".equals(retryValue)) {
+                initializeSharePolyfill();
+              } else {
+                Log.e("InAppBrowser", "JavaScript interface still not available after retry");
+              }
+            });
+          }, 1000);
+        }
+      });
+    }, 1000);
+  }
+// /////
   /**
    * Apply window insets to the WebView to properly handle edge-to-edge display
    * and fix status bar overlap issues on Android 15+
@@ -733,63 +623,6 @@ public class WebViewDialog extends Dialog {
         );
       }
     }
-  }
-
-  private void injectJavaScriptInterface() {
-    // Add JavaScript interface for message handling
-    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-    Log.d("InAppBrowser", "JavaScript interface added");
-
-    // Initialize the interface with a delay
-    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-      // First, verify that the interface is accessible
-      String verifyScript = """
-        (function() {
-          console.log('Verifying mobileApp interface...');
-          if (typeof window.mobileApp === 'undefined') {
-            console.error('mobileApp is undefined');
-            return false;
-          }
-          if (typeof window.mobileApp.share !== 'function') {
-            console.error('mobileApp.share is not a function');
-            return false;
-          }
-          console.log('mobileApp interface verified successfully');
-          return true;
-        })();
-      """;
-
-      _webView.evaluateJavascript(verifyScript, new ValueCallback<String>() {
-        @Override
-        public void onReceiveValue(String value) {
-          Log.d("InAppBrowser", "Interface verification result: " + value);
-          
-          if ("true".equals(value)) {
-            // Only initialize the share polyfill if the interface is verified
-            initializeSharePolyfill();
-          } else {
-            Log.e("InAppBrowser", "JavaScript interface verification failed");
-            // Try to re-add the interface
-            _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-            Log.d("InAppBrowser", "Re-added JavaScript interface");
-            
-            // Try verification again after a delay
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-              _webView.evaluateJavascript(verifyScript, new ValueCallback<String>() {
-                @Override
-                public void onReceiveValue(String value) {
-                  if ("true".equals(value)) {
-                    initializeSharePolyfill();
-                  } else {
-                    Log.e("InAppBrowser", "JavaScript interface still not available after retry");
-                  }
-                }
-              });
-            }, 1000);
-          }
-        }
-      });
-    }, 1000);
   }
 
   private void initializeSharePolyfill() {
@@ -1209,10 +1042,10 @@ public class WebViewDialog extends Dialog {
     } else if (TextUtils.equals(_options.getToolbarType(), "hidden")) {
       // Hide the entire toolbar
       _toolbar.setVisibility(View.GONE);
-      
+
       // Adjust the WebView layout to take full space
       if (_webView.getLayoutParams() instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) {
-        androidx.constraintlayout.widget.ConstraintLayout.LayoutParams params = 
+        androidx.constraintlayout.widget.ConstraintLayout.LayoutParams params =
           (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) _webView.getLayoutParams();
         params.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
         params.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
@@ -1667,13 +1500,13 @@ public class WebViewDialog extends Dialog {
       @Override
       public void onPageStarted(WebView view, String url, Bitmap favicon) {
         super.onPageStarted(view, url, favicon);
-        injectJavaScriptInterface();
+        injectAndroidJavaScriptInterface();
       }
 
       @Override
       public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
-        injectJavaScriptInterface();
+        injectAndroidJavaScriptInterface();
       }
     });
   }
@@ -1952,11 +1785,11 @@ public class WebViewDialog extends Dialog {
       FileChooserParams fileChooserParams
     ) {
       mFilePathCallback = filePathCallback;
-      
+
       // Check if this is a camera capture request
       String[] acceptTypes = fileChooserParams.getAcceptTypes();
       boolean isCameraCapture = false;
-      
+
       // Check for capture="camera" attribute
       if (fileChooserParams.getMode() == FileChooserParams.MODE_OPEN) {
         // Check if it's specifically a camera capture request
@@ -1985,7 +1818,7 @@ public class WebViewDialog extends Dialog {
             Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
             cameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            
+
             // Check if there's a camera app available
             if (cameraIntent.resolveActivity(activity.getPackageManager()) != null) {
               cameraLauncher.launch(cameraIntent);
