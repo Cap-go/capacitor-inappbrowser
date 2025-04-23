@@ -454,72 +454,86 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if message.name == "messageHandler" {
-            if let messageBody = message.body as? [String: Any] {
-                print("Received message from JavaScript:", messageBody)
-                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: messageBody)
-            } else {
-                print("Received non-dictionary message from JavaScript:", message.body)
-                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
+        // Очищаем очередь сообщений перед обработкой нового
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            print("[InAppBrowser] Received message: \(message.name)")
+            
+            switch message.name {
+            case "close":
+                print("[InAppBrowser] Processing close request")
+                self.cleanupWebView()
+                self.closeView()
+            case "messageHandler":
+                if let messageBody = message.body as? [String: Any] {
+                    self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: messageBody)
+                } else {
+                    self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
+                }
+            case "preShowScriptSuccess":
+                guard let semaphore = preShowSemaphore else { return }
+                semaphore.signal()
+            case "preShowScriptError":
+                guard let semaphore = preShowSemaphore else { return }
+                semaphore.signal()
+            case "magicPrint":
+                if let webView = self.webView {
+                    let printController = UIPrintInteractionController.shared
+                    let printInfo = UIPrintInfo(dictionary: nil)
+                    printInfo.outputType = .general
+                    printInfo.jobName = "Print Job"
+                    printController.printInfo = printInfo
+                    printController.printFormatter = webView.viewPrintFormatter()
+                    printController.present(animated: true, completionHandler: nil)
+                }
+            default:
+                break
             }
-        } else if message.name == "preShowScriptSuccess" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptSuccess]: Semaphore not found")
-                return
-            }
-
-            semaphore.signal()
-        } else if message.name == "preShowScriptError" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptError]: Semaphore not found")
-                return
-            }
-            print("[InAppBrowser - preShowScriptError]: Error!!!!")
-            semaphore.signal()
-        } else if message.name == "close" {
-            closeView()
-		} else if message.name == "magicPrint" {
-			if let webView = self.webView {
-				let printController = UIPrintInteractionController.shared
-
-				let printInfo = UIPrintInfo(dictionary: nil)
-				printInfo.outputType = .general
-				printInfo.jobName = "Print Job"
-
-				printController.printInfo = printInfo
-				printController.printFormatter = webView.viewPrintFormatter()
-
-				printController.present(animated: true, completionHandler: nil)
-			}
-		}
+        }
     }
 
     func injectJavaScriptInterface() {
         let script = """
-                if (!window.mobileApp) {
-                        window.mobileApp = {
-                                postMessage: function(message) {
-                                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                                                window.webkit.messageHandlers.messageHandler.postMessage(message);
-                                        }
-                                },
-                                close: function() {
-                                        window.webkit.messageHandlers.close.postMessage(null);
-                                }
-                        };
+            if (!window.mobileApp) {
+                window.mobileApp = {
+                    postMessage: function(message) {
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                            try {
+                                window.webkit.messageHandlers.messageHandler.postMessage(message);
+                            } catch (e) {
+                                console.error('Error posting message:', e);
+                            }
+                        }
+                    },
+                    close: function() {
+                        console.log('Attempting to close WebView...');
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
+                            try {
+                                window.webkit.messageHandlers.close.postMessage({});
+                                console.log('Close message sent');
+                            } catch (e) {
+                                console.error('Error closing WebView:', e);
+                            }
+                        } else {
+                            console.error('Close handler not found');
+                        }
+                    }
+                };
+                console.log('Mobile app interface injected successfully');
+            }
+        """
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.webView?.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    print("[InAppBrowser] Error injecting JavaScript interface: \(error)")
+                } else {
+                    print("[InAppBrowser] JavaScript interface injected successfully")
                 }
-                """
-		DispatchQueue.main.async {
-			self.webView?.evaluateJavaScript(script) { result, error in
-				if let error = error {
-					print("JavaScript evaluation error: \(error)")
-				} else if let result = result {
-					print("JavaScript result: \(result)")
-				} else {
-					print("JavaScript executed with no result")
-				}
-			}
-		}
+            }
+        }
     }
 
     open func initWebview(isInspectable: Bool = true) {
@@ -530,52 +544,57 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         let webConfiguration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
+        
+        // Register message handlers
+        userContentController.add(self, name: "mobileApp")
         userContentController.add(self, name: "messageHandler")
         userContentController.add(self, name: "preShowScriptError")
         userContentController.add(self, name: "preShowScriptSuccess")
         userContentController.add(self, name: "close")
-		 userContentController.add(self, name: "magicPrint")
+        userContentController.add(self, name: "magicPrint")
 
-		// Inject JavaScript to override window.print
-		let script = WKUserScript(
-			source: """
-			window.print = function() {
-				window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
-			};
-			""",
-			injectionTime: .atDocumentStart,
-			forMainFrameOnly: false
-		)
-		userContentController.addUserScript(script)
+        // Inject JavaScript bridge
+        let bridgeScript = """
+            window.mobileApp = {
+                postMessage: function(message) {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                        window.webkit.messageHandlers.messageHandler.postMessage(message);
+                    }
+                },
+                close: function() {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.mobileApp) {
+                        window.webkit.messageHandlers.mobileApp.postMessage({ action: 'close' });
+                    }
+                }
+            };
+        """
+        
+        let userScript = WKUserScript(
+            source: bridgeScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(userScript)
+
+        // Inject print override script
+        let printScript = WKUserScript(
+            source: """
+            window.print = function() {
+                window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
+            };
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(printScript)
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
 
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
-//        if webView.responds(to: Selector(("setInspectable:"))) {
-//            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
-//            webView.perform(Selector(("setInspectable:")), with: isInspectable)
-//        }
-
-		if #available(iOS 16.4, *) {
-			webView.isInspectable = true
-		} else {
-			// Fallback on earlier versions
-		}
-
-        if self.blankNavigationTab {
-            // First add the webView to view hierarchy
-            self.view.addSubview(webView)
-
-            // Then set up constraints
-            webView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
-                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
-            ])
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = true
         }
 
         webView.uiDelegate = self
@@ -592,11 +611,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         if !self.blankNavigationTab {
             self.view = webView
+        } else {
+            self.view.addSubview(webView)
+            webView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+            ])
         }
+
         self.webView = webView
-
         self.webView?.customUserAgent = self.customUserAgent ?? self.userAgent ?? self.originalUserAgent
-
         self.navigationItem.title = self.navigationItem.title ?? self.source?.absoluteString
 
         if let navigation = self.navigationController {
@@ -606,8 +633,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         if let s = self.source {
             self.load(source: s)
-        } else {
-            print("[\(type(of: self))][Error] Invalid url")
         }
     }
 
@@ -1208,28 +1233,33 @@ fileprivate extension WKWebViewController {
         self.present(activityViewController, animated: true, completion: nil)
     }
 
-    func closeView () {
+    public func closeView() {
+        print("[InAppBrowser] Starting closeView")
         var canDismiss = true
         if let url = self.source?.url {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
         }
+        
         if canDismiss {
-            // Cleanup webView
-            webView?.stopLoading()
-            webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
-            if websiteTitleInNavigationBar {
-                webView?.removeObserver(self, forKeyPath: titleKeyPath)
-            }
-            webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
-            webView?.configuration.userContentController.removeAllUserScripts()
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-            webView = nil
-
+            print("[InAppBrowser] Proceeding with dismissal")
+            
             self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
-            dismiss(animated: true, completion: nil)
+            
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                
+                if let presentingViewController = self.presentingViewController {
+                    print("[InAppBrowser] Dismissing from presenting view controller")
+                    presentingViewController.dismiss(animated: true, completion: nil)
+                } else if let navigationController = self.navigationController {
+                    print("[InAppBrowser] Dismissing from navigation controller")
+                    navigationController.dismiss(animated: true, completion: nil)
+                } else {
+                    print("[InAppBrowser] No presenting or navigation controller found")
+                }
+            }
+        } else {
+            print("[InAppBrowser] Dismissal cancelled by delegate")
         }
     }
 
@@ -1288,6 +1318,35 @@ fileprivate extension WKWebViewController {
 
         // Force button colors to update
         updateButtonTintColors()
+    }
+
+    private func cleanupWebView() {
+        print("[InAppBrowser] Starting cleanup")
+        // Останавливаем загрузку
+        webView?.stopLoading()
+        
+        // Удаляем наблюдатели
+        webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+        if websiteTitleInNavigationBar {
+            webView?.removeObserver(self, forKeyPath: titleKeyPath)
+        }
+        webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+        
+        // Очищаем все скрипты и обработчики
+        webView?.configuration.userContentController.removeAllUserScripts()
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        
+        // Очищаем кэш и данные
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
+            modifiedSince: Date(timeIntervalSince1970: 0)
+        ) { [weak self] in
+            print("[InAppBrowser] Cache cleared")
+            self?.webView = nil
+        }
     }
 }
 
@@ -1450,10 +1509,21 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
+        // Проверяем URL на наличие параметра exit
+        if let components = URLComponents(url: u, resolvingAgainstBaseURL: false),
+           let queryItems = components.queryItems,
+           queryItems.contains(where: { $0.name == "exit" && $0.value == "true" }) {
+            print("[InAppBrowser] Exit parameter detected in URL, closing WebView")
+            DispatchQueue.main.async { [weak self] in
+                self?.closeView()
+            }
+            decisionHandler(.cancel)
+            return
+        }
+
         // Check if the URL is an App Store URL
         if u.absoluteString.contains("apps.apple.com") {
             UIApplication.shared.open(u, options: [:], completionHandler: nil)
-            // Cancel the navigation in the web view
             decisionHandler(.cancel)
             return
         }
@@ -1476,7 +1546,7 @@ extension WKWebViewController: WKNavigationDelegate {
         if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue), let result = delegate?.webViewController?(self, decidePolicy: u, navigationType: navigationType) {
             actionPolicy = result ? .allow : .cancel
         }
-        self.injectJavaScriptInterface()
+
         decisionHandler(actionPolicy)
     }
 }

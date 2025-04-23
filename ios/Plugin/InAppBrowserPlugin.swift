@@ -38,7 +38,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "removeAllListeners", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
@@ -700,6 +701,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        // Добавляем обработку URL с параметром exit
+        if let url = URL(string: urlString),
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let queryItems = components.queryItems,
+           queryItems.contains(where: { $0.name == "exit" && $0.value == "true" }) {
+            print("[InAppBrowser] Exit parameter detected in URL")
+            call.resolve()
+            return
+        }
+
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let credentials = self.readCredentials(call)
 
@@ -765,10 +776,24 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func close(_ call: CAPPluginCall) {
-        DispatchQueue.main.async {
-            self.navigationWebViewController?.dismiss(animated: true, completion: nil)
-            self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
-            call.resolve()
+        print("[InAppBrowser] Closing browser")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            if let webViewController = self.webViewController {
+                webViewController.closeView()
+                self.webViewController = nil
+            }
+            
+            if let navigationController = self.navigationWebViewController {
+                navigationController.dismiss(animated: true) {
+                    self.navigationWebViewController = nil
+                    self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
+                    call.resolve()
+                }
+            } else {
+                call.resolve()
+            }
         }
     }
 
@@ -818,5 +843,18 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let blue = components[2]
         let brightness = (red * 299 + green * 587 + blue * 114) / 1000
         return brightness < 0.5
+    }
+
+    @objc public override func removeAllListeners(_ call: CAPPluginCall) {
+        print("[InAppBrowser] Removing all listeners")
+        // Очищаем все слушатели
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            if let webViewController = self.webViewController {
+                webViewController.closeView()
+                self.webViewController = nil
+            }
+            call.resolve()
+        }
     }
 }
