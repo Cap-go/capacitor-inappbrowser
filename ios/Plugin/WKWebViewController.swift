@@ -7,7 +7,7 @@
 //
 
 import UIKit
-import WebKit
+@preconcurrency import WebKit
 
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
