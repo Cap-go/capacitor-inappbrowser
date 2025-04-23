@@ -1007,7 +1007,10 @@ public class WebViewDialog extends Dialog {
   }
 
   public String getUrl() {
-    return _webView.getUrl();
+    if (_webView != null) {
+      return _webView.getUrl();
+    }
+    return "";
   }
 
   public void executeScript(String script) {

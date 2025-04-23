@@ -806,17 +806,21 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void close(PluginCall call) {
-    this.getActivity()
+    getActivity()
       .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
             if (webViewDialog != null) {
+              // Get the URL before dismissing the dialog
+              String url = webViewDialog.getUrl();
+              // Dismiss the dialog
+              webViewDialog.dismiss();
+              // Notify listeners after dismissing
               notifyListeners(
                 "closeEvent",
-                new JSObject().put("url", webViewDialog.getUrl())
+                new JSObject().put("url", url)
               );
-              webViewDialog.dismiss();
               webViewDialog = null;
             } else {
               Intent intent = new Intent(
