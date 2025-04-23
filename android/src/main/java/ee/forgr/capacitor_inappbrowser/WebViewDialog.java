@@ -170,7 +170,11 @@ public class WebViewDialog extends Dialog {
 
     @JavascriptInterface
     public void close() {
-      // Handle close
+      if (activity != null) {
+        activity.runOnUiThread(() -> {
+          dismiss();
+        });
+      }
     }
 
     @JavascriptInterface
