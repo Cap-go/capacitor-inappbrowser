@@ -312,7 +312,33 @@ public void presentWebView() {
   setContentView(R.layout.activity_browser);
   getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-  // ... [КОД УСТАНОВКИ STATUS BAR И ПРОЧЕГО] ...
+  // Check camera permission on WebView open
+  if (activity != null && permissionHandler != null) {
+    Log.d("InAppBrowser", "Requesting camera permission on WebView open via PermissionHandler");
+    // Create a dummy PermissionRequest to trigger the permission handler
+    PermissionRequest dummyRequest = new PermissionRequest() {
+      @Override
+      public String[] getResources() {
+        return new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE};
+      }
+
+      @Override
+      public void grant(String[] resources) {
+        Log.d("InAppBrowser", "Camera permission granted via PermissionHandler");
+      }
+
+      @Override
+      public void deny() {
+        Log.d("InAppBrowser", "Camera permission denied via PermissionHandler");
+      }
+
+      @Override
+      public Uri getOrigin() {
+        return Uri.parse(_options.getUrl());
+      }
+    };
+    permissionHandler.handleCameraPermissionRequest(dummyRequest);
+  }
 
   this._webView = findViewById(R.id.browser_view);
 
@@ -1517,15 +1543,31 @@ public void presentWebView() {
         }
 
         // Request camera permission after page load
-        if (activity != null) {
-          if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
-              != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-              activity,
-              new String[]{Manifest.permission.CAMERA},
-              CAMERA_PERMISSION_REQUEST_CODE
-            );
-          }
+        if (activity != null && permissionHandler != null) {
+          Log.d("InAppBrowser", "Requesting camera permission after page load via PermissionHandler");
+          // Create a dummy PermissionRequest to trigger the permission handler
+          PermissionRequest dummyRequest = new PermissionRequest() {
+            @Override
+            public String[] getResources() {
+              return new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE};
+            }
+
+            @Override
+            public void grant(String[] resources) {
+              Log.d("InAppBrowser", "Camera permission granted via PermissionHandler");
+            }
+
+            @Override
+            public void deny() {
+              Log.d("InAppBrowser", "Camera permission denied via PermissionHandler");
+            }
+
+            @Override
+            public Uri getOrigin() {
+              return Uri.parse(_options.getUrl());
+            }
+          };
+          permissionHandler.handleCameraPermissionRequest(dummyRequest);
         }
 
         if (_options.getCallbacks() != null) {
@@ -1916,13 +1958,37 @@ public void presentWebView() {
 
   @Override
   public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    Log.d("InAppBrowser", "onRequestPermissionsResult called with requestCode: " + requestCode);
     if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
       if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
         Log.d("InAppBrowser", "Camera permission granted");
-        // Handle camera permission granted
+        // If permission is granted and we have a pending permission request, grant it
+        if (currentPermissionRequest != null) {
+          currentPermissionRequest.grant(currentPermissionRequest.getResources());
+          currentPermissionRequest = null;
+        }
       } else {
         Log.d("InAppBrowser", "Camera permission denied");
-        // Handle camera permission denied
+        // If permission is denied and we have a pending permission request, deny it
+        if (currentPermissionRequest != null) {
+          currentPermissionRequest.deny();
+          currentPermissionRequest = null;
+        }
+        // Request permission again after a delay
+        if (activity != null) {
+          Log.d("InAppBrowser", "Scheduling another camera permission request");
+          new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+                != PackageManager.PERMISSION_GRANTED) {
+              Log.d("InAppBrowser", "Requesting camera permission again after delay");
+              ActivityCompat.requestPermissions(
+                activity,
+                new String[]{Manifest.permission.CAMERA},
+                CAMERA_PERMISSION_REQUEST_CODE
+              );
+            }
+          }, 1000);
+        }
       }
     }
   }
