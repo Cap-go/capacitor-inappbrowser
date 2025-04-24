@@ -8,6 +8,7 @@
 
 import UIKit
 @preconcurrency import WebKit
+import AVFoundation
 
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
@@ -496,92 +497,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    func injectWKJavaScriptInterface() {
-        // Предотвращаем повторные вызовы во время инъекции
-        guard !isInjecting else {
-            print("[InAppBrowser] Injection already in progress")
-            return
-        }
-
-        injectionQueue.async { [weak self] in
-            guard let self = self else {
-                print("[InAppBrowser] Self is nil during injection")
-                return
-            }
-
-            // Устанавливаем флаг инъекции
-            self.isInjecting = true
-            defer { self.isInjecting = false }
-
-            // Проверяем состояние WebView
-            guard let webView = self.webView else {
-                print("[InAppBrowser] WebView is nil during injection")
-                return
-            }
-
-            // Проверяем, что webView все еще прикреплен к view hierarchy
-            guard webView.superview != nil else {
-                print("[InAppBrowser] WebView is not in view hierarchy")
-                return
-            }
-
-            // Проверяем, что webView не уничтожен и не в процессе загрузки
-            guard !webView.isLoading else {
-                print("[InAppBrowser] WebView is loading")
-                return
-            }
-
-            let script = """
-                if (!window.mobileApp) {
-                    window.mobileApp = {
-                        postMessage: function(message) {
-                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                                try {
-                                    window.webkit.messageHandlers.messageHandler.postMessage(message);
-                                } catch (e) {
-                                    console.error('Error posting message:', e);
-                                }
-                            }
-                        },
-                        close: function() {
-                            console.log('Attempting to close WebView...');
-                            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
-                                try {
-                                    window.webkit.messageHandlers.close.postMessage({});
-                                    console.log('Close message sent');
-                                } catch (e) {
-                                    console.error('Error closing WebView:', e);
-                                }
-                            } else {
-                                console.error('Close handler not found');
-                            }
-                        }
-                    };
-                    console.log('Mobile app interface injected successfully');
-                }
-            """
-
-            // Выполняем JavaScript в главном потоке
-            DispatchQueue.main.async {
-                // Повторная проверка состояния WebView перед выполнением
-                guard let webView = self.webView,
-                      webView.superview != nil,
-                      !webView.isLoading else {
-                    print("[InAppBrowser] WebView state changed during injection")
-                    return
-                }
-
-                webView.evaluateJavaScript(script) { result, error in
-                    if let error = error {
-                        print("[InAppBrowser] Error injecting JavaScript interface: \(error)")
-                    } else {
-                        print("[InAppBrowser] JavaScript interface injected successfully")
-                    }
-                }
-            }
-        }
-    }
-
     open func initWebview(isInspectable: Bool = true) {
         self.view.backgroundColor = UIColor.white
 
@@ -835,7 +750,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         case "URL":
 
             self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
-            self.injectWKJavaScriptInterface()
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
         }
@@ -1426,6 +1340,31 @@ extension WKWebViewController: WKUIDelegate {
             self.present(alertController, animated: true, completion: nil)
         }
     }
+    
+    @available(iOS 15.0, *)
+    public func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (Bool) -> Void) {
+        if type == .camera {
+            DispatchQueue.main.async {
+                let alertController = UIAlertController(
+                    title: "Доступ к камере",
+                    message: "Приложению требуется доступ к камере. Разрешить?",
+                    preferredStyle: .alert
+                )
+                
+                alertController.addAction(UIAlertAction(title: "Разрешить", style: .default) { _ in
+                    decisionHandler(true)
+                })
+                
+                alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel) { _ in
+                    decisionHandler(false)
+                })
+                
+                self.present(alertController, animated: true)
+            }
+        } else {
+            decisionHandler(false)
+        }
+    }
 }
 
 // MARK: - WKNavigationDelegate
@@ -1510,8 +1449,66 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFinish: url)
         }
-        self.injectWKJavaScriptInterface()
         self.capBrowserPlugin?.notifyListeners("browserPageLoaded", data: [:])
+        
+        // Check camera authorization status and request if needed
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            let status = AVCaptureDevice.authorizationStatus(for: .video)
+            
+            switch status {
+            case .notDetermined:
+                // First time request
+                let alertController = UIAlertController(
+                    title: "Доступ к камере",
+                    message: "Приложению требуется доступ к камере. Разрешить?",
+                    preferredStyle: .alert
+                )
+                
+                alertController.addAction(UIAlertAction(title: "Разрешить", style: .default) { _ in
+                    AVCaptureDevice.requestAccess(for: .video) { granted in
+                        print("Camera permission granted: \(granted)")
+                        if granted {
+                            DispatchQueue.main.async {
+                                // Notify that camera access was granted
+                                self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
+                            }
+                        }
+                    }
+                })
+                
+                alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+                
+                self.present(alertController, animated: true)
+                
+            case .restricted, .denied:
+                // Show settings alert
+                let alertController = UIAlertController(
+                    title: "Доступ к камере запрещен",
+                    message: "Пожалуйста, разрешите доступ к камере в настройках устройства",
+                    preferredStyle: .alert
+                )
+                
+                alertController.addAction(UIAlertAction(title: "Открыть настройки", style: .default) { _ in
+                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsUrl)
+                    }
+                })
+                
+                alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+                
+                self.present(alertController, animated: true)
+                
+            case .authorized:
+                // Camera access already granted
+                print("Camera access already granted")
+                self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
+                
+            @unknown default:
+                break
+            }
+        }
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -1558,7 +1555,6 @@ extension WKWebViewController: WKNavigationDelegate {
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
         }
-        self.injectWKJavaScriptInterface()
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
