@@ -564,8 +564,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Выполняем JavaScript в главном потоке
             DispatchQueue.main.async {
                 // Повторная проверка состояния WebView перед выполнением
-                guard let self = self,
-                      let webView = self.webView,
+                guard let webView = self.webView,
                       webView.superview != nil,
                       !webView.isLoading else {
                     print("[InAppBrowser] WebView state changed during injection")

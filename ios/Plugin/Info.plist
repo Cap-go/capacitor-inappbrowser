@@ -20,5 +20,9 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSPrincipalClass</key>
 	<string></string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to camera to take photos and videos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs access to microphone for video recording.</string>
 </dict>
 </plist>
