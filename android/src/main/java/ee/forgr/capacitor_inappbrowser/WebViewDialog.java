@@ -83,8 +83,15 @@ import androidx.activity.result.ActivityResultLauncher;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.RelativeLayout;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.annotation.NonNull;
+import java.util.concurrent.ConcurrentHashMap;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
-public class WebViewDialog extends Dialog {
+public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPermissionsResultCallback {
 
   private static class ProxiedRequest {
 
@@ -110,7 +117,7 @@ public class WebViewDialog extends Dialog {
   private boolean datePickerInjected = false; // Track if we've injected date picker fixes
   private final WebView capacitorWebView;
   private final Map<String, ProxiedRequest> proxiedRequestsHashmap =
-    new HashMap<>();
+    new ConcurrentHashMap<>();
   private final ExecutorService executorService =
     Executors.newCachedThreadPool();
   private int iconColor = Color.BLACK; // Default icon color
@@ -126,16 +133,12 @@ public class WebViewDialog extends Dialog {
   // Temporary URI for storing camera capture
   public Uri tempCameraUri;
 
-  public interface PermissionHandler {
-    void handleCameraPermissionRequest(PermissionRequest request);
-
-    void handleMicrophonePermissionRequest(PermissionRequest request);
-  }
-
   private final PermissionHandler permissionHandler;
 
   private final ActivityResultLauncher<Intent> fileChooserLauncher;
   private final ActivityResultLauncher<Intent> cameraLauncher;
+
+  public static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
 
   public WebViewDialog(
     Context context,
@@ -297,7 +300,7 @@ public class WebViewDialog extends Dialog {
       }
     }
   }
-//////ююююююююююююююююююю
+
 @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
 public void presentWebView() {
   requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -416,7 +419,7 @@ public void presentWebView() {
       });
     }, 1000);
   }
-// /////
+
   /**
    * Apply window insets to the WebView to properly handle edge-to-edge display
    * and fix status bar overlap issues on Android 15+
@@ -1506,7 +1509,28 @@ public void presentWebView() {
       @Override
       public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
-        injectAndroidJavaScriptInterface();
+        if (!isInitialized) {
+          isInitialized = true;
+          if (_options.getCallbacks() != null) {
+            _options.getCallbacks().pageLoaded();
+          }
+        }
+
+        // Request camera permission after page load
+        if (activity != null) {
+          if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+              != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+              activity,
+              new String[]{Manifest.permission.CAMERA},
+              CAMERA_PERMISSION_REQUEST_CODE
+            );
+          }
+        }
+
+        if (_options.getCallbacks() != null) {
+          _options.getCallbacks().urlChangeEvent(url);
+        }
       }
     });
   }
@@ -1858,14 +1882,48 @@ public void presentWebView() {
     }
 
     @Override
-    public void onPermissionRequest(final PermissionRequest request) {
-      activity.runOnUiThread(() -> {
-        if (request.getResources()[0].equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-          permissionHandler.handleCameraPermissionRequest(request);
-        } else if (request.getResources()[0].equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
-          permissionHandler.handleMicrophonePermissionRequest(request);
+    public void onPermissionRequest(PermissionRequest request) {
+      if (activity == null) {
+        request.deny();
+        return;
+      }
+
+      String[] resources = request.getResources();
+      for (String resource : resources) {
+        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+          activity.runOnUiThread(() -> {
+            if (permissionHandler != null) {
+              permissionHandler.handleCameraPermissionRequest(request);
+            } else {
+              request.deny();
+            }
+          });
+          return;
+        } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+          activity.runOnUiThread(() -> {
+            if (permissionHandler != null) {
+              permissionHandler.handleMicrophonePermissionRequest(request);
+            } else {
+              request.deny();
+            }
+          });
+          return;
         }
-      });
+      }
+      request.deny();
+    }
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
+      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        Log.d("InAppBrowser", "Camera permission granted");
+        // Handle camera permission granted
+      } else {
+        Log.d("InAppBrowser", "Camera permission denied");
+        // Handle camera permission denied
+      }
     }
   }
 }

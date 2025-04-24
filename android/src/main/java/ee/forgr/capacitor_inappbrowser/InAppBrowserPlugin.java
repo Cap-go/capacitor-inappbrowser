@@ -38,6 +38,9 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.PackageManagerCompat;
 
 @CapacitorPlugin(
   name = "InAppBrowser",
@@ -56,7 +59,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin
   extends Plugin
-  implements WebViewDialog.PermissionHandler {
+  implements PermissionHandler {
 
   public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
   private CustomTabsClient customTabsClient;
@@ -145,18 +148,24 @@ public class InAppBrowserPlugin
     }
   }
 
+  @Override
   public void handleCameraPermissionRequest(PermissionRequest request) {
-    this.currentPermissionRequest = request;
-    if (getPermissionState("camera") != PermissionState.GRANTED) {
-      requestPermissionForAlias("camera", null, "cameraPermissionCallback");
-    } else if (getPermissionState("microphone") != PermissionState.GRANTED) {
-      requestPermissionForAlias(
-        "microphone",
-        null,
-        "microphonePermissionCallback"
-      );
+    Activity activity = getActivity();
+    if (activity == null) {
+      request.deny();
+      return;
+    }
+
+    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+        == PackageManager.PERMISSION_GRANTED) {
+      request.grant(request.getResources());
     } else {
-      grantCameraAndMicrophonePermission();
+      currentPermissionRequest = request;
+      ActivityCompat.requestPermissions(
+        activity,
+        new String[]{Manifest.permission.CAMERA},
+        WebViewDialog.CAMERA_PERMISSION_REQUEST_CODE
+      );
     }
   }
 
@@ -440,6 +449,19 @@ public class InAppBrowserPlugin
     options.setIgnoreUntrustedSSLError(
       Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false))
     );
+
+    // Request camera permission before opening WebView
+    Activity activity = getActivity();
+    if (activity != null) {
+      if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+          != PackageManager.PERMISSION_GRANTED) {
+        ActivityCompat.requestPermissions(
+          activity,
+          new String[]{Manifest.permission.CAMERA},
+          WebViewDialog.CAMERA_PERMISSION_REQUEST_CODE
+        );
+      }
+    }
 
     // Set text zoom if specified in options (default is 100)
     Integer textZoom = call.getInt("textZoom");
@@ -898,5 +920,18 @@ public class InAppBrowserPlugin
     customTabsClient = null;
     currentSession = null;
     super.handleOnDestroy();
+  }
+
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    if (requestCode == WebViewDialog.CAMERA_PERMISSION_REQUEST_CODE) {
+      if (currentPermissionRequest != null) {
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+          currentPermissionRequest.grant(currentPermissionRequest.getResources());
+        } else {
+          currentPermissionRequest.deny();
+        }
+        currentPermissionRequest = null;
+      }
+    }
   }
 }
