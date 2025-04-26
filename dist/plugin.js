@@ -34,6 +34,16 @@ var capacitorInAppBrowser = (function (exports, core) {
          */
         ToolBarType["HIDDEN"] = "hidden";
     })(exports.ToolBarType || (exports.ToolBarType = {}));
+    exports.Permissions = void 0;
+    (function (Permissions) {
+        Permissions["CAMERA"] = "camera";
+        Permissions["MICROPHONE"] = "microphone";
+        Permissions["LOCATION"] = "location";
+        Permissions["NOTIFICATIONS"] = "notifications";
+        Permissions["CONTACTS"] = "contacts";
+        Permissions["CALENDAR"] = "calendar";
+        Permissions["GALLERY"] = "gallery";
+    })(exports.Permissions || (exports.Permissions = {}));
 
     const InAppBrowser = core.registerPlugin("InAppBrowser", {
         web: () => Promise.resolve().then(function () { return web; }).then((m) => new m.InAppBrowserWeb()),

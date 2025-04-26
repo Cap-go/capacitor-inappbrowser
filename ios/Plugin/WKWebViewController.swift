@@ -9,6 +9,11 @@
 import UIKit
 @preconcurrency import WebKit
 import AVFoundation
+import Contacts
+import EventKit
+import Photos
+import CoreLocation
+import UserNotifications
 
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
@@ -87,6 +92,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, permissions: [String] = []) {
+        super.init(nibName: nil, bundle: nil)
+        self.blankNavigationTab = blankNavigationTab
+        self.source = .remote(url)
+        self.credentials = credentials
+        self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
+        self.permissions = permissions
+        self.initWebview(isInspectable: isInspectable)
+    }
+
     open var hasDynamicTitle = false
     open var source: WKWebSource?
     /// use `source` instead
@@ -114,6 +130,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
+    var permissions: [String] = []
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -1451,62 +1468,29 @@ extension WKWebViewController: WKNavigationDelegate {
         }
         self.capBrowserPlugin?.notifyListeners("browserPageLoaded", data: [:])
         
-        // Check camera authorization status and request if needed
+        // Handle permissions
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            let status = AVCaptureDevice.authorizationStatus(for: .video)
-            
-            switch status {
-            case .notDetermined:
-                // First time request
-                let alertController = UIAlertController(
-                    title: "Доступ к камере",
-                    message: "Приложению требуется доступ к камере. Разрешить?",
-                    preferredStyle: .alert
-                )
-                
-                alertController.addAction(UIAlertAction(title: "Разрешить", style: .default) { _ in
-                    AVCaptureDevice.requestAccess(for: .video) { granted in
-                        print("Camera permission granted: \(granted)")
-                        if granted {
-                            DispatchQueue.main.async {
-                                // Notify that camera access was granted
-                                self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
-                            }
-                        }
-                    }
-                })
-                
-                alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel))
-                
-                self.present(alertController, animated: true)
-                
-            case .restricted, .denied:
-                // Show settings alert
-                let alertController = UIAlertController(
-                    title: "Доступ к камере запрещен",
-                    message: "Пожалуйста, разрешите доступ к камере в настройках устройства",
-                    preferredStyle: .alert
-                )
-                
-                alertController.addAction(UIAlertAction(title: "Открыть настройки", style: .default) { _ in
-                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settingsUrl)
-                    }
-                })
-                
-                alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel))
-                
-                self.present(alertController, animated: true)
-                
-            case .authorized:
-                // Camera access already granted
-                print("Camera access already granted")
-                self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
-                
-            @unknown default:
-                break
+            for permission in self.permissions {
+                switch permission {
+                case "camera":
+                    self.handleCameraPermission()
+                case "microphone":
+                    self.handleMicrophonePermission()
+                case "location":
+                    self.handleLocationPermission()
+                case "notifications":
+                    self.handleNotificationPermission()
+                case "contacts":
+                    self.handleContactsPermission()
+                case "calendar":
+                    self.handleCalendarPermission()
+                case "gallery":
+                    self.handleGalleryPermission()
+                default:
+                    break
+                }
             }
         }
     }
@@ -1608,6 +1592,118 @@ extension WKWebViewController: WKNavigationDelegate {
         }
 
         decisionHandler(actionPolicy)
+    }
+
+    private func handleCameraPermission() {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch status {
+        case .notDetermined:
+            // First time request
+            let alertController = UIAlertController(
+                title: "Camera Access",
+                message: "This app needs access to your camera. Allow access?",
+                preferredStyle: .alert
+            )
+            
+            alertController.addAction(UIAlertAction(title: "Allow", style: .default) { _ in
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    print("Camera permission granted: \(granted)")
+                    if granted {
+                        DispatchQueue.main.async {
+                            self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
+                        }
+                    }
+                }
+            })
+            
+            alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            self.present(alertController, animated: true)
+            
+        case .restricted, .denied:
+            // Show settings alert
+            let alertController = UIAlertController(
+                title: "Camera Access Denied",
+                message: "Please enable camera access in your device settings",
+                preferredStyle: .alert
+            )
+            
+            alertController.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+                if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsUrl)
+                }
+            })
+            
+            alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            self.present(alertController, animated: true)
+            
+        case .authorized:
+            // Camera access already granted
+            print("Camera access already granted")
+            self.capBrowserPlugin?.notifyListeners("cameraAccessGranted", data: [:])
+            
+        @unknown default:
+            break
+        }
+    }
+    
+    private func handleMicrophonePermission() {
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self.capBrowserPlugin?.notifyListeners("microphoneAccessGranted", data: [:])
+                }
+            }
+        }
+    }
+    
+    private func handleLocationPermission() {
+        let locationManager = CLLocationManager()
+        locationManager.requestWhenInUseAuthorization()
+    }
+    
+    private func handleNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    self.capBrowserPlugin?.notifyListeners("notificationAccessGranted", data: [:])
+                }
+            }
+        }
+    }
+    
+    private func handleContactsPermission() {
+        let store = CNContactStore()
+        store.requestAccess(for: .contacts) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    self.capBrowserPlugin?.notifyListeners("contactsAccessGranted", data: [:])
+                }
+            }
+        }
+    }
+    
+    private func handleCalendarPermission() {
+        let eventStore = EKEventStore()
+        eventStore.requestAccess(to: .event) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    self.capBrowserPlugin?.notifyListeners("calendarAccessGranted", data: [:])
+                }
+            }
+        }
+    }
+    
+    private func handleGalleryPermission() {
+        PHPhotoLibrary.requestAuthorization { status in
+            DispatchQueue.main.async {
+                if status == .authorized {
+                    self.capBrowserPlugin?.notifyListeners("galleryAccessGranted", data: [:])
+                }
+            }
+        }
     }
 }
 

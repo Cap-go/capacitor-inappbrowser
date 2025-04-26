@@ -545,6 +545,20 @@
           "type": "string"
         },
         {
+          "name": "permissions",
+          "tags": [
+            {
+              "text": "0.1.0",
+              "name": "since"
+            }
+          ],
+          "docs": "Array of permissions to request (e.g. [\"camera\", \"microphone\"])",
+          "complexTypes": [
+            "Permissions"
+          ],
+          "type": "Permissions[] | undefined"
+        },
+        {
           "name": "headers",
           "tags": [
             {
@@ -1216,6 +1230,54 @@
     }
   ],
   "enums": [
+    {
+      "name": "Permissions",
+      "slug": "permissions",
+      "members": [
+        {
+          "name": "CAMERA",
+          "value": "'camera'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "MICROPHONE",
+          "value": "'microphone'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "LOCATION",
+          "value": "'location'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "NOTIFICATIONS",
+          "value": "'notifications'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "CONTACTS",
+          "value": "'contacts'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "CALENDAR",
+          "value": "'calendar'",
+          "tags": [],
+          "docs": ""
+        },
+        {
+          "name": "GALLERY",
+          "value": "'gallery'",
+          "tags": [],
+          "docs": ""
+        }
+      ]
+    },
     {
       "name": "ToolBarType",
       "slug": "toolbartype",

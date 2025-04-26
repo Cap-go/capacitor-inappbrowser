@@ -52,7 +52,15 @@ export enum ToolBarType {
    */
   HIDDEN = 'hidden',
 }
-
+export enum Permissions {
+  CAMERA = 'camera',
+  MICROPHONE = 'microphone',
+  LOCATION = 'location',
+  NOTIFICATIONS = 'notifications',
+  CONTACTS = 'contacts',
+  CALENDAR = 'calendar',
+  GALLERY = 'gallery',
+}
 export interface Headers {
   [key: string]: string;
 }
@@ -120,6 +128,11 @@ export interface OpenWebViewOptions {
    */
   url: string;
   /**
+   * Array of permissions to request (e.g. ["camera", "microphone"])
+   * @since 0.1.0
+   */
+  permissions?: Permissions[];
+  /**
    * Headers to send with the request.
    * @since 0.1.0
    * @example
@@ -130,6 +143,7 @@ export interface OpenWebViewOptions {
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
   headers?: Headers;
+
   /**
    * Credentials to send with the request and all subsequent requests for the same host.
    * @since 6.1.0

@@ -49,6 +49,15 @@ export declare enum ToolBarType {
      */
     HIDDEN = "hidden"
 }
+export declare enum Permissions {
+    CAMERA = "camera",
+    MICROPHONE = "microphone",
+    LOCATION = "location",
+    NOTIFICATIONS = "notifications",
+    CONTACTS = "contacts",
+    CALENDAR = "calendar",
+    GALLERY = "gallery"
+}
 export interface Headers {
     [key: string]: string;
 }
@@ -109,6 +118,11 @@ export interface OpenWebViewOptions {
      * @example "https://capgo.app"
      */
     url: string;
+    /**
+     * Array of permissions to request (e.g. ["camera", "microphone"])
+     * @since 0.1.0
+     */
+    permissions?: Permissions[];
     /**
      * Headers to send with the request.
      * @since 0.1.0

@@ -31,4 +31,14 @@ export var ToolBarType;
      */
     ToolBarType["HIDDEN"] = "hidden";
 })(ToolBarType || (ToolBarType = {}));
+export var Permissions;
+(function (Permissions) {
+    Permissions["CAMERA"] = "camera";
+    Permissions["MICROPHONE"] = "microphone";
+    Permissions["LOCATION"] = "location";
+    Permissions["NOTIFICATIONS"] = "notifications";
+    Permissions["CONTACTS"] = "contacts";
+    Permissions["CALENDAR"] = "calendar";
+    Permissions["GALLERY"] = "gallery";
+})(Permissions || (Permissions = {}));
 //# sourceMappingURL=definitions.js.map
