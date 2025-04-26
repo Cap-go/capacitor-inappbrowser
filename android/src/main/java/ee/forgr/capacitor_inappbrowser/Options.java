@@ -176,6 +176,7 @@ public class Options {
   private boolean materialPicker = false;
   private int textZoom = 100; // Default text zoom is 100%
   private boolean preventDeeplink = false;
+  private String[] permissions = new String[0];
 
   public int getTextZoom() {
     return textZoom;
@@ -421,5 +422,13 @@ public class Options {
 
   public void setPreventDeeplink(boolean preventDeeplink) {
     this.preventDeeplink = preventDeeplink;
+  }
+
+  public String[] getPermissions() {
+    return permissions;
+  }
+
+  public void setPermissions(String[] permissions) {
+    this.permissions = permissions;
   }
 }

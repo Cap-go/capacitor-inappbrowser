@@ -117,9 +117,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
   private boolean datePickerInjected = false; // Track if we've injected date picker fixes
   private final WebView capacitorWebView;
   private final Map<String, ProxiedRequest> proxiedRequestsHashmap =
-    new ConcurrentHashMap<>();
+          new ConcurrentHashMap<>();
   private final ExecutorService executorService =
-    Executors.newCachedThreadPool();
+          Executors.newCachedThreadPool();
   private int iconColor = Color.BLACK; // Default icon color
 
   Semaphore preShowSemaphore = null;
@@ -141,18 +141,18 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
   public static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
 
   public WebViewDialog(
-    Context context,
-    int theme,
-    Options options,
-    PermissionHandler permissionHandler,
-    WebView capacitorWebView,
-    ActivityResultLauncher<Intent> fileChooserLauncher,
-    ActivityResultLauncher<Intent> cameraLauncher
+          Context context,
+          int theme,
+          Options options,
+          PermissionHandler permissionHandler,
+          WebView capacitorWebView,
+          ActivityResultLauncher<Intent> fileChooserLauncher,
+          ActivityResultLauncher<Intent> cameraLauncher
   ) {
     // Use Material theme only if materialPicker is enabled
     super(
-      context,
-      options.getMaterialPicker() ? R.style.InAppBrowserMaterialTheme : theme
+            context,
+            options.getMaterialPicker() ? R.style.InAppBrowserMaterialTheme : theme
     );
     this._options = options;
     this._context = context;
@@ -183,12 +183,12 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     @JavascriptInterface
     public void share(String title, String text, String url, String fileData, String fileName, String fileType) {
       Log.d("InAppBrowser", "Native share method called with params: " +
-        "title=" + title + ", " +
-        "text=" + text + ", " +
-        "url=" + url + ", " +
-        "fileData=" + (fileData != null ? "present" : "null") + ", " +
-        "fileName=" + fileName + ", " +
-        "fileType=" + fileType);
+              "title=" + title + ", " +
+              "text=" + text + ", " +
+              "url=" + url + ", " +
+              "fileData=" + (fileData != null ? "present" : "null") + ", " +
+              "fileName=" + fileName + ", " +
+              "fileType=" + fileType);
 
       if (activity == null) {
         Log.e("InAppBrowser", "Activity is null, cannot share");
@@ -216,9 +216,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
 
               // Get content URI
               Uri fileUri = FileProvider.getUriForFile(
-                activity,
-                activity.getPackageName() + ".fileprovider",
-                tempFile
+                      activity,
+                      activity.getPackageName() + ".fileprovider",
+                      tempFile
               );
 
               // Set up share intent for file
@@ -301,99 +301,99 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     }
   }
 
-@SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
-public void presentWebView() {
-  requestWindowFeature(Window.FEATURE_NO_TITLE);
-  setCancelable(true);
-  Objects.requireNonNull(getWindow()).setFlags(
-          WindowManager.LayoutParams.FLAG_FULLSCREEN,
-          WindowManager.LayoutParams.FLAG_FULLSCREEN
-  );
-  setContentView(R.layout.activity_browser);
-  getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+  @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
+  public void presentWebView() {
+    requestWindowFeature(Window.FEATURE_NO_TITLE);
+    setCancelable(true);
+    Objects.requireNonNull(getWindow()).setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+    );
+    setContentView(R.layout.activity_browser);
+    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-  // Check camera permission on WebView open
-  if (activity != null && permissionHandler != null) {
-    Log.d("InAppBrowser", "Requesting camera permission on WebView open via PermissionHandler");
-    // Create a dummy PermissionRequest to trigger the permission handler
-    PermissionRequest dummyRequest = new PermissionRequest() {
-      @Override
-      public String[] getResources() {
-        return new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE};
-      }
+    // Check camera permission on WebView open
+    if (activity != null && permissionHandler != null) {
+      Log.d("InAppBrowser", "Requesting camera permission on WebView open via PermissionHandler");
+      // Create a dummy PermissionRequest to trigger the permission handler
+      PermissionRequest dummyRequest = new PermissionRequest() {
+        @Override
+        public String[] getResources() {
+          return new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE};
+        }
 
-      @Override
-      public void grant(String[] resources) {
-        Log.d("InAppBrowser", "Camera permission granted via PermissionHandler");
-      }
+        @Override
+        public void grant(String[] resources) {
+          Log.d("InAppBrowser", "Camera permission granted via PermissionHandler");
+        }
 
-      @Override
-      public void deny() {
-        Log.d("InAppBrowser", "Camera permission denied via PermissionHandler");
-      }
+        @Override
+        public void deny() {
+          Log.d("InAppBrowser", "Camera permission denied via PermissionHandler");
+        }
 
-      @Override
-      public Uri getOrigin() {
-        return Uri.parse(_options.getUrl());
-      }
-    };
-    permissionHandler.handleCameraPermissionRequest(dummyRequest);
-  }
+        @Override
+        public Uri getOrigin() {
+          return Uri.parse(_options.getUrl());
+        }
+      };
+      permissionHandler.handleCameraPermissionRequest(dummyRequest);
+    }
 
-  this._webView = findViewById(R.id.browser_view);
+    this._webView = findViewById(R.id.browser_view);
 
-  applyInsets();
+    applyInsets();
 
-  // Add JavaScript interfaces
-  _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-  _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
+    // Add JavaScript interfaces
+    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+    _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
 
-  // WebView settings
-  WebSettings webSettings = _webView.getSettings();
-  webSettings.setJavaScriptEnabled(true);
-  webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
-  webSettings.setDatabaseEnabled(true);
-  webSettings.setDomStorageEnabled(true);
-  webSettings.setAllowFileAccess(true);
-  webSettings.setLoadWithOverviewMode(true);
-  webSettings.setUseWideViewPort(true);
-  webSettings.setAllowFileAccessFromFileURLs(true);
-  webSettings.setAllowUniversalAccessFromFileURLs(true);
-  webSettings.setMediaPlaybackRequiresUserGesture(false);
+    // WebView settings
+    WebSettings webSettings = _webView.getSettings();
+    webSettings.setJavaScriptEnabled(true);
+    webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+    webSettings.setDatabaseEnabled(true);
+    webSettings.setDomStorageEnabled(true);
+    webSettings.setAllowFileAccess(true);
+    webSettings.setLoadWithOverviewMode(true);
+    webSettings.setUseWideViewPort(true);
+    webSettings.setAllowFileAccessFromFileURLs(true);
+    webSettings.setAllowUniversalAccessFromFileURLs(true);
+    webSettings.setMediaPlaybackRequiresUserGesture(false);
 
-  if (_options.getTextZoom() > 0) {
-    webSettings.setTextZoom(_options.getTextZoom());
-  }
+    if (_options.getTextZoom() > 0) {
+      webSettings.setTextZoom(_options.getTextZoom());
+    }
 
-  // Set WebViewClient only AFTER _webView is initialized
-  setWebViewClient();
+    // Set WebViewClient only AFTER _webView is initialized
+    setWebViewClient();
 
-  _webView.setWebChromeClient(new MyWebChromeClient());
+    _webView.setWebChromeClient(new MyWebChromeClient());
 
-  // Load URL and headers
-  Map<String, String> requestHeaders = new HashMap<>();
-  if (_options.getHeaders() != null) {
-    Iterator<String> keys = _options.getHeaders().keys();
-    while (keys.hasNext()) {
-      String key = keys.next();
-      if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
-        _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
-      } else {
-        requestHeaders.put(key, _options.getHeaders().getString(key));
+    // Load URL and headers
+    Map<String, String> requestHeaders = new HashMap<>();
+    if (_options.getHeaders() != null) {
+      Iterator<String> keys = _options.getHeaders().keys();
+      while (keys.hasNext()) {
+        String key = keys.next();
+        if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
+          _webView.getSettings().setUserAgentString(_options.getHeaders().getString(key));
+        } else {
+          requestHeaders.put(key, _options.getHeaders().getString(key));
+        }
       }
     }
-  }
-  _webView.loadUrl(_options.getUrl(), requestHeaders);
-  _webView.requestFocus();
-  _webView.requestFocusFromTouch();
+    _webView.loadUrl(_options.getUrl(), requestHeaders);
+    _webView.requestFocus();
+    _webView.requestFocusFromTouch();
 
-  setupToolbar();
+    setupToolbar();
 
-  if (!_options.isPresentAfterPageLoad()) {
-    show();
-    _options.getPluginCall().resolve();
+    if (!_options.isPresentAfterPageLoad()) {
+      show();
+      _options.getPluginCall().resolve();
+    }
   }
-}
 
   private void injectAndroidJavaScriptInterface() {
     if (_webView == null) {
@@ -470,7 +470,7 @@ public void presentWebView() {
       // Get AppBarLayout which contains the toolbar
       if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout) {
         com.google.android.material.appbar.AppBarLayout appBarLayout =
-          (com.google.android.material.appbar.AppBarLayout) toolbarView.getParent();
+                (com.google.android.material.appbar.AppBarLayout) toolbarView.getParent();
         // Remove elevation to eliminate shadows (only on Android 15+)
         appBarLayout.setElevation(0);
         appBarLayout.setStateListAnimator(null);
@@ -496,18 +496,18 @@ public void presentWebView() {
           // Get status bar height
           int statusBarHeight = 0;
           int resourceId = getContext()
-            .getResources()
-            .getIdentifier("status_bar_height", "dimen", "android");
+                  .getResources()
+                  .getIdentifier("status_bar_height", "dimen", "android");
           if (resourceId > 0) {
             statusBarHeight = getContext()
-              .getResources()
-              .getDimensionPixelSize(resourceId);
+                    .getResources()
+                    .getDimensionPixelSize(resourceId);
           }
 
           // Fix status bar view
           if (statusBarColorView != null) {
             ViewGroup.LayoutParams params =
-              statusBarColorView.getLayoutParams();
+                    statusBarColorView.getLayoutParams();
             params.height = statusBarHeight;
             statusBarColorView.setLayoutParams(params);
             statusBarColorView.setBackgroundColor(finalBgColor);
@@ -516,7 +516,7 @@ public void presentWebView() {
 
           // Fix AppBarLayout position
           ViewGroup.MarginLayoutParams params =
-            (ViewGroup.MarginLayoutParams) appBarLayout.getLayoutParams();
+                  (ViewGroup.MarginLayoutParams) appBarLayout.getLayoutParams();
           params.topMargin = statusBarHeight;
           appBarLayout.setLayoutParams(params);
           appBarLayout.setBackgroundColor(finalBgColor);
@@ -527,14 +527,14 @@ public void presentWebView() {
     // Apply system insets to WebView (compatible with all Android versions)
     ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
       Insets insets = windowInsets.getInsets(
-        WindowInsetsCompat.Type.systemBars()
+              WindowInsetsCompat.Type.systemBars()
       );
       Boolean keyboardVisible = windowInsets.isVisible(
-        WindowInsetsCompat.Type.ime()
+              WindowInsetsCompat.Type.ime()
       );
 
       ViewGroup.MarginLayoutParams mlp =
-        (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+              (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
       // Apply margins based on Android version
       if (isAndroid15Plus) {
@@ -570,17 +570,17 @@ public void presentWebView() {
         // Set status bar text color
         int backgroundColor;
         if (
-          _options.getToolbarColor() != null &&
-            !_options.getToolbarColor().isEmpty()
+                _options.getToolbarColor() != null &&
+                        !_options.getToolbarColor().isEmpty()
         ) {
           try {
             backgroundColor = Color.parseColor(_options.getToolbarColor());
             boolean isDarkBackground = isDarkColor(backgroundColor);
             WindowInsetsControllerCompat controller =
-              new WindowInsetsControllerCompat(
-                getWindow(),
-                getWindow().getDecorView()
-              );
+                    new WindowInsetsControllerCompat(
+                            getWindow(),
+                            getWindow().getDecorView()
+                    );
             controller.setAppearanceLightStatusBars(!isDarkBackground);
           } catch (IllegalArgumentException e) {
             // Ignore color parsing errors
@@ -589,15 +589,15 @@ public void presentWebView() {
       } else if (Build.VERSION.SDK_INT >= 30) {
         // Android 11-14: Use original behavior
         WindowInsetsControllerCompat controller =
-          new WindowInsetsControllerCompat(
-            getWindow(),
-            getWindow().getDecorView()
-          );
+                new WindowInsetsControllerCompat(
+                        getWindow(),
+                        getWindow().getDecorView()
+                );
 
         // Original behavior for status bar color
         if (
-          _options.getToolbarColor() != null &&
-            !_options.getToolbarColor().isEmpty()
+                _options.getToolbarColor() != null &&
+                        !_options.getToolbarColor().isEmpty()
         ) {
           try {
             int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -612,16 +612,16 @@ public void presentWebView() {
       } else {
         // Pre-Android 11: Original behavior with deprecated flags
         getWindow()
-          .getDecorView()
-          .setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-              View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-          );
+                .getDecorView()
+                .setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                );
 
         // Apply original status bar color logic
         if (
-          _options.getToolbarColor() != null &&
-            !_options.getToolbarColor().isEmpty()
+                _options.getToolbarColor() != null &&
+                        !_options.getToolbarColor().isEmpty()
         ) {
           try {
             int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -641,14 +641,14 @@ public void presentWebView() {
         jsonObject.put("detail", detail);
         String jsonDetail = jsonObject.toString();
         String script =
-          "window.dispatchEvent(new CustomEvent('messageFromNative', " +
-            jsonDetail +
-            "));";
+                "window.dispatchEvent(new CustomEvent('messageFromNative', " +
+                        jsonDetail +
+                        "));";
         _webView.post(() -> _webView.evaluateJavascript(script, null));
       } catch (Exception e) {
         Log.e(
-          "postMessageToJS",
-          "Error sending message to JS: " + e.getMessage()
+                "postMessageToJS",
+                "Error sending message to JS: " + e.getMessage()
         );
       }
     }
@@ -760,45 +760,45 @@ public void presentWebView() {
     }
 
     String script =
-      "async function preShowFunction() {\n" +
-        _options.getPreShowScript() +
-        '\n' +
-        "};\n" +
-        "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Pre show error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
+            "async function preShowFunction() {\n" +
+                    _options.getPreShowScript() +
+                    '\n' +
+                    "};\n" +
+                    "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Pre show error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
 
     Log.i(
-      "InjectPreShowScript",
-      String.format("PreShowScript script:\n%s", script)
+            "InjectPreShowScript",
+            String.format("PreShowScript script:\n%s", script)
     );
 
     preShowSemaphore = new Semaphore(0);
     activity.runOnUiThread(
-      new Runnable() {
-        @Override
-        public void run() {
-          _webView.evaluateJavascript(script, null);
-        }
-      }
+            new Runnable() {
+              @Override
+              public void run() {
+                _webView.evaluateJavascript(script, null);
+              }
+            }
     );
 
     try {
       if (!preShowSemaphore.tryAcquire(10, TimeUnit.SECONDS)) {
         Log.e(
-          "InjectPreShowScript",
-          "PreShowScript running for over 10 seconds. The plugin will not wait any longer!"
+                "InjectPreShowScript",
+                "PreShowScript running for over 10 seconds. The plugin will not wait any longer!"
         );
         return;
       }
       if (preShowError != null && !preShowError.isEmpty()) {
         Log.e(
-          "InjectPreShowScript",
-          "Error within the user-provided preShowFunction: " + preShowError
+                "InjectPreShowScript",
+                "Error within the user-provided preShowFunction: " + preShowError
         );
       }
     } catch (InterruptedException e) {
       Log.e(
-        "InjectPreShowScript",
-        "Error when calling InjectPreShowScript: " + e.getMessage()
+              "InjectPreShowScript",
+              "Error when calling InjectPreShowScript: " + e.getMessage()
       );
     } finally {
       preShowSemaphore = null;
@@ -887,8 +887,8 @@ public void presentWebView() {
         String key = keys.next();
         if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
           _webView
-            .getSettings()
-            .setUserAgentString(_options.getHeaders().getString(key));
+                  .getSettings()
+                  .setUserAgentString(_options.getHeaders().getString(key));
         } else {
           requestHeaders.put(key, _options.getHeaders().getString(key));
         }
@@ -911,8 +911,8 @@ public void presentWebView() {
 
     // Apply toolbar color early, for ALL toolbar types, before any view configuration
     if (
-      _options.getToolbarColor() != null &&
-        !_options.getToolbarColor().isEmpty()
+            _options.getToolbarColor() != null &&
+                    !_options.getToolbarColor().isEmpty()
     ) {
       try {
         int toolbarColor = Color.parseColor(_options.getToolbarColor());
@@ -924,8 +924,8 @@ public void presentWebView() {
         // Determine icon and text color
         int iconColor;
         if (
-          _options.getToolbarTextColor() != null &&
-            !_options.getToolbarTextColor().isEmpty()
+                _options.getToolbarTextColor() != null &&
+                        !_options.getToolbarTextColor().isEmpty()
         ) {
           try {
             iconColor = Color.parseColor(_options.getToolbarTextColor());
@@ -957,56 +957,56 @@ public void presentWebView() {
           // Determine proper status bar text color (light or dark icons)
           boolean isDarkBackground = isDarkColor(toolbarColor);
           WindowInsetsControllerCompat insetsController =
-            new WindowInsetsControllerCompat(
-              getWindow(),
-              getWindow().getDecorView()
-            );
+                  new WindowInsetsControllerCompat(
+                          getWindow(),
+                          getWindow().getDecorView()
+                  );
           insetsController.setAppearanceLightStatusBars(!isDarkBackground);
         }
       } catch (IllegalArgumentException e) {
         Log.e(
-          "InAppBrowser",
-          "Invalid toolbar color: " + _options.getToolbarColor()
+                "InAppBrowser",
+                "Invalid toolbar color: " + _options.getToolbarColor()
         );
       }
     }
 
     ImageButton closeButtonView = _toolbar.findViewById(R.id.closeButton);
     closeButtonView.setOnClickListener(
-      new View.OnClickListener() {
-        @Override
-        public void onClick(View view) {
-          // if closeModal true then display a native modal to check if the user is sure to close the browser
-          if (_options.getCloseModal()) {
-            new AlertDialog.Builder(_context)
-              .setTitle(_options.getCloseModalTitle())
-              .setMessage(_options.getCloseModalDescription())
-              .setPositiveButton(
-                _options.getCloseModalOk(),
-                new OnClickListener() {
-                  public void onClick(DialogInterface dialog, int which) {
-                    // Close button clicked, do something
-                    String currentUrl = _webView != null
-                      ? _webView.getUrl()
-                      : "";
-                    dismiss();
-                    if (_options != null && _options.getCallbacks() != null) {
-                      _options.getCallbacks().closeEvent(currentUrl);
-                    }
+            new View.OnClickListener() {
+              @Override
+              public void onClick(View view) {
+                // if closeModal true then display a native modal to check if the user is sure to close the browser
+                if (_options.getCloseModal()) {
+                  new AlertDialog.Builder(_context)
+                          .setTitle(_options.getCloseModalTitle())
+                          .setMessage(_options.getCloseModalDescription())
+                          .setPositiveButton(
+                                  _options.getCloseModalOk(),
+                                  new OnClickListener() {
+                                    public void onClick(DialogInterface dialog, int which) {
+                                      // Close button clicked, do something
+                                      String currentUrl = _webView != null
+                                              ? _webView.getUrl()
+                                              : "";
+                                      dismiss();
+                                      if (_options != null && _options.getCallbacks() != null) {
+                                        _options.getCallbacks().closeEvent(currentUrl);
+                                      }
+                                    }
+                                  }
+                          )
+                          .setNegativeButton(_options.getCloseModalCancel(), null)
+                          .show();
+                } else {
+                  String currentUrl = _webView != null ? _webView.getUrl() : "";
+                  dismiss();
+                  if (_options != null && _options.getCallbacks() != null) {
+                    _options.getCallbacks().closeEvent(currentUrl);
                   }
                 }
-              )
-              .setNegativeButton(_options.getCloseModalCancel(), null)
-              .show();
-          } else {
-            String currentUrl = _webView != null ? _webView.getUrl() : "";
-            dismiss();
-            if (_options != null && _options.getCallbacks() != null) {
-              _options.getCallbacks().closeEvent(currentUrl);
+              }
             }
-          }
-        }
-      }
     );
 
     if (TextUtils.equals(_options.getToolbarType(), "activity")) {
@@ -1020,14 +1020,14 @@ public void presentWebView() {
 
       // Hide buttonNearDone
       ImageButton buttonNearDoneView = _toolbar.findViewById(
-        R.id.buttonNearDone
+              R.id.buttonNearDone
       );
       buttonNearDoneView.setVisibility(View.GONE);
 
       // In activity mode, always make the share button visible by setting a default shareSubject if not provided
       if (
-        _options.getShareSubject() == null ||
-          _options.getShareSubject().isEmpty()
+              _options.getShareSubject() == null ||
+                      _options.getShareSubject().isEmpty()
       ) {
         _options.setShareSubject("Share");
         Log.d("InAppBrowser", "Activity mode: Setting default shareSubject");
@@ -1048,7 +1048,7 @@ public void presentWebView() {
 
       // Hide buttonNearDone
       ImageButton buttonNearDoneView = _toolbar.findViewById(
-        R.id.buttonNearDone
+              R.id.buttonNearDone
       );
       buttonNearDoneView.setVisibility(View.GONE);
 
@@ -1056,7 +1056,7 @@ public void presentWebView() {
       _toolbar.findViewById(R.id.reloadButton).setVisibility(View.GONE);
     } else if (TextUtils.equals(_options.getToolbarType(), "navigation")) {
       ImageButton buttonNearDoneView = _toolbar.findViewById(
-        R.id.buttonNearDone
+              R.id.buttonNearDone
       );
       buttonNearDoneView.setVisibility(View.GONE);
       // Status bar color is already set at the top of this method, no need to set again
@@ -1075,7 +1075,7 @@ public void presentWebView() {
       // Adjust the WebView layout to take full space
       if (_webView.getLayoutParams() instanceof androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) {
         androidx.constraintlayout.widget.ConstraintLayout.LayoutParams params =
-          (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) _webView.getLayoutParams();
+                (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) _webView.getLayoutParams();
         params.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
         params.bottomToBottom = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
         params.leftToLeft = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
@@ -1091,7 +1091,7 @@ public void presentWebView() {
       Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
       if (buttonNearDone != null) {
         ImageButton buttonNearDoneView = _toolbar.findViewById(
-          R.id.buttonNearDone
+                R.id.buttonNearDone
         );
         buttonNearDoneView.setVisibility(View.VISIBLE);
 
@@ -1108,8 +1108,8 @@ public void presentWebView() {
 
             // Get resource ID
             int resourceId = _context
-              .getResources()
-              .getIdentifier(iconName, "drawable", _context.getPackageName());
+                    .getResources()
+                    .getIdentifier(iconName, "drawable", _context.getPackageName());
 
             if (resourceId != 0) {
               // Set the vector drawable
@@ -1117,28 +1117,28 @@ public void presentWebView() {
               // Apply color filter
               buttonNearDoneView.setColorFilter(iconColor);
               Log.d(
-                "InAppBrowser",
-                "Successfully loaded vector drawable: " + iconName
+                      "InAppBrowser",
+                      "Successfully loaded vector drawable: " + iconName
               );
             } else {
               Log.e(
-                "InAppBrowser",
-                "Vector drawable not found: " + iconName + ", using fallback"
+                      "InAppBrowser",
+                      "Vector drawable not found: " + iconName + ", using fallback"
               );
               // Fallback to a common system icon
               buttonNearDoneView.setImageResource(
-                android.R.drawable.ic_menu_info_details
+                      android.R.drawable.ic_menu_info_details
               );
               buttonNearDoneView.setColorFilter(iconColor);
             }
           } catch (Exception e) {
             Log.e(
-              "InAppBrowser",
-              "Error loading vector drawable: " + e.getMessage()
+                    "InAppBrowser",
+                    "Error loading vector drawable: " + e.getMessage()
             );
             // Fallback to a common system icon
             buttonNearDoneView.setImageResource(
-              android.R.drawable.ic_menu_info_details
+                    android.R.drawable.ic_menu_info_details
             );
             buttonNearDoneView.setColorFilter(iconColor);
           }
@@ -1157,8 +1157,8 @@ public void presentWebView() {
                 inputStream = assetManager.open(buttonNearDone.getIcon());
               } catch (IOException e2) {
                 Log.e(
-                  "InAppBrowser",
-                  "SVG file not found in assets: " + buttonNearDone.getIcon()
+                        "InAppBrowser",
+                        "SVG file not found in assets: " + buttonNearDone.getIcon()
                 );
                 buttonNearDoneView.setVisibility(View.GONE);
                 return;
@@ -1169,8 +1169,8 @@ public void presentWebView() {
             SVG svg = SVG.getFromInputStream(inputStream);
             if (svg == null) {
               Log.e(
-                "InAppBrowser",
-                "Failed to parse SVG icon: " + buttonNearDone.getIcon()
+                      "InAppBrowser",
+                      "Failed to parse SVG icon: " + buttonNearDone.getIcon()
               );
               buttonNearDoneView.setVisibility(View.GONE);
               return;
@@ -1178,11 +1178,11 @@ public void presentWebView() {
 
             // Get the dimensions from options or use SVG's size
             float width = buttonNearDone.getWidth() > 0
-              ? buttonNearDone.getWidth()
-              : 24;
+                    ? buttonNearDone.getWidth()
+                    : 24;
             float height = buttonNearDone.getHeight() > 0
-              ? buttonNearDone.getHeight()
-              : 24;
+                    ? buttonNearDone.getHeight()
+                    : 24;
 
             // Get density for proper scaling
             float density = _context.getResources().getDisplayMetrics().density;
@@ -1195,9 +1195,9 @@ public void presentWebView() {
 
             // Create a bitmap and render SVG to it for better quality
             Bitmap bitmap = Bitmap.createBitmap(
-              targetWidth,
-              targetHeight,
-              Bitmap.Config.ARGB_8888
+                    targetWidth,
+                    targetHeight,
+                    Bitmap.Config.ARGB_8888
             );
             Canvas canvas = new Canvas(bitmap);
             svg.renderToCanvas(canvas);
@@ -1205,7 +1205,7 @@ public void presentWebView() {
             // Apply color filter to the bitmap
             Paint paint = new Paint();
             paint.setColorFilter(
-              new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN)
+                    new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN)
             );
             Canvas colorFilterCanvas = new Canvas(bitmap);
             colorFilterCanvas.drawBitmap(bitmap, 0, 0, paint);
@@ -1216,9 +1216,9 @@ public void presentWebView() {
             buttonNearDoneView.setPadding(12, 12, 12, 12); // Standard button padding
           } catch (SVGParseException e) {
             Log.e(
-              "InAppBrowser",
-              "Error loading SVG icon: " + e.getMessage(),
-              e
+                    "InAppBrowser",
+                    "Error loading SVG icon: " + e.getMessage(),
+                    e
             );
             buttonNearDoneView.setVisibility(View.GONE);
           } finally {
@@ -1227,8 +1227,8 @@ public void presentWebView() {
                 inputStream.close();
               } catch (IOException e) {
                 Log.e(
-                  "InAppBrowser",
-                  "Error closing input stream: " + e.getMessage()
+                        "InAppBrowser",
+                        "Error closing input stream: " + e.getMessage()
                 );
               }
             }
@@ -1241,11 +1241,11 @@ public void presentWebView() {
 
         // Set the click listener
         buttonNearDoneView.setOnClickListener(view ->
-          _options.getCallbacks().buttonNearDoneClicked()
+                _options.getCallbacks().buttonNearDoneClicked()
         );
       } else {
         ImageButton buttonNearDoneView = _toolbar.findViewById(
-          R.id.buttonNearDone
+                R.id.buttonNearDone
         );
         buttonNearDoneView.setVisibility(View.GONE);
       }
@@ -1254,14 +1254,14 @@ public void presentWebView() {
     // Add share button functionality
     ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
     if (
-      _options.getShareSubject() != null &&
-        !_options.getShareSubject().isEmpty()
+            _options.getShareSubject() != null &&
+                    !_options.getShareSubject().isEmpty()
     ) {
       shareButton.setVisibility(View.VISIBLE);
       Log.d(
-        "InAppBrowser",
-        "Share button should be visible, shareSubject: " +
-          _options.getShareSubject()
+              "InAppBrowser",
+              "Share button should be visible, shareSubject: " +
+                      _options.getShareSubject()
       );
 
       // Apply the same color filter as other buttons to ensure visibility
@@ -1272,20 +1272,20 @@ public void presentWebView() {
         JSObject shareDisclaimer = _options.getShareDisclaimer();
         if (shareDisclaimer != null) {
           new AlertDialog.Builder(_context)
-            .setTitle(shareDisclaimer.getString("title", "Title"))
-            .setMessage(shareDisclaimer.getString("message", "Message"))
-            .setPositiveButton(
-              shareDisclaimer.getString("confirmBtn", "Confirm"),
-              (dialog, which) -> {
-                _options.getCallbacks().confirmBtnClicked();
-                shareUrl();
-              }
-            )
-            .setNegativeButton(
-              shareDisclaimer.getString("cancelBtn", "Cancel"),
-              null
-            )
-            .show();
+                  .setTitle(shareDisclaimer.getString("title", "Title"))
+                  .setMessage(shareDisclaimer.getString("message", "Message"))
+                  .setPositiveButton(
+                          shareDisclaimer.getString("confirmBtn", "Confirm"),
+                          (dialog, which) -> {
+                            _options.getCallbacks().confirmBtnClicked();
+                            shareUrl();
+                          }
+                  )
+                  .setNegativeButton(
+                          shareDisclaimer.getString("cancelBtn", "Cancel"),
+                          null
+                  )
+                  .show();
         } else {
           shareUrl();
         }
@@ -1380,9 +1380,9 @@ public void presentWebView() {
 
       // Get content URI for the converted file
       return FileProvider.getUriForFile(
-        activity,
-        activity.getPackageName() + ".fileprovider",
-        jpegFile
+              activity,
+              activity.getPackageName() + ".fileprovider",
+              jpegFile
       );
     } catch (Exception e) {
       Log.e("InAppBrowser", "Error converting HEIC to JPEG: " + e.getMessage());
@@ -1441,13 +1441,13 @@ public void presentWebView() {
 
   public void handleProxyResultError(String result, String id) {
     Log.i(
-      "InAppBrowserProxy",
-      String.format(
-        "handleProxyResultError: %s, ok: %s id: %s",
-        result,
-        false,
-        id
-      )
+            "InAppBrowserProxy",
+            String.format(
+                    "handleProxyResultError: %s, ok: %s id: %s",
+                    result,
+                    false,
+                    id
+            )
     );
     ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
     if (proxiedRequest == null) {
@@ -1460,8 +1460,8 @@ public void presentWebView() {
 
   public void handleProxyResultOk(JSONObject result, String id) {
     Log.i(
-      "InAppBrowserProxy",
-      String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id)
+            "InAppBrowserProxy",
+            String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id)
     );
     ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
     if (proxiedRequest == null) {
@@ -1504,21 +1504,21 @@ public void presentWebView() {
 
     if (!((100 <= code && code <= 299) || (400 <= code && code <= 599))) {
       Log.e(
-        "InAppBrowserProxy",
-        String.format("Status code %s outside of the allowed range", code)
+              "InAppBrowserProxy",
+              String.format("Status code %s outside of the allowed range", code)
       );
       return;
     }
 
     WebResourceResponse webResourceResponse = new WebResourceResponse(
-      contentType,
-      "utf-8",
-      new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
+            contentType,
+            "utf-8",
+            new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
     );
 
     webResourceResponse.setStatusCodeAndReasonPhrase(
-      code,
-      getReasonPhrase(code)
+            code,
+            getReasonPhrase(code)
     );
     proxiedRequest.response = webResourceResponse;
     proxiedRequest.semaphore.release();
@@ -1580,9 +1580,9 @@ public void presentWebView() {
   @Override
   public void onBackPressed() {
     if (
-      _webView.canGoBack() &&
-        (TextUtils.equals(_options.getToolbarType(), "navigation") ||
-          _options.getActiveNativeNavigationForWebview())
+            _webView.canGoBack() &&
+                    (TextUtils.equals(_options.getToolbarType(), "navigation") ||
+                            _options.getActiveNativeNavigationForWebview())
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
@@ -1648,14 +1648,14 @@ public void presentWebView() {
     if (_webView != null) {
       // Reset file inputs to prevent WebView from caching them
       _webView.evaluateJavascript(
-        "(function() {" +
-          "  var inputs = document.querySelectorAll('input[type=\"file\"]');" +
-          "  for (var i = 0; i < inputs.length; i++) {" +
-          "    inputs[i].value = '';" +
-          "  }" +
-          "  return true;" +
-          "})();",
-        null
+              "(function() {" +
+                      "  var inputs = document.querySelectorAll('input[type=\"file\"]');" +
+                      "  for (var i = 0; i < inputs.length; i++) {" +
+                      "    inputs[i].value = '';" +
+                      "  }" +
+                      "  return true;" +
+                      "})();",
+              null
       );
 
       _webView.loadUrl("about:blank");
@@ -1723,7 +1723,7 @@ public void presentWebView() {
       TypedValue typedValue = new TypedValue();
 
       if (
-        theme.resolveAttribute(android.R.attr.isLightTheme, typedValue, true)
+              theme.resolveAttribute(android.R.attr.isLightTheme, typedValue, true)
       ) {
         // isLightTheme exists - returns true if light, false if dark
         return typedValue.data != 1;
@@ -1731,11 +1731,11 @@ public void presentWebView() {
 
       // Fallback method - check background color of window
       if (
-        theme.resolveAttribute(
-          android.R.attr.windowBackground,
-          typedValue,
-          true
-        )
+              theme.resolveAttribute(
+                      android.R.attr.windowBackground,
+                      typedValue,
+                      true
+              )
       ) {
         int backgroundColor = typedValue.data;
         return isDarkColor(backgroundColor);
@@ -1755,21 +1755,21 @@ public void presentWebView() {
 
     // This script adds minimal fixes for date inputs to use Material Design
     String script =
-      "(function() {\n" +
-      "  // Find all date inputs\n" +
-      "  const dateInputs = document.querySelectorAll('input[type=\"date\"]');\n" +
-      "  dateInputs.forEach(input => {\n" +
-      "    // Ensure change events propagate correctly\n" +
-      "    let lastValue = input.value;\n" +
-      "    input.addEventListener('change', () => {\n" +
-      "      if (input.value !== lastValue) {\n" +
-      "        lastValue = input.value;\n" +
-      "        // Dispatch an input event to ensure frameworks detect the change\n" +
-      "        input.dispatchEvent(new Event('input', { bubbles: true }));\n" +
-      "      }\n" +
-      "    });\n" +
-      "  });\n" +
-      "})();";
+            "(function() {\n" +
+                    "  // Find all date inputs\n" +
+                    "  const dateInputs = document.querySelectorAll('input[type=\"date\"]');\n" +
+                    "  dateInputs.forEach(input => {\n" +
+                    "    // Ensure change events propagate correctly\n" +
+                    "    let lastValue = input.value;\n" +
+                    "    input.addEventListener('change', () => {\n" +
+                    "      if (input.value !== lastValue) {\n" +
+                    "        lastValue = input.value;\n" +
+                    "        // Dispatch an input event to ensure frameworks detect the change\n" +
+                    "        input.dispatchEvent(new Event('input', { bubbles: true }));\n" +
+                    "      }\n" +
+                    "    });\n" +
+                    "  });\n" +
+                    "})();";
 
     // Execute the script in the WebView
     _webView.post(() -> _webView.evaluateJavascript(script, null));
@@ -1800,9 +1800,9 @@ public void presentWebView() {
       // Get content URI through FileProvider
       try {
         return androidx.core.content.FileProvider.getUriForFile(
-          _context,
-          _context.getPackageName() + ".fileprovider",
-          tempFile
+                _context,
+                _context.getPackageName() + ".fileprovider",
+                tempFile
         );
       } catch (IllegalArgumentException e) {
         // Try using external storage as fallback
@@ -1814,9 +1814,9 @@ public void presentWebView() {
             Log.d("InAppBrowser", "Error creating new file");
           }
           return androidx.core.content.FileProvider.getUriForFile(
-            _context,
-            _context.getPackageName() + ".fileprovider",
-            tempFile
+                  _context,
+                  _context.getPackageName() + ".fileprovider",
+                  tempFile
           );
         }
       }
@@ -1829,16 +1829,16 @@ public void presentWebView() {
   private File createImageFile() throws IOException {
     // Create an image file name
     String timeStamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(
-      new java.util.Date()
+            new java.util.Date()
     );
     String imageFileName = "JPEG_" + timeStamp + "_";
     File storageDir = activity.getExternalFilesDir(
-      Environment.DIRECTORY_PICTURES
+            Environment.DIRECTORY_PICTURES
     );
     File image = File.createTempFile(
-      imageFileName,/* prefix */
-      ".jpg",/* suffix */
-      storageDir/* directory */
+            imageFileName,/* prefix */
+            ".jpg",/* suffix */
+            storageDir/* directory */
     );
     return image;
   }
@@ -1846,9 +1846,9 @@ public void presentWebView() {
   private class MyWebChromeClient extends WebChromeClient {
     @Override
     public boolean onShowFileChooser(
-      WebView webView,
-      ValueCallback<Uri[]> filePathCallback,
-      FileChooserParams fileChooserParams
+            WebView webView,
+            ValueCallback<Uri[]> filePathCallback,
+            FileChooserParams fileChooserParams
     ) {
       mFilePathCallback = filePathCallback;
 
@@ -1978,13 +1978,13 @@ public void presentWebView() {
         if (activity != null) {
           Log.d("InAppBrowser", "Scheduling another camera permission request");
           new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
-                != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
+                    != PackageManager.PERMISSION_GRANTED) {
               Log.d("InAppBrowser", "Requesting camera permission again after delay");
               ActivityCompat.requestPermissions(
-                activity,
-                new String[]{Manifest.permission.CAMERA},
-                CAMERA_PERMISSION_REQUEST_CODE
+                      activity,
+                      new String[]{Manifest.permission.CAMERA},
+                      CAMERA_PERMISSION_REQUEST_CODE
               );
             }
           }, 1000);
