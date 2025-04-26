@@ -175,6 +175,10 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     this.capacitorWebView = capacitorWebView;
     this.fileChooserLauncher = fileChooserLauncher;
     this.cameraLauncher = cameraLauncher;
+
+    // Log permissions from options
+    String[] permissions = options.getPermissions();
+    Log.d("InAppBrowser", "Constructor - Permissions from options: " + (permissions != null ? Arrays.toString(permissions) : "null"));
   }
 
   @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
@@ -1316,11 +1320,30 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           }
         }
 
-        // Check camera permission after page load
+        // Check camera permission after page load only if camera permission is requested
         if (activity != null && !cameraAlertShown) {
           activity.runOnUiThread(() -> {
-            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+            // Check if camera permission is in the requested permissions
+            boolean isCameraPermissionRequested = false;
+            String[] permissions = _options.getPermissions();
+            Log.d("InAppBrowser", "Permissions array: " + (permissions != null ? Arrays.toString(permissions) : "null"));
+            
+            if (permissions != null) {
+              for (String permission : permissions) {
+                Log.d("InAppBrowser", "Checking permission: " + permission);
+                if ("camera".equalsIgnoreCase(permission)) {
+                  isCameraPermissionRequested = true;
+                  Log.d("InAppBrowser", "Camera permission found in array");
+                  break;
+                }
+              }
+            }
+
+            // Show alert only if camera permission is requested and not granted
+            if (isCameraPermissionRequested && 
+                ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
                 != PackageManager.PERMISSION_GRANTED) {
+              Log.d("InAppBrowser", "Showing camera permission alert");
               cameraAlertShown = true;
               new AlertDialog.Builder(activity)
                 .setTitle("Доступ к камере")
@@ -1706,13 +1729,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           request.deny();
           return;
         } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
-          activity.runOnUiThread(() -> {
-            if (permissionHandler != null) {
-              permissionHandler.handleMicrophonePermissionRequest(request);
-            } else {
-              request.deny();
-            }
-          });
+          request.deny();
           return;
         }
       }

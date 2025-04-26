@@ -24,6 +24,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -41,6 +42,7 @@ import org.json.JSONObject;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.PackageManagerCompat;
+import java.util.Arrays;
 
 @CapacitorPlugin(
   name = "InAppBrowser",
@@ -555,6 +557,22 @@ public class InAppBrowserPlugin
     options.setPreventDeeplink(
       Boolean.TRUE.equals(call.getBoolean("preventDeeplink", false))
     );
+
+    // Extract permissions from JSObject
+    JSArray permissionsArray = call.getArray("permissions");
+    if (permissionsArray != null) {
+      String[] permissions = new String[permissionsArray.length()];
+      for (int i = 0; i < permissionsArray.length(); i++) {
+        try {
+          permissions[i] = permissionsArray.getString(i);
+        } catch (JSONException e) {
+          Log.e("InAppBrowser", "Error getting permission at index " + i + ": " + e.getMessage());
+          permissions[i] = ""; // Set empty string as fallback
+        }
+      }
+      options.setPermissions(permissions);
+      Log.d("InAppBrowser", "Permissions extracted: " + Arrays.toString(permissions));
+    }
 
     // Validate preShowScript requires isPresentAfterPageLoad
     if (
