@@ -152,6 +152,98 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
         });
       }
     }
+
+    @JavascriptInterface
+    public void share(String title, String text, String url, String fileData, String fileName, String fileType) {
+      Log.d("InAppBrowser", "Native share method called with params: " + 
+        "title=" + title + ", " +
+        "text=" + text + ", " +
+        "url=" + url + ", " +
+        "fileData=" + (fileData != null ? "present" : "null") + ", " +
+        "fileName=" + fileName + ", " +
+        "fileType=" + fileType);
+
+      if (activity == null) {
+        Log.e("InAppBrowser", "Activity is null, cannot share");
+        return;
+      }
+
+      activity.runOnUiThread(() -> {
+        try {
+          // Create the sharing intent
+          Intent shareIntent = new Intent();
+          shareIntent.setAction(Intent.ACTION_SEND);
+          
+          // Handle file sharing
+          if (fileData != null && !fileData.isEmpty()) {
+            try {
+              Log.d("InAppBrowser", "Processing file share");
+              // Decode base64 data
+              byte[] fileBytes = Base64.decode(fileData, Base64.DEFAULT);
+              
+              // Create temporary file
+              File tempFile = new File(activity.getCacheDir(), fileName);
+              FileOutputStream fos = new FileOutputStream(tempFile);
+              fos.write(fileBytes);
+              fos.close();
+              
+              // Get content URI
+              Uri fileUri = FileProvider.getUriForFile(
+                activity,
+                activity.getPackageName() + ".fileprovider",
+                tempFile
+              );
+              
+              // Set up share intent for file
+              shareIntent.setType(fileType);
+              shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+              shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+              Log.d("InAppBrowser", "File share intent prepared");
+            } catch (Exception e) {
+              Log.e("InAppBrowser", "Error handling file share: " + e.getMessage());
+              e.printStackTrace();
+              return;
+            }
+          } else {
+            Log.d("InAppBrowser", "Processing text share");
+            // Handle text sharing
+            shareIntent.setType("text/plain");
+            
+            // Combine title, text and url
+            StringBuilder shareText = new StringBuilder();
+            if (title != null && !title.isEmpty()) {
+              shareText.append(title).append("\n");
+            }
+            if (text != null && !text.isEmpty()) {
+              shareText.append(text).append("\n");
+            }
+            if (url != null && !url.isEmpty()) {
+              shareText.append(url);
+            }
+            
+            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
+            Log.d("InAppBrowser", "Text share intent prepared");
+          }
+
+          // Verify that we can resolve the intent
+          if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
+            Log.d("InAppBrowser", "Found activity to handle share intent");
+            // Create chooser dialog
+            Intent chooser = Intent.createChooser(shareIntent, "Share with");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            
+            // Start the activity
+            activity.startActivity(chooser);
+            Log.d("InAppBrowser", "Share intent started successfully");
+          } else {
+            Log.e("InAppBrowser", "No activity found to handle share intent");
+          }
+        } catch (Exception e) {
+          Log.e("InAppBrowser", "Error sharing content: " + e.getMessage());
+          e.printStackTrace();
+        }
+      });
+    }
   }
 
   public WebViewDialog(
@@ -280,7 +372,48 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       return;
     }
 
-    Log.d("InAppBrowser", "JavaScript interface verification skipped");
+    String script = """
+      if (!navigator.share) {
+        navigator.share = async function(shareData) {
+          return new Promise((resolve, reject) => {
+            try {
+              let title = shareData.title || '';
+              let text = shareData.text || '';
+              let url = shareData.url || '';
+              let fileData = null;
+              let fileName = '';
+              let fileType = '';
+
+              if (shareData.files && shareData.files.length > 0) {
+                const file = shareData.files[0];
+                fileName = file.name;
+                fileType = file.type;
+                
+                // Convert File to base64
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                  fileData = e.target.result.split(',')[1]; // Remove data URL prefix
+                  window.mobileApp.share(title, text, url, fileData, fileName, fileType);
+                  resolve();
+                };
+                reader.onerror = function(e) {
+                  reject(new Error('Failed to read file'));
+                };
+                reader.readAsDataURL(file);
+              } else {
+                window.mobileApp.share(title, text, url, null, null, null);
+                resolve();
+              }
+            } catch (error) {
+              reject(error);
+            }
+          });
+        };
+      }
+    """;
+
+    _webView.evaluateJavascript(script, null);
+    Log.d("InAppBrowser", "Web Share API polyfill injected");
   }
 
   private void initializeSharePolyfill() {
