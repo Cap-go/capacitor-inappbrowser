@@ -1624,18 +1624,18 @@ extension WKWebViewController: WKNavigationDelegate {
         case .restricted, .denied:
             // Show settings alert
             let alertController = UIAlertController(
-                title: "Camera Access Denied",
-                message: "Please enable camera access in your device settings",
-                preferredStyle: .alert
-            )
+            title: "Доступ к камере запрещен",
+            message: "Пожалуйста, включите доступ к камере в настройках устройства",
+            preferredStyle: .alert
+)
             
-            alertController.addAction(UIAlertAction(title: "Open Settings", style: .default) { _ in
+            alertController.addAction(UIAlertAction(title: "Открыть настройки", style: .default) { _ in
                 if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsUrl)
                 }
             })
             
-            alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alertController.addAction(UIAlertAction(title: "Отмена", style: .cancel))
             
             self.present(alertController, animated: true)
             
