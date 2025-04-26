@@ -140,6 +140,19 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
 
   public static final int CAMERA_PERMISSION_REQUEST_CODE = 1001;
 
+  // Add JavaScript interface for close method
+  private class JavaScriptInterface {
+    @JavascriptInterface
+    public void close() {
+      if (activity != null) {
+        activity.runOnUiThread(() -> {
+          Log.d("WebViewDialog", "Close method called from JavaScript");
+          dismiss();
+        });
+      }
+    }
+  }
+
   public WebViewDialog(
           Context context,
           int theme,
@@ -161,144 +174,6 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     this.capacitorWebView = capacitorWebView;
     this.fileChooserLauncher = fileChooserLauncher;
     this.cameraLauncher = cameraLauncher;
-  }
-
-  // Add this class to provide safer JavaScript interface
-  private class JavaScriptInterface {
-
-    @JavascriptInterface
-    public void postMessage(String message) {
-      // Handle postMessage
-    }
-
-    @JavascriptInterface
-    public void close() {
-      if (activity != null) {
-        activity.runOnUiThread(() -> {
-          dismiss();
-        });
-      }
-    }
-
-    @JavascriptInterface
-    public void share(String title, String text, String url, String fileData, String fileName, String fileType) {
-      Log.d("InAppBrowser", "Native share method called with params: " +
-              "title=" + title + ", " +
-              "text=" + text + ", " +
-              "url=" + url + ", " +
-              "fileData=" + (fileData != null ? "present" : "null") + ", " +
-              "fileName=" + fileName + ", " +
-              "fileType=" + fileType);
-
-      if (activity == null) {
-        Log.e("InAppBrowser", "Activity is null, cannot share");
-        return;
-      }
-
-      activity.runOnUiThread(() -> {
-        try {
-          // Create the sharing intent
-          Intent shareIntent = new Intent();
-          shareIntent.setAction(Intent.ACTION_SEND);
-
-          // Handle file sharing
-          if (fileData != null && !fileData.isEmpty()) {
-            try {
-              Log.d("InAppBrowser", "Processing file share");
-              // Decode base64 data
-              byte[] fileBytes = Base64.decode(fileData, Base64.DEFAULT);
-
-              // Create temporary file
-              File tempFile = new File(activity.getCacheDir(), fileName);
-              FileOutputStream fos = new FileOutputStream(tempFile);
-              fos.write(fileBytes);
-              fos.close();
-
-              // Get content URI
-              Uri fileUri = FileProvider.getUriForFile(
-                      activity,
-                      activity.getPackageName() + ".fileprovider",
-                      tempFile
-              );
-
-              // Set up share intent for file
-              shareIntent.setType(fileType);
-              shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
-              shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-              Log.d("InAppBrowser", "File share intent prepared");
-            } catch (Exception e) {
-              Log.e("InAppBrowser", "Error handling file share: " + e.getMessage());
-              e.printStackTrace();
-              return;
-            }
-          } else {
-            Log.d("InAppBrowser", "Processing text share");
-            // Handle text sharing
-            shareIntent.setType("text/plain");
-
-            // Combine title, text and url
-            StringBuilder shareText = new StringBuilder();
-            if (title != null && !title.isEmpty()) {
-              shareText.append(title).append("\n");
-            }
-            if (text != null && !text.isEmpty()) {
-              shareText.append(text).append("\n");
-            }
-            if (url != null && !url.isEmpty()) {
-              shareText.append(url);
-            }
-
-            shareIntent.putExtra(Intent.EXTRA_TEXT, shareText.toString());
-            Log.d("InAppBrowser", "Text share intent prepared");
-          }
-
-          // Verify that we can resolve the intent
-          if (shareIntent.resolveActivity(activity.getPackageManager()) != null) {
-            Log.d("InAppBrowser", "Found activity to handle share intent");
-            // Create chooser dialog
-            Intent chooser = Intent.createChooser(shareIntent, "Share with");
-            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            // Start the activity
-            activity.startActivity(chooser);
-            Log.d("InAppBrowser", "Share intent started successfully");
-          } else {
-            Log.e("InAppBrowser", "No activity found to handle share intent");
-          }
-        } catch (Exception e) {
-          Log.e("InAppBrowser", "Error sharing content: " + e.getMessage());
-          e.printStackTrace();
-        }
-      });
-    }
-  }
-
-  public class PreShowScriptInterface {
-
-    @JavascriptInterface
-    public void error(String error) {
-      try {
-        // Handle message from JavaScript
-        if (preShowSemaphore != null) {
-          preShowError = error;
-          preShowSemaphore.release();
-        }
-      } catch (Exception e) {
-        Log.e("InAppBrowser", "Error in error callback: " + e.getMessage());
-      }
-    }
-
-    @JavascriptInterface
-    public void success() {
-      try {
-        // Handle message from JavaScript
-        if (preShowSemaphore != null) {
-          preShowSemaphore.release();
-        }
-      } catch (Exception e) {
-        Log.e("InAppBrowser", "Error in success callback: " + e.getMessage());
-      }
-    }
   }
 
   @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
@@ -344,9 +219,8 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
 
     applyInsets();
 
-    // Add JavaScript interfaces
+    // Add JavaScript interface
     _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-    _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
 
     // WebView settings
     WebSettings webSettings = _webView.getSettings();
@@ -401,49 +275,22 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       return;
     }
 
-    _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-    Log.d("InAppBrowser", "JavaScript interface added");
+    Log.d("InAppBrowser", "JavaScript interface verification skipped");
+  }
 
-    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-      if (_webView == null) return;
-      String verifyScript = """
+  private void initializeSharePolyfill() {
+    String initScript = """
       (function() {
-        console.log('Verifying mobileApp interface...');
-        if (typeof window.mobileApp === 'undefined') {
-          console.error('mobileApp is undefined');
-          return false;
-        }
-        if (typeof window.mobileApp.share !== 'function') {
-          console.error('mobileApp.share is not a function');
-          return false;
-        }
-        console.log('mobileApp interface verified successfully');
-        return true;
+        console.log('Web Share API polyfill initialization skipped');
       })();
     """;
 
-      _webView.evaluateJavascript(verifyScript, value -> {
-        Log.d("InAppBrowser", "Interface verification result: " + value);
-        if ("true".equals(value)) {
-          initializeSharePolyfill();
-        } else {
-          Log.e("InAppBrowser", "JavaScript interface verification failed");
-          _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-          Log.d("InAppBrowser", "Re-added JavaScript interface");
-
-          new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (_webView == null) return;
-            _webView.evaluateJavascript(verifyScript, retryValue -> {
-              if ("true".equals(retryValue)) {
-                initializeSharePolyfill();
-              } else {
-                Log.e("InAppBrowser", "JavaScript interface still not available after retry");
-              }
-            });
-          }, 1000);
-        }
-      });
-    }, 1000);
+    _webView.evaluateJavascript(initScript, new ValueCallback<String>() {
+      @Override
+      public void onReceiveValue(String value) {
+        Log.d("InAppBrowser", "Web Share API polyfill initialization skipped");
+      }
+    });
   }
 
   /**
@@ -652,103 +499,6 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
         );
       }
     }
-  }
-
-  private void initializeSharePolyfill() {
-    String initScript = """
-      (function() {
-        console.log('Initializing Web Share API polyfill...');
-        
-        // Function to check if mobileApp is available
-        function isMobileAppAvailable() {
-          return typeof window.mobileApp !== 'undefined' && 
-                 typeof window.mobileApp.share === 'function';
-        }
-        
-        // Function to wait for mobileApp to be available
-        function waitForMobileApp(callback, maxAttempts = 20) {
-          let attempts = 0;
-          const checkInterval = setInterval(() => {
-            attempts++;
-            if (isMobileAppAvailable()) {
-              clearInterval(checkInterval);
-              callback();
-            } else if (attempts >= maxAttempts) {
-              clearInterval(checkInterval);
-              console.error('mobileApp interface not available after ' + maxAttempts + ' attempts');
-            }
-          }, 100);
-        }
-        
-        // Initialize Web Share API polyfill
-        if (typeof navigator.share === 'undefined') {
-          console.log('navigator.share is undefined, adding polyfill');
-          navigator.share = function(shareData) {
-            console.log('Share called with data:', shareData);
-            return new Promise((resolve, reject) => {
-              try {
-                const title = shareData.title || '';
-                const text = shareData.text || '';
-                const url = shareData.url || '';
-                
-                console.log('Preparing to share:', {title, text, url});
-                
-                if (shareData.files && shareData.files.length > 0) {
-                  console.log('Sharing file:', shareData.files[0]);
-                  const file = shareData.files[0];
-                  const reader = new FileReader();
-                  
-                  reader.onload = function() {
-                    try {
-                      console.log('File loaded, converting to base64');
-                      const base64Data = reader.result.split(',')[1];
-                      
-                      // Wait for mobileApp to be available before sharing
-                      waitForMobileApp(() => {
-                        console.log('mobileApp available, calling share');
-                        window.mobileApp.share(title, text, url, base64Data, file.name, file.type);
-                        resolve();
-                      }, 20);
-                    } catch (error) {
-                      console.error('Error in file share:', error);
-                      reject(error);
-                    }
-                  };
-                  
-                  reader.onerror = function(error) {
-                    console.error('Error reading file:', error);
-                    reject(error);
-                  };
-                  
-                  reader.readAsDataURL(file);
-                } else {
-                  console.log('Sharing text/url');
-                  // Wait for mobileApp to be available before sharing
-                  waitForMobileApp(() => {
-                    console.log('mobileApp available, calling share');
-                    window.mobileApp.share(title, text, url, '', '', '');
-                    resolve();
-                  }, 20);
-                }
-              } catch (error) {
-                console.error('Error in share polyfill:', error);
-                reject(error);
-              }
-            });
-          };
-          console.log('Web Share API polyfill added successfully');
-        } else {
-          console.log('navigator.share already exists');
-        }
-      })();
-    """;
-
-    _webView.evaluateJavascript(initScript, new ValueCallback<String>() {
-      @Override
-      public void onReceiveValue(String value) {
-        Log.d("InAppBrowser", "Web Share API polyfill initialized with result: " + value);
-      }
-    });
   }
 
   private void injectPreShowScript() {
@@ -1530,6 +1280,29 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       public void onPageStarted(WebView view, String url, Bitmap favicon) {
         super.onPageStarted(view, url, favicon);
         injectAndroidJavaScriptInterface();
+      }
+
+      @Override
+      public boolean shouldOverrideUrlLoading(WebView view, String url) {
+        Log.d("WebViewDialog", "Loading URL: " + url);
+        // Check if URL contains exit=true parameter
+        if (url.contains("exit=true")) {
+          Log.d("WebViewDialog", "Exit parameter detected, closing WebView");
+          if (activity != null) {
+            activity.runOnUiThread(() -> {
+              if (_options.getCallbacks() != null) {
+                Log.d("WebViewDialog", "Calling urlChangeEvent");
+                _options.getCallbacks().urlChangeEvent(url);
+              }
+              Log.d("WebViewDialog", "Dismissing WebView");
+              dismiss();
+            });
+          } else {
+            Log.e("WebViewDialog", "Activity is null, cannot dismiss");
+          }
+          return true;
+        }
+        return false;
       }
 
       @Override
