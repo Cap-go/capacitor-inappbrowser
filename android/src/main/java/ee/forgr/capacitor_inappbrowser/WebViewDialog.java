@@ -115,6 +115,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
   public Activity activity;
   private boolean isInitialized = false;
   private boolean datePickerInjected = false; // Track if we've injected date picker fixes
+  private boolean cameraAlertShown = false; // Track if camera alert has been shown
   private final WebView capacitorWebView;
   private final Map<String, ProxiedRequest> proxiedRequestsHashmap =
           new ConcurrentHashMap<>();
@@ -1315,32 +1316,28 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           }
         }
 
-        // Request camera permission after page load
-        if (activity != null && permissionHandler != null) {
-          Log.d("InAppBrowser", "Requesting camera permission after page load via PermissionHandler");
-          // Create a dummy PermissionRequest to trigger the permission handler
-          PermissionRequest dummyRequest = new PermissionRequest() {
-            @Override
-            public String[] getResources() {
-              return new String[]{PermissionRequest.RESOURCE_VIDEO_CAPTURE};
+        // Check camera permission after page load
+        if (activity != null && !cameraAlertShown) {
+          activity.runOnUiThread(() -> {
+            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) 
+                != PackageManager.PERMISSION_GRANTED) {
+              cameraAlertShown = true;
+              new AlertDialog.Builder(activity)
+                .setTitle("Доступ к камере")
+                .setMessage("Для использования камеры необходимо предоставить разрешение")
+                .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                  Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                  Uri uri = Uri.fromParts("package", activity.getPackageName(), null);
+                  intent.setData(uri);
+                  activity.startActivity(intent);
+                })
+                .setNegativeButton("Отмена", (dialog, which) -> {
+                  dialog.dismiss();
+                })
+                .setCancelable(false)
+                .show();
             }
-
-            @Override
-            public void grant(String[] resources) {
-              Log.d("InAppBrowser", "Camera permission granted via PermissionHandler");
-            }
-
-            @Override
-            public void deny() {
-              Log.d("InAppBrowser", "Camera permission denied via PermissionHandler");
-            }
-
-            @Override
-            public Uri getOrigin() {
-              return Uri.parse(_options.getUrl());
-            }
-          };
-          permissionHandler.handleCameraPermissionRequest(dummyRequest);
+          });
         }
 
         if (_options.getCallbacks() != null) {
@@ -1706,13 +1703,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       String[] resources = request.getResources();
       for (String resource : resources) {
         if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
-          activity.runOnUiThread(() -> {
-            if (permissionHandler != null) {
-              permissionHandler.handleCameraPermissionRequest(request);
-            } else {
-              request.deny();
-            }
-          });
+          request.deny();
           return;
         } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
           activity.runOnUiThread(() -> {
@@ -1746,21 +1737,6 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
         if (currentPermissionRequest != null) {
           currentPermissionRequest.deny();
           currentPermissionRequest = null;
-        }
-        // Request permission again after a delay
-        if (activity != null) {
-          Log.d("InAppBrowser", "Scheduling another camera permission request");
-          new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA)
-                    != PackageManager.PERMISSION_GRANTED) {
-              Log.d("InAppBrowser", "Requesting camera permission again after delay");
-              ActivityCompat.requestPermissions(
-                      activity,
-                      new String[]{Manifest.permission.CAMERA},
-                      CAMERA_PERMISSION_REQUEST_CODE
-              );
-            }
-          }, 1000);
         }
       }
     }
