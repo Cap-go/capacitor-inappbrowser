@@ -28,6 +28,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.HttpAuthHandler;
@@ -44,6 +45,7 @@ import android.webkit.WebViewClient;
 import android.webkit.WebSettings;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -90,6 +92,8 @@ import androidx.annotation.NonNull;
 import java.util.concurrent.ConcurrentHashMap;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.constraintlayout.widget.ConstraintSet;
 
 public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPermissionsResultCallback {
 
@@ -122,6 +126,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
   private final ExecutorService executorService =
           Executors.newCachedThreadPool();
   private int iconColor = Color.BLACK; // Default icon color
+  private ProgressBar loadingSpinner; // Add spinner property
 
   Semaphore preShowSemaphore = null;
   String preShowError = null;
@@ -284,6 +289,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     setContentView(R.layout.activity_browser);
     getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+    // Setup loading spinner
+    setupLoadingSpinner();
+
     // Check camera permission on WebView open
     if (activity != null && permissionHandler != null) {
       Log.d("InAppBrowser", "Requesting camera permission on WebView open via PermissionHandler");
@@ -444,7 +452,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
 
     // Get parent view
-    ViewGroup parent = (ViewGroup) _webView.getParent();
+    ViewParent parent = findViewById(R.id.browser_view).getParent();
 
     // Find status bar color view and toolbar for Android 15+ specific handling
     View statusBarColorView = findViewById(R.id.status_bar_color_view);
@@ -1418,6 +1426,12 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       public void onPageStarted(WebView view, String url, Bitmap favicon) {
         super.onPageStarted(view, url, favicon);
         injectAndroidJavaScriptInterface();
+        
+        // Show spinner when page starts loading
+        if (loadingSpinner != null) {
+            loadingSpinner.setVisibility(View.VISIBLE);
+            loadingSpinner.bringToFront();
+        }
       }
 
       @Override
@@ -1446,6 +1460,12 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
       @Override
       public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
+        
+        // Hide spinner when page finishes loading
+        if (loadingSpinner != null) {
+            loadingSpinner.setVisibility(View.GONE);
+        }
+        
         if (!isInitialized) {
           isInitialized = true;
           if (_options.getCallbacks() != null) {
@@ -1498,6 +1518,16 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
 
         if (_options.getCallbacks() != null) {
           _options.getCallbacks().urlChangeEvent(url);
+        }
+      }
+
+      @Override
+      public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+        super.onReceivedError(view, request, error);
+        
+        // Hide spinner on error
+        if (loadingSpinner != null) {
+            loadingSpinner.setVisibility(View.GONE);
         }
       }
     });
@@ -1889,6 +1919,42 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           currentPermissionRequest = null;
         }
       }
+    }
+  }
+
+  private void setupLoadingSpinner() {
+    // Create a new ProgressBar for the spinner
+    loadingSpinner = new ProgressBar(_context);
+    loadingSpinner.setIndeterminate(true);
+    loadingSpinner.setId(View.generateViewId()); // Generate a unique ID for the spinner
+    
+    // Create layout parameters to center the spinner
+    ConstraintLayout.LayoutParams params = new ConstraintLayout.LayoutParams(
+            ConstraintLayout.LayoutParams.WRAP_CONTENT,
+            ConstraintLayout.LayoutParams.WRAP_CONTENT
+    );
+    
+    // Add the spinner to the layout
+    ViewParent viewParent = findViewById(R.id.browser_view).getParent();
+    if (viewParent instanceof View) {
+        View parent = (View) viewParent;
+        if (parent instanceof ConstraintLayout) {
+            ConstraintLayout rootLayout = (ConstraintLayout) parent;
+            rootLayout.addView(loadingSpinner, params);
+            
+            // Center the spinner using ConstraintSet
+            ConstraintSet constraintSet = new ConstraintSet();
+            constraintSet.clone(rootLayout);
+            constraintSet.connect(loadingSpinner.getId(), ConstraintSet.LEFT, ConstraintSet.PARENT_ID, ConstraintSet.LEFT);
+            constraintSet.connect(loadingSpinner.getId(), ConstraintSet.RIGHT, ConstraintSet.PARENT_ID, ConstraintSet.RIGHT);
+            constraintSet.connect(loadingSpinner.getId(), ConstraintSet.TOP, ConstraintSet.PARENT_ID, ConstraintSet.TOP);
+            constraintSet.connect(loadingSpinner.getId(), ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM);
+            constraintSet.applyTo(rootLayout);
+            
+            // Show spinner immediately
+            loadingSpinner.setVisibility(View.VISIBLE);
+            loadingSpinner.bringToFront(); // Ensure spinner is on top
+        }
     }
   }
 }
