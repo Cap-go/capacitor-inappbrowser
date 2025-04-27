@@ -138,6 +138,35 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     private var isInjecting = false
     private let injectionQueue = DispatchQueue(label: "com.inappbrowser.injection")
 
+    // Add spinner property
+    private var loadingSpinner: UIActivityIndicatorView?
+
+    // Add method to setup spinner
+    private func setupSpinner() {
+        // Remove existing spinner if any
+        loadingSpinner?.removeFromSuperview()
+        
+        // Create new spinner
+        loadingSpinner = UIActivityIndicatorView(style: .large)
+        if let spinner = loadingSpinner {
+            spinner.translatesAutoresizingMaskIntoConstraints = false
+            spinner.color = .gray // Make spinner more visible
+            spinner.hidesWhenStopped = true
+            
+            // Add to view
+            view.addSubview(spinner)
+            
+            // Center in view
+            NSLayoutConstraint.activate([
+                spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            ])
+            
+            // Start animating immediately
+            spinner.startAnimating()
+        }
+    }
+
     func setHeaders(headers: [String: String]) {
         self.headers = headers
         let lowercasedHeaders = headers.mapKeys { $0.lowercased() }
@@ -520,6 +549,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.extendedLayoutIncludesOpaqueBars = true
         self.edgesForExtendedLayout = [.bottom]
 
+        // Setup spinner before WebView initialization
+        setupSpinner()
+
         let webConfiguration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
         
@@ -589,6 +621,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         if !self.blankNavigationTab {
             self.view = webView
+            // Re-add spinner after setting WebView as main view
+            setupSpinner()
         } else {
             self.view.addSubview(webView)
             webView.translatesAutoresizingMaskIntoConstraints = false
@@ -598,6 +632,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
                 webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
             ])
+            // Re-add spinner after adding WebView
+            setupSpinner()
         }
 
         self.webView = webView
@@ -1434,8 +1470,13 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = u
             delegate?.webViewController?(self, didStart: u)
         }
+        // Start spinner
+        loadingSpinner?.startAnimating()
     }
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Stop spinner
+        loadingSpinner?.stopAnimating()
+
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
             // injectPreShowScript will block, don't execute on the main thread
             if self.preShowScript != nil && !self.preShowScript!.isEmpty {
@@ -1496,6 +1537,9 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // Stop spinner on error
+        loadingSpinner?.stopAnimating()
+        
         updateBarButtonItems()
         self.progressView?.progress = 0
         if let url = webView.url {
@@ -1506,6 +1550,9 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        // Stop spinner on error
+        loadingSpinner?.stopAnimating()
+        
         updateBarButtonItems()
         self.progressView?.progress = 0
         if let url = webView.url {
