@@ -127,6 +127,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           Executors.newCachedThreadPool();
   private int iconColor = Color.BLACK; // Default icon color
   private ProgressBar loadingSpinner; // Add spinner property
+  private String backgroundColor = "white"; // Default background color
 
   Semaphore preShowSemaphore = null;
   String preShowError = null;
@@ -260,18 +261,19 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
           ActivityResultLauncher<Intent> fileChooserLauncher,
           ActivityResultLauncher<Intent> cameraLauncher
   ) {
-    // Use Material theme only if materialPicker is enabled
-    super(
-            context,
-            options.getMaterialPicker() ? R.style.InAppBrowserMaterialTheme : theme
-    );
-    this._options = options;
+    super(context, theme);
     this._context = context;
+    this._options = options;
     this.permissionHandler = permissionHandler;
-    this.isInitialized = false;
     this.capacitorWebView = capacitorWebView;
     this.fileChooserLauncher = fileChooserLauncher;
     this.cameraLauncher = cameraLauncher;
+    this.activity = (Activity) context;
+
+    // Set initial background color from options
+    if (options != null && options.getBackgroundColor() != null) {
+      this.backgroundColor = options.getBackgroundColor();
+    }
 
     // Log permissions from options
     String[] permissions = options.getPermissions();
@@ -291,6 +293,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
 
     // Setup loading spinner
     setupLoadingSpinner();
+
+    // Set background color
+    updateBackgroundColor();
 
     // Check camera permission on WebView open
     if (activity != null && permissionHandler != null) {
@@ -321,6 +326,7 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     }
 
     this._webView = findViewById(R.id.browser_view);
+    updateBackgroundColor(); // Apply background color after WebView creation
 
     applyInsets();
 
@@ -367,6 +373,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
     _webView.requestFocusFromTouch();
 
     setupToolbar();
+    
+    // Apply background color after toolbar is set up
+    updateBackgroundColor();
 
     if (!_options.isPresentAfterPageLoad()) {
       show();
@@ -1213,27 +1222,29 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
    * Applies background and tint colors to all buttons in the toolbar
    */
   private void applyColorToAllButtons(int backgroundColor, int iconColor) {
-    // Get all buttons
+    // Get all buttons from the toolbar
     ImageButton backButton = _toolbar.findViewById(R.id.backButton);
     ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
     ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
     ImageButton reloadButton = _toolbar.findViewById(R.id.reloadButton);
     ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
-    ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
-
-    // Set button backgrounds
-    backButton.setBackgroundColor(backgroundColor);
-    forwardButton.setBackgroundColor(backgroundColor);
-    closeButton.setBackgroundColor(backgroundColor);
-    reloadButton.setBackgroundColor(backgroundColor);
-
-    // Apply tint colors to buttons
-    backButton.setColorFilter(iconColor);
-    forwardButton.setColorFilter(iconColor);
-    closeButton.setColorFilter(iconColor);
-    reloadButton.setColorFilter(iconColor);
-    shareButton.setColorFilter(iconColor);
-    buttonNearDoneView.setColorFilter(iconColor);
+    ImageButton buttonNearDone = _toolbar.findViewById(R.id.buttonNearDone);
+    
+    // Apply background color to buttons
+    if (backButton != null) backButton.setBackgroundColor(backgroundColor);
+    if (forwardButton != null) forwardButton.setBackgroundColor(backgroundColor);
+    if (closeButton != null) closeButton.setBackgroundColor(backgroundColor);
+    if (reloadButton != null) reloadButton.setBackgroundColor(backgroundColor);
+    if (shareButton != null) shareButton.setBackgroundColor(backgroundColor);
+    if (buttonNearDone != null) buttonNearDone.setBackgroundColor(backgroundColor);
+    
+    // Apply icon color to buttons
+    if (backButton != null) backButton.setColorFilter(iconColor);
+    if (forwardButton != null) forwardButton.setColorFilter(iconColor);
+    if (closeButton != null) closeButton.setColorFilter(iconColor);
+    if (reloadButton != null) reloadButton.setColorFilter(iconColor);
+    if (shareButton != null) shareButton.setColorFilter(iconColor);
+    if (buttonNearDone != null) buttonNearDone.setColorFilter(iconColor);
   }
 
   private Uri convertHeicToJpeg(Uri heicUri) {
@@ -1432,6 +1443,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
             loadingSpinner.setVisibility(View.VISIBLE);
             loadingSpinner.bringToFront();
         }
+        
+        // Update background color when page starts loading
+        updateBackgroundColor();
       }
 
       @Override
@@ -1664,10 +1678,9 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
   }
 
   private boolean isDarkColor(int color) {
-    int red = Color.red(color);
-    int green = Color.green(color);
-    int blue = Color.blue(color);
-    double luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255.0;
+    // Calculate luminance using the formula: 0.299*R + 0.587*G + 0.114*B
+    double luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255.0;
+    // If luminance is less than 0.5, the color is considered dark
     return luminance < 0.5;
   }
 
@@ -1956,5 +1969,45 @@ public class WebViewDialog extends Dialog implements ActivityCompat.OnRequestPer
             loadingSpinner.bringToFront(); // Ensure spinner is on top
         }
     }
+  }
+
+  private void updateBackgroundColor() {
+    if (_webView != null) {
+      int colorValue = Color.WHITE; // Default to white
+      if ("black".equalsIgnoreCase(backgroundColor)) {
+        colorValue = Color.BLACK;
+      }
+      
+      // Set WebView background color
+      _webView.setBackgroundColor(colorValue);
+      
+      // Set window background color
+      if (getWindow() != null) {
+        getWindow().getDecorView().setBackgroundColor(colorValue);
+      }
+      
+      // Update Toolbar background color
+      if (_toolbar != null) {
+        _toolbar.setBackgroundColor(colorValue);
+        
+        // Determine icon color based on background
+        int iconColor = isDarkColor(colorValue) ? Color.WHITE : Color.BLACK;
+        this.iconColor = iconColor;
+        
+        // Apply icon color to all buttons
+        applyColorToAllButtons(colorValue, iconColor);
+        
+        // Update title text color
+        TextView titleText = _toolbar.findViewById(R.id.titleText);
+        if (titleText != null) {
+          titleText.setTextColor(iconColor);
+        }
+      }
+    }
+  }
+
+  public void setBackgroundColor(String color) {
+    this.backgroundColor = color;
+    updateBackgroundColor();
   }
 }
