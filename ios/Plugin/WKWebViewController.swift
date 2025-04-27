@@ -360,16 +360,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Show chevron icon when showArrowAsClose is true (originally was arrow.left)
             let chevronImage = UIImage(systemName: "chevron.left")?.withRenderingMode(.alwaysTemplate)
             let barButtonItem = UIBarButtonItem(image: chevronImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
-            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
-                barButtonItem.tintColor = tintColor
+            // Set tint color based on background color
+            if backgroundColor == .white {
+                barButtonItem.tintColor = .black
+            } else {
+                barButtonItem.tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor ?? .white
             }
             return barButtonItem
         } else {
             // Show X icon by default
             let xImage = UIImage(systemName: "xmark")?.withRenderingMode(.alwaysTemplate)
             let barButtonItem = UIBarButtonItem(image: xImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
-            if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
-                barButtonItem.tintColor = tintColor
+            // Set tint color based on background color
+            if backgroundColor == .white {
+                barButtonItem.tintColor = .black
+            } else {
+                barButtonItem.tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor ?? .white
             }
             return barButtonItem
         }
@@ -426,43 +432,44 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     func updateButtonTintColors() {
-        // Ensure all button items use the navigation bar's tint color
-        if let tintColor = navigationController?.navigationBar.tintColor {
-            backBarButtonItem.tintColor = tintColor
-            forwardBarButtonItem.tintColor = tintColor
-            reloadBarButtonItem.tintColor = tintColor
-            stopBarButtonItem.tintColor = tintColor
-            activityBarButtonItem.tintColor = tintColor
-            doneBarButtonItem.tintColor = tintColor
+        // Set tint color based on background color
+        let buttonTintColor = backgroundColor == .white ? UIColor.black : (tintColor ?? navigationController?.navigationBar.tintColor ?? .white)
+        
+        // Ensure all button items use the correct tint color
+        backBarButtonItem.tintColor = buttonTintColor
+        forwardBarButtonItem.tintColor = buttonTintColor
+        reloadBarButtonItem.tintColor = buttonTintColor
+        stopBarButtonItem.tintColor = buttonTintColor
+        activityBarButtonItem.tintColor = buttonTintColor
+        doneBarButtonItem.tintColor = buttonTintColor
 
-            // Update navigation items
-            if let leftItems = navigationItem.leftBarButtonItems {
-                for item in leftItems {
-                    item.tintColor = tintColor
-                }
+        // Update navigation items
+        if let leftItems = navigationItem.leftBarButtonItems {
+            for item in leftItems {
+                item.tintColor = buttonTintColor
             }
+        }
 
-            if let rightItems = navigationItem.rightBarButtonItems {
-                for item in rightItems {
-                    item.tintColor = tintColor
-                }
+        if let rightItems = navigationItem.rightBarButtonItems {
+            for item in rightItems {
+                item.tintColor = buttonTintColor
             }
+        }
 
-            // Create buttonNearDone button with the correct tint color if it doesn't already exist
-            if buttonNearDoneIcon != nil &&
-                navigationItem.rightBarButtonItems?.count == 1 &&
-                navigationItem.rightBarButtonItems?.first == doneBarButtonItem {
+        // Create buttonNearDone button with the correct tint color if it doesn't already exist
+        if buttonNearDoneIcon != nil &&
+            navigationItem.rightBarButtonItems?.count == 1 &&
+            navigationItem.rightBarButtonItems?.first == doneBarButtonItem {
 
-                // Create a properly tinted button
-                let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                                                    style: .plain,
-                                                    target: self,
-                                                    action: #selector(buttonNearDoneDidClick))
-                buttonItem.tintColor = tintColor
+            // Create a properly tinted button
+            let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
+                                                style: .plain,
+                                                target: self,
+                                                action: #selector(buttonNearDoneDidClick))
+            buttonItem.tintColor = buttonTintColor
 
-                // Add it to right items
-                navigationItem.rightBarButtonItems?.append(buttonItem)
-            }
+            // Add it to right items
+            navigationItem.rightBarButtonItems?.append(buttonItem)
         }
     }
 
@@ -1336,20 +1343,17 @@ fileprivate extension WKWebViewController {
             navBar.shadowImage = UIImage()
             navBar.isTranslucent = true
 
-            // Ensure tint colors are applied properly
-            if navBar.tintColor == nil {
-                navBar.tintColor = tintColor ?? .black
-            }
+            // Set tint color based on background color
+            let buttonTintColor = backgroundColor == .white ? UIColor.black : (tintColor ?? .white)
+            navBar.tintColor = buttonTintColor
 
             // Ensure text colors are set
-            if navBar.titleTextAttributes == nil {
-                navBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: tintColor ?? .black]
-            }
+            navBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: buttonTintColor]
 
             // Ensure the navigation bar buttons are properly visible
             for item in navBar.items ?? [] {
                 for barButton in (item.leftBarButtonItems ?? []) + (item.rightBarButtonItems ?? []) {
-                    barButton.tintColor = tintColor ?? navBar.tintColor ?? .black
+                    barButton.tintColor = buttonTintColor
                 }
             }
         }
