@@ -365,7 +365,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank", permissions: permissions)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank", permissions: permissions, backgroundColor: backgroundColor)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
@@ -512,6 +512,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             // Handle web view background color
             webViewController.view.backgroundColor = backgroundColor
+            self.navigationWebViewController?.view.backgroundColor = backgroundColor
+            self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
 
             // Handle toolbar color
             if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
@@ -557,7 +559,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
                 webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
                 webViewController.updateStatusBarStyle()
-
             }
 
             self.navigationWebViewController?.modalPresentationStyle = .fullScreen
@@ -579,11 +580,17 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Apply background color to whole view to ensure no gaps
                     webViewController.view.backgroundColor = color
                     self.navigationWebViewController?.view.backgroundColor = color
+                    self.navigationWebViewController?.navigationBar.backgroundColor = color
 
                     // Apply status bar background color
                     if let navController = self.navigationWebViewController {
                         navController.view.backgroundColor = color
                     }
+                } else {
+                    // Use the backgroundColor parameter
+                    webViewController.view.backgroundColor = backgroundColor
+                    self.navigationWebViewController?.view.backgroundColor = backgroundColor
+                    self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
                 }
             } else if toolbarType == "hidden" {
                 // Completely hide the navigation bar
@@ -600,6 +607,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     let color = UIColor(hexString: toolbarColor)
                     webViewController.view.backgroundColor = color
                     self.navigationWebViewController?.view.backgroundColor = color
+                    self.navigationWebViewController?.navigationBar.backgroundColor = color
                     
                     // Set status bar style based on toolbar color
                     let isDark = self.isDarkColor(color)
@@ -608,6 +616,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     
                     // Apply status bar background color
                     webViewController.setupStatusBarBackground(color: color)
+                } else {
+                    // Use the backgroundColor parameter
+                    webViewController.view.backgroundColor = backgroundColor
+                    self.navigationWebViewController?.view.backgroundColor = backgroundColor
+                    self.navigationWebViewController?.navigationBar.backgroundColor = backgroundColor
                 }
             }
 

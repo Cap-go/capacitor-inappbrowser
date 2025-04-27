@@ -92,7 +92,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, permissions: [String] = []) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, permissions: [String] = [], backgroundColor: UIColor = .white) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.source = .remote(url)
@@ -100,6 +100,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.permissions = permissions
+        self.backgroundColor = backgroundColor
         self.initWebview(isInspectable: isInspectable)
     }
 
@@ -543,8 +544,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
+    open var backgroundColor: UIColor = .white {
+        didSet {
+            updateBackgroundColor()
+        }
+    }
+
+    private func updateBackgroundColor() {
+        view.backgroundColor = backgroundColor
+        webView?.backgroundColor = backgroundColor
+        webView?.isOpaque = false
+    }
+
     open func initWebview(isInspectable: Bool = true) {
-        self.view.backgroundColor = UIColor.white
+        self.view.backgroundColor = backgroundColor
 
         self.extendedLayoutIncludesOpaqueBars = true
         self.edgesForExtendedLayout = [.bottom]
@@ -602,6 +615,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.userContentController = userContentController
 
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
+        webView.backgroundColor = backgroundColor
+        webView.isOpaque = false
 
         if #available(iOS 16.4, *) {
             webView.isInspectable = true
