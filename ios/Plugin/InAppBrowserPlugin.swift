@@ -544,7 +544,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             }
 
-            self.navigationWebViewController?.modalPresentationStyle = .fullScreen
+            self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
+            self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true
                 webViewController.blankNavigationTab = true
@@ -734,7 +735,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // Always hide toolbar to ensure no bottom bar
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
-            self.navigationWebViewController?.modalPresentationStyle = .fullScreen
+            self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
+            self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
 
             if !self.isPresentAfterPageLoad {
                 self.presentView()
