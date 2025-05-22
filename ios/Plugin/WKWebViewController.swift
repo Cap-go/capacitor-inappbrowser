@@ -1375,12 +1375,21 @@ fileprivate extension WKWebViewController {
         // Останавливаем загрузку
         webView.stopLoading()
         
-        // Удаляем наблюдатели
-        webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
-        if websiteTitleInNavigationBar {
-            webView.removeObserver(self, forKeyPath: titleKeyPath)
+        // Безопасно удаляем наблюдатели
+        do {
+            // Удаляем наблюдатель для estimatedProgress
+            webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+            
+            // Удаляем наблюдатель для title только если websiteTitleInNavigationBar true
+            if websiteTitleInNavigationBar {
+                webView.removeObserver(self, forKeyPath: titleKeyPath)
+            }
+            
+            // Удаляем наблюдатель для url
+            webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+        } catch {
+            print("[InAppBrowser] Error removing observers: \(error)")
         }
-        webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
         
         // Очищаем все скрипты и обработчики
         webView.configuration.userContentController.removeAllUserScripts()
