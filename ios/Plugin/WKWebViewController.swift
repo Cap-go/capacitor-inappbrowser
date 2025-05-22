@@ -281,6 +281,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var activityBarButtonItemImage: UIImage?
 
     open var buttonNearDoneIcon: UIImage?
+    open var closeButtonIcon: UIImage?
 
     fileprivate var webView: WKWebView?
     fileprivate var progressView: UIProgressView?
@@ -357,26 +358,26 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     fileprivate lazy var doneBarButtonItem: UIBarButtonItem = {
         if showArrowAsClose {
-            // Show chevron icon when showArrowAsClose is true (originally was arrow.left)
+            // Show chevron icon when showArrowAsClose is true
             let chevronImage = UIImage(systemName: "chevron.left")?.withRenderingMode(.alwaysTemplate)
             let barButtonItem = UIBarButtonItem(image: chevronImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
             // Set tint color based on background color
-            if backgroundColor == .white {
-                barButtonItem.tintColor = .black
-            } else {
-                barButtonItem.tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor ?? .white
-            }
+            barButtonItem.tintColor = backgroundColor.isEqual(UIColor.white) ? .black : .white
             return barButtonItem
         } else {
             // Show X icon by default
-            let xImage = UIImage(systemName: "xmark")?.withRenderingMode(.alwaysTemplate)
+            let xImage: UIImage?
+            if let customImage = closeButtonIcon {
+                // Use custom close button icon if provided
+                xImage = customImage.withRenderingMode(.alwaysTemplate)
+            } else {
+                // Fallback to system icon
+                xImage = UIImage(systemName: "xmark")?.withRenderingMode(.alwaysTemplate)
+            }
+            
             let barButtonItem = UIBarButtonItem(image: xImage, style: .plain, target: self, action: #selector(doneDidClick(sender:)))
             // Set tint color based on background color
-            if backgroundColor == .white {
-                barButtonItem.tintColor = .black
-            } else {
-                barButtonItem.tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor ?? .white
-            }
+            barButtonItem.tintColor = backgroundColor.isEqual(UIColor.white) ? .black : .white
             return barButtonItem
         }
     }()
@@ -433,7 +434,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func updateButtonTintColors() {
         // Set tint color based on background color
-        let buttonTintColor = backgroundColor == .white ? UIColor.black : (tintColor ?? navigationController?.navigationBar.tintColor ?? .white)
+        let buttonTintColor = backgroundColor.isEqual(UIColor.white) ? UIColor.black : UIColor.white
         
         // Ensure all button items use the correct tint color
         backBarButtonItem.tintColor = buttonTintColor

@@ -282,7 +282,93 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
 
-        let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
+        let toolbarType = call.getString("toolbarType", "")
+        let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
+
+        // Handle custom close button icon
+        var closeButtonIcon: UIImage?
+        if let closeIconSettings = call.getObject("closeButtonIcon") {
+            guard let iosSettingsRaw = closeIconSettings["ios"] else {
+                call.reject("IOS settings not found")
+                return
+            }
+            if !(iosSettingsRaw is JSObject) {
+                call.reject("IOS settings are not an object")
+                return
+            }
+            let iosSettings = iosSettingsRaw as! JSObject
+
+            guard let iconType = iosSettings["iconType"] as? String else {
+                call.reject("closeButtonIcon.iconType is empty")
+                return
+            }
+            if iconType != "sf-symbol" && iconType != "asset" {
+                call.reject("IconType is neither 'sf-symbol' nor 'asset'")
+                return
+            }
+            guard let icon = iosSettings["icon"] as? String else {
+                call.reject("closeButtonIcon.icon is empty")
+                return
+            }
+
+            if iconType == "sf-symbol" {
+                closeButtonIcon = UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate)
+            } else {
+                // Look in app's web assets/public directory
+                guard let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") else {
+                    print("[DEBUG] Failed to locate web assets directory")
+                    return
+                }
+
+                // Try several path combinations to find the asset
+                let paths = [
+                    icon,                    // Just the icon name
+                    "public/\(icon)",        // With public/ prefix
+                    icon.replacingOccurrences(of: "public/", with: "")  // Without public/ prefix
+                ]
+
+                var foundImage = false
+
+                for path in paths {
+                    // Try as a direct path from web assets dir
+                    let assetPath = path.replacingOccurrences(of: "public/", with: "")
+                    let fileURL = webDir.appendingPathComponent(assetPath)
+
+                    if FileManager.default.fileExists(atPath: fileURL.path),
+                       let data = try? Data(contentsOf: fileURL),
+                       let img = UIImage(data: data) {
+                        closeButtonIcon = img.withRenderingMode(.alwaysTemplate)
+                        foundImage = true
+                        break
+                    }
+
+                    // Try with www directory as an alternative
+                    if let wwwDir = Bundle.main.resourceURL?.appendingPathComponent("www") {
+                        let wwwFileURL = wwwDir.appendingPathComponent(assetPath)
+
+                        if FileManager.default.fileExists(atPath: wwwFileURL.path),
+                           let data = try? Data(contentsOf: wwwFileURL),
+                           let img = UIImage(data: data) {
+                            closeButtonIcon = img.withRenderingMode(.alwaysTemplate)
+                            foundImage = true
+                            break
+                        }
+                    }
+
+                    // Try looking in app bundle assets
+                    if let iconImage = UIImage(named: path) {
+                        closeButtonIcon = iconImage.withRenderingMode(.alwaysTemplate)
+                        foundImage = true
+                        break
+                    }
+                }
+
+                if !foundImage {
+                    print("[DEBUG] Failed to load close button icon: \(icon)")
+                }
+            }
+        }
+
         let closeModal = call.getBool("closeModal", false)
         let closeModalTitle = call.getString("closeModalTitle", "Close")
         let closeModalDescription = call.getString("closeModalDescription", "Are you sure you want to close this window?")
@@ -341,14 +427,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             disclaimerContent = shareDisclaimerRaw
         }
 
-        let toolbarType = call.getString("toolbarType", "")
-        let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
-
-        // Don't null out shareDisclaimer regardless of toolbarType
-        // if toolbarType != "activity" {
-        //     disclaimerContent = nil
-        // }
-
         let ignoreUntrustedSSLError = call.getBool("ignoreUntrustedSSLError", false)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
@@ -358,6 +436,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         
         // Get permissions array
         let permissions = (call.getArray("permissions", []) as? [Any])?.compactMap { $0 as? String } ?? []
+
+        // Get headers
+        let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
 
         DispatchQueue.main.async {
             guard let url = URL(string: urlString) else {
@@ -465,6 +546,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if let buttonNearDoneIcon = buttonNearDoneIcon {
                 webViewController.buttonNearDoneIcon = buttonNearDoneIcon
                 print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
+            }
+
+            // Set custom close button icon if provided
+            if let closeButtonIcon = closeButtonIcon {
+                webViewController.closeButtonIcon = closeButtonIcon
             }
 
             webViewController.capBrowserPlugin = self

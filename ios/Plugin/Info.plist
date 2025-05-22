@@ -28,8 +28,6 @@
 	<string>This app needs access to location to provide location-based services.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>This app needs access to contacts to manage your contacts.</string>
-	<key>NSCalendarsUsageDescription</key>
-	<string>This app needs access to calendar to manage your events.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to photos to manage your media.</string>
 </dict>
