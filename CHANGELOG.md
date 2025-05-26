@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.9.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.5...7.9.6) (2025-05-26)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.window:window to v1.4.0 ([#307](https://github.com/Cap-go/capacitor-inappbrowser/issues/307)) ([696d34a](https://github.com/Cap-go/capacitor-inappbrowser/commit/696d34a950129b7f531f39326ddc47273d55dfb8))
+
 ### [7.9.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.4...7.9.5) (2025-05-26)
 
 ### [7.9.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.3...7.9.4) (2025-05-26)
