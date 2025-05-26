@@ -264,6 +264,15 @@ public class WebViewDialog extends Dialog {
       WindowManager.LayoutParams.FLAG_FULLSCREEN
     );
     setContentView(R.layout.activity_browser);
+
+    // Set fitsSystemWindows only for Android 10 (API 29)
+    if (android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q) {
+      View coordinator = findViewById(R.id.coordinator_layout);
+      if (coordinator != null) coordinator.setFitsSystemWindows(true);
+      View appBar = findViewById(R.id.app_bar_layout);
+      if (appBar != null) appBar.setFitsSystemWindows(true);
+    }
+
     getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
     // Make status bar transparent
@@ -2034,7 +2043,7 @@ public class WebViewDialog extends Dialog {
                   );
                 }
                 String s = String.format(
-                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})}",
+                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})",
                   headers,
                   toBase64(request.getUrl().toString()),
                   request.getMethod(),
