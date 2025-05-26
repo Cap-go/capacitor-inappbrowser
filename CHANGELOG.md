@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.9.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.3...7.9.4) (2025-05-26)
+
+
+### Bug Fixes
+
+* AppBarLayout for Android 10 ([9063076](https://github.com/Cap-go/capacitor-inappbrowser/commit/906307634e8240049ed3fdef3cca778f7a9f85dc))
+
 ### [7.9.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.2...7.9.3) (2025-05-08)
 
 
