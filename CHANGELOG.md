@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.10.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.6...7.10.0) (2025-06-02)
+
+
+### Features
+
+* change default backgroundColor to white on Android ([e3683a2](https://github.com/Cap-go/capacitor-inappbrowser/commit/e3683a2956aaa2f8be70046c7cb322ce881d2197))
+
 ### [7.9.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.5...7.9.6) (2025-05-26)
 
 
