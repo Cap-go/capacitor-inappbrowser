@@ -2227,6 +2227,15 @@ public class WebViewDialog extends Dialog {
             backButton.setImageResource(R.drawable.arrow_back_enabled);
             backButton.setEnabled(true);
             backButton.setColorFilter(iconColor);
+            backButton.setOnClickListener(
+              new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                  if (_webView.canGoBack()) {
+                    _webView.goBack();
+                  }
+                }
+              });
           } else {
             backButton.setImageResource(R.drawable.arrow_back_disabled);
             backButton.setEnabled(false);
@@ -2245,6 +2254,15 @@ public class WebViewDialog extends Dialog {
             forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
             forwardButton.setEnabled(true);
             forwardButton.setColorFilter(iconColor);
+            forwardButton.setOnClickListener(
+              new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                  if (_webView.canGoForward()) {
+                    _webView.goForward();
+                  }
+                }
+              });
           } else {
             forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
             forwardButton.setEnabled(false);
