@@ -988,10 +988,10 @@ public class WebViewDialog extends Dialog {
       return WindowInsetsCompat.CONSUMED;
     });
 
-    // Handle window decoration - ensure edge-to-edge for all versions
+    // Handle window decoration - version-specific handling
     if (getWindow() != null) {
-      if (Build.VERSION.SDK_INT >= 30) {
-        // Android 11+: Use modern WindowInsetsController and setDecorFitsSystemWindows
+      if (isAndroid15Plus) {
+        // Android 15+: Use edge-to-edge with proper insets handling
         getWindow().setDecorFitsSystemWindows(false);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
@@ -1015,18 +1015,63 @@ public class WebViewDialog extends Dialog {
             // Ignore color parsing errors
           }
         }
+      } else if (Build.VERSION.SDK_INT >= 30) {
+        // Android 11-14: Keep navigation bar transparent but respect status bar
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+
+        WindowInsetsControllerCompat controller =
+          new WindowInsetsControllerCompat(
+            getWindow(),
+            getWindow().getDecorView()
+          );
+
+        // Set status bar color to match toolbar or use system default
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            int toolbarColor = Color.parseColor(_options.getToolbarColor());
+            getWindow().setStatusBarColor(toolbarColor);
+            boolean isDarkBackground = isDarkColor(toolbarColor);
+            controller.setAppearanceLightStatusBars(!isDarkBackground);
+          } catch (IllegalArgumentException e) {
+            // Follow system theme if color parsing fails
+            boolean isDarkTheme = isDarkThemeEnabled();
+            int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+            getWindow().setStatusBarColor(statusBarColor);
+            controller.setAppearanceLightStatusBars(!isDarkTheme);
+          }
+        } else {
+          // Follow system theme if no toolbar color provided
+          boolean isDarkTheme = isDarkThemeEnabled();
+          int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+          getWindow().setStatusBarColor(statusBarColor);
+          controller.setAppearanceLightStatusBars(!isDarkTheme);
+        }
       } else {
-        // Pre-Android 11: Use deprecated flags
+        // Pre-Android 11: Use deprecated flags for edge-to-edge navigation bar only
         getWindow()
           .getDecorView()
           .setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
           );
         
-        getWindow().setStatusBarColor(Color.TRANSPARENT);
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        
+        // Set status bar color to match toolbar
+        if (
+          _options.getToolbarColor() != null &&
+          !_options.getToolbarColor().isEmpty()
+        ) {
+          try {
+            int toolbarColor = Color.parseColor(_options.getToolbarColor());
+            getWindow().setStatusBarColor(toolbarColor);
+          } catch (IllegalArgumentException e) {
+            // Use system default
+          }
+        }
       }
     }
   }
