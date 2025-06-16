@@ -263,12 +263,11 @@ public class InAppBrowserPlugin
               webViewDialog.setUrl(url);
               call.resolve();
             } else {
-               call.reject("WebView is not initialized");
+              call.reject("WebView is not initialized");
             }
           }
         }
       );
-
   }
 
   @PluginMethod
@@ -411,8 +410,6 @@ public class InAppBrowserPlugin
           }
         }
       );
-
-
   }
 
   @PluginMethod
@@ -421,7 +418,7 @@ public class InAppBrowserPlugin
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
       return;
-    } 
+    }
     CookieManager cookieManager = CookieManager.getInstance();
     String cookieString = cookieManager.getCookie(url);
     JSObject result = new JSObject();

@@ -1057,9 +1057,9 @@ public class WebViewDialog extends Dialog {
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
           );
-        
+
         getWindow().setNavigationBarColor(Color.TRANSPARENT);
-        
+
         // Set status bar color to match toolbar
         if (
           _options.getToolbarColor() != null &&
@@ -2301,7 +2301,8 @@ public class WebViewDialog extends Dialog {
                     _webView.goBack();
                   }
                 }
-              });
+              }
+            );
           } else {
             backButton.setImageResource(R.drawable.arrow_back_disabled);
             backButton.setEnabled(false);
@@ -2328,7 +2329,8 @@ public class WebViewDialog extends Dialog {
                     _webView.goForward();
                   }
                 }
-              });
+              }
+            );
           } else {
             forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
             forwardButton.setEnabled(false);
