@@ -2208,7 +2208,8 @@ public class WebViewDialog extends Dialog {
                     _webView.goBack();
                   }
                 }
-              });
+              }
+            );
           } else {
             backButton.setImageResource(R.drawable.arrow_back_disabled);
             backButton.setEnabled(false);
@@ -2235,7 +2236,8 @@ public class WebViewDialog extends Dialog {
                     _webView.goForward();
                   }
                 }
-              });
+              }
+            );
           } else {
             forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
             forwardButton.setEnabled(false);
