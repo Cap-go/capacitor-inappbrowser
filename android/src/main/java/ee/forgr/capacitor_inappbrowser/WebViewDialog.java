@@ -1041,7 +1041,11 @@ public class WebViewDialog extends Dialog {
           "window.dispatchEvent(new CustomEvent('messageFromNative', " +
           jsonDetail +
           "));";
-        _webView.post(() -> _webView.evaluateJavascript(script, null));
+        _webView.post(() -> {
+          if (_webView != null) {
+            _webView.evaluateJavascript(script, null);
+          }
+        });
       } catch (Exception e) {
         Log.e(
           "postMessageToJS",
@@ -1052,6 +1056,9 @@ public class WebViewDialog extends Dialog {
   }
 
   private void injectJavaScriptInterface() {
+    if (_webView == null) {
+      return;
+    }
     String script =
       "if (!window.mobileApp) { " +
       "    window.mobileApp = { " +
@@ -1099,7 +1106,14 @@ public class WebViewDialog extends Dialog {
       new Runnable() {
         @Override
         public void run() {
-          _webView.evaluateJavascript(script, null);
+          if (_webView != null) {
+            _webView.evaluateJavascript(script, null);
+          } else {
+            // If WebView is null, release semaphore to prevent deadlock
+            if (preShowSemaphore != null) {
+              preShowSemaphore.release();
+            }
+          }
         }
       }
     );
@@ -1290,36 +1304,45 @@ public class WebViewDialog extends Dialog {
   }
 
   public void reload() {
-    if (_webView != null) {
-      // First stop any ongoing loading
-      _webView.stopLoading();
+    if (_webView == null) {
+      return;
+    }
+    // First stop any ongoing loading
+    _webView.stopLoading();
 
-      // Check if there's a URL to reload
-      if (_webView.getUrl() != null) {
-        // Reload the current page
-        _webView.reload();
-        Log.d("InAppBrowser", "Reloading page: " + _webView.getUrl());
-      } else if (_options != null && _options.getUrl() != null) {
-        // If webView URL is null but we have an initial URL, load that
-        setUrl(_options.getUrl());
-        Log.d("InAppBrowser", "Loading initial URL: " + _options.getUrl());
-      }
+    // Check if there's a URL to reload
+    String currentUrl = _webView.getUrl();
+    if (currentUrl != null) {
+      // Reload the current page
+      _webView.reload();
+      Log.d("InAppBrowser", "Reloading page: " + currentUrl);
+    } else if (_options != null && _options.getUrl() != null) {
+      // If webView URL is null but we have an initial URL, load that
+      setUrl(_options.getUrl());
+      Log.d("InAppBrowser", "Loading initial URL: " + _options.getUrl());
     }
   }
 
   public void destroy() {
-    _webView.destroy();
+    if (_webView != null) {
+      _webView.destroy();
+    }
   }
 
   public String getUrl() {
-    return _webView.getUrl();
+    return _webView != null ? _webView.getUrl() : "";
   }
 
   public void executeScript(String script) {
-    _webView.evaluateJavascript(script, null);
+    if (_webView != null) {
+      _webView.evaluateJavascript(script, null);
+    }
   }
 
   public void setUrl(String url) {
+    if (_webView == null) {
+      return;
+    }
     Map<String, String> requestHeaders = new HashMap<>();
     if (_options.getHeaders() != null) {
       Iterator<String> keys = _options.getHeaders().keys();
@@ -1469,10 +1492,11 @@ public class WebViewDialog extends Dialog {
               _webView.stopLoading();
 
               // Check if there's a URL to reload
-              if (_webView.getUrl() != null) {
+              String currentUrl = _webView.getUrl();
+              if (currentUrl != null) {
                 // Reload the current page
                 _webView.reload();
-                Log.d("InAppBrowser", "Reloading page: " + _webView.getUrl());
+                Log.d("InAppBrowser", "Reloading page: " + currentUrl);
               } else if (_options.getUrl() != null) {
                 // If webView URL is null but we have an initial URL, load that
                 setUrl(_options.getUrl());
@@ -1917,6 +1941,9 @@ public class WebViewDialog extends Dialog {
           WebView view,
           WebResourceRequest request
         ) {
+          if (view == null || _webView == null) {
+            return false;
+          }
           Context context = view.getContext();
           String url = request.getUrl().toString();
           Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
@@ -1970,6 +1997,9 @@ public class WebViewDialog extends Dialog {
           WebView view,
           WebResourceRequest request
         ) {
+          if (view == null || _webView == null) {
+            return null;
+          }
           Pattern pattern = _options.getProxyRequestsPattern();
           if (pattern == null) {
             return null;
@@ -2051,6 +2081,12 @@ public class WebViewDialog extends Dialog {
           String host,
           String realm
         ) {
+          if (view == null || _webView == null) {
+            if (handler != null) {
+              handler.cancel();
+            }
+            return;
+          }
           final String sourceUrl = _options.getUrl();
           final String url = view.getUrl();
           final JSObject credentials = _options.getCredentials();
@@ -2114,12 +2150,18 @@ public class WebViewDialog extends Dialog {
 
         @Override
         public void onLoadResource(WebView view, String url) {
+          if (view == null || _webView == null) {
+            return;
+          }
           super.onLoadResource(view, url);
         }
 
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {
           super.onPageStarted(view, url, favicon);
+          if (view == null || _webView == null) {
+            return;
+          }
           try {
             URI uri = new URI(url);
             if (TextUtils.isEmpty(_options.getTitle())) {
@@ -2135,6 +2177,9 @@ public class WebViewDialog extends Dialog {
           String url,
           boolean isReload
         ) {
+          if (view == null || _webView == null) {
+            return;
+          }
           if (!isReload) {
             _options.getCallbacks().urlChangeEvent(url);
           }
@@ -2145,6 +2190,9 @@ public class WebViewDialog extends Dialog {
         @Override
         public void onPageFinished(WebView view, String url) {
           super.onPageFinished(view, url);
+          if (view == null || _webView == null) {
+            return;
+          }
           if (!isInitialized) {
             isInitialized = true;
             _webView.clearHistory();
@@ -2196,7 +2244,7 @@ public class WebViewDialog extends Dialog {
           }
 
           ImageButton backButton = _toolbar.findViewById(R.id.backButton);
-          if (_webView.canGoBack()) {
+          if (_webView != null && _webView.canGoBack()) {
             backButton.setImageResource(R.drawable.arrow_back_enabled);
             backButton.setEnabled(true);
             backButton.setColorFilter(iconColor);
@@ -2204,7 +2252,7 @@ public class WebViewDialog extends Dialog {
               new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                  if (_webView.canGoBack()) {
+                  if (_webView != null && _webView.canGoBack()) {
                     _webView.goBack();
                   }
                 }
@@ -2223,7 +2271,7 @@ public class WebViewDialog extends Dialog {
           }
 
           ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
-          if (_webView.canGoForward()) {
+          if (_webView != null && _webView.canGoForward()) {
             forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
             forwardButton.setEnabled(true);
             forwardButton.setColorFilter(iconColor);
@@ -2231,7 +2279,7 @@ public class WebViewDialog extends Dialog {
               new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                  if (_webView.canGoForward()) {
+                  if (_webView != null && _webView.canGoForward()) {
                     _webView.goForward();
                   }
                 }
@@ -2260,6 +2308,9 @@ public class WebViewDialog extends Dialog {
           WebResourceError error
         ) {
           super.onReceivedError(view, request, error);
+          if (view == null || _webView == null) {
+            return;
+          }
           _options.getCallbacks().pageLoadError();
         }
 
@@ -2270,6 +2321,12 @@ public class WebViewDialog extends Dialog {
           SslErrorHandler handler,
           SslError error
         ) {
+          if (view == null || _webView == null) {
+            if (handler != null) {
+              handler.cancel();
+            }
+            return;
+          }
           boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
           if (
             ignoreSSLUntrustedError &&
@@ -2286,14 +2343,18 @@ public class WebViewDialog extends Dialog {
   @Override
   public void onBackPressed() {
     if (
+      _webView != null &&
       _webView.canGoBack() &&
       (TextUtils.equals(_options.getToolbarType(), "navigation") ||
         _options.getActiveNativeNavigationForWebview())
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
-      _options.getCallbacks().closeEvent(_webView.getUrl());
-      _webView.destroy();
+      String currentUrl = _webView != null ? _webView.getUrl() : "";
+      _options.getCallbacks().closeEvent(currentUrl);
+      if (_webView != null) {
+        _webView.destroy();
+      }
       super.onBackPressed();
     }
   }
@@ -2479,7 +2540,11 @@ public class WebViewDialog extends Dialog {
       })();""";
 
     // Execute the script in the WebView
-    _webView.post(() -> _webView.evaluateJavascript(script, null));
+    _webView.post(() -> {
+      if (_webView != null) {
+        _webView.evaluateJavascript(script, null);
+      }
+    });
 
     Log.d("InAppBrowser", "Applied minimal date picker fixes");
   }

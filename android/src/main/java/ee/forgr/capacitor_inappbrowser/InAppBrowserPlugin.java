@@ -251,6 +251,7 @@ public class InAppBrowserPlugin
     String url = call.getString("url");
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
+      return;
     }
     currentUrl = url;
     this.getActivity()
@@ -258,11 +259,16 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            webViewDialog.setUrl(url);
+            if (webViewDialog != null) {
+              webViewDialog.setUrl(url);
+              call.resolve();
+            } else {
+               call.reject("WebView is not initialized");
+            }
           }
         }
       );
-    call.resolve();
+
   }
 
   @PluginMethod
@@ -396,12 +402,17 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            webViewDialog.executeScript(scriptToRun.toString());
+            if (webViewDialog != null) {
+              webViewDialog.executeScript(scriptToRun.toString());
+              call.resolve();
+            } else {
+              call.reject("WebView is not initialized");
+            }
           }
         }
       );
 
-    call.resolve();
+
   }
 
   @PluginMethod
@@ -409,22 +420,21 @@ public class InAppBrowserPlugin
     String url = call.getString("url");
     if (url == null || TextUtils.isEmpty(url)) {
       call.reject("Invalid URL");
-    } else {
-      CookieManager cookieManager = CookieManager.getInstance();
-      String cookieString = cookieManager.getCookie(url);
-      if (cookieString != null) {
-        String[] cookiePairs = cookieString.split("; ");
-        JSObject result = new JSObject();
-        for (String cookie : cookiePairs) {
-          String[] parts = cookie.split("=", 2);
-          if (parts.length == 2) {
-            result.put(parts[0], parts[1]);
-          }
+      return;
+    } 
+    CookieManager cookieManager = CookieManager.getInstance();
+    String cookieString = cookieManager.getCookie(url);
+    JSObject result = new JSObject();
+    if (cookieString != null) {
+      String[] cookiePairs = cookieString.split("; ");
+      for (String cookie : cookiePairs) {
+        String[] parts = cookie.split("=", 2);
+        if (parts.length == 2) {
+          result.put(parts[0], parts[1]);
         }
-        call.resolve(result);
       }
-      call.resolve(new JSObject());
     }
+    call.resolve(result);
   }
 
   @PluginMethod
@@ -753,8 +763,12 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            webViewDialog.postMessageToJS(eventData);
-            call.resolve();
+            if (webViewDialog != null) {
+              webViewDialog.postMessageToJS(eventData);
+              call.resolve();
+            } else {
+              call.reject("WebView is not initialized");
+            }
           }
         }
       );
@@ -765,37 +779,40 @@ public class InAppBrowserPlugin
     String script = call.getString("code");
     if (script == null || TextUtils.isEmpty(script)) {
       call.reject("No script to run");
+      return;
     }
-
-    if (webViewDialog != null) {
-      this.getActivity()
-        .runOnUiThread(
-          new Runnable() {
-            @Override
-            public void run() {
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            if (webViewDialog != null) {
               webViewDialog.executeScript(script);
+              call.resolve();
+            } else {
+              call.reject("WebView is not initialized");
             }
           }
-        );
-    }
-
-    call.resolve();
+        }
+      );
   }
 
   @PluginMethod
   public void reload(PluginCall call) {
-    if (webViewDialog != null) {
-      this.getActivity()
-        .runOnUiThread(
-          new Runnable() {
-            @Override
-            public void run() {
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            if (webViewDialog != null) {
               webViewDialog.reload();
+              call.resolve();
+            } else {
+              call.reject("WebView is not initialized");
             }
           }
-        );
-    }
-    call.resolve();
+        }
+      );
   }
 
   @PluginMethod
@@ -826,9 +843,10 @@ public class InAppBrowserPlugin
           @Override
           public void run() {
             if (webViewDialog != null) {
+              String currentUrl = webViewDialog.getUrl();
               notifyListeners(
                 "closeEvent",
-                new JSObject().put("url", webViewDialog.getUrl())
+                new JSObject().put("url", currentUrl)
               );
               webViewDialog.dismiss();
               webViewDialog = null;
