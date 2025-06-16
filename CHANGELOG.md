@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.10.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.1...7.10.2) (2025-06-16)
+
+
+### Bug Fixes
+
+* nav issue android ([a2e9104](https://github.com/Cap-go/capacitor-inappbrowser/commit/a2e9104f6541b497e69120f657f38d68ce1e1e3d))
+
 ### [7.10.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.0...7.10.1) (2025-06-13)
 
 ## [7.10.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.9.6...7.10.0) (2025-06-02)
