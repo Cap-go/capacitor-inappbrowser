@@ -1099,7 +1099,7 @@ fileprivate extension WKWebViewController {
         var tryToOpenURLWithApp = false
 
         // Handle all non-http(s) schemes by default
-        if let scheme = url.scheme?.lowercased(), !scheme.hasPrefix("http") {
+        if let scheme = url.scheme?.lowercased(), !scheme.hasPrefix("http") && !scheme.hasPrefix("file") {
             tryToOpenURLWithApp = true
         }
 
