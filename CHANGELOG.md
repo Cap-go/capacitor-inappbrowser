@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.10.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.2...7.10.3) (2025-06-16)
+
+
+### Bug Fixes
+
+* crash ([b79fee1](https://github.com/Cap-go/capacitor-inappbrowser/commit/b79fee1ea6c70371a71f6b3858723f19dae14b64))
+* display topbar android 11 ([a57857a](https://github.com/Cap-go/capacitor-inappbrowser/commit/a57857a08b5166d717e77215b8f80c319787284c))
+* lint ios ([ec0e1ed](https://github.com/Cap-go/capacitor-inappbrowser/commit/ec0e1edfcce4047da5822e430d326646cc1b85db))
+* lint issues + test ([20f0957](https://github.com/Cap-go/capacitor-inappbrowser/commit/20f0957a6e7db2dfd16895b1869df8d1299b1033))
+
 ### [7.10.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.1...7.10.2) (2025-06-16)
 
 
