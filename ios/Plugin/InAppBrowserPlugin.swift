@@ -369,14 +369,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             if self.bridge?.statusBarVisible == true {
-				let subviews = self.bridge?.webView?.superview?.subviews
-				if let emptyStatusBarIndex = subviews?.firstIndex(where: { $0.subviews.isEmpty }) {
-					if let emptyStatusBar = subviews?[emptyStatusBarIndex] {
-						webViewController.capacitorStatusBar = emptyStatusBar
-						emptyStatusBar.removeFromSuperview()
-					}
-				}
-			}
+                let subviews = self.bridge?.webView?.superview?.subviews
+                if let emptyStatusBarIndex = subviews?.firstIndex(where: { $0.subviews.isEmpty }) {
+                    if let emptyStatusBar = subviews?[emptyStatusBarIndex] {
+                        webViewController.capacitorStatusBar = emptyStatusBar
+                        emptyStatusBar.removeFromSuperview()
+                    }
+                }
+            }
 
             webViewController.source = .remote(url)
             webViewController.leftNavigationBarItemTypes = []
@@ -697,14 +697,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             if self.bridge?.statusBarVisible == true {
-				let subviews = self.bridge?.webView?.superview?.subviews
-				if let emptyStatusBarIndex = subviews?.firstIndex(where: { $0.subviews.isEmpty }) {
-					if let emptyStatusBar = subviews?[emptyStatusBarIndex] {
-						webViewController.capacitorStatusBar = emptyStatusBar
-						emptyStatusBar.removeFromSuperview()
-					}
-				}
-			}
+                let subviews = self.bridge?.webView?.superview?.subviews
+                if let emptyStatusBarIndex = subviews?.firstIndex(where: { $0.subviews.isEmpty }) {
+                    if let emptyStatusBar = subviews?[emptyStatusBarIndex] {
+                        webViewController.capacitorStatusBar = emptyStatusBar
+                        emptyStatusBar.removeFromSuperview()
+                    }
+                }
+            }
 
             webViewController.source = .remote(url)
             webViewController.leftNavigationBarItemTypes = [.back, .forward, .reload]
