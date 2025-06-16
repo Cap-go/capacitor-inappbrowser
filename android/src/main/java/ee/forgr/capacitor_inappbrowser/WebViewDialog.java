@@ -948,7 +948,7 @@ public class WebViewDialog extends Dialog {
       }
     }
 
-    // Apply system insets to WebView (compatible with all Android versions)
+    // Apply system insets to WebView content view (compatible with all Android versions)
     ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
       Insets insets = windowInsets.getInsets(
         WindowInsetsCompat.Type.systemBars()
@@ -971,9 +971,13 @@ public class WebViewDialog extends Dialog {
         // On Android 15+, don't add top margin as it's handled by AppBarLayout
         mlp.topMargin = 0;
       } else {
-        // Original behavior for older Android versions
-        mlp.topMargin = insets.top;
-        mlp.bottomMargin = insets.bottom;
+        // For all other Android versions, ensure bottom margin respects navigation bar
+        mlp.topMargin = 0; // Top is handled by toolbar
+        if (keyboardVisible) {
+          mlp.bottomMargin = 0;
+        } else {
+          mlp.bottomMargin = insets.bottom;
+        }
       }
 
       // These stay the same for all Android versions
@@ -984,76 +988,45 @@ public class WebViewDialog extends Dialog {
       return WindowInsetsCompat.CONSUMED;
     });
 
-    // Handle window decoration - version-specific window settings
+    // Handle window decoration - ensure edge-to-edge for all versions
     if (getWindow() != null) {
-      if (isAndroid15Plus) {
-        // Only for Android 15+: Set window to draw behind status bar
+      if (Build.VERSION.SDK_INT >= 30) {
+        // Android 11+: Use modern WindowInsetsController and setDecorFitsSystemWindows
         getWindow().setDecorFitsSystemWindows(false);
         getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
 
-        // Set status bar text color
-        int backgroundColor;
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
-          try {
-            backgroundColor = Color.parseColor(_options.getToolbarColor());
-            boolean isDarkBackground = isDarkColor(backgroundColor);
-            WindowInsetsControllerCompat controller =
-              new WindowInsetsControllerCompat(
-                getWindow(),
-                getWindow().getDecorView()
-              );
-            controller.setAppearanceLightStatusBars(!isDarkBackground);
-          } catch (IllegalArgumentException e) {
-            // Ignore color parsing errors
-          }
-        }
-      } else if (Build.VERSION.SDK_INT >= 30) {
-        // Android 11-14: Use original behavior
         WindowInsetsControllerCompat controller =
           new WindowInsetsControllerCompat(
             getWindow(),
             getWindow().getDecorView()
           );
 
-        // Original behavior for status bar color
+        // Set status bar text color
         if (
           _options.getToolbarColor() != null &&
           !_options.getToolbarColor().isEmpty()
         ) {
           try {
-            int toolbarColor = Color.parseColor(_options.getToolbarColor());
-            getWindow().setStatusBarColor(toolbarColor);
-
-            boolean isDarkBackground = isDarkColor(toolbarColor);
+            int backgroundColor = Color.parseColor(_options.getToolbarColor());
+            boolean isDarkBackground = isDarkColor(backgroundColor);
             controller.setAppearanceLightStatusBars(!isDarkBackground);
           } catch (IllegalArgumentException e) {
             // Ignore color parsing errors
           }
         }
       } else {
-        // Pre-Android 11: Original behavior with deprecated flags
+        // Pre-Android 11: Use deprecated flags
         getWindow()
           .getDecorView()
           .setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
           );
-
-        // Apply original status bar color logic
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
-          try {
-            int toolbarColor = Color.parseColor(_options.getToolbarColor());
-            getWindow().setStatusBarColor(toolbarColor);
-          } catch (IllegalArgumentException e) {
-            // Ignore color parsing errors
-          }
-        }
+        
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
       }
     }
   }
