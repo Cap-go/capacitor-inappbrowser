@@ -160,6 +160,15 @@ public class WebViewDialog extends Dialog {
           Log.e("InAppBrowser", "Received empty message from WebView");
           return;
         }
+
+        if (_options == null || _options.getCallbacks() == null) {
+          Log.e(
+            "InAppBrowser",
+            "Cannot handle postMessage - options or callbacks are null"
+          );
+          return;
+        }
+
         _options.getCallbacks().javascriptCallback(message);
       } catch (Exception e) {
         Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
@@ -170,19 +179,35 @@ public class WebViewDialog extends Dialog {
     public void close() {
       try {
         // close webview safely
-        if (activity != null) {
-          activity.runOnUiThread(() -> {
-            try {
-              String currentUrl = _webView != null ? _webView.getUrl() : "";
-              dismiss();
-              if (_options != null && _options.getCallbacks() != null) {
-                _options.getCallbacks().closeEvent(currentUrl);
-              }
-            } catch (Exception e) {
-              Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
-            }
-          });
+        if (activity == null) {
+          Log.e("InAppBrowser", "Cannot close - activity is null");
+          return;
         }
+
+        activity.runOnUiThread(() -> {
+          try {
+            String currentUrl = "";
+            if (_webView != null) {
+              try {
+                currentUrl = _webView.getUrl();
+                if (currentUrl == null) {
+                  currentUrl = "";
+                }
+              } catch (Exception e) {
+                Log.e("InAppBrowser", "Error getting URL: " + e.getMessage());
+                currentUrl = "";
+              }
+            }
+
+            dismiss();
+
+            if (_options != null && _options.getCallbacks() != null) {
+              _options.getCallbacks().closeEvent(currentUrl);
+            }
+          } catch (Exception e) {
+            Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
+          }
+        });
       } catch (Exception e) {
         Log.e("InAppBrowser", "Error in close: " + e.getMessage());
       }
@@ -1102,28 +1127,53 @@ public class WebViewDialog extends Dialog {
 
   private void injectJavaScriptInterface() {
     if (_webView == null) {
+      Log.w(
+        "InAppBrowser",
+        "Cannot inject JavaScript interface - WebView is null"
+      );
       return;
     }
-    String script =
-      "if (!window.mobileApp) { " +
-      "    window.mobileApp = { " +
-      "        postMessage: function(message) { " +
-      "            if (window.AndroidInterface) { " +
-      "                window.AndroidInterface.postMessage(JSON.stringify(message)); " +
-      "            } " +
-      "        }, " +
-      "        close: function() { " +
-      "            window.AndroidInterface.close(); " +
-      "        } " +
-      "    }; " +
-      "} " +
-      // Override the window.print function to use our PrintInterface
-      "window.print = function() { " +
-      "    if (window.PrintInterface) { " +
-      "        window.PrintInterface.print(); " +
-      "    } " +
-      "};";
-    _webView.evaluateJavascript(script, null);
+
+    try {
+      String script =
+        "(function() {" +
+        "  if (window.AndroidInterface) {" +
+        "    window.postMessage = function(data) {" +
+        "      try {" +
+        "        var message = typeof data === 'string' ? data : JSON.stringify(data);" +
+        "        window.AndroidInterface.postMessage(message);" +
+        "      } catch(e) {" +
+        "        console.error('Error in postMessage:', e);" +
+        "      }" +
+        "    };" +
+        "    window.close = function() {" +
+        "      try {" +
+        "        window.AndroidInterface.close();" +
+        "      } catch(e) {" +
+        "        console.error('Error in close:', e);" +
+        "      }" +
+        "    };" +
+        "  }" +
+        "})();";
+
+      _webView.post(() -> {
+        if (_webView != null) {
+          try {
+            _webView.evaluateJavascript(script, null);
+          } catch (Exception e) {
+            Log.e(
+              "InAppBrowser",
+              "Error injecting JavaScript interface: " + e.getMessage()
+            );
+          }
+        }
+      });
+    } catch (Exception e) {
+      Log.e(
+        "InAppBrowser",
+        "Error preparing JavaScript interface: " + e.getMessage()
+      );
+    }
   }
 
   private void injectPreShowScript() {
@@ -1350,21 +1400,29 @@ public class WebViewDialog extends Dialog {
 
   public void reload() {
     if (_webView == null) {
+      Log.w("InAppBrowser", "Cannot reload - WebView is null");
       return;
     }
-    // First stop any ongoing loading
-    _webView.stopLoading();
 
-    // Check if there's a URL to reload
-    String currentUrl = _webView.getUrl();
-    if (currentUrl != null) {
-      // Reload the current page
-      _webView.reload();
-      Log.d("InAppBrowser", "Reloading page: " + currentUrl);
-    } else if (_options != null && _options.getUrl() != null) {
-      // If webView URL is null but we have an initial URL, load that
-      setUrl(_options.getUrl());
-      Log.d("InAppBrowser", "Loading initial URL: " + _options.getUrl());
+    try {
+      // First stop any ongoing loading
+      _webView.stopLoading();
+
+      // Check if there's a URL to reload
+      String currentUrl = _webView.getUrl();
+      if (currentUrl != null && !currentUrl.equals("about:blank")) {
+        // Reload the current page
+        _webView.reload();
+        Log.d("InAppBrowser", "Reloading page: " + currentUrl);
+      } else if (_options != null && _options.getUrl() != null) {
+        // If webView URL is null but we have an initial URL, load that
+        setUrl(_options.getUrl());
+        Log.d("InAppBrowser", "Loading initial URL: " + _options.getUrl());
+      } else {
+        Log.w("InAppBrowser", "Cannot reload - no valid URL available");
+      }
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error during reload: " + e.getMessage());
     }
   }
 
@@ -1379,30 +1437,53 @@ public class WebViewDialog extends Dialog {
   }
 
   public void executeScript(String script) {
-    if (_webView != null) {
+    if (_webView == null) {
+      Log.w("InAppBrowser", "Cannot execute script - WebView is null");
+      return;
+    }
+
+    if (script == null || script.trim().isEmpty()) {
+      Log.w("InAppBrowser", "Cannot execute empty script");
+      return;
+    }
+
+    try {
       _webView.evaluateJavascript(script, null);
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error executing script: " + e.getMessage());
     }
   }
 
   public void setUrl(String url) {
     if (_webView == null) {
+      Log.w("InAppBrowser", "Cannot set URL - WebView is null");
       return;
     }
-    Map<String, String> requestHeaders = new HashMap<>();
-    if (_options.getHeaders() != null) {
-      Iterator<String> keys = _options.getHeaders().keys();
-      while (keys.hasNext()) {
-        String key = keys.next();
-        if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
-          _webView
-            .getSettings()
-            .setUserAgentString(_options.getHeaders().getString(key));
-        } else {
-          requestHeaders.put(key, _options.getHeaders().getString(key));
+
+    if (url == null || url.trim().isEmpty()) {
+      Log.w("InAppBrowser", "Cannot set empty URL");
+      return;
+    }
+
+    try {
+      Map<String, String> requestHeaders = new HashMap<>();
+      if (_options.getHeaders() != null) {
+        Iterator<String> keys = _options.getHeaders().keys();
+        while (keys.hasNext()) {
+          String key = keys.next();
+          if (TextUtils.equals(key.toLowerCase(), "user-agent")) {
+            _webView
+              .getSettings()
+              .setUserAgentString(_options.getHeaders().getString(key));
+          } else {
+            requestHeaders.put(key, _options.getHeaders().getString(key));
+          }
         }
       }
+      _webView.loadUrl(url, requestHeaders);
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error setting URL: " + e.getMessage());
     }
-    _webView.loadUrl(url, requestHeaders);
   }
 
   private void setTitle(String newTitleText) {
@@ -2459,38 +2540,93 @@ public class WebViewDialog extends Dialog {
 
   @Override
   public void dismiss() {
+    // First, stop any ongoing operations and disable further interactions
     if (_webView != null) {
-      // Reset file inputs to prevent WebView from caching them
-      _webView.evaluateJavascript(
-        "(function() {" +
-        "  var inputs = document.querySelectorAll('input[type=\"file\"]');" +
-        "  for (var i = 0; i < inputs.length; i++) {" +
-        "    inputs[i].value = '';" +
-        "  }" +
-        "  return true;" +
-        "})();",
-        null
-      );
+      try {
+        // Stop loading first to prevent any ongoing operations
+        _webView.stopLoading();
 
-      _webView.loadUrl("about:blank");
-      _webView.onPause();
-      _webView.removeAllViews();
-      _webView.destroy();
-      _webView = null;
+        // Clear any pending callbacks to prevent memory leaks
+        if (mFilePathCallback != null) {
+          mFilePathCallback.onReceiveValue(null);
+          mFilePathCallback = null;
+        }
+        tempCameraUri = null;
+
+        // Clear file inputs for security/privacy before destroying WebView
+        try {
+          _webView.evaluateJavascript(
+            "(function() {" +
+            "  try {" +
+            "    var inputs = document.querySelectorAll('input[type=\"file\"]');" +
+            "    for (var i = 0; i < inputs.length; i++) {" +
+            "      inputs[i].value = '';" +
+            "    }" +
+            "    return true;" +
+            "  } catch(e) {" +
+            "    console.log('Error clearing file inputs:', e);" +
+            "    return false;" +
+            "  }" +
+            "})();",
+            null
+          );
+        } catch (Exception e) {
+          Log.w(
+            "InAppBrowser",
+            "Could not clear file inputs (WebView may be in invalid state): " +
+            e.getMessage()
+          );
+        }
+
+        // Remove JavaScript interfaces before destroying
+        _webView.removeJavascriptInterface("AndroidInterface");
+        _webView.removeJavascriptInterface("PreShowScriptInterface");
+        _webView.removeJavascriptInterface("PrintInterface");
+
+        // Load blank page and cleanup
+        _webView.loadUrl("about:blank");
+        _webView.onPause();
+        _webView.removeAllViews();
+        _webView.destroy();
+        _webView = null;
+      } catch (Exception e) {
+        Log.e(
+          "InAppBrowser",
+          "Error during WebView cleanup: " + e.getMessage()
+        );
+        // Force set to null even if cleanup failed
+        _webView = null;
+      }
     }
 
+    // Shutdown executor service safely
     if (executorService != null && !executorService.isShutdown()) {
-      executorService.shutdown();
       try {
+        executorService.shutdown();
         if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
           executorService.shutdownNow();
         }
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         executorService.shutdownNow();
+      } catch (Exception e) {
+        Log.e(
+          "InAppBrowser",
+          "Error shutting down executor: " + e.getMessage()
+        );
       }
     }
 
-    super.dismiss();
+    // Clear any remaining proxied requests
+    synchronized (proxiedRequestsHashmap) {
+      proxiedRequestsHashmap.clear();
+    }
+
+    try {
+      super.dismiss();
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
+    }
   }
 
   public void addProxiedRequest(String key, ProxiedRequest request) {
@@ -2561,7 +2697,15 @@ public class WebViewDialog extends Dialog {
   }
 
   private void injectDatePickerFixes() {
-    if (_webView == null || datePickerInjected) {
+    if (_webView == null) {
+      Log.w(
+        "InAppBrowser",
+        "Cannot inject date picker fixes - WebView is null"
+      );
+      return;
+    }
+
+    if (datePickerInjected) {
       return;
     }
 
@@ -2571,29 +2715,43 @@ public class WebViewDialog extends Dialog {
     String script =
       """
       (function() {
-        // Find all date inputs
-        const dateInputs = document.querySelectorAll('input[type="date"]');
-        dateInputs.forEach(input => {
-          // Ensure change events propagate correctly
-          let lastValue = input.value;
-          input.addEventListener('change', () => {
-            if (input.value !== lastValue) {
-              lastValue = input.value;
-              // Dispatch an input event to ensure frameworks detect the change
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+        try {
+          // Find all date inputs
+          const dateInputs = document.querySelectorAll('input[type="date"]');
+          dateInputs.forEach(input => {
+            // Ensure change events propagate correctly
+            let lastValue = input.value;
+            input.addEventListener('change', () => {
+              try {
+                if (input.value !== lastValue) {
+                  lastValue = input.value;
+                  // Dispatch an input event to ensure frameworks detect the change
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              } catch(e) {
+                console.error('Error in date input change handler:', e);
+              }
+            });
           });
-        });
+        } catch(e) {
+          console.error('Error applying date picker fixes:', e);
+        }
       })();""";
 
     // Execute the script in the WebView
     _webView.post(() -> {
       if (_webView != null) {
-        _webView.evaluateJavascript(script, null);
+        try {
+          _webView.evaluateJavascript(script, null);
+          Log.d("InAppBrowser", "Applied minimal date picker fixes");
+        } catch (Exception e) {
+          Log.e(
+            "InAppBrowser",
+            "Error injecting date picker fixes: " + e.getMessage()
+          );
+        }
       }
     });
-
-    Log.d("InAppBrowser", "Applied minimal date picker fixes");
   }
 
   /**
