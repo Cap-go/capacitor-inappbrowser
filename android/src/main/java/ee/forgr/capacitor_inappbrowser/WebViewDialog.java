@@ -877,13 +877,16 @@ public class WebViewDialog extends Dialog {
     _webView.loadUrl(this._options.getUrl(), requestHeaders);
     _webView.requestFocus();
     _webView.requestFocusFromTouch();
-    
+
     // Inject JavaScript interface early to ensure it's available immediately
     // This complements the injection in onPageFinished and doUpdateVisitedHistory
     _webView.post(() -> {
       if (_webView != null) {
         injectJavaScriptInterface();
-        Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+        Log.d(
+          "InAppBrowser",
+          "JavaScript interface injected early after URL load"
+        );
       }
     });
 
@@ -1142,7 +1145,7 @@ public class WebViewDialog extends Dialog {
       );
       return;
     }
-    
+
     try {
       String script =
         "(function() {" +
