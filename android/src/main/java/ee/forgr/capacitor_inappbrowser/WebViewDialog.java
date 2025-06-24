@@ -877,6 +877,15 @@ public class WebViewDialog extends Dialog {
     _webView.loadUrl(this._options.getUrl(), requestHeaders);
     _webView.requestFocus();
     _webView.requestFocusFromTouch();
+    
+    // Inject JavaScript interface early to ensure it's available immediately
+    // This complements the injection in onPageFinished and doUpdateVisitedHistory
+    _webView.post(() -> {
+      if (_webView != null) {
+        injectJavaScriptInterface();
+        Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+      }
+    });
 
     setupToolbar();
     setWebViewClient();
@@ -1133,11 +1142,32 @@ public class WebViewDialog extends Dialog {
       );
       return;
     }
-
+    
     try {
       String script =
         "(function() {" +
         "  if (window.AndroidInterface) {" +
+        "    // Create mobileApp object for backward compatibility" +
+        "    if (!window.mobileApp) {" +
+        "      window.mobileApp = {" +
+        "        postMessage: function(message) {" +
+        "          try {" +
+        "            var msg = typeof message === 'string' ? message : JSON.stringify(message);" +
+        "            window.AndroidInterface.postMessage(msg);" +
+        "          } catch(e) {" +
+        "            console.error('Error in mobileApp.postMessage:', e);" +
+        "          }" +
+        "        }," +
+        "        close: function() {" +
+        "          try {" +
+        "            window.AndroidInterface.close();" +
+        "          } catch(e) {" +
+        "            console.error('Error in mobileApp.close:', e);" +
+        "          }" +
+        "        }" +
+        "      };" +
+        "    }" +
+        "    // Also provide direct window methods for convenience" +
         "    window.postMessage = function(data) {" +
         "      try {" +
         "        var message = typeof data === 'string' ? data : JSON.stringify(data);" +
@@ -1151,6 +1181,16 @@ public class WebViewDialog extends Dialog {
         "        window.AndroidInterface.close();" +
         "      } catch(e) {" +
         "        console.error('Error in close:', e);" +
+        "      }" +
+        "    };" +
+        "  }" +
+        "  // Override window.print function to use our PrintInterface" +
+        "  if (window.PrintInterface) {" +
+        "    window.print = function() {" +
+        "      try {" +
+        "        window.PrintInterface.print();" +
+        "      } catch(e) {" +
+        "        console.error('Error in print:', e);" +
         "      }" +
         "    };" +
         "  }" +
