@@ -1119,10 +1119,10 @@ public class WebViewDialog extends Dialog {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("detail", detail);
         String jsonDetail = jsonObject.toString();
-        String script =
-          "window.dispatchEvent(new CustomEvent('messageFromNative', " +
-          jsonDetail +
-          "));";
+        String script = String.format(
+          "window.dispatchEvent(new CustomEvent('messageFromNative', %s));",
+          jsonDetail
+        );
         _webView.post(() -> {
           if (_webView != null) {
             _webView.evaluateJavascript(script, null);
@@ -1148,56 +1148,58 @@ public class WebViewDialog extends Dialog {
 
     try {
       String script =
-        "(function() {" +
-        "  if (window.AndroidInterface) {" +
-        "    // Create mobileApp object for backward compatibility" +
-        "    if (!window.mobileApp) {" +
-        "      window.mobileApp = {" +
-        "        postMessage: function(message) {" +
-        "          try {" +
-        "            var msg = typeof message === 'string' ? message : JSON.stringify(message);" +
-        "            window.AndroidInterface.postMessage(msg);" +
-        "          } catch(e) {" +
-        "            console.error('Error in mobileApp.postMessage:', e);" +
-        "          }" +
-        "        }," +
-        "        close: function() {" +
-        "          try {" +
-        "            window.AndroidInterface.close();" +
-        "          } catch(e) {" +
-        "            console.error('Error in mobileApp.close:', e);" +
-        "          }" +
-        "        }" +
-        "      };" +
-        "    }" +
-        "    // Also provide direct window methods for convenience" +
-        "    window.postMessage = function(data) {" +
-        "      try {" +
-        "        var message = typeof data === 'string' ? data : JSON.stringify(data);" +
-        "        window.AndroidInterface.postMessage(message);" +
-        "      } catch(e) {" +
-        "        console.error('Error in postMessage:', e);" +
-        "      }" +
-        "    };" +
-        "    window.close = function() {" +
-        "      try {" +
-        "        window.AndroidInterface.close();" +
-        "      } catch(e) {" +
-        "        console.error('Error in close:', e);" +
-        "      }" +
-        "    };" +
-        "  }" +
-        "  // Override window.print function to use our PrintInterface" +
-        "  if (window.PrintInterface) {" +
-        "    window.print = function() {" +
-        "      try {" +
-        "        window.PrintInterface.print();" +
-        "      } catch(e) {" +
-        "        console.error('Error in print:', e);" +
-        "      }" +
-        "    };" +
-        "  }" +
-        "})();";
+        """
+        (function() {
+          if (window.AndroidInterface) {
+            // Create mobileApp object for backward compatibility
+            if (!window.mobileApp) {
+              window.mobileApp = {
+                postMessage: function(message) {
+                  try {
+                    var msg = typeof message === 'string' ? message : JSON.stringify(message);
+                    window.AndroidInterface.postMessage(msg);
+                  } catch(e) {
+                    console.error('Error in mobileApp.postMessage:', e);
+                  }
+                },
+                close: function() {
+                  try {
+                    window.AndroidInterface.close();
+                  } catch(e) {
+                    console.error('Error in mobileApp.close:', e);
+                  }
+                }
+              };
+            }
+            // Also provide direct window methods for convenience
+            window.postMessage = function(data) {
+              try {
+                var message = typeof data === 'string' ? data : JSON.stringify(data);
+                window.AndroidInterface.postMessage(message);
+              } catch(e) {
+                console.error('Error in postMessage:', e);
+              }
+            };
+            window.close = function() {
+              try {
+                window.AndroidInterface.close();
+              } catch(e) {
+                console.error('Error in close:', e);
+              }
+            };
+          }
+          // Override window.print function to use our PrintInterface
+          if (window.PrintInterface) {
+            window.print = function() {
+              try {
+                window.PrintInterface.print();
+              } catch(e) {
+                console.error('Error in print:', e);
+              }
+            };
+          }
+        })();
+        """;
 
       _webView.post(() -> {
         if (_webView != null) {
@@ -1227,12 +1229,20 @@ public class WebViewDialog extends Dialog {
       return;
     }
 
-    String script =
-      "async function preShowFunction() {\n" +
-      _options.getPreShowScript() +
-      '\n' +
-      "};\n" +
-      "preShowFunction().then(() => window.PreShowScriptInterface.success()).catch(err => { console.error('Pre show error', err); window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err))) })";
+    String script = String.format(
+      """
+      async function preShowFunction() {
+        %s
+      }
+      preShowFunction()
+        .then(() => window.PreShowScriptInterface.success())
+        .catch(err => {
+          console.error('Pre show error', err);
+          window.PreShowScriptInterface.error(JSON.stringify(err, Object.getOwnPropertyNames(err)));
+        });
+      """,
+      _options.getPreShowScript()
+    );
 
     Log.i(
       "InjectPreShowScript",
@@ -2214,8 +2224,44 @@ public class WebViewDialog extends Dialog {
                     )
                   );
                 }
+                String jsTemplate =
+                  """
+                  try {
+                    function getHeaders() {
+                      const h = {};
+                      %s
+                      return h;
+                    }
+                    window.InAppBrowserProxyRequest(new Request(atob('%s'), {
+                      headers: getHeaders(),
+                      method: '%s'
+                    })).then(async (res) => {
+                      Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
+                        ok: true,
+                        result: (!!res ? {
+                          headers: Object.fromEntries(res.headers.entries()),
+                          code: res.status,
+                          body: (await res.text())
+                        } : null),
+                        id: '%s'
+                      });
+                    }).catch((e) => {
+                      Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
+                        ok: false,
+                        result: e.toString(),
+                        id: '%s'
+                      });
+                    });
+                  } catch (e) {
+                    Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
+                      ok: false,
+                      result: e.toString(),
+                      id: '%s'
+                    });
+                  }
+                  """;
                 String s = String.format(
-                  "try {function getHeaders() {const h = {}; %s return h}; window.InAppBrowserProxyRequest(new Request(atob('%s'), {headers: getHeaders(), method: '%s'})).then(async (res) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: true, result: (!!res ? {headers: Object.fromEntries(res.headers.entries()), code: res.status, body: (await res.text())} : null), id: '%s'})).catch((e) => Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})} catch (e) {Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({ok: false, result: e.toString(), id: '%s'})",
+                  jsTemplate,
                   headers,
                   toBase64(request.getUrl().toString()),
                   request.getMethod(),
@@ -2598,21 +2644,22 @@ public class WebViewDialog extends Dialog {
 
         // Clear file inputs for security/privacy before destroying WebView
         try {
-          _webView.evaluateJavascript(
-            "(function() {" +
-            "  try {" +
-            "    var inputs = document.querySelectorAll('input[type=\"file\"]');" +
-            "    for (var i = 0; i < inputs.length; i++) {" +
-            "      inputs[i].value = '';" +
-            "    }" +
-            "    return true;" +
-            "  } catch(e) {" +
-            "    console.log('Error clearing file inputs:', e);" +
-            "    return false;" +
-            "  }" +
-            "})();",
-            null
-          );
+          String clearInputsScript =
+            """
+            (function() {
+              try {
+                var inputs = document.querySelectorAll('input[type="file"]');
+                for (var i = 0; i < inputs.length; i++) {
+                  inputs[i].value = '';
+                }
+                return true;
+              } catch(e) {
+                console.log('Error clearing file inputs:', e);
+                return false;
+              }
+            })();
+            """;
+          _webView.evaluateJavascript(clearInputsScript, null);
         } catch (Exception e) {
           Log.w(
             "InAppBrowser",
