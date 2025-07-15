@@ -24,6 +24,8 @@ import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
 import android.provider.MediaStore;
+import android.security.KeyChain;
+import android.security.KeyChainAliasCallback;
 import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
@@ -65,6 +67,8 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -2151,6 +2155,41 @@ public class WebViewDialog extends Dialog {
             }
           }
           return false;
+        }
+
+        @Override
+        public void onReceivedClientCertRequest(WebView view, android.webkit.ClientCertRequest request) {
+          Log.i("InAppBrowser", "onReceivedClientCertRequest CALLED");
+          Log.i("InAppBrowser", "Host: " + request.getHost());
+          Log.i("InAppBrowser", "Port: " + request.getPort());
+          Log.i("InAppBrowser", "Principals: " + java.util.Arrays.toString(request.getPrincipals()));
+          Log.i("InAppBrowser", "KeyTypes: " + java.util.Arrays.toString(request.getKeyTypes()));
+
+          KeyChain.choosePrivateKeyAlias(activity, new KeyChainAliasCallback() {
+              @Override
+              public void alias(String alias) {
+                if (alias != null) {
+                  try {
+                    PrivateKey privateKey = KeyChain.getPrivateKey(activity, alias);
+                    X509Certificate[] certChain = KeyChain.getCertificateChain(activity, alias);
+                    request.proceed(privateKey, certChain);
+                    Log.i("InAppBrowser", "Selected certificate: " + alias);
+                  } catch (Exception e) {
+                    request.cancel();
+                    Log.e("InAppBrowser", "Error selecting certificate: " + e.getMessage());
+                  }
+                } else {
+                  request.cancel();
+                  Log.i("InAppBrowser", "No certificate found");
+                }
+              }
+            },
+            null, // keyTypes
+            null, // issuers
+            request.getHost(),
+            request.getPort(),
+            null // alias (null = system asks user to choose)
+          );
         }
 
         private String randomRequestId() {
