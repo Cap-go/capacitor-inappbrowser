@@ -2160,36 +2160,69 @@ public class WebViewDialog extends Dialog {
         @Override
         public void onReceivedClientCertRequest(WebView view, android.webkit.ClientCertRequest request) {
           Log.i("InAppBrowser", "onReceivedClientCertRequest CALLED");
-          Log.i("InAppBrowser", "Host: " + request.getHost());
-          Log.i("InAppBrowser", "Port: " + request.getPort());
-          Log.i("InAppBrowser", "Principals: " + java.util.Arrays.toString(request.getPrincipals()));
-          Log.i("InAppBrowser", "KeyTypes: " + java.util.Arrays.toString(request.getKeyTypes()));
+          
+          if (request == null) {
+            Log.e("InAppBrowser", "ClientCertRequest is null");
+            return;
+          }
+          
+          if (activity == null) {
+            Log.e("InAppBrowser", "Activity is null, canceling request");
+            try {
+              request.cancel();
+            } catch (Exception e) {
+              Log.e("InAppBrowser", "Error canceling request: " + e.getMessage());
+            }
+            return;
+          }
 
-          KeyChain.choosePrivateKeyAlias(activity, new KeyChainAliasCallback() {
-              @Override
-              public void alias(String alias) {
-                if (alias != null) {
-                  try {
-                    PrivateKey privateKey = KeyChain.getPrivateKey(activity, alias);
-                    X509Certificate[] certChain = KeyChain.getCertificateChain(activity, alias);
-                    request.proceed(privateKey, certChain);
-                    Log.i("InAppBrowser", "Selected certificate: " + alias);
-                  } catch (Exception e) {
-                    request.cancel();
-                    Log.e("InAppBrowser", "Error selecting certificate: " + e.getMessage());
+          try {
+            Log.i("InAppBrowser", "Host: " + request.getHost());
+            Log.i("InAppBrowser", "Port: " + request.getPort());
+            Log.i("InAppBrowser", "Principals: " + java.util.Arrays.toString(request.getPrincipals()));
+            Log.i("InAppBrowser", "KeyTypes: " + java.util.Arrays.toString(request.getKeyTypes()));
+
+            KeyChain.choosePrivateKeyAlias(activity, new KeyChainAliasCallback() {
+                @Override
+                public void alias(String alias) {
+                  if (alias != null) {
+                    try {
+                      PrivateKey privateKey = KeyChain.getPrivateKey(activity, alias);
+                      X509Certificate[] certChain = KeyChain.getCertificateChain(activity, alias);
+                      request.proceed(privateKey, certChain);
+                      Log.i("InAppBrowser", "Selected certificate: " + alias);
+                    } catch (Exception e) {
+                      try {
+                        request.cancel();
+                      } catch (Exception cancelEx) {
+                        Log.e("InAppBrowser", "Error canceling request: " + cancelEx.getMessage());
+                      }
+                      Log.e("InAppBrowser", "Error selecting certificate: " + e.getMessage());
+                    }
+                  } else {
+                    try {
+                      request.cancel();
+                    } catch (Exception e) {
+                      Log.e("InAppBrowser", "Error canceling request: " + e.getMessage());
+                    }
+                    Log.i("InAppBrowser", "No certificate found");
                   }
-                } else {
-                  request.cancel();
-                  Log.i("InAppBrowser", "No certificate found");
                 }
-              }
-            },
-            null, // keyTypes
-            null, // issuers
-            request.getHost(),
-            request.getPort(),
-            null // alias (null = system asks user to choose)
-          );
+              },
+              null, // keyTypes
+              null, // issuers
+              request.getHost(),
+              request.getPort(),
+              null // alias (null = system asks user to choose)
+            );
+          } catch (Exception e) {
+            Log.e("InAppBrowser", "Error in onReceivedClientCertRequest: " + e.getMessage());
+            try {
+              request.cancel();
+            } catch (Exception cancelEx) {
+              Log.e("InAppBrowser", "Error canceling request after exception: " + cancelEx.getMessage());
+            }
+          }
         }
 
         private String randomRequestId() {
