@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.10.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.10...7.10.11) (2025-07-17)
+
+
+### Bug Fixes
+
+* improve JavaScript error handling and script construction in WebViewDialog and WKWebViewController ([2dd2fde](https://github.com/Cap-go/capacitor-inappbrowser/commit/2dd2fde14f11411060c1543bce4b24456751b094))
+
 ### [7.10.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.9...7.10.10) (2025-07-11)
 
 ### [7.10.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.8...7.10.9) (2025-07-03)
