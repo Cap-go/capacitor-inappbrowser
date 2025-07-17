@@ -186,19 +186,7 @@ public class WebViewDialog extends Dialog {
 
         activity.runOnUiThread(() -> {
           try {
-            String currentUrl = "";
-            if (_webView != null) {
-              try {
-                currentUrl = _webView.getUrl();
-                if (currentUrl == null) {
-                  currentUrl = "";
-                }
-              } catch (Exception e) {
-                Log.e("InAppBrowser", "Error getting URL: " + e.getMessage());
-                currentUrl = "";
-              }
-            }
-
+            String currentUrl = getUrl();
             dismiss();
 
             if (_options != null && _options.getCallbacks() != null) {
@@ -446,8 +434,7 @@ public class WebViewDialog extends Dialog {
           Log.d("InAppBrowser", "Accept type: " + acceptType);
           Log.d(
             "InAppBrowser",
-            "Current URL: " +
-            (webView.getUrl() != null ? webView.getUrl() : "null")
+            "Current URL: " + getUrl()
           );
           Log.d(
             "InAppBrowser",
@@ -477,7 +464,7 @@ public class WebViewDialog extends Dialog {
           // Direct check for capture attribute in URL (fallback method)
           boolean isCaptureInUrl;
           String captureMode;
-          String currentUrl = webView.getUrl();
+          String currentUrl = getUrl();
 
           // Look for capture in URL parameters - sometimes the attribute shows up in URL
           if (currentUrl != null && currentUrl.contains("capture=")) {
@@ -1467,7 +1454,7 @@ public class WebViewDialog extends Dialog {
       _webView.stopLoading();
 
       // Check if there's a URL to reload
-      String currentUrl = _webView.getUrl();
+      String currentUrl = getUrl();
       if (currentUrl != null && !currentUrl.equals("about:blank")) {
         // Reload the current page
         _webView.reload();
@@ -1491,7 +1478,16 @@ public class WebViewDialog extends Dialog {
   }
 
   public String getUrl() {
-    return _webView != null ? _webView.getUrl() : "";
+    try {
+      WebView webView = _webView;
+      if (webView != null) {
+        String url = webView.getUrl();
+        return url != null ? url : "";
+      }
+    } catch (Exception e) {
+      Log.w("InAppBrowser", "Error getting URL: " + e.getMessage());
+    }
+    return "";
   }
 
   public void executeScript(String script) {
@@ -1633,9 +1629,7 @@ public class WebViewDialog extends Dialog {
                 new OnClickListener() {
                   public void onClick(DialogInterface dialog, int which) {
                     // Close button clicked, do something
-                    String currentUrl = _webView != null
-                      ? _webView.getUrl()
-                      : "";
+                    String currentUrl = getUrl();
                     dismiss();
                     if (_options != null && _options.getCallbacks() != null) {
                       _options.getCallbacks().closeEvent(currentUrl);
@@ -1646,7 +1640,7 @@ public class WebViewDialog extends Dialog {
               .setNegativeButton(_options.getCloseModalCancel(), null)
               .show();
           } else {
-            String currentUrl = _webView != null ? _webView.getUrl() : "";
+            String currentUrl = getUrl();
             dismiss();
             if (_options != null && _options.getCallbacks() != null) {
               _options.getCallbacks().closeEvent(currentUrl);
@@ -1676,7 +1670,7 @@ public class WebViewDialog extends Dialog {
               _webView.stopLoading();
 
               // Check if there's a URL to reload
-              String currentUrl = _webView.getUrl();
+              String currentUrl = getUrl();
               if (currentUrl != null) {
                 // Reload the current page
                 _webView.reload();
@@ -2572,7 +2566,7 @@ public class WebViewDialog extends Dialog {
     ) {
       _webView.goBack();
     } else if (!_options.getDisableGoBackOnNativeApplication()) {
-      String currentUrl = _webView != null ? _webView.getUrl() : "";
+      String currentUrl = getUrl();
       _options.getCallbacks().closeEvent(currentUrl);
       if (_webView != null) {
         _webView.destroy();
