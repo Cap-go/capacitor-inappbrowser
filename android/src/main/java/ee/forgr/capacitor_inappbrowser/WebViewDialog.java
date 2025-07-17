@@ -512,43 +512,48 @@ public class WebViewDialog extends Dialog {
 
             // Fixed JavaScript with proper error handling
             String js =
-              "try {" +
-              "  (function() {" +
-              "    var captureAttr = null;" +
-              "    // Check active element first" +
-              "    if (document.activeElement && " +
-              "        document.activeElement.tagName === 'INPUT' && " +
-              "        document.activeElement.type === 'file') {" +
-              "      if (document.activeElement.hasAttribute('capture')) {" +
-              "        captureAttr = document.activeElement.getAttribute('capture') || 'environment';" +
-              "        return captureAttr;" +
-              "      }" +
-              "    }" +
-              "    // Try to find any input with capture attribute" +
-              "    var inputs = document.querySelectorAll('input[type=\"file\"][capture]');" +
-              "    if (inputs && inputs.length > 0) {" +
-              "      captureAttr = inputs[0].getAttribute('capture') || 'environment';" +
-              "      return captureAttr;" +
-              "    }" +
-              "    // Try to extract from HTML attributes" +
-              "    var allInputs = document.getElementsByTagName('input');" +
-              "    for (var i = 0; i < allInputs.length; i++) {" +
-              "      var input = allInputs[i];" +
-              "      if (input.type === 'file') {" +
-              "        if (input.hasAttribute('capture')) {" +
-              "          captureAttr = input.getAttribute('capture') || 'environment';" +
-              "          return captureAttr;" +
-              "        }" +
-              "        // Look for the accept attribute containing image/* as this might be a camera input" +
-              "        var acceptAttr = input.getAttribute('accept');" +
-              "        if (acceptAttr && acceptAttr.indexOf('image/*') >= 0) {" +
-              "          console.log('Found input with image/* accept');" +
-              "        }" +
-              "      }" +
-              "    }" +
-              "    return '';" +
-              "  })();" +
-              "} catch(e) { console.error('Capture detection error:', e); return ''; }";
+              """
+              try {
+                (function() {
+                  var captureAttr = null;
+                  // Check active element first
+                  if (document.activeElement &&
+                      document.activeElement.tagName === 'INPUT' &&
+                      document.activeElement.type === 'file') {
+                    if (document.activeElement.hasAttribute('capture')) {
+                      captureAttr = document.activeElement.getAttribute('capture') || 'environment';
+                      return captureAttr;
+                    }
+                  }
+                  // Try to find any input with capture attribute
+                  var inputs = document.querySelectorAll('input[type="file"][capture]');
+                  if (inputs && inputs.length > 0) {
+                    captureAttr = inputs[0].getAttribute('capture') || 'environment';
+                    return captureAttr;
+                  }
+                  // Try to extract from HTML attributes
+                  var allInputs = document.getElementsByTagName('input');
+                  for (var i = 0; i < allInputs.length; i++) {
+                    var input = allInputs[i];
+                    if (input.type === 'file') {
+                      if (input.hasAttribute('capture')) {
+                        captureAttr = input.getAttribute('capture') || 'environment';
+                        return captureAttr;
+                      }
+                      // Look for the accept attribute containing image/* as this might be a camera input
+                      var acceptAttr = input.getAttribute('accept');
+                      if (acceptAttr && acceptAttr.indexOf('image/*') >= 0) {
+                        console.log('Found input with image/* accept');
+                      }
+                    }
+                  }
+                  return '';
+                })();
+              } catch(e) {
+                console.error('Capture detection error:', e);
+                return '';
+              }
+              """;
 
             webView.evaluateJavascript(js, value -> {
               Log.d("InAppBrowser", "Capture attribute JS result: " + value);

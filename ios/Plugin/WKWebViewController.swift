@@ -443,11 +443,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     // Method to send a message from Swift to JavaScript
     open func postMessageToJS(message: [String: Any]) {
-        if let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
-            DispatchQueue.main.async {
-                self.webView?.evaluateJavaScript(script, completionHandler: nil)
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: message, options: []),
+              let jsonString = String(data: jsonData, encoding: .utf8) else {
+            print("[InAppBrowser] Failed to serialize message to JSON")
+            return
+        }
+        
+        // Safely build the script to avoid any potential issues
+        let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
+        
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(script) { result, error in
+                if let error = error {
+                    print("[InAppBrowser] JavaScript evaluation error in postMessageToJS: \(error)")
+                }
             }
         }
     }
@@ -1339,20 +1348,25 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
-        // TODO: implement interface
-        let script = """
-                        async function preShowFunction() {
-                        \(self.preShowScript ?? "")
-                        };
-                        preShowFunction().then(
-                                () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})
-                        ).catch(
-                                err => {
-                                        console.error('Preshow error', err);
-                                        window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));
-                                }
-                        )
-                        """
+        // Safely construct script template with proper escaping
+        let userScript = self.preShowScript ?? ""
+        
+        // Build script using safe concatenation to avoid multi-line string issues
+        let scriptTemplate = [
+            "async function preShowFunction() {",
+            userScript,
+            "}",
+            "preShowFunction().then(",
+            "    () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})",
+            ").catch(",
+            "    err => {",
+            "        console.error('Preshow error', err);",
+            "        window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));",
+            "    }",
+            ")"
+        ]
+        
+        let script = scriptTemplate.joined(separator: "\n")
         print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
 
         self.preShowSemaphore = DispatchSemaphore(value: 0)
