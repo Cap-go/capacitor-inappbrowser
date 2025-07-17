@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.11.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.12...7.11.0) (2025-07-17)
+
+
+### Features
+
+* add user certificate selection for client authentication (mutual TLS) ([9ada3d8](https://github.com/Cap-go/capacitor-inappbrowser/commit/9ada3d8044127ef291a09c18913a199bc8a469d0))
+
+
+### Bug Fixes
+
+* improve error handling in client certificate request process ([300a42f](https://github.com/Cap-go/capacitor-inappbrowser/commit/300a42f90703e9f71d2afa360ed74eea2b8c17db))
+
 ### [7.10.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.11...7.10.12) (2025-07-17)
 
 ### [7.10.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.10.10...7.10.11) (2025-07-17)
