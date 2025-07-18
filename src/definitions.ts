@@ -418,6 +418,15 @@ export interface OpenWebViewOptions {
    * Test URL: https://aasa-tester.capgo.app/
    */
   preventDeeplink?: boolean;
+
+  /**
+   * List of URL base patterns that should be treated as authorized App Links.
+   * Only links starting with any of these base URLs will be opened in the InAppBrowser.
+   *
+   * @since 7.2.0
+   * @default []
+   */
+  authorizedAppLinks?: string[];
 }
 
 export interface InAppBrowserPlugin {

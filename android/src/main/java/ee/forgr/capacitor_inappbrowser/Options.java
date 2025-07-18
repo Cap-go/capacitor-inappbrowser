@@ -6,6 +6,7 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -176,6 +177,7 @@ public class Options {
   private boolean materialPicker = false;
   private int textZoom = 100; // Default text zoom is 100%
   private boolean preventDeeplink = false;
+  private List<String> authorizedAppLinks = new ArrayList<>();
 
   public int getTextZoom() {
     return textZoom;
@@ -421,5 +423,13 @@ public class Options {
 
   public void setPreventDeeplink(boolean preventDeeplink) {
     this.preventDeeplink = preventDeeplink;
+  }
+
+  public List<String> getAuthorizedAppLinks() {
+    return authorizedAppLinks;
+  }
+
+  public void setAuthorizedAppLinks(List<String> authorizedAppLinks) {
+    this.authorizedAppLinks = authorizedAppLinks;
   }
 }

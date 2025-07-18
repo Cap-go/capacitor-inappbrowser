@@ -72,6 +72,7 @@ import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -2115,6 +2116,44 @@ public class WebViewDialog extends Dialog {
   private void setWebViewClient() {
     _webView.setWebViewClient(
       new WebViewClient() {
+
+        /**
+         * Checks whether the given URL is authorized based on the provided list of authorized links.
+         * <p>
+         * For http(s) URLs, compares only the host (ignoring "www." prefix and case).
+         * Each entry in authorizedLinks should be a base URL (e.g., "https://example.com").
+         * If the host of the input URL matches (case-insensitive) the host of any authorized link, returns true.
+         * <p>
+         * This method is intended to limit which external links can be handled as authorized app links.
+         *
+         * @param url             The URL to check. Can be any valid absolute URL.
+         * @param authorizedLinks List of authorized base URLs (e.g., "https://mydomain.com", "myapp://").
+         * @return true if the URL is authorized (host matches one of the authorizedLinks); false otherwise.
+         */
+        private boolean isUrlAuthorized(String url, List<String> authorizedLinks) {
+          if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
+            return false;
+          }
+          try {
+            URI uri = new URI(url);
+            String urlHost = uri.getHost();
+            if (urlHost == null) return false;
+            if (urlHost.startsWith("www.")) urlHost = urlHost.substring(4);
+            for (String authorized : authorizedLinks) {
+              URI authUri = new URI(authorized);
+              String authHost = authUri.getHost();
+              if (authHost == null) continue;
+              if (authHost.startsWith("www.")) authHost = authHost.substring(4);
+              if (urlHost.equalsIgnoreCase(authHost)) {
+                return true;
+              }
+            }
+          } catch (URISyntaxException e) {
+            Log.e("InAppBrowser", "Invalid URI in isUrlAuthorized: " + url, e);
+          }
+          return false;
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(
           WebView view,
@@ -2126,15 +2165,39 @@ public class WebViewDialog extends Dialog {
           Context context = view.getContext();
           String url = request.getUrl().toString();
           Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
+
+          boolean isNotHttpOrHttps = !url.startsWith("https://") && !url.startsWith("http://");
+
           // If preventDeeplink is true, don't handle any non-http(s) URLs
           if (_options.getPreventDeeplink()) {
             Log.d("InAppBrowser", "preventDeeplink is true");
-            if (!url.startsWith("https://") && !url.startsWith("http://")) {
+            if (isNotHttpOrHttps) {
               return true;
             }
           }
 
-          if (!url.startsWith("https://") && !url.startsWith("http://")) {
+          // Handle authorized app links
+          List<String> authorizedLinks = _options.getAuthorizedAppLinks();
+          boolean urlAuthorized = isUrlAuthorized(url, authorizedLinks);
+
+          Log.d("InAppBrowser", "authorizedLinks: " + authorizedLinks);
+          Log.d("InAppBrowser", "urlAuthorized: " + urlAuthorized);
+
+          if (urlAuthorized) {
+            try {
+              Log.d("InAppBrowser", "Launching intent for authorized link: " + url);
+              Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+              context.startActivity(intent);
+              Log.i("InAppBrowser", "Intent started for authorized link: " + url);
+              return true;
+            } catch (ActivityNotFoundException e) {
+              Log.e("InAppBrowser", "No app found to handle this authorized link", e);
+              return false;
+            }
+          }
+
+          if (isNotHttpOrHttps) {
             try {
               Intent intent;
               if (url.startsWith("intent://")) {
@@ -2142,7 +2205,6 @@ public class WebViewDialog extends Dialog {
               } else {
                 intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
               }
-
               intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
               context.startActivity(intent);
               return true;
