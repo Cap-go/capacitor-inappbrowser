@@ -736,10 +736,17 @@ public class InAppBrowserPlugin
             authorizedLinks.add(link);
           }
         } catch (Exception e) {
-          Log.w("InAppBrowserPlugin", "Error reading authorized app link at index " + i, e);
+          Log.w(
+            "InAppBrowserPlugin",
+            "Error reading authorized app link at index " + i,
+            e
+          );
         }
       }
-      Log.d("InAppBrowserPlugin", "Parsed authorized app links: " + authorizedLinks);
+      Log.d(
+        "InAppBrowserPlugin",
+        "Parsed authorized app links: " + authorizedLinks
+      );
       options.setAuthorizedAppLinks(authorizedLinks);
     } else {
       Log.d("InAppBrowserPlugin", "No authorized app links provided.");
