@@ -7,6 +7,8 @@ import com.getcapacitor.PluginCall;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
