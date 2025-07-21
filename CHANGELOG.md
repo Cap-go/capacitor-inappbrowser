@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.12.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.0...7.12.1) (2025-07-19)
+
+## [7.12.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.11.1...7.12.0) (2025-07-18)
+
+
+### Features
+
+* add Android App Links support handling with deeplinks ([e508a43](https://github.com/Cap-go/capacitor-inappbrowser/commit/e508a43b0517c4e2da05fb09a6936859e1d2588e))
+* update next release tag references ([255b4b0](https://github.com/Cap-go/capacitor-inappbrowser/commit/255b4b00d4cc4efeff3bb477c8a0903c473d710c))
+* update parameter definitions ([3ac8c2a](https://github.com/Cap-go/capacitor-inappbrowser/commit/3ac8c2ac41a6baf1b3d67ce7fc363c151d82686e))
+
 ### [7.11.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.11.0...7.11.1) (2025-07-17)
 
 
