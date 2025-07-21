@@ -2116,7 +2116,6 @@ public class WebViewDialog extends Dialog {
   private void setWebViewClient() {
     _webView.setWebViewClient(
       new WebViewClient() {
-
         /**
          * Checks whether the given URL is authorized based on the provided list of authorized links.
          * <p>
@@ -2130,8 +2129,13 @@ public class WebViewDialog extends Dialog {
          * @param authorizedLinks List of authorized base URLs (e.g., "https://mydomain.com", "myapp://").
          * @return true if the URL is authorized (host matches one of the authorizedLinks); false otherwise.
          */
-        private boolean isUrlAuthorized(String url, List<String> authorizedLinks) {
-          if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
+        private boolean isUrlAuthorized(
+          String url,
+          List<String> authorizedLinks
+        ) {
+          if (
+            authorizedLinks == null || authorizedLinks.isEmpty() || url == null
+          ) {
             return false;
           }
           try {
@@ -2166,7 +2170,8 @@ public class WebViewDialog extends Dialog {
           String url = request.getUrl().toString();
           Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
 
-          boolean isNotHttpOrHttps = !url.startsWith("https://") && !url.startsWith("http://");
+          boolean isNotHttpOrHttps =
+            !url.startsWith("https://") && !url.startsWith("http://");
 
           // If preventDeeplink is true, don't handle any non-http(s) URLs
           if (_options.getPreventDeeplink()) {
@@ -2185,14 +2190,24 @@ public class WebViewDialog extends Dialog {
 
           if (urlAuthorized) {
             try {
-              Log.d("InAppBrowser", "Launching intent for authorized link: " + url);
+              Log.d(
+                "InAppBrowser",
+                "Launching intent for authorized link: " + url
+              );
               Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
               intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
               context.startActivity(intent);
-              Log.i("InAppBrowser", "Intent started for authorized link: " + url);
+              Log.i(
+                "InAppBrowser",
+                "Intent started for authorized link: " + url
+              );
               return true;
             } catch (ActivityNotFoundException e) {
-              Log.e("InAppBrowser", "No app found to handle this authorized link", e);
+              Log.e(
+                "InAppBrowser",
+                "No app found to handle this authorized link",
+                e
+              );
               return false;
             }
           }

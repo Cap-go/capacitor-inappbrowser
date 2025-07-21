@@ -420,7 +420,7 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
-   * List of URL base patterns that should be treated as authorized App Links.
+   * List of URL base patterns that should be treated as authorized App Links, Android only.
    * Only links starting with any of these base URLs will be opened in the InAppBrowser.
    *
    * @since 7.12.0
