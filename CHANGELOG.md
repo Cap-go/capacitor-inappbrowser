@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.13.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.1...7.13.0) (2025-07-27)
+
+
+### Features
+
+* add Google Pay support and enhancements for InAppBrowser ([f781399](https://github.com/Cap-go/capacitor-inappbrowser/commit/f78139975b566e9a4237f5d27e0ae933f4f12620))
+
 ### [7.12.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.0...7.12.1) (2025-07-19)
 
 ## [7.12.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.11.1...7.12.0) (2025-07-18)
