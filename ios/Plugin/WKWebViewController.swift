@@ -76,9 +76,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeMargin: Bool, safeMargin: CGFloat) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
+        self.enabledSafeMargin = enabledSafeMargin
+        self.safeMargin = safeMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -113,6 +115,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
+    var enabledSafeMargin: Bool = false
+    var safeMargin: CGFloat = 20.0 // Default safe margin in points
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -448,10 +452,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             print("[InAppBrowser] Failed to serialize message to JSON")
             return
         }
-        
+
         // Safely build the script to avoid any potential issues
         let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
-        
+
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
                 if let error = error {
@@ -575,12 +579,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Fallback on earlier versions
         }
 
-        if self.blankNavigationTab {
-            // First add the webView to view hierarchy
-            self.view.addSubview(webView)
+        // First add the webView to view hierarchy
+        self.view.addSubview(webView)
 
-            // Then set up constraints
-            webView.translatesAutoresizingMaskIntoConstraints = false
+        // Then set up constraints
+        webView.translatesAutoresizingMaskIntoConstraints = false
+
+        if self.enabledSafeMargin {
+            // Add custom safe margin when enabled
+            NSLayoutConstraint.activate([
+                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -self.safeMargin)
+            ])
+        } else {
+            // Normal full height layout
             NSLayoutConstraint.activate([
                 webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
                 webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
@@ -602,7 +616,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
 
         if !self.blankNavigationTab {
-            self.view = webView
+            // For non-blank navigation tab, we need to handle enabledSafeMargin differently
+            if self.enabledSafeMargin {
+                // Create a container view to hold the webView with margin
+                let containerView = UIView()
+                containerView.translatesAutoresizingMaskIntoConstraints = false
+                self.view = containerView
+
+                // Add webView to container
+                containerView.addSubview(webView)
+                webView.translatesAutoresizingMaskIntoConstraints = false
+
+                // Set constraints with custom safe margin
+                NSLayoutConstraint.activate([
+                    webView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                    webView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                    webView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -self.safeMargin)
+                ])
+            } else {
+                // Normal behavior - webView is the entire view
+                self.view = webView
+            }
         }
         self.webView = webView
 
@@ -667,7 +702,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewWillLayoutSubviews() {
         restateViewHeight()
-        if self.currentViewHeight != nil {
+        // Don't override frame height when enabledSafeMargin is true, as it would override our constraints
+        if self.currentViewHeight != nil && !self.enabledSafeMargin {
             self.view.frame.size.height = self.currentViewHeight!
         }
     }
@@ -1350,7 +1386,7 @@ extension WKWebViewController: WKNavigationDelegate {
 
         // Safely construct script template with proper escaping
         let userScript = self.preShowScript ?? ""
-        
+
         // Build script using safe concatenation to avoid multi-line string issues
         let scriptTemplate = [
             "async function preShowFunction() {",
@@ -1365,7 +1401,7 @@ extension WKWebViewController: WKNavigationDelegate {
             "    }",
             ")"
         ]
-        
+
         let script = scriptTemplate.joined(separator: "\n")
         print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
 

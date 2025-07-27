@@ -180,6 +180,8 @@ public class Options {
   private int textZoom = 100; // Default text zoom is 100%
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
+  private boolean enabledSafeMargin = false;
+  private int safeMargin = 20; // Default safe margin in pixels
 
   public int getTextZoom() {
     return textZoom;
@@ -195,6 +197,22 @@ public class Options {
 
   public void setMaterialPicker(boolean materialPicker) {
     this.materialPicker = materialPicker;
+  }
+
+  public boolean getEnabledSafeMargin() {
+    return enabledSafeMargin;
+  }
+
+  public void setEnabledSafeMargin(boolean enabledSafeMargin) {
+    this.enabledSafeMargin = enabledSafeMargin;
+  }
+
+  public int getSafeMargin() {
+    return safeMargin;
+  }
+
+  public void setSafeMargin(int safeMargin) {
+    this.safeMargin = safeMargin;
   }
 
   public Pattern getProxyRequestsPattern() {

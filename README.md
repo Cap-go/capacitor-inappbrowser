@@ -22,6 +22,31 @@ import { InAppBrowser } from '@capgo/inappbrowser'
 InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
+### Open WebView with Safe Margin
+
+To create a webView with a 20px bottom margin (safe margin area outside the browser):
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+InAppBrowser.openWebView({
+  url: "YOUR_URL",
+  enabledSafeMargin: true
+});
+```
+
+To create a webView with a custom safe margin:
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+InAppBrowser.openWebView({
+  url: "YOUR_URL",
+  enabledSafeMargin: true,
+  safeMargin: 30  // Custom 30px margin
+});
+```
+
 Web platform is not supported. Use `window.open` instead.
 
 
@@ -551,6 +576,8 @@ Reload the current web page.
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                               | <code>100</code>                                           | 7.6.0  |
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                | <code>false</code>                                         | 0.1.0  |
 | **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of URL base patterns that should be treated as authorized App Links, Android only. Only links starting with any of these base URLs will be opened in the InAppBrowser.                                                                                                                                                                                                                                                                                                                                                                   | <code>[]</code>                                            | 7.12.0 |
+| **`enabledSafeMargin`**                | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                         | 7.13.0 |
+| **`safeMargin`**                       | <code>number</code>                                                                                                                                                    | Custom safe margin value in pixels. Only used when enabledSafeMargin is true. If not specified, defaults to 20px.                                                                                                                                                                                                                                                                                                                                                                                                                             | <code>20</code>                                            | 7.13.0 |
 
 
 #### Headers

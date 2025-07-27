@@ -427,6 +427,26 @@ export interface OpenWebViewOptions {
    * @default []
    */
   authorizedAppLinks?: string[];
+
+  /**
+   * If true, the webView will not take the full height and will have a 20px margin at the bottom.
+   * This creates a safe margin area outside the browser view.
+   * @since 7.13.0
+   * @default false
+   * @example
+   * enabledSafeMargin: true
+   */
+  enabledSafeMargin?: boolean;
+
+  /**
+   * Custom safe margin value in pixels. Only used when enabledSafeMargin is true.
+   * If not specified, defaults to 20px.
+   * @since 7.13.0
+   * @default 20
+   * @example
+   * safeMargin: 30
+   */
+  safeMargin?: number;
 }
 
 export interface InAppBrowserPlugin {
