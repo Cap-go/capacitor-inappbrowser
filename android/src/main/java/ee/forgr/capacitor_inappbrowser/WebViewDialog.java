@@ -299,14 +299,12 @@ public class WebViewDialog extends Dialog {
       getWindow().setStatusBarColor(Color.TRANSPARENT);
 
       // Add FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS flag to the window
-      getWindow().addFlags(
-        WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS
-      );
+      getWindow()
+        .addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 
       // On Android 30+ clear FLAG_TRANSLUCENT_STATUS flag
-      getWindow().clearFlags(
-        WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS
-      );
+      getWindow()
+        .clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
     }
 
     WindowInsetsControllerCompat insetsController =
@@ -369,10 +367,11 @@ public class WebViewDialog extends Dialog {
         });
     }
 
-    getWindow().setLayout(
-      WindowManager.LayoutParams.MATCH_PARENT,
-      WindowManager.LayoutParams.MATCH_PARENT
-    );
+    getWindow()
+      .setLayout(
+        WindowManager.LayoutParams.MATCH_PARENT,
+        WindowManager.LayoutParams.MATCH_PARENT
+      );
 
     this._webView = findViewById(R.id.browser_view);
 
@@ -524,7 +523,8 @@ public class WebViewDialog extends Dialog {
             );
 
             // Fixed JavaScript with proper error handling
-            String js = """
+            String js =
+              """
               try {
                 (function() {
                   var captureAttr = null;
@@ -1164,7 +1164,8 @@ public class WebViewDialog extends Dialog {
     }
 
     try {
-      String script = """
+      String script =
+        """
         (function() {
           if (window.AndroidInterface) {
             // Create mobileApp object for backward compatibility
@@ -2094,7 +2095,7 @@ public class WebViewDialog extends Dialog {
       body = result.getString("body");
       code = result.getInt("code");
       JSONObject headers = result.getJSONObject("headers");
-      for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
+      for (Iterator<String> it = headers.keys(); it.hasNext();) {
         String headerName = it.next();
         String header = headers.getString(headerName);
         responseHeaders.put(headerName, header);
@@ -2426,7 +2427,8 @@ public class WebViewDialog extends Dialog {
                     )
                   );
                 }
-                String jsTemplate = """
+                String jsTemplate =
+                  """
                   try {
                     function getHeaders() {
                       const h = {};
@@ -2845,7 +2847,8 @@ public class WebViewDialog extends Dialog {
 
         // Clear file inputs for security/privacy before destroying WebView
         try {
-          String clearInputsScript = """
+          String clearInputsScript =
+            """
             (function() {
               try {
                 var inputs = document.querySelectorAll('input[type="file"]');
@@ -3002,7 +3005,8 @@ public class WebViewDialog extends Dialog {
     datePickerInjected = true;
 
     // This script adds minimal fixes for date inputs to use Material Design
-    String script = """
+    String script =
+      """
       (function() {
         try {
           // Find all date inputs
@@ -3102,9 +3106,9 @@ public class WebViewDialog extends Dialog {
       Environment.DIRECTORY_PICTURES
     );
     File image = File.createTempFile(
-      imageFileName /* prefix */,
-      ".jpg" /* suffix */,
-      storageDir /* directory */
+      imageFileName/* prefix */,
+      ".jpg"/* suffix */,
+      storageDir/* directory */
     );
     return image;
   }
