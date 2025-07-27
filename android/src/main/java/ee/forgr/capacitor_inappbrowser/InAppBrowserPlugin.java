@@ -71,10 +71,11 @@ public class InAppBrowserPlugin
   @Override
   public void load() {
     super.load();
-    fileChooserLauncher = getActivity().registerForActivityResult(
-      new ActivityResultContracts.StartActivityForResult(),
-      this::handleFileChooserResult
-    );
+    fileChooserLauncher = getActivity()
+      .registerForActivityResult(
+        new ActivityResultContracts.StartActivityForResult(),
+        this::handleFileChooserResult
+      );
   }
 
   private void handleFileChooserResult(ActivityResult result) {
@@ -261,7 +262,8 @@ public class InAppBrowserPlugin
     }
 
     currentUrl = url;
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -387,10 +389,8 @@ public class InAppBrowserPlugin
         String[] parts = cookie.split("=");
         if (parts.length > 0) {
           cookiesToRemove.add(parts[0].trim());
-          CookieManager.getInstance().setCookie(
-            url,
-            String.format("%s=del;", parts[0].trim())
-          );
+          CookieManager.getInstance()
+            .setCookie(url, String.format("%s=del;", parts[0].trim()));
         }
       }
     }
@@ -409,7 +409,8 @@ public class InAppBrowserPlugin
 
     Log.i("DelCookies", String.format("Script to run:\n%s", scriptToRun));
 
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -762,7 +763,8 @@ public class InAppBrowserPlugin
       Log.d("InAppBrowserPlugin", "No authorized app links provided.");
     }
 
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -812,7 +814,8 @@ public class InAppBrowserPlugin
     }
 
     Log.d("InAppBrowserPlugin", "Event data: " + eventData.toString());
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -840,7 +843,8 @@ public class InAppBrowserPlugin
       return;
     }
 
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -865,7 +869,8 @@ public class InAppBrowserPlugin
 
   @PluginMethod
   public void reload(PluginCall call) {
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
@@ -924,7 +929,8 @@ public class InAppBrowserPlugin
       return;
     }
 
-    this.getActivity().runOnUiThread(
+    this.getActivity()
+      .runOnUiThread(
         new Runnable() {
           @Override
           public void run() {
