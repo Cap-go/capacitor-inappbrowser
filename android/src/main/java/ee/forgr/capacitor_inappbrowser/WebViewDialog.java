@@ -386,21 +386,6 @@ public class WebViewDialog extends Dialog {
         float density = _context.getResources().getDisplayMetrics().density;
         int marginHeightPx = (int) (marginHeightDp * density);
 
-        // Approach 1: Modify WebView constraints to add bottom margin
-        RelativeLayout.LayoutParams webViewParams =
-          (RelativeLayout.LayoutParams) webView.getLayoutParams();
-        webViewParams.bottomMargin = marginHeightPx;
-        webView.setLayoutParams(webViewParams);
-
-        // Approach 2: Set bottom padding on the WebView itself
-        webView.setPadding(
-          webView.getPaddingLeft(),
-          webView.getPaddingTop(),
-          webView.getPaddingRight(),
-          webView.getPaddingBottom() + marginHeightPx
-        );
-
-        // Approach 3: Add padding to the parent container as another backup
         View parentContainer = findViewById(android.R.id.content);
         if (parentContainer != null) {
           parentContainer.setPadding(

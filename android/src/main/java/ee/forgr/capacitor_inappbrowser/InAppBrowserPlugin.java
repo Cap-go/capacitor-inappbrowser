@@ -658,10 +658,48 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("enabledSafeMargin", false))
     );
 
-    // Set safeMargin option (default to 20 if not specified)
-    Integer safeMargin = call.getInt("safeMargin");
-    if (safeMargin != null && safeMargin > 0) {
-      options.setSafeMargin(safeMargin);
+    // Set safeMargin option with proper handling
+    try {
+      // Try multiple ways to get the safeMargin value
+      Integer safeMarginValue = null;
+
+      // First try as integer
+      if (call.hasOption("safeMargin")) {
+        safeMarginValue = call.getInt("safeMargin");
+        Log.d("InAppBrowser", "safeMargin from getInt(): " + safeMarginValue);
+      }
+
+      // If that didn't work, try as double and convert to int
+      if (safeMarginValue == null && call.hasOption("safeMargin")) {
+        Double safeMarginDouble = call.getDouble("safeMargin");
+        if (safeMarginDouble != null) {
+          safeMarginValue = safeMarginDouble.intValue();
+          Log.d(
+            "InAppBrowser",
+            "safeMargin from getDouble(): " +
+            safeMarginDouble +
+            " -> " +
+            safeMarginValue
+          );
+        }
+      }
+
+      if (safeMarginValue != null && safeMarginValue > 0) {
+        options.setSafeMargin(safeMarginValue);
+        Log.d("InAppBrowser", "Custom safeMargin set to: " + safeMarginValue);
+      } else {
+        // Keep default value (20) from Options class
+        Log.d(
+          "InAppBrowser",
+          "Using default safeMargin: " + options.getSafeMargin()
+        );
+      }
+    } catch (Exception e) {
+      Log.e("InAppBrowser", "Error setting safeMargin: " + e.getMessage());
+      Log.d(
+        "InAppBrowser",
+        "Using default safeMargin: " + options.getSafeMargin()
+      );
     }
 
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
