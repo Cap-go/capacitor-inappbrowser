@@ -41,30 +41,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
-
-    aaptOptions {
-        additionalParameters "--auto-add-overlay"
-    }
-
-    buildFeatures {
-        viewBinding false
-        dataBinding false
-    }
-
-    androidResources {
-        additionalParameters '--allow-reserved-package-id', '--auto-add-overlay'
-    }
-
-    packagingOptions {
-        pickFirst '**/libc++_shared.so'
-        pickFirst '**/libjsc.so'
-    }
-
-    sourceSets {
-        main {
-            res.srcDirs = ['src/main/res']
-        }
-    }
 }
 
 repositories {
