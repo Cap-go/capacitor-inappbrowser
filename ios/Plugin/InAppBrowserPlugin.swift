@@ -349,6 +349,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // }
 
         let ignoreUntrustedSSLError = call.getBool("ignoreUntrustedSSLError", false)
+        let enableGooglePaySupport = call.getBool("enableGooglePaySupport", false)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
@@ -469,6 +470,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.preShowScript = call.getString("preShowScript")
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
+
+            // Set Google Pay support
+            webViewController.enableGooglePaySupport = enableGooglePaySupport
 
             // Set text zoom if specified
             if let textZoom = call.getInt("textZoom") {

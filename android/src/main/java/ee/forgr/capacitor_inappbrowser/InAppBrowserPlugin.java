@@ -752,6 +752,11 @@ public class InAppBrowserPlugin
       Log.d("InAppBrowserPlugin", "No authorized app links provided.");
     }
 
+    // Set Google Pay support option
+    options.setEnableGooglePaySupport(
+      Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false))
+    );
+
     this.getActivity()
       .runOnUiThread(
         new Runnable() {

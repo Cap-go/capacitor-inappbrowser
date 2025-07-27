@@ -109,6 +109,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var closeModalOk = ""
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
+    open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
@@ -448,12 +449,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             print("[InAppBrowser] Failed to serialize message to JSON")
             return
         }
-        
+
         // Safely build the script to avoid any potential issues
         let script = "window.dispatchEvent(new CustomEvent('messageFromNative', { detail: \(jsonString) }));"
-        
+
         DispatchQueue.main.async {
-            self.webView?.evaluateJavaScript(script) { result, error in
+            self.webView?.evaluateJavaScript(script) { _, error in
                 if let error = error {
                     print("[InAppBrowser] JavaScript evaluation error in postMessageToJS: \(error)")
                 }
@@ -561,6 +562,56 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.userContentController = userContentController
         webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+
+        // Enhanced configuration for Google Pay support (only when enabled)
+        if enableGooglePaySupport {
+            print("[InAppBrowser] Enabling Google Pay support features for iOS")
+
+            // Allow arbitrary loads in web views for Payment Request API
+            webConfiguration.setValue(true, forKey: "allowsArbitraryLoads")
+
+            // Enable JavaScript popup support for Google Pay
+            webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
+
+            // Inject Google Pay support script
+            let googlePayScript = WKUserScript(
+                source: """
+                console.log('[InAppBrowser] Injecting Google Pay support for iOS');
+
+                // Enhanced window.open for Google Pay
+                (function() {
+                    const originalWindowOpen = window.open;
+                    window.open = function(url, target, features) {
+                        console.log('[InAppBrowser iOS] Enhanced window.open called:', url, target, features);
+
+                        // For Google Pay URLs, handle popup properly
+                        if (url && (url.includes('google.com/pay') || url.includes('accounts.google.com'))) {
+                            console.log('[InAppBrowser iOS] Google Pay popup detected');
+                            return originalWindowOpen.call(window, url, target || '_blank', features);
+                        }
+
+                        return originalWindowOpen.call(window, url, target, features);
+                    };
+
+                    // Add Cross-Origin-Opener-Policy meta tag if not present
+                    if (!document.querySelector('meta[http-equiv="Cross-Origin-Opener-Policy"]')) {
+                        const meta = document.createElement('meta');
+                        meta.setAttribute('http-equiv', 'Cross-Origin-Opener-Policy');
+                        meta.setAttribute('content', 'same-origin-allow-popups');
+                        if (document.head) {
+                            document.head.appendChild(meta);
+                            console.log('[InAppBrowser iOS] Added Cross-Origin-Opener-Policy meta tag');
+                        }
+                    }
+
+                    console.log('[InAppBrowser iOS] Google Pay support enhancements complete');
+                })();
+                """,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: false
+            )
+            userContentController.addUserScript(googlePayScript)
+        }
 
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
@@ -1350,7 +1401,7 @@ extension WKWebViewController: WKNavigationDelegate {
 
         // Safely construct script template with proper escaping
         let userScript = self.preShowScript ?? ""
-        
+
         // Build script using safe concatenation to avoid multi-line string issues
         let scriptTemplate = [
             "async function preShowFunction() {",
@@ -1365,7 +1416,7 @@ extension WKWebViewController: WKNavigationDelegate {
             "    }",
             ")"
         ]
-        
+
         let script = scriptTemplate.joined(separator: "\n")
         print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
 

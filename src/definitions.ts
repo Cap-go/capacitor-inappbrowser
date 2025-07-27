@@ -427,6 +427,25 @@ export interface OpenWebViewOptions {
    * @default []
    */
   authorizedAppLinks?: string[];
+
+  /**
+   * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
+   * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.
+   * Only enable this if you need Google Pay functionality as it allows popup windows.
+   *
+   * When enabled:
+   * - Allows popup windows for Google Pay authentication
+   * - Sets proper CORS headers for Payment Request API
+   * - Enables multiple window support in WebView
+   * - Configures secure context for payment processing
+   *
+   * @since 7.13.0
+   * @default false
+   * @example
+   * enableGooglePaySupport: true
+   * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
+   */
+  enableGooglePaySupport?: boolean;
 }
 
 export interface InAppBrowserPlugin {
