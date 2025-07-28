@@ -654,52 +654,61 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("materialPicker", false))
     );
 
-    // Set enabledSafeMargin option
+    // Set enabledSafeBottomMargin option
     options.setEnabledSafeMargin(
-      Boolean.TRUE.equals(call.getBoolean("enabledSafeMargin", false))
+      Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false))
     );
 
-    // Set safeMargin option with proper handling
+    // Set safeBottomMargin option with proper handling
     try {
-      // Try multiple ways to get the safeMargin value
-      Integer safeMarginValue = null;
+      // Try multiple ways to get the safeBottomMargin value
+      Integer safeBottomMarginValue = null;
 
       // First try as integer
-      if (call.hasOption("safeMargin")) {
-        safeMarginValue = call.getInt("safeMargin");
-        Log.d("InAppBrowser", "safeMargin from getInt(): " + safeMarginValue);
+      if (call.hasOption("safeBottomMargin")) {
+        safeBottomMarginValue = call.getInt("safeBottomMargin");
+        Log.d(
+          "InAppBrowser",
+          "safeBottomMargin from getInt(): " + safeBottomMarginValue
+        );
       }
 
       // If that didn't work, try as double and convert to int
-      if (safeMarginValue == null && call.hasOption("safeMargin")) {
-        Double safeMarginDouble = call.getDouble("safeMargin");
-        if (safeMarginDouble != null) {
-          safeMarginValue = safeMarginDouble.intValue();
+      if (safeBottomMarginValue == null && call.hasOption("safeBottomMargin")) {
+        Double safeBottomMarginDouble = call.getDouble("safeBottomMargin");
+        if (safeBottomMarginDouble != null) {
+          safeBottomMarginValue = safeBottomMarginDouble.intValue();
           Log.d(
             "InAppBrowser",
-            "safeMargin from getDouble(): " +
-            safeMarginDouble +
+            "safeBottomMargin from getDouble(): " +
+            safeBottomMarginDouble +
             " -> " +
-            safeMarginValue
+            safeBottomMarginValue
           );
         }
       }
 
-      if (safeMarginValue != null && safeMarginValue > 0) {
-        options.setSafeMargin(safeMarginValue);
-        Log.d("InAppBrowser", "Custom safeMargin set to: " + safeMarginValue);
+      if (safeBottomMarginValue != null && safeBottomMarginValue > 0) {
+        options.setSafeMargin(safeBottomMarginValue);
+        Log.d(
+          "InAppBrowser",
+          "Custom safeBottomMargin set to: " + safeBottomMarginValue
+        );
       } else {
         // Keep default value (20) from Options class
         Log.d(
           "InAppBrowser",
-          "Using default safeMargin: " + options.getSafeMargin()
+          "Using default safeBottomMargin: " + options.getSafeMargin()
         );
       }
     } catch (Exception e) {
-      Log.e("InAppBrowser", "Error setting safeMargin: " + e.getMessage());
+      Log.e(
+        "InAppBrowser",
+        "Error setting safeBottomMargin: " + e.getMessage()
+      );
       Log.d(
         "InAppBrowser",
-        "Using default safeMargin: " + options.getSafeMargin()
+        "Using default safeBottomMargin: " + options.getSafeMargin()
       );
     }
 

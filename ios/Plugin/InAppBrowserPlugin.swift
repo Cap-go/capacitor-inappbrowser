@@ -290,8 +290,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
-        let enabledSafeMargin = call.getBool("enabledSafeMargin", false)
-        let safeMargin = call.getDouble("safeMargin", 20.0)
+        let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
+        let safeBottomMargin = call.getDouble("safeBottomMargin", 20.0)
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if call.getString("preShowScript") != nil && !call.getBool("isPresentAfterPageLoad", false) {
@@ -364,7 +364,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank", enabledSafeMargin: enabledSafeMargin, safeMargin: safeMargin)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank", enabledSafeBottomMargin: enabledSafeBottomMargin, safeBottomMargin: safeBottomMargin)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
@@ -695,7 +695,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeMargin: false, safeMargin: 20.0)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, safeBottomMargin: 20.0)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")

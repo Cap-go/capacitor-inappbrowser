@@ -76,11 +76,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeMargin: Bool, safeMargin: CGFloat) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, safeBottomMargin: CGFloat) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
-        self.enabledSafeMargin = enabledSafeMargin
-        self.safeMargin = safeMargin
+        self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.safeBottomMargin = safeBottomMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -116,8 +116,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
-    var enabledSafeMargin: Bool = false
-    var safeMargin: CGFloat = 20.0 // Default safe margin in points
+    var enabledSafeBottomMargin: Bool = false
+    var safeBottomMargin: CGFloat = 20.0 // Default safe margin in points
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -636,13 +636,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         // Then set up constraints
         webView.translatesAutoresizingMaskIntoConstraints = false
 
-        if self.enabledSafeMargin {
+        if self.enabledSafeBottomMargin {
             // Add custom safe margin when enabled
             NSLayoutConstraint.activate([
                 webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
                 webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
                 webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -self.safeMargin)
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -self.safeBottomMargin)
             ])
         } else {
             // Normal full height layout
@@ -667,8 +667,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
 
         if !self.blankNavigationTab {
-            // For non-blank navigation tab, we need to handle enabledSafeMargin differently
-            if self.enabledSafeMargin {
+            // For non-blank navigation tab, we need to handle enabledSafeBottomMargin differently
+            if self.enabledSafeBottomMargin {
                 // Create a container view to hold the webView with margin
                 let containerView = UIView()
                 containerView.translatesAutoresizingMaskIntoConstraints = false
@@ -683,7 +683,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                     webView.topAnchor.constraint(equalTo: containerView.topAnchor),
                     webView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                     webView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -self.safeMargin)
+                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -self.safeBottomMargin)
                 ])
             } else {
                 // Normal behavior - webView is the entire view
@@ -753,8 +753,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewWillLayoutSubviews() {
         restateViewHeight()
-        // Don't override frame height when enabledSafeMargin is true, as it would override our constraints
-        if self.currentViewHeight != nil && !self.enabledSafeMargin {
+        // Don't override frame height when enabledSafeBottomMargin is true, as it would override our constraints
+        if self.currentViewHeight != nil && !self.enabledSafeBottomMargin {
             self.view.frame.size.height = self.currentViewHeight!
         }
     }

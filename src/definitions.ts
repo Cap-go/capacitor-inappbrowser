@@ -434,19 +434,19 @@ export interface OpenWebViewOptions {
    * @since 7.13.0
    * @default false
    * @example
-   * enabledSafeMargin: true
+   * enabledSafeBottomMargin: true
    */
-  enabledSafeMargin?: boolean;
+  enabledSafeBottomMargin?: boolean;
 
   /**
-   * Custom safe margin value in pixels. Only used when enabledSafeMargin is true.
+   * Custom safe margin value in pixels. Only used when enabledSafeBottomMargin is true.
    * If not specified, defaults to 20px.
    * @since 7.13.0
    * @default 20
    * @example
-   * safeMargin: 30
+   * safeBottomMargin: 30
    */
-  safeMargin?: number;
+  safeBottomMargin?: number;
   /**
    * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
    * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.

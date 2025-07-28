@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* add enabledSafeMargin & safeMargin property ([f64166f](https://github.com/Cap-go/capacitor-inappbrowser/commit/f64166fa3a1df0f814591a674947d5c20f7305a2))
+* add enabledSafeBottomMargin & safeBottomMargin property ([f64166f](https://github.com/Cap-go/capacitor-inappbrowser/commit/f64166fa3a1df0f814591a674947d5c20f7305a2))
 
 ### [7.13.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.1...7.13.0) (2025-01-XX)
 ## [7.13.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.1...7.13.0) (2025-07-27)
@@ -15,8 +15,8 @@ All notable changes to this project will be documented in this file. See [standa
 
 ### Features
 
-* add enabledSafeMargin option to create 20px bottom margin in webView ([XXXXXXX](https://github.com/Cap-go/capacitor-inappbrowser/commit/XXXXXXX))
-* add safeMargin property to customize safe margin value ([XXXXXXX](https://github.com/Cap-go/capacitor-inappbrowser/commit/XXXXXXX))
+* add enabledSafeBottomMargin option to create 20px bottom margin in webView ([XXXXXXX](https://github.com/Cap-go/capacitor-inappbrowser/commit/XXXXXXX))
+* add safeBottomMargin property to customize safe margin value ([XXXXXXX](https://github.com/Cap-go/capacitor-inappbrowser/commit/XXXXXXX))
 * add Google Pay support and enhancements for InAppBrowser ([f781399](https://github.com/Cap-go/capacitor-inappbrowser/commit/f78139975b566e9a4237f5d27e0ae933f4f12620))
 
 ### [7.12.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.12.0...7.12.1) (2025-07-19)

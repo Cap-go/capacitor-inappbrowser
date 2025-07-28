@@ -180,8 +180,8 @@ public class Options {
   private int textZoom = 100; // Default text zoom is 100%
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
-  private boolean enabledSafeMargin = false;
-  private int safeMargin = 20; // Default safe margin in pixels
+  private boolean enabledSafeBottomMargin = false;
+  private int safeBottomMargin = 20; // Default safe margin in pixels
   private boolean enableGooglePaySupport = false;
 
   public int getTextZoom() {
@@ -201,19 +201,19 @@ public class Options {
   }
 
   public boolean getEnabledSafeMargin() {
-    return enabledSafeMargin;
+    return enabledSafeBottomMargin;
   }
 
-  public void setEnabledSafeMargin(boolean enabledSafeMargin) {
-    this.enabledSafeMargin = enabledSafeMargin;
+  public void setEnabledSafeMargin(boolean enabledSafeBottomMargin) {
+    this.enabledSafeBottomMargin = enabledSafeBottomMargin;
   }
 
   public int getSafeMargin() {
-    return safeMargin;
+    return safeBottomMargin;
   }
 
-  public void setSafeMargin(int safeMargin) {
-    this.safeMargin = safeMargin;
+  public void setSafeMargin(int safeBottomMargin) {
+    this.safeBottomMargin = safeBottomMargin;
   }
 
   public Pattern getProxyRequestsPattern() {
