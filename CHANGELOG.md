@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.15.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.14.0...7.15.0) (2025-07-28)
+
+
+### Features
+
+* rename enabledSafeMargin to enabledSafeBottomMargin and update related properties ([3286ffe](https://github.com/Cap-go/capacitor-inappbrowser/commit/3286ffe9345ef03f31219a5c58c3e681209f7c29))
+
 ## [7.14.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.13.0...7.14.0) (2025-07-28)
 
 
