@@ -423,6 +423,27 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
     _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+    // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
+    if (_options.getEnableGooglePaySupport()) {
+      Log.d("InAppBrowser", "Enabling Google Pay support features");
+      _webView
+        .getSettings()
+        .setMixedContentMode(
+          android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        );
+      _webView.getSettings().setSupportMultipleWindows(true);
+      _webView.getSettings().setGeolocationEnabled(true);
+
+      // Ensure secure context for Payment Request API
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        _webView
+          .getSettings()
+          .setMixedContentMode(
+            android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+          );
+      }
+    }
+
     // Set web view background color
     int backgroundColor = _options.getBackgroundColor().equals("white")
       ? Color.WHITE
@@ -873,6 +894,88 @@ public class WebViewDialog extends Dialog {
             injectDatePickerFixes();
           }
         }
+
+        // Support for Google Pay and popup windows (critical for OR_BIBED_15 fix)
+        @Override
+        public boolean onCreateWindow(
+          WebView view,
+          boolean isDialog,
+          boolean isUserGesture,
+          android.os.Message resultMsg
+        ) {
+          Log.d(
+            "InAppBrowser",
+            "onCreateWindow called - isUserGesture: " +
+            isUserGesture +
+            ", GooglePaySupport: " +
+            _options.getEnableGooglePaySupport()
+          );
+
+          // Only handle popup windows if Google Pay support is enabled
+          if (_options.getEnableGooglePaySupport() && isUserGesture) {
+            // Create a new WebView for the popup
+            WebView popupWebView = new WebView(activity);
+            popupWebView.getSettings().setJavaScriptEnabled(true);
+            popupWebView
+              .getSettings()
+              .setJavaScriptCanOpenWindowsAutomatically(true);
+            popupWebView.getSettings().setSupportMultipleWindows(true);
+
+            // Set WebViewClient to handle URL loading and closing
+            popupWebView.setWebViewClient(
+              new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(
+                  WebView view,
+                  String url
+                ) {
+                  Log.d("InAppBrowser", "Popup WebView loading URL: " + url);
+
+                  // Handle Google Pay result URLs or close conditions
+                  if (
+                    url.contains("google.com/pay") ||
+                    url.contains("close") ||
+                    url.contains("cancel")
+                  ) {
+                    Log.d(
+                      "InAppBrowser",
+                      "Closing popup for Google Pay result"
+                    );
+                    // Notify the parent WebView and close popup
+                    activity.runOnUiThread(() -> {
+                      try {
+                        if (popupWebView.getParent() != null) {
+                          ((ViewGroup) popupWebView.getParent()).removeView(
+                              popupWebView
+                            );
+                        }
+                        popupWebView.destroy();
+                      } catch (Exception e) {
+                        Log.e(
+                          "InAppBrowser",
+                          "Error closing popup: " + e.getMessage()
+                        );
+                      }
+                    });
+                    return true;
+                  }
+                  return false;
+                }
+              }
+            );
+
+            // Set up the popup WebView transport
+            WebView.WebViewTransport transport =
+              (WebView.WebViewTransport) resultMsg.obj;
+            transport.setWebView(popupWebView);
+            resultMsg.sendToTarget();
+
+            Log.d("InAppBrowser", "Created popup window for Google Pay");
+            return true;
+          }
+
+          return false;
+        }
       }
     );
 
@@ -900,6 +1003,12 @@ public class WebViewDialog extends Dialog {
     _webView.post(() -> {
       if (_webView != null) {
         injectJavaScriptInterface();
+
+        // Inject Google Pay support enhancements if enabled
+        if (_options.getEnableGooglePaySupport()) {
+          injectGooglePayPolyfills();
+        }
+
         Log.d(
           "InAppBrowser",
           "JavaScript interface injected early after URL load"
@@ -1234,6 +1343,113 @@ public class WebViewDialog extends Dialog {
       Log.e(
         "InAppBrowser",
         "Error preparing JavaScript interface: " + e.getMessage()
+      );
+    }
+  }
+
+  /**
+   * Injects JavaScript polyfills and enhancements for Google Pay support
+   * Helps resolve OR_BIBED_15 errors by ensuring proper cross-origin handling
+   */
+  private void injectGooglePayPolyfills() {
+    if (_webView == null) {
+      Log.w(
+        "InAppBrowser",
+        "Cannot inject Google Pay polyfills - WebView is null"
+      );
+      return;
+    }
+
+    try {
+      String googlePayScript =
+        """
+        (function() {
+          console.log('[InAppBrowser] Injecting Google Pay support enhancements');
+
+          // Enhance window.open to work better with Google Pay popups
+          const originalWindowOpen = window.open;
+          window.open = function(url, target, features) {
+            console.log('[InAppBrowser] Enhanced window.open called:', url, target, features);
+
+            // For Google Pay URLs, ensure they open in a new context
+            if (url && (url.includes('google.com/pay') || url.includes('accounts.google.com'))) {
+              console.log('[InAppBrowser] Google Pay popup detected, using enhanced handling');
+              // Let the native WebView handle this via onCreateWindow
+              return originalWindowOpen.call(window, url, '_blank', features);
+            }
+
+            return originalWindowOpen.call(window, url, target, features);
+          };
+
+          // Ensure proper Payment Request API context
+          if (window.PaymentRequest) {
+            console.log('[InAppBrowser] Payment Request API available');
+
+            // Wrap PaymentRequest constructor to add better error handling
+            const OriginalPaymentRequest = window.PaymentRequest;
+            window.PaymentRequest = function(methodData, details, options) {
+              console.log('[InAppBrowser] PaymentRequest created with enhanced error handling');
+              const request = new OriginalPaymentRequest(methodData, details, options);
+
+              // Override show method to handle popup blocking issues
+              const originalShow = request.show;
+              request.show = function() {
+                console.log('[InAppBrowser] PaymentRequest.show() called');
+                return originalShow.call(this).catch((error) => {
+                  console.error('[InAppBrowser] PaymentRequest error:', error);
+                  if (error.name === 'SecurityError' || error.message.includes('popup')) {
+                    console.log('[InAppBrowser] Attempting to handle popup blocking issue');
+                  }
+                  throw error;
+                });
+              };
+
+              return request;
+            };
+
+            // Copy static methods
+            Object.setPrototypeOf(window.PaymentRequest, OriginalPaymentRequest);
+            Object.defineProperty(window.PaymentRequest, 'prototype', {
+              value: OriginalPaymentRequest.prototype
+            });
+          }
+
+          // Add meta tag to ensure proper cross-origin handling if not present
+          if (!document.querySelector('meta[http-equiv="Cross-Origin-Opener-Policy"]')) {
+            const meta = document.createElement('meta');
+            meta.setAttribute('http-equiv', 'Cross-Origin-Opener-Policy');
+            meta.setAttribute('content', 'same-origin-allow-popups');
+            if (document.head) {
+              document.head.appendChild(meta);
+              console.log('[InAppBrowser] Added Cross-Origin-Opener-Policy meta tag');
+            }
+          }
+
+          console.log('[InAppBrowser] Google Pay support enhancements complete');
+        })();
+        """;
+
+      _webView.post(() -> {
+        if (_webView != null) {
+          try {
+            _webView.evaluateJavascript(googlePayScript, result -> {
+              Log.d(
+                "InAppBrowser",
+                "Google Pay polyfills injected successfully"
+              );
+            });
+          } catch (Exception e) {
+            Log.e(
+              "InAppBrowser",
+              "Error injecting Google Pay polyfills: " + e.getMessage()
+            );
+          }
+        }
+      });
+    } catch (Exception e) {
+      Log.e(
+        "InAppBrowser",
+        "Error preparing Google Pay polyfills: " + e.getMessage()
       );
     }
   }
@@ -2603,6 +2819,11 @@ public class WebViewDialog extends Dialog {
           }
           super.doUpdateVisitedHistory(view, url, isReload);
           injectJavaScriptInterface();
+
+          // Inject Google Pay polyfills if enabled
+          if (_options.getEnableGooglePaySupport()) {
+            injectGooglePayPolyfills();
+          }
         }
 
         @Override
@@ -2719,6 +2940,11 @@ public class WebViewDialog extends Dialog {
 
           _options.getCallbacks().pageLoaded();
           injectJavaScriptInterface();
+
+          // Inject Google Pay polyfills if enabled
+          if (_options.getEnableGooglePaySupport()) {
+            injectGooglePayPolyfills();
+          }
         }
 
         @Override

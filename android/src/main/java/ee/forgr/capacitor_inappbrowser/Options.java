@@ -182,6 +182,7 @@ public class Options {
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeMargin = false;
   private int safeMargin = 20; // Default safe margin in pixels
+  private boolean enableGooglePaySupport = false;
 
   public int getTextZoom() {
     return textZoom;
@@ -451,5 +452,13 @@ public class Options {
 
   public void setAuthorizedAppLinks(List<String> authorizedAppLinks) {
     this.authorizedAppLinks = authorizedAppLinks;
+  }
+
+  public boolean getEnableGooglePaySupport() {
+    return enableGooglePaySupport;
+  }
+
+  public void setEnableGooglePaySupport(boolean enableGooglePaySupport) {
+    this.enableGooglePaySupport = enableGooglePaySupport;
   }
 }
