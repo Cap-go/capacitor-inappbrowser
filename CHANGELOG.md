@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [7.16.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.15.2...7.16.0) (2025-07-29)
+
+
+### Features
+
+* add example-app ([55da27b](https://github.com/Cap-go/capacitor-inappbrowser/commit/55da27b87df9822307569bc9e82486062af09025))
+* better implementation of enabledSafeMarginBottom ([f948114](https://github.com/Cap-go/capacitor-inappbrowser/commit/f9481144ad0bb9fe11fb286daf6ce4eb90ce4e5d))
+* **ios:** fix and clean implementation ([24c270c](https://github.com/Cap-go/capacitor-inappbrowser/commit/24c270c86eedca3415c690589f36b1238f282952))
+
+
+### Bug Fixes
+
+* correct code formatting in README for type definitions ([d5f013c](https://github.com/Cap-go/capacitor-inappbrowser/commit/d5f013ceb54e0df25170d18e511b7de6fe90dfd1))
+
 ### [7.15.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.15.1...7.15.2) (2025-07-29)
 
 
