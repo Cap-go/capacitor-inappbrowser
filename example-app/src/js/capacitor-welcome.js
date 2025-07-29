@@ -1,10 +1,6 @@
-import { SplashScreen } from "@capacitor/splash-screen";
-import { Camera } from "@capacitor/camera";
-import {
-  InAppBrowser,
-  ToolBarType,
-  BackgroundColor,
-} from "@capgo/inappbrowser";
+import { Camera } from '@capacitor/camera';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { InAppBrowser, ToolBarType, BackgroundColor } from '@capgo/inappbrowser';
 
 window.customElements.define(
   "capacitor-welcome",
@@ -130,8 +126,8 @@ window.customElements.define(
             await InAppBrowser.openWebView({
               url: "https://github.com/Cap-go/capacitor-inappbrowser",
               toolbarColor: "#000000",
-              toolbarType: ToolBarType.ACTIVITY,
-              backgroundColor: BackgroundColor.WHITE,
+              toolbarType: ToolBarType.NAVIGATION,
+              backgroundColor: BackgroundColor.BLACK,
               title: "Capacitor InAppBrowser",
               enabledSafeBottomMargin: true,
             });
