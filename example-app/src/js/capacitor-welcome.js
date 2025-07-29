@@ -1,16 +1,20 @@
-import { SplashScreen } from '@capacitor/splash-screen';
-import { Camera } from '@capacitor/camera';
-import { InAppBrowser, ToolBarType, BackgroundColor } from '@capgo/inappbrowser';
+import { SplashScreen } from "@capacitor/splash-screen";
+import { Camera } from "@capacitor/camera";
+import {
+  InAppBrowser,
+  ToolBarType,
+  BackgroundColor,
+} from "@capgo/inappbrowser";
 
 window.customElements.define(
-  'capacitor-welcome',
+  "capacitor-welcome",
   class extends HTMLElement {
     constructor() {
       super();
 
       SplashScreen.hide();
 
-      const root = this.attachShadow({ mode: 'open' });
+      const root = this.attachShadow({ mode: "open" });
 
       root.innerHTML = `
     <style>
@@ -100,61 +104,64 @@ window.customElements.define(
     connectedCallback() {
       const self = this;
 
-      self.shadowRoot.querySelector('#take-photo').addEventListener('click', async function (e) {
-        try {
-          const photo = await Camera.getPhoto({
-            resultType: 'uri',
-          });
+      self.shadowRoot
+        .querySelector("#take-photo")
+        .addEventListener("click", async function (e) {
+          try {
+            const photo = await Camera.getPhoto({
+              resultType: "uri",
+            });
 
-          const image = self.shadowRoot.querySelector('#image');
-          if (!image) {
-            return;
+            const image = self.shadowRoot.querySelector("#image");
+            if (!image) {
+              return;
+            }
+
+            image.src = photo.webPath;
+          } catch (e) {
+            console.warn("User cancelled", e);
           }
+        });
 
-          image.src = photo.webPath;
-        } catch (e) {
-          console.warn('User cancelled', e);
-        }
-      });
+      self.shadowRoot
+        .querySelector("#open-browser")
+        .addEventListener("click", async function (e) {
+          try {
+            await InAppBrowser.openWebView({
+              url: "https://github.com/Cap-go/capacitor-inappbrowser",
+              toolbarColor: "#000000",
+              toolbarType: ToolBarType.ACTIVITY,
+              backgroundColor: BackgroundColor.WHITE,
+              title: "Capacitor InAppBrowser",
+              enabledSafeBottomMargin: true,
+            });
 
-      self.shadowRoot.querySelector('#open-browser').addEventListener('click', async function (e) {
-        try {
-          await InAppBrowser.openWebView({
-            url: 'https://github.com/Cap-go/capacitor-inappbrowser',
-            toolbarColor: '#000000',
-            toolbarType: ToolBarType.ACTIVITY,
-            backgroundColor: BackgroundColor.WHITE,
-            title: 'Capacitor InAppBrowser',
-            enabledSafeBottomMargin: true,
-          });
+            // Add event listeners after opening the browser
+            InAppBrowser.addListener("urlChange", (result) => {
+              console.log("URL changed:", result.url);
+            });
 
-          // Add event listeners after opening the browser
-          InAppBrowser.addListener('urlChange', (result) => {
-            console.log('URL changed:', result.url);
-          });
+            InAppBrowser.addListener("closePressed", () => {
+              console.log("Close button pressed");
+            });
 
-          InAppBrowser.addListener('closePressed', () => {
-            console.log('Close button pressed');
-          });
-
-          InAppBrowser.addListener('sharePressed', () => {
-            console.log('Share button pressed');
-          });
-
-        } catch (e) {
-          console.error('Error opening in-app browser:', e);
-        }
-      });
+            InAppBrowser.addListener("sharePressed", () => {
+              console.log("Share button pressed");
+            });
+          } catch (e) {
+            console.error("Error opening in-app browser:", e);
+          }
+        });
     }
   },
 );
 
 window.customElements.define(
-  'capacitor-welcome-titlebar',
+  "capacitor-welcome-titlebar",
   class extends HTMLElement {
     constructor() {
       super();
-      const root = this.attachShadow({ mode: 'open' });
+      const root = this.attachShadow({ mode: "open" });
       root.innerHTML = `
     <style>
       :host {

@@ -375,8 +375,6 @@ public class WebViewDialog extends Dialog {
 
     this._webView = findViewById(R.id.browser_view);
 
-
-
     // Apply insets to fix edge-to-edge issues on Android 15+
     applyInsets();
 
@@ -1132,7 +1130,10 @@ public class WebViewDialog extends Dialog {
       if (_options.getEnabledSafeMargin()) {
         View parentContainer = findViewById(android.R.id.content);
         if (parentContainer != null) {
-          Log.d("InAppBrowser", "Applying bottom safe area padding: " + insets.bottom);
+          Log.d(
+            "InAppBrowser",
+            "Applying bottom safe area padding: " + insets.bottom
+          );
           parentContainer.setPadding(
             parentContainer.getPaddingLeft(),
             parentContainer.getPaddingTop(),
