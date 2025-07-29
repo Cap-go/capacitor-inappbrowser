@@ -1,0 +1,10 @@
+{
+  "appId": "com.example.app",
+  "appName": "test-inappbrowser",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}
