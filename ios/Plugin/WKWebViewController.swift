@@ -76,11 +76,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, safeBottomMargin: CGFloat) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
-        self.safeBottomMargin = safeBottomMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -117,7 +116,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
-    var safeBottomMargin: CGFloat = 20.0 // Default safe margin in points
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -635,24 +633,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Then set up constraints
         webView.translatesAutoresizingMaskIntoConstraints = false
+        var bottomPadding = self.view.bottomAnchor
 
         if self.enabledSafeBottomMargin {
-            // Add custom safe margin when enabled
-            NSLayoutConstraint.activate([
-                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
-                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -self.safeBottomMargin)
-            ])
-        } else {
-            // Normal full height layout
-            NSLayoutConstraint.activate([
-                webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
-                webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
-                webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
-            ])
+            bottomPadding = self.view.safeAreaLayoutGuide.bottomAnchor
         }
+
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: bottomPadding)
+        ])
 
         webView.uiDelegate = self
         webView.navigationDelegate = self
@@ -667,28 +659,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.addObserver(self, forKeyPath: #keyPath(WKWebView.url), options: .new, context: nil)
 
         if !self.blankNavigationTab {
-            // For non-blank navigation tab, we need to handle enabledSafeBottomMargin differently
-            if self.enabledSafeBottomMargin {
-                // Create a container view to hold the webView with margin
-                let containerView = UIView()
-                containerView.translatesAutoresizingMaskIntoConstraints = false
-                self.view = containerView
-
-                // Add webView to container
-                containerView.addSubview(webView)
-                webView.translatesAutoresizingMaskIntoConstraints = false
-
-                // Set constraints with custom safe margin
-                NSLayoutConstraint.activate([
-                    webView.topAnchor.constraint(equalTo: containerView.topAnchor),
-                    webView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-                    webView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -self.safeBottomMargin)
-                ])
-            } else {
-                // Normal behavior - webView is the entire view
-                self.view = webView
-            }
+            self.view.addSubview(webView)
+            // Then set up constraints
+            webView.translatesAutoresizingMaskIntoConstraints = false
         }
         self.webView = webView
 

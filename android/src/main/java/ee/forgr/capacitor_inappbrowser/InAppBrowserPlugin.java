@@ -659,59 +659,6 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false))
     );
 
-    // Set safeBottomMargin option with proper handling
-    try {
-      // Try multiple ways to get the safeBottomMargin value
-      Integer safeBottomMarginValue = null;
-
-      // First try as integer
-      if (call.hasOption("safeBottomMargin")) {
-        safeBottomMarginValue = call.getInt("safeBottomMargin");
-        Log.d(
-          "InAppBrowser",
-          "safeBottomMargin from getInt(): " + safeBottomMarginValue
-        );
-      }
-
-      // If that didn't work, try as double and convert to int
-      if (safeBottomMarginValue == null && call.hasOption("safeBottomMargin")) {
-        Double safeBottomMarginDouble = call.getDouble("safeBottomMargin");
-        if (safeBottomMarginDouble != null) {
-          safeBottomMarginValue = safeBottomMarginDouble.intValue();
-          Log.d(
-            "InAppBrowser",
-            "safeBottomMargin from getDouble(): " +
-            safeBottomMarginDouble +
-            " -> " +
-            safeBottomMarginValue
-          );
-        }
-      }
-
-      if (safeBottomMarginValue != null && safeBottomMarginValue > 0) {
-        options.setSafeMargin(safeBottomMarginValue);
-        Log.d(
-          "InAppBrowser",
-          "Custom safeBottomMargin set to: " + safeBottomMarginValue
-        );
-      } else {
-        // Keep default value (20) from Options class
-        Log.d(
-          "InAppBrowser",
-          "Using default safeBottomMargin: " + options.getSafeMargin()
-        );
-      }
-    } catch (Exception e) {
-      Log.e(
-        "InAppBrowser",
-        "Error setting safeBottomMargin: " + e.getMessage()
-      );
-      Log.d(
-        "InAppBrowser",
-        "Using default safeBottomMargin: " + options.getSafeMargin()
-      );
-    }
-
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {

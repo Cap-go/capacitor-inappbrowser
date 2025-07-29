@@ -374,28 +374,6 @@ public class WebViewDialog extends Dialog {
 
     this._webView = findViewById(R.id.browser_view);
 
-    // Apply safe margin if enabled
-    if (_options.getEnabledSafeMargin()) {
-      WebView webView = findViewById(R.id.browser_view);
-
-      if (webView != null) {
-        // Use custom safe margin value from options (defaults to 20)
-        int marginHeightDp = _options.getSafeMargin();
-        float density = _context.getResources().getDisplayMetrics().density;
-        int marginHeightPx = (int) (marginHeightDp * density);
-
-        View parentContainer = findViewById(android.R.id.content);
-        if (parentContainer != null) {
-          parentContainer.setPadding(
-            parentContainer.getPaddingLeft(),
-            parentContainer.getPaddingTop(),
-            parentContainer.getPaddingRight(),
-            parentContainer.getPaddingBottom() + marginHeightPx
-          );
-        }
-      }
-    }
-
     // Apply insets to fix edge-to-edge issues on Android 15+
     applyInsets();
 
@@ -1146,6 +1124,23 @@ public class WebViewDialog extends Dialog {
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
+
+      // Apply safe area padding to parent container if enabled
+      if (_options.getEnabledSafeMargin()) {
+        View parentContainer = findViewById(android.R.id.content);
+        if (parentContainer != null) {
+          Log.d(
+            "InAppBrowser",
+            "Applying bottom safe area padding: " + insets.bottom
+          );
+          parentContainer.setPadding(
+            parentContainer.getPaddingLeft(),
+            parentContainer.getPaddingTop(),
+            parentContainer.getPaddingRight(),
+            insets.bottom
+          );
+        }
+      }
 
       return WindowInsetsCompat.CONSUMED;
     });
