@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.15.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.15.1...7.15.2) (2025-07-29)
+
+
+### Bug Fixes
+
+* **android:** topbar disappeared when enabledSafeBottomMargin ([2da972f](https://github.com/Cap-go/capacitor-inappbrowser/commit/2da972f0e9ce766928c5ddaec033f69d46a98d7a))
+
 ### [7.15.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.15.0...7.15.1) (2025-07-28)
 
 
