@@ -1,6 +1,10 @@
-import { Camera } from '@capacitor/camera';
-import { SplashScreen } from '@capacitor/splash-screen';
-import { InAppBrowser, ToolBarType, BackgroundColor } from '@capgo/inappbrowser';
+import { Camera } from "@capacitor/camera";
+import { SplashScreen } from "@capacitor/splash-screen";
+import {
+  InAppBrowser,
+  ToolBarType,
+  BackgroundColor,
+} from "@capgo/inappbrowser";
 
 window.customElements.define(
   "capacitor-welcome",
