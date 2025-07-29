@@ -35,18 +35,6 @@ InAppBrowser.openWebView({
 });
 ```
 
-To create a webView with a custom safe bottom margin:
-
-```js
-import { InAppBrowser } from '@capgo/inappbrowser'
-
-InAppBrowser.openWebView({
-  url: "YOUR_URL",
-  enabledSafeBottomMargin: true,
-  safeBottomMargin: 30  // Custom 30px margin
-});
-```
-
 Web platform is not supported. Use `window.open` instead.
 
 
@@ -577,7 +565,6 @@ Reload the current web page.
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                | <code>false</code>                                         | 0.1.0  |
 | **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of URL base patterns that should be treated as authorized App Links, Android only. Only links starting with any of these base URLs will be opened in the InAppBrowser.                                                                                                                                                                                                                                                                                                                                                                   | <code>[]</code>                                            | 7.12.0 |
 | **`enabledSafeBottomMargin`**          | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                         | 7.13.0 |
-| **`safeBottomMargin`**                 | <code>number</code>                                                                                                                                                    | Custom safe margin value in pixels. Only used when enabledSafeBottomMargin is true. If not specified, defaults to 20px.                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>20</code>                                            | 7.13.0 |
 | **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                   | <code>false</code>                                         | 7.13.0 |
 
 
@@ -642,7 +629,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -656,7 +645,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions

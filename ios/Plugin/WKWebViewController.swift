@@ -76,11 +76,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, safeBottomMargin: CGFloat) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
-        self.safeBottomMargin = safeBottomMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -117,7 +116,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
-    var safeBottomMargin: CGFloat = 20.0 // Default safe margin in points
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -637,12 +635,21 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.translatesAutoresizingMaskIntoConstraints = false
 
         if self.enabledSafeBottomMargin {
-            // Add custom safe margin when enabled
+            // default value is consider as the right padding according to the design to https://createwithplay.com/blog/considering-ios-safe-area
+            var bottomPadding = CGFloat(34)
+
+            if #available(iOS 13.0, *) {
+                let window = UIApplication.shared.windows.first
+                bottomPadding = window?.safeAreaInsets.bottom ?? 34
+                print("from window: \(window?.safeAreaInsets.bottom ?? 0.0)")
+                print("bottomPadding: \(bottomPadding)")
+            }
+
             NSLayoutConstraint.activate([
                 webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
                 webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
                 webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -self.safeBottomMargin)
+                webView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: CGFloat(-bottomPadding))
             ])
         } else {
             // Normal full height layout
@@ -671,8 +678,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             if self.enabledSafeBottomMargin {
                 // Create a container view to hold the webView with margin
                 let containerView = UIView()
+                // default value is consider as the right padding according to the design to https://createwithplay.com/blog/considering-ios-safe-area
+                var bottomPadding = CGFloat(34)
                 containerView.translatesAutoresizingMaskIntoConstraints = false
                 self.view = containerView
+
+                if #available(iOS 13.0, *) {
+                    let window = UIApplication.shared.windows.first
+                    bottomPadding = window?.safeAreaInsets.bottom ?? 34
+                    print("from window: \(window?.safeAreaInsets.bottom ?? 0.0)")
+                    print("bottomPadding: \(bottomPadding)")
+                }
 
                 // Add webView to container
                 containerView.addSubview(webView)
@@ -683,7 +699,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                     webView.topAnchor.constraint(equalTo: containerView.topAnchor),
                     webView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                     webView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -self.safeBottomMargin)
+                    webView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -bottomPadding)
                 ])
             } else {
                 // Normal behavior - webView is the entire view

@@ -181,7 +181,6 @@ public class Options {
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeBottomMargin = false;
-  private int safeBottomMargin = 20; // Default safe margin in pixels
   private boolean enableGooglePaySupport = false;
 
   public int getTextZoom() {
@@ -206,14 +205,6 @@ public class Options {
 
   public void setEnabledSafeMargin(boolean enabledSafeBottomMargin) {
     this.enabledSafeBottomMargin = enabledSafeBottomMargin;
-  }
-
-  public int getSafeMargin() {
-    return safeBottomMargin;
-  }
-
-  public void setSafeMargin(int safeBottomMargin) {
-    this.safeBottomMargin = safeBottomMargin;
   }
 
   public Pattern getProxyRequestsPattern() {
