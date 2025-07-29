@@ -181,7 +181,7 @@ public class Options {
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeBottomMargin = false;
-  private int safeBottomMargin = 20; // Default safe margin in pixels
+  private int safeBottomMargin = 0; // Default safe margin in pixels
   private boolean enableGooglePaySupport = false;
 
   public int getTextZoom() {

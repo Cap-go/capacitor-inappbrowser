@@ -655,9 +655,9 @@ public class InAppBrowserPlugin
     );
 
     // Set enabledSafeBottomMargin option
-    options.setEnabledSafeMargin(
-      Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false))
-    );
+    boolean enabledSafeMargin = Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false));
+    options.setEnabledSafeMargin(enabledSafeMargin);
+    Log.d("InAppBrowser", "PLUGIN CONFIG: enabledSafeBottomMargin = " + enabledSafeMargin);
 
     // Set safeBottomMargin option with proper handling
     try {
@@ -692,13 +692,13 @@ public class InAppBrowserPlugin
         options.setSafeMargin(safeBottomMarginValue);
         Log.d(
           "InAppBrowser",
-          "Custom safeBottomMargin set to: " + safeBottomMarginValue
+          "PLUGIN CONFIG: Custom safeBottomMargin set to: " + safeBottomMarginValue + "dp"
         );
       } else {
         // Keep default value (20) from Options class
         Log.d(
           "InAppBrowser",
-          "Using default safeBottomMargin: " + options.getSafeMargin()
+          "PLUGIN CONFIG: Using default safeBottomMargin: " + options.getSafeMargin() + "dp"
         );
       }
     } catch (Exception e) {

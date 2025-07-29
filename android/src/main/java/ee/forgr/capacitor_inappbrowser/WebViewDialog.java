@@ -47,7 +47,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -135,6 +134,8 @@ public class WebViewDialog extends Dialog {
   }
 
   private final PermissionHandler permissionHandler;
+
+  private boolean insetsListenerSet = false;  // Add this as a class field
 
   public WebViewDialog(
     Context context,
@@ -375,28 +376,6 @@ public class WebViewDialog extends Dialog {
 
     this._webView = findViewById(R.id.browser_view);
 
-    // Apply safe margin if enabled
-    if (_options.getEnabledSafeMargin()) {
-      WebView webView = findViewById(R.id.browser_view);
-
-      if (webView != null) {
-        // Use custom safe margin value from options (defaults to 20)
-        int marginHeightDp = _options.getSafeMargin();
-        float density = _context.getResources().getDisplayMetrics().density;
-        int marginHeightPx = (int) (marginHeightDp * density);
-
-        View parentContainer = findViewById(android.R.id.content);
-        if (parentContainer != null) {
-          parentContainer.setPadding(
-            parentContainer.getPaddingLeft(),
-            parentContainer.getPaddingTop(),
-            parentContainer.getPaddingRight(),
-            parentContainer.getPaddingBottom() + marginHeightPx
-          );
-        }
-      }
-    }
-
     // Apply insets to fix edge-to-edge issues on Android 15+
     applyInsets();
 
@@ -422,27 +401,6 @@ public class WebViewDialog extends Dialog {
     _webView.getSettings().setAllowFileAccessFromFileURLs(true);
     _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
     _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
-
-    // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
-    if (_options.getEnableGooglePaySupport()) {
-      Log.d("InAppBrowser", "Enabling Google Pay support features");
-      _webView
-        .getSettings()
-        .setMixedContentMode(
-          android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        );
-      _webView.getSettings().setSupportMultipleWindows(true);
-      _webView.getSettings().setGeolocationEnabled(true);
-
-      // Ensure secure context for Payment Request API
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        _webView
-          .getSettings()
-          .setMixedContentMode(
-            android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-          );
-      }
-    }
 
     // Set web view background color
     int backgroundColor = _options.getBackgroundColor().equals("white")
@@ -1034,6 +992,12 @@ public class WebViewDialog extends Dialog {
       return;
     }
 
+    // Prevent multiple listener setups
+    if (insetsListenerSet) {
+      Log.d("InAppBrowser", "Insets listener already set, skipping");
+      return;
+    }
+
     // Check if we need Android 15+ specific fixes
     boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
 
@@ -1093,8 +1057,7 @@ public class WebViewDialog extends Dialog {
 
           // Fix status bar view
           if (statusBarColorView != null) {
-            ViewGroup.LayoutParams params =
-              statusBarColorView.getLayoutParams();
+            ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
             params.height = statusBarHeight;
             statusBarColorView.setLayoutParams(params);
             statusBarColorView.setBackgroundColor(finalBgColor);
@@ -1112,131 +1075,50 @@ public class WebViewDialog extends Dialog {
     }
 
     // Apply system insets to WebView content view (compatible with all Android versions)
-    ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
-      Insets insets = windowInsets.getInsets(
-        WindowInsetsCompat.Type.systemBars()
-      );
-      Boolean keyboardVisible = windowInsets.isVisible(
-        WindowInsetsCompat.Type.ime()
-      );
+    ViewCompat.setOnApplyWindowInsetsListener(
+      _webView,
+      (v, windowInsets) -> {
+        // Get different types of insets to detect device characteristics
+        Insets systemInsets = windowInsets.getInsets(
+          WindowInsetsCompat.Type.systemBars()
+        );
+        Insets gestureInsets = windowInsets.getInsets(
+          WindowInsetsCompat.Type.systemGestures()
+        );
 
-      ViewGroup.MarginLayoutParams mlp =
-        (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+        Boolean keyboardVisible = windowInsets.isVisible(
+          WindowInsetsCompat.Type.ime()
+        );
 
-      // Apply margins based on Android version
-      if (isAndroid15Plus) {
-        // Android 15+ specific handling
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
+        ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+
+        // Base bottom margin is the system navigation bar height
+        int bottomMargin = systemInsets.bottom;
+
+        // If safe margin is enabled and keyboard is not visible, add gesture area
+        if (_options.getEnabledSafeMargin() && !keyboardVisible) {
+          bottomMargin = 150;
+          Log.d(
+            "InAppBrowser",
+            "Safe margin enabled. Total bottom margin: " +
+            bottomMargin +
+            "px (system: " +
+            systemInsets.bottom +
+            "px + gesture: " +
+            gestureInsets.bottom +
+            "px)"
+          );
         }
-        // On Android 15+, don't add top margin as it's handled by AppBarLayout
-        mlp.topMargin = 0;
-      } else {
-        // For all other Android versions, ensure bottom margin respects navigation bar
-        mlp.topMargin = 0; // Top is handled by toolbar
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
-        }
+
+        mlp.bottomMargin = bottomMargin;
+        v.setLayoutParams(mlp);
+
+        return WindowInsetsCompat.CONSUMED;
       }
+    );
 
-      // These stay the same for all Android versions
-      mlp.leftMargin = insets.left;
-      mlp.rightMargin = insets.right;
-      v.setLayoutParams(mlp);
-
-      return WindowInsetsCompat.CONSUMED;
-    });
-
-    // Handle window decoration - version-specific handling
-    if (getWindow() != null) {
-      if (isAndroid15Plus) {
-        // Android 15+: Use edge-to-edge with proper insets handling
-        getWindow().setDecorFitsSystemWindows(false);
-        getWindow().setStatusBarColor(Color.TRANSPARENT);
-        getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-        WindowInsetsControllerCompat controller =
-          new WindowInsetsControllerCompat(
-            getWindow(),
-            getWindow().getDecorView()
-          );
-
-        // Set status bar text color
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
-          try {
-            int backgroundColor = Color.parseColor(_options.getToolbarColor());
-            boolean isDarkBackground = isDarkColor(backgroundColor);
-            controller.setAppearanceLightStatusBars(!isDarkBackground);
-          } catch (IllegalArgumentException e) {
-            // Ignore color parsing errors
-          }
-        }
-      } else if (Build.VERSION.SDK_INT >= 30) {
-        // Android 11-14: Keep navigation bar transparent but respect status bar
-        getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-        WindowInsetsControllerCompat controller =
-          new WindowInsetsControllerCompat(
-            getWindow(),
-            getWindow().getDecorView()
-          );
-
-        // Set status bar color to match toolbar or use system default
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
-          try {
-            int toolbarColor = Color.parseColor(_options.getToolbarColor());
-            getWindow().setStatusBarColor(toolbarColor);
-            boolean isDarkBackground = isDarkColor(toolbarColor);
-            controller.setAppearanceLightStatusBars(!isDarkBackground);
-          } catch (IllegalArgumentException e) {
-            // Follow system theme if color parsing fails
-            boolean isDarkTheme = isDarkThemeEnabled();
-            int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-            getWindow().setStatusBarColor(statusBarColor);
-            controller.setAppearanceLightStatusBars(!isDarkTheme);
-          }
-        } else {
-          // Follow system theme if no toolbar color provided
-          boolean isDarkTheme = isDarkThemeEnabled();
-          int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-          getWindow().setStatusBarColor(statusBarColor);
-          controller.setAppearanceLightStatusBars(!isDarkTheme);
-        }
-      } else {
-        // Pre-Android 11: Use deprecated flags for edge-to-edge navigation bar only
-        getWindow()
-          .getDecorView()
-          .setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-          );
-
-        getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-        // Set status bar color to match toolbar
-        if (
-          _options.getToolbarColor() != null &&
-          !_options.getToolbarColor().isEmpty()
-        ) {
-          try {
-            int toolbarColor = Color.parseColor(_options.getToolbarColor());
-            getWindow().setStatusBarColor(toolbarColor);
-          } catch (IllegalArgumentException e) {
-            // Use system default
-          }
-        }
-      }
-    }
+    insetsListenerSet = true;
+    Log.d("InAppBrowser", "Insets listener setup complete");
   }
 
   public void postMessageToJS(Object detail) {
