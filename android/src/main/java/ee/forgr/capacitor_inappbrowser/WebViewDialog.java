@@ -1086,20 +1086,12 @@ public class WebViewDialog extends Dialog {
           appBarLayout.setBackgroundColor(finalBgColor);
 
           View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+          View parentContainer = findViewById(android.R.id.content);
           ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
             (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
 
-          View parentContainer = findViewById(android.R.id.content);
-          // ViewGroup.MarginLayoutParams mlpParentContainer =
-          //   (ViewGroup.MarginLayoutParams) parentContainer.getLayoutParams();
-
-          Log.d("InAppBrowser", "parent.getHeight(): " + contentBrowserLayout.getHeight());
-          Log.d("InAppBrowser", "statusBarHeight: " + statusBarHeight);
-          Log.d("InAppBrowser", "toolbarView.getHeight(): " + appBarLayout.getHeight());
+          // Recompute the height of the content browser to be able to set margin bottom as we want to
           mlpContentBrowserLayout.height = parentContainer.getHeight() - (statusBarHeight + appBarLayout.getHeight());
-          // mlpParentContainer.bottomMargin = 63;
-          Log.d("InAppBrowser", "mlpContentBrowserLayout.height: " + mlpContentBrowserLayout.height);
-          Log.d("InAppBrowser", "mlpContentBrowserLayout.bottomMargin: " + mlpContentBrowserLayout.bottomMargin);
           contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
         });
       }
@@ -1127,50 +1119,6 @@ public class WebViewDialog extends Dialog {
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
-
-      // Apply safe area padding to parent container if enabled
-      if (_options.getEnabledSafeMargin()) {
-        View parentContainer = findViewById(android.R.id.content);
-        ViewGroup.MarginLayoutParams mlpParentContainer =
-          (ViewGroup.MarginLayoutParams) parentContainer.getLayoutParams();
-        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
-        ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
-          (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
-
-        Log.d("InAppBrowser", "parentContainer: " + parentContainer);
-        Log.d("InAppBrowser", "webView: " + _webView);
-        Log.d("InAppBrowser", "contentBrowserLayout: " + contentBrowserLayout);
-        if (parentContainer != null && _webView != null) {
-          Log.d(
-            "InAppBrowser",
-            "Applying bottom safe area padding: " + insets.bottom
-          );
-
-          // mlpParentContainer.leftMargin = insets.left;
-          // mlpParentContainer.rightMargin = insets.right;
-          // mlpParentContainer.bottomMargin = insets.bottom;
-          // parentContainer.setLayoutParams(mlpParentContainer);
-
-          // mlpContentBrowserLayout.leftMargin = insets.left;
-          // mlpContentBrowserLayout.rightMargin = insets.right;
-          // mlpContentBrowserLayout.bottomMargin = insets.bottom;
-          // contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
-
-          // parentContainer.setPadding(
-          //   parentContainer.getPaddingLeft(),
-          //   parentContainer.getPaddingTop(),
-          //   parentContainer.getPaddingRight(),
-          //   insets.bottom
-          // );
-
-          // contentBrowserLayout.setPadding(
-          //   contentBrowserLayout.getPaddingLeft(),
-          //   contentBrowserLayout.getPaddingTop(),
-          //   contentBrowserLayout.getPaddingRight(),
-          //   insets.bottom
-          // );
-        }
-      }
 
       return WindowInsetsCompat.CONSUMED;
     });
