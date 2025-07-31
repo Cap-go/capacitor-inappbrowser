@@ -1084,6 +1084,23 @@ public class WebViewDialog extends Dialog {
           params.topMargin = statusBarHeight;
           appBarLayout.setLayoutParams(params);
           appBarLayout.setBackgroundColor(finalBgColor);
+
+          View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+          ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
+            (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
+
+          View parentContainer = findViewById(android.R.id.content);
+          // ViewGroup.MarginLayoutParams mlpParentContainer =
+          //   (ViewGroup.MarginLayoutParams) parentContainer.getLayoutParams();
+
+          Log.d("InAppBrowser", "parent.getHeight(): " + contentBrowserLayout.getHeight());
+          Log.d("InAppBrowser", "statusBarHeight: " + statusBarHeight);
+          Log.d("InAppBrowser", "toolbarView.getHeight(): " + appBarLayout.getHeight());
+          mlpContentBrowserLayout.height = parentContainer.getHeight() - (statusBarHeight + appBarLayout.getHeight());
+          // mlpParentContainer.bottomMargin = 63;
+          Log.d("InAppBrowser", "mlpContentBrowserLayout.height: " + mlpContentBrowserLayout.height);
+          Log.d("InAppBrowser", "mlpContentBrowserLayout.bottomMargin: " + mlpContentBrowserLayout.bottomMargin);
+          contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
         });
       }
     }
@@ -1100,27 +1117,13 @@ public class WebViewDialog extends Dialog {
       ViewGroup.MarginLayoutParams mlp =
         (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
-      // Apply margins based on Android version
-      if (isAndroid15Plus) {
-        // Android 15+ specific handling
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
-        }
-        // On Android 15+, don't add top margin as it's handled by AppBarLayout
-        mlp.topMargin = 0;
-      } else {
-        // For all other Android versions, ensure bottom margin respects navigation bar
-        mlp.topMargin = 0; // Top is handled by toolbar
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
-        }
+      // // Apply margins based on Android version
+      if (_options.getEnabledSafeMargin()) {
+         mlp.bottomMargin = insets.bottom;
       }
 
       // These stay the same for all Android versions
+      mlp.topMargin = 0;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
@@ -1128,17 +1131,44 @@ public class WebViewDialog extends Dialog {
       // Apply safe area padding to parent container if enabled
       if (_options.getEnabledSafeMargin()) {
         View parentContainer = findViewById(android.R.id.content);
-        if (parentContainer != null) {
+        ViewGroup.MarginLayoutParams mlpParentContainer =
+          (ViewGroup.MarginLayoutParams) parentContainer.getLayoutParams();
+        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+        ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
+          (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
+
+        Log.d("InAppBrowser", "parentContainer: " + parentContainer);
+        Log.d("InAppBrowser", "webView: " + _webView);
+        Log.d("InAppBrowser", "contentBrowserLayout: " + contentBrowserLayout);
+        if (parentContainer != null && _webView != null) {
           Log.d(
             "InAppBrowser",
             "Applying bottom safe area padding: " + insets.bottom
           );
-          parentContainer.setPadding(
-            parentContainer.getPaddingLeft(),
-            parentContainer.getPaddingTop(),
-            parentContainer.getPaddingRight(),
-            insets.bottom
-          );
+
+          // mlpParentContainer.leftMargin = insets.left;
+          // mlpParentContainer.rightMargin = insets.right;
+          // mlpParentContainer.bottomMargin = insets.bottom;
+          // parentContainer.setLayoutParams(mlpParentContainer);
+
+          // mlpContentBrowserLayout.leftMargin = insets.left;
+          // mlpContentBrowserLayout.rightMargin = insets.right;
+          // mlpContentBrowserLayout.bottomMargin = insets.bottom;
+          // contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
+
+          // parentContainer.setPadding(
+          //   parentContainer.getPaddingLeft(),
+          //   parentContainer.getPaddingTop(),
+          //   parentContainer.getPaddingRight(),
+          //   insets.bottom
+          // );
+
+          // contentBrowserLayout.setPadding(
+          //   contentBrowserLayout.getPaddingLeft(),
+          //   contentBrowserLayout.getPaddingTop(),
+          //   contentBrowserLayout.getPaddingRight(),
+          //   insets.bottom
+          // );
         }
       }
 
