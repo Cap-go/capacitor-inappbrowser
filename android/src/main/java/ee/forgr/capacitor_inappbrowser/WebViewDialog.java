@@ -1091,7 +1091,9 @@ public class WebViewDialog extends Dialog {
             (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
 
           // Recompute the height of the content browser to be able to set margin bottom as we want to
-          mlpContentBrowserLayout.height = parentContainer.getHeight() - (statusBarHeight + appBarLayout.getHeight());
+          mlpContentBrowserLayout.height =
+            parentContainer.getHeight() -
+            (statusBarHeight + appBarLayout.getHeight());
           contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
         });
       }
@@ -1111,7 +1113,7 @@ public class WebViewDialog extends Dialog {
 
       // // Apply margins based on Android version
       if (_options.getEnabledSafeMargin()) {
-         mlp.bottomMargin = insets.bottom;
+        mlp.bottomMargin = insets.bottom;
       }
 
       // These stay the same for all Android versions
