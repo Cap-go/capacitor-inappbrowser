@@ -1087,13 +1087,20 @@ public class WebViewDialog extends Dialog {
           View contentBrowserLayout = findViewById(R.id.content_browser_layout);
           View parentContainer = findViewById(android.R.id.content);
           if (contentBrowserLayout == null || parentContainer == null) {
-            Log.w("InAppBrowser", "Required views not found for height calculation");
+            Log.w(
+              "InAppBrowser",
+              "Required views not found for height calculation"
+            );
             return;
           }
 
-          ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
+          ViewGroup.LayoutParams layoutParams =
+            contentBrowserLayout.getLayoutParams();
           if (!(layoutParams instanceof ViewGroup.MarginLayoutParams)) {
-            Log.w("InAppBrowser", "Content browser layout does not support margins");
+            Log.w(
+              "InAppBrowser",
+              "Content browser layout does not support margins"
+            );
             return;
           }
           ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
