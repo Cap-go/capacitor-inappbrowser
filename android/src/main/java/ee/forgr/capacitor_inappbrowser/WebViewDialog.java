@@ -1084,6 +1084,40 @@ public class WebViewDialog extends Dialog {
           params.topMargin = statusBarHeight;
           appBarLayout.setLayoutParams(params);
           appBarLayout.setBackgroundColor(finalBgColor);
+          View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+          View parentContainer = findViewById(android.R.id.content);
+          if (contentBrowserLayout == null || parentContainer == null) {
+            Log.w(
+              "InAppBrowser",
+              "Required views not found for height calculation"
+            );
+            return;
+          }
+
+          ViewGroup.LayoutParams layoutParams =
+            contentBrowserLayout.getLayoutParams();
+          if (!(layoutParams instanceof ViewGroup.MarginLayoutParams)) {
+            Log.w(
+              "InAppBrowser",
+              "Content browser layout does not support margins"
+            );
+            return;
+          }
+          ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
+            (ViewGroup.MarginLayoutParams) layoutParams;
+
+          int parentHeight = parentContainer.getHeight();
+          int appBarHeight = appBarLayout.getHeight(); // can be 0 if not visible with the toolbar type BLANK
+
+          if (parentHeight <= 0) {
+            Log.w("InAppBrowser", "Parent dimensions not yet available");
+            return;
+          }
+
+          // Recompute the height of the content browser to be able to set margin bottom as we want to
+          mlpContentBrowserLayout.height =
+            parentHeight - (statusBarHeight + appBarHeight);
+          contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
         });
       }
     }
@@ -1100,47 +1134,16 @@ public class WebViewDialog extends Dialog {
       ViewGroup.MarginLayoutParams mlp =
         (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
-      // Apply margins based on Android version
-      if (isAndroid15Plus) {
-        // Android 15+ specific handling
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
-        }
-        // On Android 15+, don't add top margin as it's handled by AppBarLayout
-        mlp.topMargin = 0;
-      } else {
-        // For all other Android versions, ensure bottom margin respects navigation bar
-        mlp.topMargin = 0; // Top is handled by toolbar
-        if (keyboardVisible) {
-          mlp.bottomMargin = 0;
-        } else {
-          mlp.bottomMargin = insets.bottom;
-        }
+      // // Apply margins based on Android version
+      if (_options.getEnabledSafeMargin()) {
+        mlp.bottomMargin = insets.bottom;
       }
 
       // These stay the same for all Android versions
+      mlp.topMargin = 0;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
-
-      // Apply safe area padding to parent container if enabled
-      if (_options.getEnabledSafeMargin()) {
-        View parentContainer = findViewById(android.R.id.content);
-        if (parentContainer != null) {
-          Log.d(
-            "InAppBrowser",
-            "Applying bottom safe area padding: " + insets.bottom
-          );
-          parentContainer.setPadding(
-            parentContainer.getPaddingLeft(),
-            parentContainer.getPaddingTop(),
-            parentContainer.getPaddingRight(),
-            insets.bottom
-          );
-        }
-      }
 
       return WindowInsetsCompat.CONSUMED;
     });
