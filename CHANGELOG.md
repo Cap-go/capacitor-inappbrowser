@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [7.16.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.0...7.16.1) (2025-08-01)
+
+
+### Bug Fixes
+
+* **android:** safe margin by computing by hand the height of the parent layout ([2a7a0cd](https://github.com/Cap-go/capacitor-inappbrowser/commit/2a7a0cde9c7d077fba094a5440544fe2250a30f9))
+* handle tooltape type BLANK ([9bbd530](https://github.com/Cap-go/capacitor-inappbrowser/commit/9bbd53014f0b64ea17cc9b9dba584a23dfc4f6c5))
+
 ## [7.16.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.15.2...7.16.0) (2025-07-29)
 
 
