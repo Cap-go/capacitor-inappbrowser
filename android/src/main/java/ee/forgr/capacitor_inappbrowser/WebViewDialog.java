@@ -1084,16 +1084,31 @@ public class WebViewDialog extends Dialog {
           params.topMargin = statusBarHeight;
           appBarLayout.setLayoutParams(params);
           appBarLayout.setBackgroundColor(finalBgColor);
-
           View contentBrowserLayout = findViewById(R.id.content_browser_layout);
           View parentContainer = findViewById(android.R.id.content);
+          if (contentBrowserLayout == null || parentContainer == null) {
+            Log.w("InAppBrowser", "Required views not found for height calculation");
+            return;
+          }
+
+          ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
+          if (!(layoutParams instanceof ViewGroup.MarginLayoutParams)) {
+            Log.w("InAppBrowser", "Content browser layout does not support margins");
+            return;
+          }
           ViewGroup.MarginLayoutParams mlpContentBrowserLayout =
-            (ViewGroup.MarginLayoutParams) contentBrowserLayout.getLayoutParams();
+            (ViewGroup.MarginLayoutParams) layoutParams;
+
+          int parentHeight = parentContainer.getHeight();
+          int appBarHeight = appBarLayout.getHeight();
+          if (parentHeight <= 0 || appBarHeight <= 0) {
+            Log.w("InAppBrowser", "Layout dimensions not yet available");
+            return;
+          }
 
           // Recompute the height of the content browser to be able to set margin bottom as we want to
           mlpContentBrowserLayout.height =
-            parentContainer.getHeight() -
-            (statusBarHeight + appBarLayout.getHeight());
+            parentHeight - (statusBarHeight + appBarHeight);
           contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
         });
       }
