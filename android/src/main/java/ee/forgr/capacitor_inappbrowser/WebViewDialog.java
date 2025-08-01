@@ -1100,9 +1100,10 @@ public class WebViewDialog extends Dialog {
             (ViewGroup.MarginLayoutParams) layoutParams;
 
           int parentHeight = parentContainer.getHeight();
-          int appBarHeight = appBarLayout.getHeight();
-          if (parentHeight <= 0 || appBarHeight <= 0) {
-            Log.w("InAppBrowser", "Layout dimensions not yet available");
+          int appBarHeight = appBarLayout.getHeight(); // can be 0 if not visible with the toolbar type BLANK
+
+          if (parentHeight <= 0) {
+            Log.w("InAppBrowser", "Parent dimensions not yet available");
             return;
           }
 
