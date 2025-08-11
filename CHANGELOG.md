@@ -1,6 +1,13 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
+
+## [7.16.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.2...7.16.3) (2025-08-11)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.appcompat:appcompat to v1.7.1 ([#334](https://github.com/Cap-go/capacitor-inappbrowser/issues/334)) ([89320ab](https://github.com/Cap-go/capacitor-inappbrowser/commit/89320ab71c84b4cd4e9f0032c6f3ad73c3796608))
 
 ### [7.16.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.1...7.16.2) (2025-08-05)
 
