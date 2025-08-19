@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "CapgoCapacitorInappbrowser",
+    name: "CapgoInappbrowser",
     platforms: [.iOS(.v14)],
     products: [
         .library(
-            name: "CapgoCapacitorInappbrowser",
+            name: "CapgoInappbrowser",
             targets: ["InappbrowserPlugin"])
     ],
     dependencies: [
@@ -19,7 +19,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
-            path: "ios/Sources/InappbrowserPlugin"),
+            path: "ios/Plugin"),
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],
