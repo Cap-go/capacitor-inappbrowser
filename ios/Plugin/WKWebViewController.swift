@@ -895,24 +895,31 @@ public extension WKWebViewController {
     }
 
     open func cleanupWebView() {
-        webView?.stopLoading()
-        webView?.loadHTMLString("", baseURL: nil)
+        guard let webView = self.webView else { return }
+        webView.stopLoading()
+        // Break delegate callbacks early
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.loadHTMLString("", baseURL: nil)
 
-        webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+        webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
-            webView?.removeObserver(self, forKeyPath: titleKeyPath)
+            webView.removeObserver(self, forKeyPath: titleKeyPath)
         }
-        webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+        webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
 
-        webView?.configuration.userContentController.removeAllUserScripts()
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
+        webView.configuration.userContentController.removeAllUserScripts()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
 
-        webView?.removeFromSuperview()
-        webView = nil
+        webView.removeFromSuperview()
+        // Also clean progress bar view if present
+        progressView?.removeFromSuperview()
+        progressView = nil
+        self.webView = nil
     }
 }
 
