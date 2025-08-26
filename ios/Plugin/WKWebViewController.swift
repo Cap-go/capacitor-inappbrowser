@@ -893,6 +893,27 @@ public extension WKWebViewController {
 
         executeScript(script: script)
     }
+
+    open func cleanupWebView() {
+        webView?.stopLoading()
+        webView?.loadHTMLString("", baseURL: nil)
+
+        webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+        if websiteTitleInNavigationBar {
+            webView?.removeObserver(self, forKeyPath: titleKeyPath)
+        }
+        webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+
+        webView?.configuration.userContentController.removeAllUserScripts()
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
+
+        webView?.removeFromSuperview()
+        webView = nil
+    }
 }
 
 // MARK: - Fileprivate Methods
@@ -1285,21 +1306,9 @@ fileprivate extension WKWebViewController {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
         }
         if canDismiss {
-            // Cleanup webView
-            webView?.stopLoading()
-            webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
-            if websiteTitleInNavigationBar {
-                webView?.removeObserver(self, forKeyPath: titleKeyPath)
-            }
-            webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
-            webView?.configuration.userContentController.removeAllUserScripts()
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-            webView = nil
-
-            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            let currentUrl = webView?.url?.absoluteString ?? ""
+            cleanupWebView()
+            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
             dismiss(animated: true, completion: nil)
         }
     }
@@ -1327,6 +1336,7 @@ fileprivate extension WKWebViewController {
 
     func close() {
         let currentUrl = webView?.url?.absoluteString ?? ""
+        cleanupWebView()
         dismiss(animated: true, completion: nil)
         capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
     }
