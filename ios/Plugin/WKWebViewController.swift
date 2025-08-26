@@ -969,7 +969,6 @@ fileprivate extension WKWebViewController {
         if !(self.navigationController?.navigationBar.isHidden)! {
             self.progressView?.frame.origin.y = CGFloat((self.navigationController?.navigationBar.frame.height)!)
             self.navigationController?.navigationBar.addSubview(self.progressView!)
-            webView?.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
         }
     }
 
@@ -1344,8 +1343,8 @@ fileprivate extension WKWebViewController {
     func close() {
         let currentUrl = webView?.url?.absoluteString ?? ""
         cleanupWebView()
-        dismiss(animated: true, completion: nil)
         capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+        dismiss(animated: true, completion: nil)
     }
 
     open func setUpNavigationBarAppearance() {
