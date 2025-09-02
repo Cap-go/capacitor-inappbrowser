@@ -893,6 +893,34 @@ public extension WKWebViewController {
 
         executeScript(script: script)
     }
+
+    open func cleanupWebView() {
+        guard let webView = self.webView else { return }
+        webView.stopLoading()
+        // Break delegate callbacks early
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.loadHTMLString("", baseURL: nil)
+
+        webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
+        if websiteTitleInNavigationBar {
+            webView.removeObserver(self, forKeyPath: titleKeyPath)
+        }
+        webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+
+        webView.configuration.userContentController.removeAllUserScripts()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
+
+        webView.removeFromSuperview()
+        // Also clean progress bar view if present
+        progressView?.removeFromSuperview()
+        progressView = nil
+        self.webView = nil
+    }
 }
 
 // MARK: - Fileprivate Methods
@@ -941,7 +969,6 @@ fileprivate extension WKWebViewController {
         if !(self.navigationController?.navigationBar.isHidden)! {
             self.progressView?.frame.origin.y = CGFloat((self.navigationController?.navigationBar.frame.height)!)
             self.navigationController?.navigationBar.addSubview(self.progressView!)
-            webView?.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
         }
     }
 
@@ -1285,21 +1312,9 @@ fileprivate extension WKWebViewController {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
         }
         if canDismiss {
-            // Cleanup webView
-            webView?.stopLoading()
-            webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
-            if websiteTitleInNavigationBar {
-                webView?.removeObserver(self, forKeyPath: titleKeyPath)
-            }
-            webView?.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
-            webView?.configuration.userContentController.removeAllUserScripts()
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-            webView = nil
-
-            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            let currentUrl = webView?.url?.absoluteString ?? ""
+            cleanupWebView()
+            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
             dismiss(animated: true, completion: nil)
         }
     }
@@ -1327,8 +1342,9 @@ fileprivate extension WKWebViewController {
 
     func close() {
         let currentUrl = webView?.url?.absoluteString ?? ""
-        dismiss(animated: true, completion: nil)
+        cleanupWebView()
         capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+        dismiss(animated: true, completion: nil)
     }
 
     open func setUpNavigationBarAppearance() {
