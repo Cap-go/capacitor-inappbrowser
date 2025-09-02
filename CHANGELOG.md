@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.8...7.16.9) (2025-09-02)
+
+
+### Bug Fixes
+
+* ensure browserPageLoaded is only fired for Custom Tabs ([2dbc3c5](https://github.com/Cap-go/capacitor-inappbrowser/commit/2dbc3c5773a8bb13ec746f54fb611ee90ea8ade1))
+
 ## [7.16.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.7...7.16.8) (2025-09-02)
 
 
