@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.5...7.16.6) (2025-09-02)
+
+
+### Bug Fixes
+
+* **deps:** update capacitor monorepo to v7.4.3 ([d0e3207](https://github.com/Cap-go/capacitor-inappbrowser/commit/d0e32077749e7e216b32326db536dc06896830dd))
+* **deps:** update dependency androidx.test.ext:junit to v1.3.0 ([8a1995b](https://github.com/Cap-go/capacitor-inappbrowser/commit/8a1995b29039e86e9b141f5c081e8a7138388443))
+
 ## [7.16.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.4...7.16.5) (2025-09-02)
 
 ## [7.16.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.3...7.16.4) (2025-08-11)
