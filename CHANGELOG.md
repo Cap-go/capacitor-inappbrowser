@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.6...7.16.7) (2025-09-02)
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.coordinatorlayout:coordinatorlayout to v1.3.0 ([96eeb04](https://github.com/Cap-go/capacitor-inappbrowser/commit/96eeb0458a20bc28287be65767bf2a161763e446))
+* **deps:** update dependency androidx.test.espresso:espresso-core to v3.7.0 ([48818ca](https://github.com/Cap-go/capacitor-inappbrowser/commit/48818ca78ec932f478f1f22730a4ac446593e439))
+* **ios:** dispose WKWebView on close and teardown resources ([#343](https://github.com/Cap-go/capacitor-inappbrowser/issues/343))\n\n- Add cleanupWebView() to explicitly stop, clear, and remove observers/handlers\n- Call cleanupWebView() from closeView() and close()\n- Update plugin close() to cleanup and clear references before/after dismiss\n\nFixes [#343](https://github.com/Cap-go/capacitor-inappbrowser/issues/343) ([e20dabf](https://github.com/Cap-go/capacitor-inappbrowser/commit/e20dabf548f88a11c81f563dc6d9c6b40eaa0025))
+
 ## [7.16.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.5...7.16.6) (2025-09-02)
 
 
