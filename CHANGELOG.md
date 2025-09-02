@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.8](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.7...7.16.8) (2025-09-02)
+
+
+### Bug Fixes
+
+* **docs:** update event listener syntax in README.md ([3c1c54e](https://github.com/Cap-go/capacitor-inappbrowser/commit/3c1c54e0f4eb24406fd2acc8cd7570460f7f57ff))
+
 ## [7.16.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.6...7.16.7) (2025-09-02)
 
 
