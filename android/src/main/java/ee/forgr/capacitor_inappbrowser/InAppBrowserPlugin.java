@@ -1023,7 +1023,10 @@ public class InAppBrowserPlugin
         new CustomTabsCallback() {
           @Override
           public void onNavigationEvent(int navigationEvent, Bundle extras) {
-            if (navigationEvent == NAVIGATION_FINISHED) {
+            // Only fire browserPageLoaded for Custom Tabs, not for WebView
+            if (
+              navigationEvent == NAVIGATION_FINISHED && webViewDialog == null
+            ) {
               notifyListeners("browserPageLoaded", new JSObject());
             }
           }
