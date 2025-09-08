@@ -2,6 +2,8 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.9...7.16.10) (2025-09-08)
+
 ## [7.16.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.8...7.16.9) (2025-09-02)
 
 
