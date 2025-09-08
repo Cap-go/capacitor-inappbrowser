@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.10...7.16.11) (2025-09-08)
+
+
+### Bug Fixes
+
+* **deps:** update dependency com.google.android.material:material to v1.13.0 ([#347](https://github.com/Cap-go/capacitor-inappbrowser/issues/347)) ([d1169d1](https://github.com/Cap-go/capacitor-inappbrowser/commit/d1169d153e658a2ab48b0b8359881c59a9451fe5))
+
 ## [7.16.10](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.9...7.16.10) (2025-09-08)
 
 ## [7.16.9](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.8...7.16.9) (2025-09-02)
