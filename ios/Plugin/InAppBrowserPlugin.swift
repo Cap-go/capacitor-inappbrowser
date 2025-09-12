@@ -355,6 +355,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
 
+        let blockedHostsRaw = call.getArray("blockedHosts", [])
+        let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
+
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
@@ -363,7 +366,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: toolbarType == "blank", enabledSafeBottomMargin: enabledSafeBottomMargin)
+            self.webViewController = WKWebViewController.init(
+                url: url,
+                headers: headers,
+                isInspectable: isInspectable,
+                credentials: credentials,
+                preventDeeplink: preventDeeplink,
+                blankNavigationTab: toolbarType == "blank",
+                enabledSafeBottomMargin: enabledSafeBottomMargin,
+                blockedHosts: blockedHosts
+            )
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")

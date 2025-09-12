@@ -96,6 +96,9 @@ window.customElements.define(
         <p>
           <button class="button" id="open-browser">Open In-App Browser</button>
         </p>
+        <p>
+          <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
+        </p>
       </main>
     </div>
     `;
@@ -133,7 +136,38 @@ window.customElements.define(
               toolbarType: ToolBarType.NAVIGATION,
               backgroundColor: BackgroundColor.BLACK,
               title: "Capacitor InAppBrowser",
-              enabledSafeBottomMargin: true,
+              enabledSafeMargin: true,
+            });
+
+            // Add event listeners after opening the browser
+            InAppBrowser.addListener("urlChange", (result) => {
+              console.log("URL changed:", result.url);
+            });
+
+            InAppBrowser.addListener("closePressed", () => {
+              console.log("Close button pressed");
+            });
+
+            InAppBrowser.addListener("sharePressed", () => {
+              console.log("Share button pressed");
+            });
+          } catch (e) {
+            console.error("Error opening in-app browser:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#open-browser-with-blocked-host")
+        .addEventListener("click", async function (e) {
+          try {
+            await InAppBrowser.openWebView({
+              url: "https://github.com/Cap-go/capacitor-inappbrowser",
+              toolbarColor: "#000000",
+              toolbarType: ToolBarType.NAVIGATION,
+              backgroundColor: BackgroundColor.BLACK,
+              title: "Capacitor InAppBrowser, blocked GitHub host",
+              enabledSafeMargin: true,
+              blockedHosts: ["github.com"],
             });
 
             // Add event listeners after opening the browser
