@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.12...7.16.13) (2025-09-12)
+
+
+### Bug Fixes
+
+* **deps:** add rule for com.google.* packages to allow android versions ([fd871ae](https://github.com/Cap-go/capacitor-inappbrowser/commit/fd871ae5fd0e02725ce1df75fad7240ee65194a2))
+
 ## [7.16.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.11...7.16.12) (2025-09-11)
 
 ## [7.16.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.10...7.16.11) (2025-09-08)
