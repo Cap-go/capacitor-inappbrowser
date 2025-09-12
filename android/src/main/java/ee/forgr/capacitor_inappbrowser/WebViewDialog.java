@@ -1140,7 +1140,7 @@ public class WebViewDialog extends Dialog {
       }
 
       // These stay the same for all Android versions
-      mlp.topMargin = 0;
+      mlp.topMargin = insets.top;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
