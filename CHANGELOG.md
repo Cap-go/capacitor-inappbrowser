@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.14](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.13...7.16.14) (2025-09-12)
+
+
+### Bug Fixes
+
+* add dependencyDashboard setting to renovate configuration ([08c02eb](https://github.com/Cap-go/capacitor-inappbrowser/commit/08c02eb87fc94aac07e58a3b675736617abecb5f))
+
 ## [7.16.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.12...7.16.13) (2025-09-12)
 
 
