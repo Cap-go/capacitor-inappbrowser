@@ -456,6 +456,19 @@ export interface OpenWebViewOptions {
    * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
    */
   enableGooglePaySupport?: boolean;
+
+  /**
+   * blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations.
+   * Any request inside WebView to a URL with a host matching any of these patterns will be blocked.
+   * Supports wildcard patterns like "*.example.com" to block all subdomains.
+   * **Note**: This does not affect the initial URL loaded, only internal navigations.
+   *
+   * @since 7.17.0
+   * @default []
+   * @example
+   * blockedHosts: ["*.tracking.com", "ads.example.com"]
+   */
+  blockedHosts?: string[];
 }
 
 export interface InAppBrowserPlugin {
