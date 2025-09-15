@@ -2396,7 +2396,8 @@ public class WebViewDialog extends Dialog {
 
         /**
          * Checks if a host should be blocked based on the configured blocked hosts patterns
-         * @param host The host to check
+         * @param url The URL to check
+         * @param blockedHosts The list of blocked hosts patterns
          * @return true if the host should be blocked, false otherwise
          */
         private boolean shouldBlockHost(String url, List<String> blockedHosts) {
@@ -2586,6 +2587,8 @@ public class WebViewDialog extends Dialog {
           if (blockedHosts != null && !blockedHosts.isEmpty()) {
             Log.d("InAppBrowser", "Checking for blocked hosts");
             if (shouldBlockHost(url, blockedHosts)) {
+              // Make sure to notify that a URL has changed even when it was blocked
+              _options.getCallbacks().urlChangeEvent(url);
               Log.d("InAppBrowser", "Navigation blocked for URL: " + url);
               return true; // Block the navigation
             }
