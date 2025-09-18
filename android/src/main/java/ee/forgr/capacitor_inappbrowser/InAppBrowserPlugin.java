@@ -757,6 +757,29 @@ public class InAppBrowserPlugin
       Log.d("InAppBrowserPlugin", "No authorized app links provided.");
     }
 
+    JSArray blockedHostsRaw = call.getArray("blockedHosts");
+    if (blockedHostsRaw != null && blockedHostsRaw.length() > 0) {
+      List<String> blockedHosts = new ArrayList<>();
+      for (int i = 0; i < blockedHostsRaw.length(); i++) {
+        try {
+          String host = blockedHostsRaw.getString(i);
+          if (host != null && !host.trim().isEmpty()) {
+            blockedHosts.add(host);
+          }
+        } catch (Exception e) {
+          Log.w(
+            "InAppBrowserPlugin",
+            "Error reading blocked host at index " + i,
+            e
+          );
+        }
+      }
+      Log.d("InAppBrowserPlugin", "Parsed blocked hosts: " + blockedHosts);
+      options.setBlockedHosts(blockedHosts);
+    } else {
+      Log.d("InAppBrowserPlugin", "No blocked hosts provided.");
+    }
+
     // Set Google Pay support option
     options.setEnableGooglePaySupport(
       Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false))
