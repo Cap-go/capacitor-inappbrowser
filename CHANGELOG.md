@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.16](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.15...7.16.16) (2025-09-18)
+
+
+### Bug Fixes
+
+* reorder build steps to ensure verification occurs after linting ([756f5e4](https://github.com/Cap-go/capacitor-inappbrowser/commit/756f5e4551571be640ee747b4751df538f0f97c1))
+
 ## [7.16.15](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.14...7.16.15) (2025-09-18)
 
 
