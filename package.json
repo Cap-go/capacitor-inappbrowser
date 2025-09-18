@@ -1,6 +1,6 @@
 {
   "name": "@capgo/inappbrowser",
-  "version": "7.16.16",
+  "version": "7.16.17",
   "description": "Capacitor plugin in app browser",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
