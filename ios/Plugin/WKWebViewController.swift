@@ -1694,7 +1694,7 @@ extension WKWebViewController: WKNavigationDelegate {
         // Check for blocked hosts using the extracted function
         if let host = u.host, shouldBlockHost(host) {
             print("[InAppBrowser] Blocked host detected: \(host)")
-            self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": u.absoluteString ?? ""])
+            self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": u.absoluteString])
             actionPolicy = .cancel
         }
 
