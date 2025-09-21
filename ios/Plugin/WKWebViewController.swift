@@ -1498,25 +1498,10 @@ extension WKWebViewController {
     ///   - pattern: The pattern with wildcards to convert to regex
     /// - Returns: true if the host matches the regex pattern
     private func matchesRegexPattern(host: String, pattern: String) -> Bool {
-        // Escape special regex characters except *
-        let escapedPattern =
-            pattern
-            .replacingOccurrences(of: ".", with: "\\.")
-            .replacingOccurrences(of: "+", with: "\\+")
-            .replacingOccurrences(of: "?", with: "\\?")
-            .replacingOccurrences(of: "^", with: "\\^")
-            .replacingOccurrences(of: "$", with: "\\$")
-            .replacingOccurrences(of: "(", with: "\\(")
-            .replacingOccurrences(of: ")", with: "\\)")
-            .replacingOccurrences(of: "[", with: "\\[")
-            .replacingOccurrences(of: "]", with: "\\]")
-            .replacingOccurrences(of: "{", with: "\\{")
-            .replacingOccurrences(of: "}", with: "\\}")
-            .replacingOccurrences(of: "|", with: "\\|")
-            .replacingOccurrences(of: "\\", with: "\\\\")
-
-        // Convert wildcards to regex
-        let regexPattern = "^" + escapedPattern.replacingOccurrences(of: "*", with: ".*") + "$"
+        // Escape everything, then re-enable '*' as a wildcard
+        let escaped = NSRegularExpression.escapedPattern(for: pattern)
+        let wildcardEnabled = escaped.replacingOccurrences(of: "\\*", with: ".*")
+        let regexPattern = "^\(wildcardEnabled)$"
 
         do {
             let regex = try NSRegularExpression(pattern: regexPattern, options: [])

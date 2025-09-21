@@ -2582,13 +2582,19 @@ public class WebViewDialog extends Dialog {
             }
           }
 
-          // Check for blocked hosts using the extracted function
+          // Check for blocked hosts (main-frame only) using the extracted function
           List<String> blockedHosts = _options.getBlockedHosts();
-          if (blockedHosts != null && !blockedHosts.isEmpty()) {
-            Log.d("InAppBrowser", "Checking for blocked hosts");
+          if (
+            blockedHosts != null &&
+            !blockedHosts.isEmpty() &&
+            request.isForMainFrame()
+          ) {
+            Log.d("InAppBrowser", "Checking for blocked hosts (on main frame)");
             if (shouldBlockHost(url, blockedHosts)) {
               // Make sure to notify that a URL has changed even when it was blocked
-              _options.getCallbacks().urlChangeEvent(url);
+              if (_options.getCallbacks() != null) {
+                _options.getCallbacks().urlChangeEvent(url);
+              }
               Log.d("InAppBrowser", "Navigation blocked for URL: " + url);
               return true; // Block the navigation
             }
