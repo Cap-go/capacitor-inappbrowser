@@ -10,7 +10,7 @@ let package = Package(
             targets: ["InappbrowserPlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.4.3")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
     ],
     targets: [
         .target(
@@ -19,7 +19,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
-            path: "ios/Plugin"),
+            path: "ios/Sources/InAppBrowserPlugin"),
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],

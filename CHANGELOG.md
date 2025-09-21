@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.16.18](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.17...7.16.18) (2025-09-18)
+
+
+### Bug Fixes
+
+* **ios:** allow any 7.x Capacitor version ([f525d6b](https://github.com/Cap-go/capacitor-inappbrowser/commit/f525d6b43434e0c5f28b381fee4e7de282c40801))
+
+## [7.16.17](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.16...7.16.17) (2025-09-18)
+
+## [7.16.16](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.15...7.16.16) (2025-09-18)
+
+
+### Bug Fixes
+
+* reorder build steps to ensure verification occurs after linting ([756f5e4](https://github.com/Cap-go/capacitor-inappbrowser/commit/756f5e4551571be640ee747b4751df538f0f97c1))
+
+## [7.16.15](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.14...7.16.15) (2025-09-18)
+
+
+### Bug Fixes
+
+* update build workflow to include linting and upgrade action versions ([75d6f54](https://github.com/Cap-go/capacitor-inappbrowser/commit/75d6f54599ee2a71e686862d8b396850887199f6))
+
+## [7.16.14](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.13...7.16.14) (2025-09-12)
+
+
+### Bug Fixes
+
+* add dependencyDashboard setting to renovate configuration ([08c02eb](https://github.com/Cap-go/capacitor-inappbrowser/commit/08c02eb87fc94aac07e58a3b675736617abecb5f))
+
+## [7.16.13](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.12...7.16.13) (2025-09-12)
+
+
+### Bug Fixes
+
+* **deps:** add rule for com.google.* packages to allow android versions ([fd871ae](https://github.com/Cap-go/capacitor-inappbrowser/commit/fd871ae5fd0e02725ce1df75fad7240ee65194a2))
+
 ## [7.16.12](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.11...7.16.12) (2025-09-11)
 
 ## [7.16.11](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.10...7.16.11) (2025-09-08)
