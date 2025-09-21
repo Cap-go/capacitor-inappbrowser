@@ -131,11 +131,11 @@ window.customElements.define(
         .addEventListener("click", async function (e) {
           try {
             await InAppBrowser.openWebView({
-              url: 'https://github.com/Cap-go/capacitor-inappbrowser',
-              toolbarColor: '#000000',
+              url: "https://github.com/Cap-go/capacitor-inappbrowser",
+              toolbarColor: "#000000",
               toolbarType: ToolBarType.NAVIGATION,
               backgroundColor: BackgroundColor.BLACK,
-              title: 'Capacitor InAppBrowser',
+              title: "Capacitor InAppBrowser",
               enabledSafeBottomMargin: true,
             });
 
@@ -161,13 +161,13 @@ window.customElements.define(
         .addEventListener("click", async function (e) {
           try {
             await InAppBrowser.openWebView({
-              url: 'https://github.com/Cap-go/capacitor-inappbrowser',
-              toolbarColor: '#000000',
+              url: "https://github.com/Cap-go/capacitor-inappbrowser",
+              toolbarColor: "#000000",
               toolbarType: ToolBarType.NAVIGATION,
               backgroundColor: BackgroundColor.BLACK,
-              title: 'Capacitor InAppBrowser, blocked GitHub host',
+              title: "Capacitor InAppBrowser, blocked GitHub host",
               enabledSafeBottomMargin: true,
-              blockedHosts: ['github.com'],
+              blockedHosts: ["github.com"],
             });
 
             // Add event listeners after opening the browser
