@@ -546,7 +546,8 @@ export interface InAppBrowserPlugin {
     listenerFunc: UrlChangeListener,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when user clicks on confirm button when disclaimer is required
+   * Will be triggered when user clicks on confirm button when disclaimer is required,
+   * works with openWebView shareDisclaimer and closeModal
    *
    * @since 0.0.1
    */

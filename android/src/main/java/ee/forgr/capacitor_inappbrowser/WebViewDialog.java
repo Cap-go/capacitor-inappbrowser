@@ -1870,6 +1870,8 @@ public class WebViewDialog extends Dialog {
                     String currentUrl = getUrl();
                     dismiss();
                     if (_options != null && _options.getCallbacks() != null) {
+                      // Notify that confirm was clicked
+                      _options.getCallbacks().confirmBtnClicked(currentUrl);
                       _options.getCallbacks().closeEvent(currentUrl);
                     }
                   }

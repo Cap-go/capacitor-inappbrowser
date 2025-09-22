@@ -1269,6 +1269,7 @@ fileprivate extension WKWebViewController {
                 title: disclaimer["title"] as? String ?? "Title",
                 message: disclaimer["message"] as? String ?? "Message",
                 preferredStyle: UIAlertController.Style.alert)
+            let currentUrl = self.webView?.url?.absoluteString ?? ""
 
             // Add confirm button that continues with sharing
             alert.addAction(UIAlertAction(
@@ -1276,7 +1277,7 @@ fileprivate extension WKWebViewController {
                 style: UIAlertAction.Style.default,
                 handler: { _ in
                     // Notify that confirm was clicked
-                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: nil)
+                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
 
                     // Show the share dialog
                     self.showShareSheet(items: items, sender: sender)
