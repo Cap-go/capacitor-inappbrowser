@@ -1322,8 +1322,11 @@ fileprivate extension WKWebViewController {
     @objc func doneDidClick(sender: AnyObject) {
         // check if closeModal is true, if true display alert before close
         if self.closeModal {
+            let currentUrl = webView?.url?.absoluteString ?? ""
             let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
             alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
+                // Notify that confirm was clicked
+                self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
                 self.closeView()
             }))
             alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))

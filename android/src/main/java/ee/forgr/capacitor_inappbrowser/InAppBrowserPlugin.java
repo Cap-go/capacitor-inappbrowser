@@ -688,8 +688,8 @@ public class InAppBrowserPlugin
         }
 
         @Override
-        public void confirmBtnClicked() {
-          notifyListeners("confirmBtnClicked", new JSObject());
+        public void confirmBtnClicked(String url) {
+          notifyListeners("confirmBtnClicked", new JSObject().put("url", url));
         }
 
         @Override

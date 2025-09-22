@@ -2201,7 +2201,9 @@ public class WebViewDialog extends Dialog {
             .setPositiveButton(
               shareDisclaimer.getString("confirmBtn", "Confirm"),
               (dialog, which) -> {
-                _options.getCallbacks().confirmBtnClicked();
+                // Notify that confirm was clicked
+                String currentUrl = getUrl();
+                _options.getCallbacks().confirmBtnClicked(currentUrl);
                 shareUrl();
               }
             )
