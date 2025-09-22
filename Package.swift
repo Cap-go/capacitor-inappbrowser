@@ -23,6 +23,6 @@ let package = Package(
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],
-            path: "ios/PluginTests/InappbrowserPluginTests")
+            path: "ios/PluginTests")
     ]
 )
