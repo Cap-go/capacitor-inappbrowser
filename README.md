@@ -392,7 +392,8 @@ Listen for close click only for openWebView
 addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
 ```
 
-Will be triggered when user clicks on confirm button when disclaimer is required
+Will be triggered when user clicks on confirm button when disclaimer is required,
+works with openWebView shareDisclaimer and closeModal
 
 | Param              | Type                                                              |
 | ------------------ | ----------------------------------------------------------------- |
