@@ -1,22 +1,45 @@
 name: Build source code and check lint
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     tags:
       - "*"
 
 jobs:
-  build_android:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        id: install_code
+        run: bun i
+      - name: Lint
+        id: lint_code
+        run: bun run lint
+      - name: Build
+        id: build_code
+        run: bun run build
+      - name: Verify
+        id: verify_code
+        run: bun run verify:web
+  build_android:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - name: Install dependencies
         id: install_code
         run: bun i
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '21'
@@ -28,10 +51,11 @@ jobs:
         id: build_code
         run: npm run verify:android
   build_ios:
+    needs: lint
     runs-on: macOS-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - uses: actions/cache@v4
         id: cocoapods-cache
@@ -51,24 +75,18 @@ jobs:
     runs-on: ubuntu-latest
     name: "Build code and npm release"
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
       - name: Install dependencies
         id: install_code
         run: bun i
-      - name: Lint
-        id: lint_code
-        run: bun run lint
       - name: Build
         id: build_code
         run: bun run build
-      - name: Verify
-        id: verify_code
-        run: bun run verify:web
       - uses: JS-DevTools/npm-publish@v3
         if: ${{ !contains(github.ref, '-alpha.') }}
         with:
@@ -80,3 +98,9 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
           tag: next
           provenance: true
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref, '-alpha.') }}

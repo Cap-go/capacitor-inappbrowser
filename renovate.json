@@ -4,6 +4,7 @@
     "config:base",
     "schedule:earlyMondays"
   ],
+  "dependencyDashboard": false,
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
@@ -20,6 +21,11 @@
       "matchPackageNames": ["eslint"],
       "matchManagers": ["npm"],
       "enabled": false
+    },
+    {
+      "matchPackagePatterns": ["^com\\.google\\..*"],
+      "matchCurrentVersion": "/^.*-android$/",
+      "allowedVersions": "/^.*-android$/"
     },
     {
       "matchPackagePatterns": ["^com\\.android\\.tools\\.build\\:gradle$"],
