@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.18.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.17.0...7.18.0) (2025-09-23)
+
+
+### Features
+
+* adds option to block list of hostnames ([b264d64](https://github.com/Cap-go/capacitor-inappbrowser/commit/b264d64359b6dd84b4492c4f379af0a75064e6bc))
+* send event when url changes to one from blocked host ([12c8ee0](https://github.com/Cap-go/capacitor-inappbrowser/commit/12c8ee0600c5f239628b7c67e1646f012cbe0566))
+
+
+### Bug Fixes
+
+* adds top safe-area margin like in iOS ([7688899](https://github.com/Cap-go/capacitor-inappbrowser/commit/76888996fa376d8034b0e2329482c319c0f68d6d)), closes [./ios/Plugin/WKWebViewController.swift#L659-L664](https://github.com/./ios/Plugin/WKWebViewController.swift/issues/L659-L664)
+* fixes comment and make sure to notify on url change like in ios ([dd375fd](https://github.com/Cap-go/capacitor-inappbrowser/commit/dd375fdc39211549d48f37450b613df9c426107d))
+* fixes from code reviews ([c03e960](https://github.com/Cap-go/capacitor-inappbrowser/commit/c03e9603f80e0887407a0717b6c1ab44715d6729))
+* fixes typo in example ([8038609](https://github.com/Cap-go/capacitor-inappbrowser/commit/803860995c6b77d9653a26dc48a1f1262bea2c80))
+
 ## [7.17.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.16.19...7.17.0) (2025-09-23)
 
 
