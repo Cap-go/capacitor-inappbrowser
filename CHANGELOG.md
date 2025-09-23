@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.19.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.18.0...7.19.0) (2025-09-23)
+
+
+### Features
+
+* add event for close modal's confirm ([961500b](https://github.com/Cap-go/capacitor-inappbrowser/commit/961500b8507debc12c0666c74a7516d76b0874bd))
+
+
+### Bug Fixes
+
+* send confirm button event as documented ([3e50d24](https://github.com/Cap-go/capacitor-inappbrowser/commit/3e50d24e2aa8aeec1d74295975831def4ef8104e))
+
 ## [7.18.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.17.0...7.18.0) (2025-09-23)
 
 
