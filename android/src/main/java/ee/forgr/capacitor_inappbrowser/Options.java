@@ -182,6 +182,7 @@ public class Options {
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeBottomMargin = false;
   private boolean enableGooglePaySupport = false;
+  private List<String> blockedHosts = new ArrayList<>();
 
   public int getTextZoom() {
     return textZoom;
@@ -451,5 +452,16 @@ public class Options {
 
   public void setEnableGooglePaySupport(boolean enableGooglePaySupport) {
     this.enableGooglePaySupport = enableGooglePaySupport;
+  }
+
+  public List<String> getBlockedHosts() {
+    if (blockedHosts != null) {
+      return blockedHosts;
+    }
+    return new ArrayList<>();
+  }
+
+  public void setBlockedHosts(List<String> blockedHosts) {
+    this.blockedHosts = blockedHosts;
   }
 }

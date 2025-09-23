@@ -119,8 +119,8 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * headers: {
-   *   'Custom-Header': 'test-value',
-   *   'Authorization': 'Bearer test-token'
+   *   "Custom-Header": "test-value",
+   *   "Authorization": "Bearer test-token"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -130,8 +130,8 @@ export interface OpenWebViewOptions {
    * @since 6.1.0
    * @example
    * credentials: {
-   *   username: 'test-user',
-   *   password: 'test-pass'
+   *   username: "test-user",
+   *   password: "test-pass"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -154,12 +154,12 @@ export interface OpenWebViewOptions {
    *
    * @example
    * // In your webpage loaded in the webview:
-   * document.getElementById('closeBtn').addEventListener('click', () => {
+   * document.getElementById("closeBtn").addEventListener("click", () => {
    *   window.mobileApp.close();
    * });
    *
    * // Send data to the app
-   * window.mobileApp.postMessage({ action: 'login', data: { user: 'test' }});
+   * window.mobileApp.postMessage({ action: "login", data: { user: "test" }});
    *
    * @since 6.10.0
    */
@@ -176,10 +176,10 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * shareDisclaimer: {
-   *   title: 'Disclaimer',
-   *   message: 'This is a test disclaimer',
-   *   confirmBtn: 'Accept',
-   *   cancelBtn: 'Decline'
+   *   title: "Disclaimer",
+   *   message: "This is a test disclaimer",
+   *   confirmBtn: "Accept",
+   *   cancelBtn: "Decline"
    * }
    * Test URL: https://capgo.app
    */
@@ -194,7 +194,7 @@ export interface OpenWebViewOptions {
    * @default ToolBarType.DEFAULT
    * @example
    * toolbarType: ToolBarType.ACTIVITY,
-   * title: 'Activity Toolbar Test'
+   * title: "Activity Toolbar Test"
    * Test URL: https://capgo.app
    */
   toolbarType?: ToolBarType;
@@ -208,7 +208,7 @@ export interface OpenWebViewOptions {
   /**
    * Title of the browser
    * @since 0.1.0
-   * @default 'New Window'
+   * @default "New Window"
    * @example "Camera Test"
    */
   title?: string;
@@ -272,35 +272,35 @@ export interface OpenWebViewOptions {
    * @default false
    * @example
    * closeModal: true,
-   * closeModalTitle: 'Close Window',
-   * closeModalDescription: 'Are you sure you want to close?',
-   * closeModalOk: 'Yes, close',
-   * closeModalCancel: 'No, stay'
+   * closeModalTitle: "Close Window",
+   * closeModalDescription: "Are you sure you want to close?",
+   * closeModalOk: "Yes, close",
+   * closeModalCancel: "No, stay"
    * Test URL: https://capgo.app
    */
   closeModal?: boolean;
   /**
    * CloseModalTitle: title of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalTitle?: string;
   /**
    * CloseModalDescription: description of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Are you sure you want to close this window?'
+   * @default "Are you sure you want to close this window?"
    */
   closeModalDescription?: string;
   /**
    * CloseModalOk: text of the confirm button when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalOk?: string;
   /**
    * CloseModalCancel: text of the cancel button when user clicks on close button
    * @since 1.1.0
-   * @default 'Cancel'
+   * @default "Cancel"
    */
   closeModalCancel?: string;
   /**
@@ -312,9 +312,9 @@ export interface OpenWebViewOptions {
   /**
    * toolbarColor: color of the toolbar in hex format
    * @since 1.2.5
-   * @default '#ffffff'
+   * @default "#ffffff"
    * @example
-   * toolbarColor: '#FF5733'
+   * toolbarColor: "#FF5733"
    * Test URL: https://capgo.app
    */
   toolbarColor?: string;
@@ -324,7 +324,7 @@ export interface OpenWebViewOptions {
    * @since 6.10.0
    * @default calculated based on toolbarColor brightness
    * @example
-   * toolbarTextColor: '#FFFFFF'
+   * toolbarTextColor: "#FFFFFF"
    * Test URL: https://capgo.app
    */
   toolbarTextColor?: string;
@@ -375,12 +375,12 @@ export interface OpenWebViewOptions {
    * @example
    * buttonNearDone: {
    *   ios: {
-   *     iconType: 'sf-symbol',
-   *     icon: 'star.fill'
+   *     iconType: "sf-symbol",
+   *     icon: "star.fill"
    *   },
    *   android: {
-   *     iconType: 'asset',
-   *     icon: 'public/monkey.svg',
+   *     iconType: "asset",
+   *     icon: "public/monkey.svg",
    *     width: 24,
    *     height: 24
    *   }
@@ -456,6 +456,20 @@ export interface OpenWebViewOptions {
    * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
    */
   enableGooglePaySupport?: boolean;
+
+  /**
+   * blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations.
+   * Any request inside WebView to a URL with a host matching any of these patterns will be blocked.
+   * Supports wildcard patterns like:
+   * - "*.example.com" to block all subdomains
+   * - "www.example.*" to block wildcard domain extensions
+   *
+   * @since 7.17.0
+   * @default []
+   * @example
+   * blockedHosts: ["*.tracking.com", "ads.example.com"]
+   */
+  blockedHosts?: string[];
 }
 
 export interface InAppBrowserPlugin {
@@ -502,7 +516,7 @@ export interface InAppBrowserPlugin {
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
-   * - `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+   * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
    * @since 0.1.0
    */
@@ -606,7 +620,7 @@ export interface InAppBrowserPlugin {
  * window.mobileApp.close();
  *
  * // Sending a message from webview to the native app
- * window.mobileApp.postMessage({ key: 'value' });
+ * window.mobileApp.postMessage({ key: "value" });
  *
  * @since 6.10.0
  */
@@ -620,9 +634,9 @@ export interface InAppBrowserWebViewAPIs {
      *
      * @example
      * // Add a button to close the webview
-     * const closeButton = document.createElement('button');
-     * closeButton.textContent = 'Close WebView';
-     * closeButton.addEventListener('click', () => {
+     * const closeButton = document.createElement("button");
+     * closeButton.textContent = "Close WebView";
+     * closeButton.addEventListener("click", () => {
      *   window.mobileApp.close();
      * });
      * document.body.appendChild(closeButton);
@@ -639,8 +653,8 @@ export interface InAppBrowserWebViewAPIs {
      * @example
      * // Send data to native app
      * window.mobileApp.postMessage({
-     *   action: 'dataSubmitted',
-     *   data: { username: 'test', email: 'test@example.com' }
+     *   action: "dataSubmitted",
+     *   data: { username: "test", email: "test@example.com" }
      * });
      *
      * @since 6.10.0

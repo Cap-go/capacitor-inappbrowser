@@ -87,6 +87,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, blockedHosts: [String]) {
+        super.init(nibName: nil, bundle: nil)
+        self.blankNavigationTab = blankNavigationTab
+        self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.source = .remote(url)
+        self.credentials = credentials
+        self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
+        self.setBlockedHosts(blockedHosts: blockedHosts)
+        self.initWebview(isInspectable: isInspectable)
+    }
+
     open var hasDynamicTitle = false
     open var source: WKWebSource?
     /// use `source` instead
@@ -116,6 +128,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
+    var blockedHosts: [String] = []
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -134,6 +147,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func setPreventDeeplink(preventDeeplink: Bool) {
         self.preventDeeplink = preventDeeplink
+    }
+
+    func setBlockedHosts(blockedHosts: [String]) {
+        self.blockedHosts = blockedHosts
     }
 
     internal var customUserAgent: String? {
@@ -1417,6 +1434,86 @@ extension WKWebViewController: WKUIDelegate {
     }
 }
 
+// MARK: - Host Blocking Utilities
+extension WKWebViewController {
+
+    /// Checks if a host should be blocked based on the configured blocked hosts patterns
+    /// - Parameter host: The host to check
+    /// - Returns: true if the host should be blocked, false otherwise
+    private func shouldBlockHost(_ host: String) -> Bool {
+        guard !host.isEmpty else { return false }
+
+        let normalizedHost = host.lowercased()
+
+        return blockedHosts.contains { blockPattern in
+            return matchesBlockPattern(host: normalizedHost, pattern: blockPattern.lowercased())
+        }
+    }
+
+    /// Matches a host against a blocking pattern (supports wildcards)
+    /// - Parameters:
+    ///   - host: The normalized host to check
+    ///   - pattern: The normalized blocking pattern
+    /// - Returns: true if the host matches the pattern
+    private func matchesBlockPattern(host: String, pattern: String) -> Bool {
+        guard !pattern.isEmpty else { return false }
+
+        // Exact match - fastest check first
+        if host == pattern {
+            return true
+        }
+
+        // No wildcards - already checked exact match above
+        guard pattern.contains("*") else {
+            return false
+        }
+
+        // Handle wildcard patterns
+        if pattern.hasPrefix("*.") {
+            return matchesWildcardDomain(host: host, pattern: pattern)
+        } else if pattern.contains("*") {
+            return matchesRegexPattern(host: host, pattern: pattern)
+        }
+
+        return false
+    }
+
+    /// Handles simple subdomain wildcard patterns like "*.example.com"
+    /// - Parameters:
+    ///   - host: The host to check
+    ///   - pattern: The wildcard pattern starting with "*."
+    /// - Returns: true if the host matches the wildcard domain
+    private func matchesWildcardDomain(host: String, pattern: String) -> Bool {
+        let domain = String(pattern.dropFirst(2))  // Remove "*."
+
+        guard !domain.isEmpty else { return false }
+
+        // Match exact domain or any subdomain
+        return host == domain || host.hasSuffix("." + domain)
+    }
+
+    /// Handles complex regex patterns with multiple wildcards
+    /// - Parameters:
+    ///   - host: The host to check
+    ///   - pattern: The pattern with wildcards to convert to regex
+    /// - Returns: true if the host matches the regex pattern
+    private func matchesRegexPattern(host: String, pattern: String) -> Bool {
+        // Escape everything, then re-enable '*' as a wildcard
+        let escaped = NSRegularExpression.escapedPattern(for: pattern)
+        let wildcardEnabled = escaped.replacingOccurrences(of: "\\*", with: ".*")
+        let regexPattern = "^\(wildcardEnabled)$"
+
+        do {
+            let regex = try NSRegularExpression(pattern: regexPattern, options: [])
+            let range = NSRange(location: 0, length: host.utf16.count)
+            return regex.firstMatch(in: host, options: [], range: range) != nil
+        } catch {
+            print("[InAppBrowser] Invalid regex pattern '\(regexPattern)': \(error)")
+            return false
+        }
+    }
+}
+
 // MARK: - WKNavigationDelegate
 extension WKWebViewController: WKNavigationDelegate {
     internal func injectPreShowScript() {
@@ -1593,6 +1690,14 @@ extension WKWebViewController: WKNavigationDelegate {
         if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue), let result = delegate?.webViewController?(self, decidePolicy: u, navigationType: navigationType) {
             actionPolicy = result ? .allow : .cancel
         }
+
+        // Check for blocked hosts using the extracted function
+        if let host = u.host, shouldBlockHost(host) {
+            print("[InAppBrowser] Blocked host detected: \(host)")
+            self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": u.absoluteString])
+            actionPolicy = .cancel
+        }
+
         self.injectJavaScriptInterface()
         decisionHandler(actionPolicy)
     }

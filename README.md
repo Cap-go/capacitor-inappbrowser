@@ -333,7 +333,7 @@ Sets the URL of the webview.
 ### addListener('urlChangeEvent', ...)
 
 ```typescript
-addListener(eventName: "urlChangeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for url change, only for openWebView
@@ -353,7 +353,7 @@ Listen for url change, only for openWebView
 ### addListener('buttonNearDoneClick', ...)
 
 ```typescript
-addListener(eventName: "buttonNearDoneClick", listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>
 ```
 
 | Param              | Type                                                              |
@@ -369,7 +369,7 @@ addListener(eventName: "buttonNearDoneClick", listenerFunc: ButtonNearListener) 
 ### addListener('closeEvent', ...)
 
 ```typescript
-addListener(eventName: "closeEvent", listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
 ```
 
 Listen for close click only for openWebView
@@ -389,7 +389,7 @@ Listen for close click only for openWebView
 ### addListener('confirmBtnClicked', ...)
 
 ```typescript
-addListener(eventName: "confirmBtnClicked", listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
+addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when user clicks on confirm button when disclaimer is required
@@ -409,7 +409,7 @@ Will be triggered when user clicks on confirm button when disclaimer is required
 ### addListener('messageFromWebview', ...)
 
 ```typescript
-addListener(eventName: "messageFromWebview", listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'messageFromWebview', listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
@@ -431,7 +431,7 @@ This method is inject at runtime in the webview
 ### addListener('browserPageLoaded', ...)
 
 ```typescript
-addListener(eventName: "browserPageLoaded", listenerFunc: () => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'browserPageLoaded', listenerFunc: () => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when page is loaded
@@ -449,7 +449,7 @@ Will be triggered when page is loaded
 ### addListener('pageLoadError', ...)
 
 ```typescript
-addListener(eventName: "pageLoadError", listenerFunc: () => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'pageLoadError', listenerFunc: () => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when page load error
@@ -566,6 +566,7 @@ Reload the current web page.
 | **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of URL base patterns that should be treated as authorized App Links, Android only. Only links starting with any of these base URLs will be opened in the InAppBrowser.                                                                                                                                                                                                                                                                                                                                                                   | <code>[]</code>                                            | 7.12.0 |
 | **`enabledSafeBottomMargin`**          | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                         | 7.13.0 |
 | **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                   | <code>false</code>                                         | 7.13.0 |
+| **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "*.example.com" to block all subdomains - "www.example.*" to block wildcard domain extensions                                                                                                                                                                                          | <code>[]</code>                                            | 7.17.0 |
 
 
 #### Headers
@@ -673,18 +674,18 @@ Construct a type with a set of properties K of type T
 
 | Members          | Value                     | Description                                                      | Since |
 | ---------------- | ------------------------- | ---------------------------------------------------------------- | ----- |
-| **`ACTIVITY`**   | <code>"activity"</code>   | Shows a simple toolbar with just a close button and share button | 0.1.0 |
-| **`COMPACT`**    | <code>"compact"</code>    | Shows a simple toolbar with just a close button                  | 7.6.8 |
-| **`NAVIGATION`** | <code>"navigation"</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
-| **`BLANK`**      | <code>"blank"</code>      | Shows no toolbar                                                 | 0.1.0 |
+| **`ACTIVITY`**   | <code>'activity'</code>   | Shows a simple toolbar with just a close button and share button | 0.1.0 |
+| **`COMPACT`**    | <code>'compact'</code>    | Shows a simple toolbar with just a close button                  | 7.6.8 |
+| **`NAVIGATION`** | <code>'navigation'</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
+| **`BLANK`**      | <code>'blank'</code>      | Shows no toolbar                                                 | 0.1.0 |
 
 
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
-| **`WHITE`** | <code>"white"</code> |
-| **`BLACK`** | <code>"black"</code> |
+| **`WHITE`** | <code>'white'</code> |
+| **`BLACK`** | <code>'black'</code> |
 
 </docgen-api>
 
