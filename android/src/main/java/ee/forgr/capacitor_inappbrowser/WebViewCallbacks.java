@@ -13,5 +13,5 @@ public interface WebViewCallbacks {
 
   public void buttonNearDoneClicked();
 
-  public void confirmBtnClicked();
+  public void confirmBtnClicked(String url);
 }

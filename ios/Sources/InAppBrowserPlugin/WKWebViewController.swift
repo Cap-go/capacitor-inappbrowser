@@ -1286,6 +1286,7 @@ fileprivate extension WKWebViewController {
                 title: disclaimer["title"] as? String ?? "Title",
                 message: disclaimer["message"] as? String ?? "Message",
                 preferredStyle: UIAlertController.Style.alert)
+            let currentUrl = self.webView?.url?.absoluteString ?? ""
 
             // Add confirm button that continues with sharing
             alert.addAction(UIAlertAction(
@@ -1293,7 +1294,7 @@ fileprivate extension WKWebViewController {
                 style: UIAlertAction.Style.default,
                 handler: { _ in
                     // Notify that confirm was clicked
-                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: nil)
+                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
 
                     // Show the share dialog
                     self.showShareSheet(items: items, sender: sender)
@@ -1339,8 +1340,11 @@ fileprivate extension WKWebViewController {
     @objc func doneDidClick(sender: AnyObject) {
         // check if closeModal is true, if true display alert before close
         if self.closeModal {
+            let currentUrl = webView?.url?.absoluteString ?? ""
             let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
             alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
+                // Notify that confirm was clicked
+                self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
                 self.closeView()
             }))
             alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))
