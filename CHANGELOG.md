@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.20.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.19.0...7.20.0) (2025-09-24)
+
+
+### Features
+
+* add useTopInset option for WebView margin on Android ([c6617b1](https://github.com/Cap-go/capacitor-inappbrowser/commit/c6617b1b3140a9e2b3abc86981ed495f75d32626))
+
 ## [7.19.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.18.0...7.19.0) (2025-09-23)
 
 
