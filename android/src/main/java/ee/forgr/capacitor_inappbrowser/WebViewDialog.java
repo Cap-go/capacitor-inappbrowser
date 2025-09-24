@@ -1140,7 +1140,8 @@ public class WebViewDialog extends Dialog {
       }
 
       // These stay the same for all Android versions
-      mlp.topMargin = insets.top;
+      // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
+      mlp.topMargin = (Build.VERSION.SDK_INT >= 35) ? 0 : insets.top;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
