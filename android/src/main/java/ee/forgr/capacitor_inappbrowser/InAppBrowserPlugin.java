@@ -659,6 +659,11 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false))
     );
 
+    // Use system top inset for WebView margin when explicitly enabled
+    options.setUseTopInset(
+      Boolean.TRUE.equals(call.getBoolean("useTopInset", false))
+    );
+
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {

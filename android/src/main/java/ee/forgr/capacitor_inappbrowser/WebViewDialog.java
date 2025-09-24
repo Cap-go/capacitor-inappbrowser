@@ -1137,10 +1137,12 @@ public class WebViewDialog extends Dialog {
       // // Apply margins based on Android version
       if (_options.getEnabledSafeMargin()) {
         mlp.bottomMargin = insets.bottom;
+      } else {
+        mlp.bottomMargin = 0;
       }
 
-      // These stay the same for all Android versions
-      mlp.topMargin = insets.top;
+      // Use system top inset only when explicitly enabled otherwise keep legacy 0px margin
+      mlp.topMargin = _options.getUseTopInset() ? insets.top : 0;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);

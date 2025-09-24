@@ -439,6 +439,15 @@ export interface OpenWebViewOptions {
   enabledSafeBottomMargin?: boolean;
 
   /**
+   * When true, applies the system status bar inset as the WebView top margin on Android.
+   * Keeps the legacy 0px margin by default for apps that handle padding themselves.
+   * @default false
+   * @example
+   * useTopInset: true
+   */
+  useTopInset?: boolean;
+
+  /**
    * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
    * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.
    * Only enable this if you need Google Pay functionality as it allows popup windows.

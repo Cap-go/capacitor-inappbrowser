@@ -181,6 +181,7 @@ public class Options {
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeBottomMargin = false;
+  private boolean useTopInset = false;
   private boolean enableGooglePaySupport = false;
   private List<String> blockedHosts = new ArrayList<>();
 
@@ -206,6 +207,14 @@ public class Options {
 
   public void setEnabledSafeMargin(boolean enabledSafeBottomMargin) {
     this.enabledSafeBottomMargin = enabledSafeBottomMargin;
+  }
+
+  public boolean getUseTopInset() {
+    return useTopInset;
+  }
+
+  public void setUseTopInset(boolean useTopInset) {
+    this.useTopInset = useTopInset;
   }
 
   public Pattern getProxyRequestsPattern() {
