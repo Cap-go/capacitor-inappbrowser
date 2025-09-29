@@ -763,12 +763,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func close(_ call: CAPPluginCall) {
+        let isAnimated = call.getBool("isAnimated", true)
+
         DispatchQueue.main.async {
             let currentUrl = self.webViewController?.url?.absoluteString ?? ""
 
             self.webViewController?.cleanupWebView()
 
-            self.navigationWebViewController?.dismiss(animated: true) {
+            self.navigationWebViewController?.dismiss(animated: isAnimated) {
                 self.webViewController = nil
                 self.navigationWebViewController = nil
             }
