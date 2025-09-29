@@ -526,7 +526,7 @@ export interface InAppBrowserPlugin {
   /**
    * Close the webview.
    */
-  close(options: CloseWebviewOptions): Promise<any>;
+  close(options?: CloseWebviewOptions): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
