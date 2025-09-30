@@ -27,6 +27,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "goBack", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openWebView", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearCookies", returnType: CAPPluginReturnPromise),
@@ -611,6 +612,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.presentView(isAnimated: isAnimated)
             }
             call.resolve()
+        }
+    }
+
+    @objc func goBack(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if let canGoBack = self.webViewController?.webView?.canGoBack {
+                if canGoBack {
+                    self.webViewController?.webView?.goBack()
+                }
+                call.resolve(["canGoBack": canGoBack])
+            } else {
+                call.resolve(["canGoBack": false])
+            }
         }
     }
 

@@ -895,6 +895,31 @@ public class InAppBrowserPlugin
   }
 
   @PluginMethod
+  public void goBack(PluginCall call) {
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            if (webViewDialog != null && webViewDialog.getWebView() != null) {
+              boolean canGoBack = webViewDialog.getWebView().canGoBack();
+              if (canGoBack) {
+                webViewDialog.getWebView().goBack();
+              }
+              JSObject result = new JSObject();
+              result.put("canGoBack", canGoBack);
+              call.resolve(result);
+            } else {
+              JSObject result = new JSObject();
+              result.put("canGoBack", false);
+              call.resolve(result);
+            }
+          }
+        }
+      );
+  }
+
+  @PluginMethod
   public void reload(PluginCall call) {
     this.getActivity()
       .runOnUiThread(
