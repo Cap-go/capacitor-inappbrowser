@@ -3126,6 +3126,18 @@ public class WebViewDialog extends Dialog {
     );
   }
 
+  /**
+   * Navigates back in the WebView history if possible
+   * @return true if navigation was successful, false otherwise
+   */
+  public boolean goBack() {
+    if (_webView != null && _webView.canGoBack()) {
+      _webView.goBack();
+      return true;
+    }
+    return false;
+  }
+
   @Override
   public void onBackPressed() {
     if (

@@ -901,11 +901,8 @@ public class InAppBrowserPlugin
         new Runnable() {
           @Override
           public void run() {
-            if (webViewDialog != null && webViewDialog.getWebView() != null) {
-              boolean canGoBack = webViewDialog.getWebView().canGoBack();
-              if (canGoBack) {
-                webViewDialog.getWebView().goBack();
-              }
+            if (webViewDialog != null) {
+              boolean canGoBack = webViewDialog.goBack();
               JSObject result = new JSObject();
               result.put("canGoBack", canGoBack);
               call.resolve(result);
