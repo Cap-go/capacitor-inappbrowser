@@ -622,10 +622,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             
-            let canGoBack = webViewController.canGoBack()
-            if canGoBack {
-                webViewController.goBack()
-            }
+            let canGoBack = webViewController.goBack()
             call.resolve(["canGoBack": canGoBack])
         }
     }
