@@ -617,14 +617,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func goBack(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            if let canGoBack = self.webViewController?.webView?.canGoBack {
-                if canGoBack {
-                    self.webViewController?.webView?.goBack()
-                }
-                call.resolve(["canGoBack": canGoBack])
-            } else {
+            guard let webViewController = self.webViewController else {
                 call.resolve(["canGoBack": false])
+                return
             }
+            
+            let canGoBack = webViewController.canGoBack()
+            if canGoBack {
+                webViewController.goBack()
+            }
+            call.resolve(["canGoBack": canGoBack])
         }
     }
 
