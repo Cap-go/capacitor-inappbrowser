@@ -287,15 +287,21 @@ public class WebViewDialog extends Dialog {
       getWindow().setDecorFitsSystemWindows(false);
     }
 
-    getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+    getWindow()
+      .setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
 
     View root = findViewById(R.id.content_browser_layout);
     if (root != null) {
       ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
         Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-        Insets ime  = insets.getInsets(WindowInsetsCompat.Type.ime());
-        int bottom  = Math.max(bars.bottom, ime.bottom);
-        v.setPadding(bars.left, _options.getUseTopInset() ? bars.top : 0, bars.right, bottom);
+        Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+        int bottom = Math.max(bars.bottom, ime.bottom);
+        v.setPadding(
+          bars.left,
+          _options.getUseTopInset() ? bars.top : 0,
+          bars.right,
+          bottom
+        );
         return insets; // IMPORTANT: don't consume
       });
     }
@@ -1142,16 +1148,17 @@ public class WebViewDialog extends Dialog {
     // Apply system insets to WebView content view (compatible with all Android versions)
     ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, insets) -> {
       Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-      Insets ime  = insets.getInsets(WindowInsetsCompat.Type.ime());
+      Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
 
       // Use the larger of IME or system bar bottom so it works both with and without the keyboard.
       int bottom = Math.max(bars.bottom, ime.bottom);
 
-      ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+      ViewGroup.MarginLayoutParams lp =
+        (ViewGroup.MarginLayoutParams) v.getLayoutParams();
       lp.bottomMargin = _options.getEnabledSafeMargin() ? bottom : 0;
-      lp.topMargin    = _options.getUseTopInset() ? bars.top : 0;
-      lp.leftMargin   = bars.left;
-      lp.rightMargin  = bars.right;
+      lp.topMargin = _options.getUseTopInset() ? bars.top : 0;
+      lp.leftMargin = bars.left;
+      lp.rightMargin = bars.right;
       v.setLayoutParams(lp);
 
       // IMPORTANT: return the original insets so parents can also react if needed.
