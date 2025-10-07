@@ -295,14 +295,14 @@ public class WebViewDialog extends Dialog {
       ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
         Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
         Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
-        int bottom = Math.max(bars.bottom, ime.bottom);
-        v.setPadding(
-          bars.left,
-          _options.getUseTopInset() ? bars.top : 0,
-          bars.right,
-          bottom
-        );
-        return insets; // IMPORTANT: don't consume
+        int imeBottom = ime.bottom;
+        int navBottom = _options.getEnabledSafeMargin() ? bars.bottom : 0;
+        int bottom = imeBottom > 0 ? imeBottom : navBottom;
+        int left = _options.getEnabledSafeMargin() ? bars.left : 0;
+        int right = _options.getEnabledSafeMargin() ? bars.right : 0;
+        int top = _options.getUseTopInset() ? bars.top : 0;
+        v.setPadding(left, top, right, bottom);
+        return insets;
       });
     }
 
