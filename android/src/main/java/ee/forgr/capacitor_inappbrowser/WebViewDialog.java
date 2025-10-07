@@ -283,6 +283,23 @@ public class WebViewDialog extends Dialog {
     );
     setContentView(R.layout.activity_browser);
 
+    if (Build.VERSION.SDK_INT >= 30) {
+      getWindow().setDecorFitsSystemWindows(false);
+    }
+
+    getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+
+    View root = findViewById(R.id.content_browser_layout);
+    if (root != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+        Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+        Insets ime  = insets.getInsets(WindowInsetsCompat.Type.ime());
+        int bottom  = Math.max(bars.bottom, ime.bottom);
+        v.setPadding(bars.left, _options.getUseTopInset() ? bars.top : 0, bars.right, bottom);
+        return insets; // IMPORTANT: don't consume
+      });
+    }
+
     // Set fitsSystemWindows only for Android 10 (API 29)
     if (android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q) {
       View coordinator = findViewById(R.id.coordinator_layout);
@@ -1123,31 +1140,22 @@ public class WebViewDialog extends Dialog {
     }
 
     // Apply system insets to WebView content view (compatible with all Android versions)
-    ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
-      Insets insets = windowInsets.getInsets(
-        WindowInsetsCompat.Type.systemBars()
-      );
-      Boolean keyboardVisible = windowInsets.isVisible(
-        WindowInsetsCompat.Type.ime()
-      );
+    ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, insets) -> {
+      Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+      Insets ime  = insets.getInsets(WindowInsetsCompat.Type.ime());
 
-      ViewGroup.MarginLayoutParams mlp =
-        (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+      // Use the larger of IME or system bar bottom so it works both with and without the keyboard.
+      int bottom = Math.max(bars.bottom, ime.bottom);
 
-      // // Apply margins based on Android version
-      if (_options.getEnabledSafeMargin()) {
-        mlp.bottomMargin = insets.bottom;
-      } else {
-        mlp.bottomMargin = 0;
-      }
+      ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+      lp.bottomMargin = _options.getEnabledSafeMargin() ? bottom : 0;
+      lp.topMargin    = _options.getUseTopInset() ? bars.top : 0;
+      lp.leftMargin   = bars.left;
+      lp.rightMargin  = bars.right;
+      v.setLayoutParams(lp);
 
-      // Use system top inset only when explicitly enabled otherwise keep legacy 0px margin
-      mlp.topMargin = _options.getUseTopInset() ? insets.top : 0;
-      mlp.leftMargin = insets.left;
-      mlp.rightMargin = insets.right;
-      v.setLayoutParams(mlp);
-
-      return WindowInsetsCompat.CONSUMED;
+      // IMPORTANT: return the original insets so parents can also react if needed.
+      return insets;
     });
 
     // Handle window decoration - version-specific handling
