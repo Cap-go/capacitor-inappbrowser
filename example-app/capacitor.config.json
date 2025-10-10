@@ -1,5 +1,5 @@
 {
-  "appId": "com.example.app",
+  "appId": "app.capgo.inappbrowser",
   "appName": "test-inappbrowser",
   "webDir": "dist",
   "plugins": {
