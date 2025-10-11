@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.example.app"
+    namespace "app.capgo.inappbrowser"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "app.capgo.inappbrowser"
