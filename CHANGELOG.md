@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.20.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.5...7.20.6) (2025-10-14)
+
+
+### Bug Fixes
+
+* navigation bar height + brand example_app ([633f692](https://github.com/Cap-go/capacitor-inappbrowser/commit/633f6926c383f1445d6a19ad1514139209919967))
+
 ## [7.20.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.4...7.20.5) (2025-10-11)
 
 ## [7.20.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.3...7.20.4) (2025-10-10)
