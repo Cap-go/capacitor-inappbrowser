@@ -107,6 +107,14 @@ export interface DisclaimerOptions {
   cancelBtn: string;
 }
 
+export interface CloseWebviewOptions {
+  /**
+   * Whether the webview closing is animated or not, ios only
+   * @default true
+   */
+  isAnimated?: boolean;
+}
+
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
@@ -483,6 +491,14 @@ export interface OpenWebViewOptions {
 
 export interface InAppBrowserPlugin {
   /**
+   * Navigates back in the WebView's history if possible
+   *
+   * @since 7.21.0
+   * @returns Promise that resolves with true if navigation was possible, false otherwise
+   */
+  goBack(): Promise<{ canGoBack: boolean }>;
+
+  /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
    * @since 0.1.0
@@ -518,7 +534,7 @@ export interface InAppBrowserPlugin {
   /**
    * Close the webview.
    */
-  close(): Promise<any>;
+  close(options?: CloseWebviewOptions): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *

@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.22.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.21.0...7.22.0) (2025-10-14)
+
+
+### Features
+
+* add go back method ([6649266](https://github.com/Cap-go/capacitor-inappbrowser/commit/6649266865bb2df004ebc9cd33fdf46de82337d2))
+
+
+### Bug Fixes
+
+* goBack in android ([d0ac1ff](https://github.com/Cap-go/capacitor-inappbrowser/commit/d0ac1ffb6116fdd4efb31a2eb488503c6b00eaf6))
+* goBack in ios ([4e0c153](https://github.com/Cap-go/capacitor-inappbrowser/commit/4e0c15314c7474399f16c6640b91e4d0115c624b))
+* interface & ios ([43f90ba](https://github.com/Cap-go/capacitor-inappbrowser/commit/43f90ba694b154e6b588b56cb3c75b14c8193a52))
+
+## [7.21.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.7...7.21.0) (2025-10-14)
+
+
+### Features
+
+* add is animated option on close ([5c467cc](https://github.com/Cap-go/capacitor-inappbrowser/commit/5c467cc0c1fda31702d26e660390e77f522626fa))
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.window:window to v1.5.0 ([51d75e8](https://github.com/Cap-go/capacitor-inappbrowser/commit/51d75e8ec1e20f2ae3fc7b1624f49d8c8a4fbee6))
+* **deps:** update dependency com.google.gms:google-services to v4.4.4 ([3f05edc](https://github.com/Cap-go/capacitor-inappbrowser/commit/3f05edc681d6988e0bbf1e174881e5becaca59ee))
+* optional options on close ([80bb3bf](https://github.com/Cap-go/capacitor-inappbrowser/commit/80bb3bf2b7c699dc4d0ff7ab39aa9709810777ce))
+
 ## [7.20.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.6...7.20.7) (2025-10-14)
 
 

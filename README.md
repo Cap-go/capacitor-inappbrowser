@@ -131,12 +131,13 @@ window.mobileApp.close();
 
 <docgen-index>
 
+* [`goBack()`](#goback)
 * [`open(...)`](#open)
 * [`clearCookies(...)`](#clearcookies)
 * [`clearAllCookies()`](#clearallcookies)
 * [`clearCache()`](#clearcache)
 * [`getCookies(...)`](#getcookies)
-* [`close()`](#close)
+* [`close(...)`](#close)
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
 * [`postMessage(...)`](#postmessage)
@@ -158,6 +159,21 @@ window.mobileApp.close();
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
+
+### goBack()
+
+```typescript
+goBack() => Promise<{ canGoBack: boolean; }>
+```
+
+Navigates back in the WebView's history if possible
+
+**Returns:** <code>Promise&lt;{ canGoBack: boolean; }&gt;</code>
+
+**Since:** 7.21.0
+
+--------------------
+
 
 ### open(...)
 
@@ -244,13 +260,17 @@ Get cookies for a specific URL.
 --------------------
 
 
-### close()
+### close(...)
 
 ```typescript
-close() => Promise<any>
+close(options?: CloseWebviewOptions | undefined) => Promise<any>
 ```
 
 Close the webview.
+
+| Param         | Type                                                                |
+| ------------- | ------------------------------------------------------------------- |
+| **`options`** | <code><a href="#closewebviewoptions">CloseWebviewOptions</a></code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -527,6 +547,13 @@ Reload the current web page.
 | --------------------- | -------------------- |
 | **`url`**             | <code>string</code>  |
 | **`includeHttpOnly`** | <code>boolean</code> |
+
+
+#### CloseWebviewOptions
+
+| Prop             | Type                 | Description                                              | Default           |
+| ---------------- | -------------------- | -------------------------------------------------------- | ----------------- |
+| **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only | <code>true</code> |
 
 
 #### OpenWebViewOptions
