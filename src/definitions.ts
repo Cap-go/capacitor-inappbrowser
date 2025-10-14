@@ -107,6 +107,14 @@ export interface DisclaimerOptions {
   cancelBtn: string;
 }
 
+export interface CloseWebviewOptions {
+  /**
+   * Whether the webview closing is animated or not, ios only
+   * @default true
+   */
+  isAnimated?: boolean;
+}
+
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
@@ -518,7 +526,7 @@ export interface InAppBrowserPlugin {
   /**
    * Close the webview.
    */
-  close(): Promise<any>;
+  close(options?: CloseWebviewOptions): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
