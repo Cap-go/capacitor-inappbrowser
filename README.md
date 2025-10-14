@@ -136,7 +136,7 @@ window.mobileApp.close();
 * [`clearAllCookies()`](#clearallcookies)
 * [`clearCache()`](#clearcache)
 * [`getCookies(...)`](#getcookies)
-* [`close()`](#close)
+* [`close(...)`](#close)
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
 * [`postMessage(...)`](#postmessage)
@@ -244,13 +244,17 @@ Get cookies for a specific URL.
 --------------------
 
 
-### close()
+### close(...)
 
 ```typescript
-close() => Promise<any>
+close(options?: CloseWebviewOptions | undefined) => Promise<any>
 ```
 
 Close the webview.
+
+| Param         | Type                                                                |
+| ------------- | ------------------------------------------------------------------- |
+| **`options`** | <code><a href="#closewebviewoptions">CloseWebviewOptions</a></code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -527,6 +531,13 @@ Reload the current web page.
 | --------------------- | -------------------- |
 | **`url`**             | <code>string</code>  |
 | **`includeHttpOnly`** | <code>boolean</code> |
+
+
+#### CloseWebviewOptions
+
+| Prop             | Type                 | Description                                              | Default           |
+| ---------------- | -------------------- | -------------------------------------------------------- | ----------------- |
+| **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only | <code>true</code> |
 
 
 #### OpenWebViewOptions
