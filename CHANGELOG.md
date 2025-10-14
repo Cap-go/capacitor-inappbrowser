@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.21.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.7...7.21.0) (2025-10-14)
+
+
+### Features
+
+* add is animated option on close ([5c467cc](https://github.com/Cap-go/capacitor-inappbrowser/commit/5c467cc0c1fda31702d26e660390e77f522626fa))
+
+
+### Bug Fixes
+
+* **deps:** update dependency androidx.window:window to v1.5.0 ([51d75e8](https://github.com/Cap-go/capacitor-inappbrowser/commit/51d75e8ec1e20f2ae3fc7b1624f49d8c8a4fbee6))
+* **deps:** update dependency com.google.gms:google-services to v4.4.4 ([3f05edc](https://github.com/Cap-go/capacitor-inappbrowser/commit/3f05edc681d6988e0bbf1e174881e5becaca59ee))
+* optional options on close ([80bb3bf](https://github.com/Cap-go/capacitor-inappbrowser/commit/80bb3bf2b7c699dc4d0ff7ab39aa9709810777ce))
+
 ## [7.20.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.6...7.20.7) (2025-10-14)
 
 
