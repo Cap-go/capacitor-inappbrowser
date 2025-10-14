@@ -1238,6 +1238,15 @@ fileprivate extension WKWebViewController {
         }
     }
 
+    // Public method for safe back navigation
+    public func goBack() -> Bool {
+        if webView?.canGoBack ?? false {
+            webView?.goBack()
+            return true
+        }
+        return false
+    }
+
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
     }

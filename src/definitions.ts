@@ -491,6 +491,14 @@ export interface OpenWebViewOptions {
 
 export interface InAppBrowserPlugin {
   /**
+   * Navigates back in the WebView's history if possible
+   *
+   * @since 7.21.0
+   * @returns Promise that resolves with true if navigation was possible, false otherwise
+   */
+  goBack(): Promise<{ canGoBack: boolean }>;
+
+  /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
    * @since 0.1.0
