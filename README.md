@@ -131,6 +131,7 @@ window.mobileApp.close();
 
 <docgen-index>
 
+* [`goBack()`](#goback)
 * [`open(...)`](#open)
 * [`clearCookies(...)`](#clearcookies)
 * [`clearAllCookies()`](#clearallcookies)
@@ -150,7 +151,6 @@ window.mobileApp.close();
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload()`](#reload)
-* [`goBack()`](#goback)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -159,6 +159,21 @@ window.mobileApp.close();
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
+
+### goBack()
+
+```typescript
+goBack() => Promise<{ canGoBack: boolean; }>
+```
+
+Navigates back in the WebView's history if possible
+
+**Returns:** <code>Promise&lt;{ canGoBack: boolean; }&gt;</code>
+
+**Since:** 7.21.0
+
+--------------------
+
 
 ### open(...)
 
@@ -498,23 +513,6 @@ Reload the current web page.
 --------------------
 
 
-### goBack()
-
-```typescript
-goBack() => Promise<{ canGoBack: boolean }>
-```
-
-Navigate back in the WebView's history.
-
-**Returns:** <code>Promise&lt;{ canGoBack: boolean }&gt;</code>
-
-Returns a boolean indicating if there was a page to navigate back to.
-
-**Since:** 7.21.0
-
---------------------
-
-
 ### Interfaces
 
 
@@ -661,9 +659,7 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{
- [P in K]: T[P];
- }</code>
+<code>{ [P in K]: T[P]; }</code>
 
 
 #### Exclude
@@ -677,9 +673,7 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{
- [P in K]: T;
- }</code>
+<code>{ [P in K]: T; }</code>
 
 
 #### GetCookieOptions
