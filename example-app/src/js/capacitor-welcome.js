@@ -173,7 +173,9 @@ window.customElements.define(
               const { url } = await import("./url.js");
               urlToUse = url;
             } catch (e) {
-              console.warn("url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.");
+              console.warn(
+                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+              );
             }
 
             await InAppBrowser.openWebView({
@@ -208,10 +210,11 @@ window.customElements.define(
             InAppBrowser.addListener("messageFromWebview", (event) => {
               console.log("💬 Message from webview:", event.detail);
             });
-
           } catch (e) {
             console.error("Error opening test webapp:", e);
-            alert("Error opening test webapp. Make sure your local server is running and url.js is configured correctly.");
+            alert(
+              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+            );
           }
         });
 
@@ -226,7 +229,9 @@ window.customElements.define(
               const { url } = await import("./url.js");
               urlToUse = url;
             } catch (e) {
-              console.warn("url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.");
+              console.warn(
+                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+              );
             }
 
             await InAppBrowser.openWebView({
@@ -249,10 +254,11 @@ window.customElements.define(
             InAppBrowser.addListener("closeEvent", () => {
               console.log("❌ [Activity Mode] Close button pressed");
             });
-
           } catch (e) {
             console.error("Error opening test webapp in activity mode:", e);
-            alert("Error opening test webapp. Make sure your local server is running and url.js is configured correctly.");
+            alert(
+              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+            );
           }
         });
     }
