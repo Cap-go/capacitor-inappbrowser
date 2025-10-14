@@ -90,6 +90,9 @@ window.customElements.define(
         <p>
           <button class="button" id="open-test-webapp-activity" style="background-color: #ffc107; color: #212529;">🧪 Open Test Webapp (Activity Mode)</button>
         </p>
+        <p>
+          <button class="button" id="open-test-webapp-close-modal" style="background-color: #dc3545;">🚪 Open Test Webapp (Close Confirmation)</button>
+        </p>
         <div id="webapp-status" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.8em; color: #666;">
           <strong>Setup:</strong> Make sure to copy url.js.example to url.js and configure your local server URL.
         </div>
@@ -256,6 +259,67 @@ window.customElements.define(
             });
           } catch (e) {
             console.error("Error opening test webapp in activity mode:", e);
+            alert(
+              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+            );
+          }
+        });
+
+      // Test webapp with close confirmation modal
+      self.shadowRoot
+        .querySelector("#open-test-webapp-close-modal")
+        .addEventListener("click", async function (e) {
+          try {
+            // Try to load custom URL configuration
+            let urlToUse = testWebappUrl;
+            try {
+              const { url } = await import("./url.js");
+              urlToUse = url;
+            } catch (e) {
+              console.warn(
+                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+              );
+            }
+
+            await InAppBrowser.openWebView({
+              url: urlToUse,
+              toolbarColor: "#dc3545",
+              toolbarTextColor: "#ffffff",
+              toolbarType: ToolBarType.NAVIGATION,
+              backgroundColor: BackgroundColor.WHITE,
+              title: "Close Confirmation Test",
+              showReloadButton: true,
+              visibleTitle: true,
+              showArrow: false,
+              closeModal: true,
+              closeModalTitle: "Close Browser?",
+              closeModalDescription: "Are you sure you want to close this browser? Any unsaved changes will be lost.",
+              closeModalOk: "Yes, Close",
+              closeModalCancel: "Stay Here"
+            });
+
+            // Add event listeners for close confirmation testing
+            InAppBrowser.addListener("urlChangeEvent", (result) => {
+              console.log("🔄 [Close Modal] URL changed:", result.url);
+            });
+
+            InAppBrowser.addListener("closeEvent", () => {
+              console.log("❌ [Close Modal] Browser closed");
+            });
+
+            InAppBrowser.addListener("confirmBtnClicked", (result) => {
+              console.log("✅ [Close Modal] Confirm button clicked for URL:", result.url);
+            });
+
+            InAppBrowser.addListener("browserPageLoaded", () => {
+              console.log("✅ [Close Modal] Page loaded");
+            });
+
+            InAppBrowser.addListener("messageFromWebview", (event) => {
+              console.log("💬 [Close Modal] Message from webview:", event.detail);
+            });
+          } catch (e) {
+            console.error("Error opening test webapp with close modal:", e);
             alert(
               "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
             );

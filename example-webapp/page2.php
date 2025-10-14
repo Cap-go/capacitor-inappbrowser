@@ -54,6 +54,12 @@ session_start();
         .button.ajax:hover {
             background-color: #138496;
         }
+        .button.close {
+            background-color: #dc3545;
+        }
+        .button.close:hover {
+            background-color: #c82333;
+        }
         .navigation-info {
             background-color: #cce7ff;
             padding: 15px;
@@ -110,6 +116,10 @@ session_start();
         
         <!-- Back navigation -->
         <button onclick="history.back()" class="button">⬅️ JavaScript Back</button>
+        
+        <h3>Close Browser Tests (Page 2):</h3>
+        <button onclick="testWindowClose()" class="button close">❌ Test window.close()</button>
+        <button onclick="testMobileAppClose()" class="button close">📱 Test mobileApp.close()</button>
 
         <div id="ajax-content">
             <h4>AJAX Content Loaded!</h4>
@@ -165,6 +175,34 @@ session_start();
                 document.getElementById('ajax-content').style.display = 'none';
             }
         });
+
+        function testWindowClose() {
+            console.log('Testing window.close() from Page 2...');
+            alert('Testing window.close() from Page 2 - should close immediately');
+            try {
+                window.close();
+            } catch (e) {
+                console.error('Error calling window.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function testMobileAppClose() {
+            console.log('Testing mobileApp.close() from Page 2...');
+            alert('Testing mobileApp.close() from Page 2');
+            try {
+                if (window.mobileApp && window.mobileApp.close) {
+                    window.mobileApp.close();
+                } else {
+                    alert('mobileApp.close() not available - this only works in InAppBrowser');
+                }
+            } catch (e) {
+                console.error('Error calling mobileApp.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        console.log('Page 2 loaded - Close test functions available');
     </script>
 </body>
 </html>

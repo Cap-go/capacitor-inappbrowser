@@ -538,6 +538,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 }
                         };
                 }
+                // Also provide direct window methods for convenience
+                window.close = function() {
+                  try {
+                    window.webkit.messageHandlers.close.postMessage(null);
+                  } catch(e) {
+                    console.error('Error in close:', e);
+                  }
+                };
                 """
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in

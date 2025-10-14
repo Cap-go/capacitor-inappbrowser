@@ -54,6 +54,12 @@ session_start();
         .button.redirect:hover {
             background-color: #c82333;
         }
+        .button.close {
+            background-color: #dc3545;
+        }
+        .button.close:hover {
+            background-color: #c82333;
+        }
         .navigation-info {
             background-color: #d4edda;
             padding: 15px;
@@ -111,6 +117,10 @@ session_start();
         <!-- Same page with query params -->
         <a href="page1.php?test=1" class="button">🔗 Same Page + Query</a>
         <a href="page1.php?test=2&more=data" class="button">🔗 Same Page + More Queries</a>
+        
+        <h3>Close Browser Tests (Page 1):</h3>
+        <button onclick="testWindowClose()" class="button close">❌ Test window.close()</button>
+        <button onclick="testMobileAppClose()" class="button close">📱 Test mobileApp.close()</button>
 
         <?php if (isset($_GET['test'])): ?>
         <div style="margin-top: 20px; padding: 15px; background-color: #fff3cd; border-radius: 5px;">
@@ -129,5 +139,35 @@ session_start();
             </ul>
         </div>
     </div>
+
+    <script>
+        function testWindowClose() {
+            console.log('Testing window.close() from Page 1...');
+            alert('Testing window.close() from Page 1 - should close immediately');
+            try {
+                window.close();
+            } catch (e) {
+                console.error('Error calling window.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function testMobileAppClose() {
+            console.log('Testing mobileApp.close() from Page 1...');
+            alert('Testing mobileApp.close() from Page 1');
+            try {
+                if (window.mobileApp && window.mobileApp.close) {
+                    window.mobileApp.close();
+                } else {
+                    alert('mobileApp.close() not available - this only works in InAppBrowser');
+                }
+            } catch (e) {
+                console.error('Error calling mobileApp.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        console.log('Page 1 loaded - Close test functions available');
+    </script>
 </body>
 </html>

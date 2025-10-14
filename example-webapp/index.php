@@ -55,6 +55,12 @@ session_start();
         .button.javascript:hover {
             background-color: #e0a800;
         }
+        .button.close {
+            background-color: #dc3545;
+        }
+        .button.close:hover {
+            background-color: #c82333;
+        }
         .navigation-info {
             background-color: #e9ecef;
             padding: 15px;
@@ -114,6 +120,14 @@ session_start();
         
         <!-- External then back -->
         <a href="external-redirect.php" class="button redirect">🌐 External Site Test</a>
+        
+        <h3>Close Browser Tests:</h3>
+        <p style="color: #666; font-size: 14px;">Test the new window.close() functionality (works in InAppBrowser)</p>
+        
+        <!-- Close tests -->
+        <button onclick="testWindowClose()" class="button close">❌ Test window.close()</button>
+        <button onclick="testMobileAppClose()" class="button close">📱 Test mobileApp.close()</button>
+        <button onclick="testCloseWithConfirm()" class="button close">⚠️ Test close() with confirmation</button>
 
         <div id="section1" style="margin-top: 50px; padding: 20px; background-color: #f8f9fa; border-radius: 5px;">
             <h4>Section 1 (Hash Target)</h4>
@@ -130,5 +144,57 @@ session_start();
             </ol>
         </div>
     </div>
+
+    <script>
+        function testWindowClose() {
+            console.log('Testing window.close()...');
+            alert('Testing window.close() - this should close the browser immediately (bypassing close confirmation)');
+            try {
+                window.close();
+            } catch (e) {
+                console.error('Error calling window.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function testMobileAppClose() {
+            console.log('Testing mobileApp.close()...');
+            alert('Testing mobileApp.close() - this should close the browser through the mobileApp interface');
+            try {
+                if (window.mobileApp && window.mobileApp.close) {
+                    window.mobileApp.close();
+                } else {
+                    alert('mobileApp.close() not available - this only works in InAppBrowser');
+                }
+            } catch (e) {
+                console.error('Error calling mobileApp.close():', e);
+                alert('Error: ' + e.message);
+            }
+        }
+
+        function testCloseWithConfirm() {
+            console.log('Testing close with user confirmation...');
+            if (confirm('This will test programmatic closing. Do you want to close the browser?')) {
+                alert('User confirmed - closing browser with window.close()');
+                try {
+                    window.close();
+                } catch (e) {
+                    console.error('Error calling window.close():', e);
+                    alert('Error: ' + e.message);
+                }
+            } else {
+                alert('User cancelled - browser will stay open');
+            }
+        }
+
+        // Add some debug info
+        console.log('InAppBrowser Close Test Page Loaded');
+        console.log('Available close methods:');
+        console.log('- window.close:', typeof window.close);
+        console.log('- window.mobileApp:', typeof window.mobileApp);
+        if (window.mobileApp) {
+            console.log('- window.mobileApp.close:', typeof window.mobileApp.close);
+        }
+    </script>
 </body>
 </html>
