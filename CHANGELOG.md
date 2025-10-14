@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.20.7](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.6...7.20.7) (2025-10-14)
+
+
+### Bug Fixes
+
+* **android:** removes overrides for js window object ([73c0632](https://github.com/Cap-go/capacitor-inappbrowser/commit/73c0632dab1e7394032940e817a072e076fb899b))
+
 ## [7.20.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.5...7.20.6) (2025-10-14)
 
 
