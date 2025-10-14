@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.22.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.21.0...7.22.0) (2025-10-14)
+
+
+### Features
+
+* add go back method ([6649266](https://github.com/Cap-go/capacitor-inappbrowser/commit/6649266865bb2df004ebc9cd33fdf46de82337d2))
+
+
+### Bug Fixes
+
+* goBack in android ([d0ac1ff](https://github.com/Cap-go/capacitor-inappbrowser/commit/d0ac1ffb6116fdd4efb31a2eb488503c6b00eaf6))
+* goBack in ios ([4e0c153](https://github.com/Cap-go/capacitor-inappbrowser/commit/4e0c15314c7474399f16c6640b91e4d0115c624b))
+* interface & ios ([43f90ba](https://github.com/Cap-go/capacitor-inappbrowser/commit/43f90ba694b154e6b588b56cb3c75b14c8193a52))
+
 ## [7.21.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.20.7...7.21.0) (2025-10-14)
 
 
