@@ -1334,7 +1334,7 @@ fileprivate extension WKWebViewController {
         self.present(activityViewController, animated: true, completion: nil)
     }
 
-    func closeView () {
+    func closeView() {
         var canDismiss = true
         if let url = self.source?.url {
             canDismiss = delegate?.webViewController?(self, canDismiss: url) ?? true
