@@ -1,0 +1,8 @@
+// Example URL configuration for the InAppBrowser test webapp
+// Copy this file to url.js and update the URL to point to your local server
+
+export const url = "http://localhost:8000/index.php";
+
+// Alternative examples:
+// export const url = "http://192.168.1.100:8000/index.php"; // Local network IP
+// export const url = "https://your-domain.com/path/to/webapp/index.php"; // Remote server

@@ -1,7 +1,7 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8' ?>
 <resources>
-    <string name="app_name">test-inappbrowser</string>
-    <string name="title_activity_main">test-inappbrowser</string>
-    <string name="package_name">com.example.app</string>
-    <string name="custom_url_scheme">com.example.app</string>
+    <string name="app_name">InApp Browser example app</string>
+    <string name="title_activity_main">Inappbrowser Example</string>
+    <string name="package_name">app.capgo.inappbrowser</string>
+    <string name="custom_url_scheme">app.capgo.inappbrowser</string>
 </resources>

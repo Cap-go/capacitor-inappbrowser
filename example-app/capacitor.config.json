@@ -1,6 +1,6 @@
 {
-  "appId": "com.example.app",
-  "appName": "test-inappbrowser",
+  "appId": "app.capgo.inappbrowser",
+  "appName": "Inappbrowser Example",
   "webDir": "dist",
   "plugins": {
     "SplashScreen": {

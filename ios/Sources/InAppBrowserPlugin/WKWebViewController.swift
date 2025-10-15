@@ -213,7 +213,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             // Calculate total height - status bar + navigation bar
             let navBarHeight = navigationController?.navigationBar.frame.height ?? 44
-            let totalHeight = statusBarHeight + navBarHeight
+            let totalHeight = (navigationController?.view.safeAreaInsets.top ?? CGFloat(0)) + navBarHeight
 
             // Position from top of screen to bottom of navigation bar
             NSLayoutConstraint.activate([
@@ -229,6 +229,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Make navigation bar transparent to show our view underneath
             navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
             navigationController?.navigationBar.shadowImage = UIImage()
+            navigationController?.navigationBar.isTranslucent = true
             navigationController?.navigationBar.isTranslucent = true
         }
     }
@@ -1235,6 +1236,15 @@ fileprivate extension WKWebViewController {
         if webView?.canGoBack ?? false {
             webView?.goBack()
         }
+    }
+
+    // Public method for safe back navigation
+    public func goBack() -> Bool {
+        if webView?.canGoBack ?? false {
+            webView?.goBack()
+            return true
+        }
+        return false
     }
 
     @objc func forwardDidClick(sender: AnyObject) {

@@ -1,10 +1,12 @@
-import { Camera } from "@capacitor/camera";
 import { SplashScreen } from "@capacitor/splash-screen";
 import {
   InAppBrowser,
   ToolBarType,
   BackgroundColor,
 } from "@capgo/inappbrowser";
+
+// Default URL configuration
+let testWebappUrl = "http://localhost:8000/index.php";
 
 window.customElements.define(
   "capacitor-welcome",
@@ -62,32 +64,11 @@ window.customElements.define(
     </style>
     <div>
       <capacitor-welcome-titlebar>
-        <h1>Capacitor</h1>
+        <h1>InAppBrowser Test App</h1>
       </capacitor-welcome-titlebar>
       <main>
         <p>
-          Capacitor makes it easy to build powerful apps for the app stores, mobile web (Progressive Web Apps), and desktop, all
-          with a single code base.
-        </p>
-        <h2>Getting Started</h2>
-        <p>
-          You'll probably need a UI framework to build a full-featured app. Might we recommend
-          <a target="_blank" href="http://ionicframework.com/">Ionic</a>?
-        </p>
-        <p>
-          Visit <a href="https://capacitorjs.com">capacitorjs.com</a> for information
-          on using native features, building plugins, and more.
-        </p>
-        <a href="https://capacitorjs.com" target="_blank" class="button">Read more</a>
-        <h2>Tiny Demo</h2>
-        <p>
-          This demo shows how to call Capacitor plugins. Say cheese!
-        </p>
-        <p>
-          <button class="button" id="take-photo">Take Photo</button>
-        </p>
-        <p>
-          <img id="image" style="max-width: 100%">
+          This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
         </p>
         <h2>In-App Browser Demo</h2>
         <p>
@@ -99,6 +80,19 @@ window.customElements.define(
         <p>
           <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
         </p>
+        <h2>Back Button Test</h2>
+        <p>
+          Test the back button issue with our custom test webapp. This opens a PHP webapp designed to reproduce navigation issues.
+        </p>
+        <p>
+          <button class="button" id="open-test-webapp" style="background-color: #28a745;">🧪 Open Test Webapp (Navigation Mode)</button>
+        </p>
+        <p>
+          <button class="button" id="open-test-webapp-activity" style="background-color: #ffc107; color: #212529;">🧪 Open Test Webapp (Activity Mode)</button>
+        </p>
+        <div id="webapp-status" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.8em; color: #666;">
+          <strong>Setup:</strong> Make sure to copy url.js.example to url.js and configure your local server URL.
+        </div>
       </main>
     </div>
     `;
@@ -106,25 +100,6 @@ window.customElements.define(
 
     connectedCallback() {
       const self = this;
-
-      self.shadowRoot
-        .querySelector("#take-photo")
-        .addEventListener("click", async function (e) {
-          try {
-            const photo = await Camera.getPhoto({
-              resultType: "uri",
-            });
-
-            const image = self.shadowRoot.querySelector("#image");
-            if (!image) {
-              return;
-            }
-
-            image.src = photo.webPath;
-          } catch (e) {
-            console.warn("User cancelled", e);
-          }
-        });
 
       self.shadowRoot
         .querySelector("#open-browser")
@@ -184,6 +159,106 @@ window.customElements.define(
             });
           } catch (e) {
             console.error("Error opening in-app browser:", e);
+          }
+        });
+
+      // Test webapp with navigation toolbar (main test for back button issue)
+      self.shadowRoot
+        .querySelector("#open-test-webapp")
+        .addEventListener("click", async function (e) {
+          try {
+            // Try to load custom URL configuration
+            let urlToUse = testWebappUrl;
+            try {
+              const { url } = await import("./url.js");
+              urlToUse = url;
+            } catch (e) {
+              console.warn(
+                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+              );
+            }
+
+            await InAppBrowser.openWebView({
+              url: urlToUse,
+              toolbarColor: "#ffffff",
+              toolbarTextColor: "#000000",
+              toolbarType: ToolBarType.NAVIGATION,
+              backgroundColor: BackgroundColor.WHITE,
+              title: "Back Button Test - Navigation Mode",
+              showReloadButton: true,
+              visibleTitle: true,
+              showArrow: false,
+            });
+
+            // Add comprehensive event listeners for debugging
+            InAppBrowser.addListener("urlChangeEvent", (result) => {
+              console.log("🔄 URL changed:", result.url);
+            });
+
+            InAppBrowser.addListener("closeEvent", () => {
+              console.log("❌ Close button pressed");
+            });
+
+            InAppBrowser.addListener("browserPageLoaded", () => {
+              console.log("✅ Page loaded");
+            });
+
+            InAppBrowser.addListener("pageLoadError", () => {
+              console.log("❌ Page load error");
+            });
+
+            InAppBrowser.addListener("messageFromWebview", (event) => {
+              console.log("💬 Message from webview:", event.detail);
+            });
+          } catch (e) {
+            console.error("Error opening test webapp:", e);
+            alert(
+              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+            );
+          }
+        });
+
+      // Test webapp with activity toolbar (comparison test)
+      self.shadowRoot
+        .querySelector("#open-test-webapp-activity")
+        .addEventListener("click", async function (e) {
+          try {
+            // Try to load custom URL configuration
+            let urlToUse = testWebappUrl;
+            try {
+              const { url } = await import("./url.js");
+              urlToUse = url;
+            } catch (e) {
+              console.warn(
+                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+              );
+            }
+
+            await InAppBrowser.openWebView({
+              url: urlToUse,
+              toolbarColor: "#ffc107",
+              toolbarTextColor: "#212529",
+              toolbarType: ToolBarType.ACTIVITY,
+              backgroundColor: BackgroundColor.WHITE,
+              title: "Back Button Test - Activity Mode",
+              showReloadButton: false,
+              visibleTitle: true,
+              showArrow: true,
+            });
+
+            // Add event listeners for comparison
+            InAppBrowser.addListener("urlChangeEvent", (result) => {
+              console.log("🔄 [Activity Mode] URL changed:", result.url);
+            });
+
+            InAppBrowser.addListener("closeEvent", () => {
+              console.log("❌ [Activity Mode] Close button pressed");
+            });
+          } catch (e) {
+            console.error("Error opening test webapp in activity mode:", e);
+            alert(
+              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+            );
           }
         });
     }

@@ -60,4 +60,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log("postMessage", options);
     return options;
   }
+
+  async goBack(): Promise<any> {
+    console.log("goBack");
+    return;
+  }
 }

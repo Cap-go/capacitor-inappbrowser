@@ -1311,22 +1311,6 @@ public class WebViewDialog extends Dialog {
                 }
               };
             }
-            // Also provide direct window methods for convenience
-            window.postMessage = function(data) {
-              try {
-                var message = typeof data === 'string' ? data : JSON.stringify(data);
-                window.AndroidInterface.postMessage(message);
-              } catch(e) {
-                console.error('Error in postMessage:', e);
-              }
-            };
-            window.close = function() {
-              try {
-                window.AndroidInterface.close();
-              } catch(e) {
-                console.error('Error in close:', e);
-              }
-            };
           }
           // Override window.print function to use our PrintInterface
           if (window.PrintInterface) {
@@ -3139,6 +3123,18 @@ public class WebViewDialog extends Dialog {
         }
       }
     );
+  }
+
+  /**
+   * Navigates back in the WebView history if possible
+   * @return true if navigation was successful, false otherwise
+   */
+  public boolean goBack() {
+    if (_webView != null && _webView.canGoBack()) {
+      _webView.goBack();
+      return true;
+    }
+    return false;
   }
 
   @Override
