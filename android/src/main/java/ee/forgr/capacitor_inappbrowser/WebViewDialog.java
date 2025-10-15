@@ -1127,9 +1127,7 @@ public class WebViewDialog extends Dialog {
       Insets bars = windowInsets.getInsets(
         WindowInsetsCompat.Type.systemBars()
       );
-      Insets ime = windowInsets.getInsets(
-        WindowInsetsCompat.Type.ime()
-      );
+      Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
       Boolean keyboardVisible = windowInsets.isVisible(
         WindowInsetsCompat.Type.ime()
       );
@@ -1137,18 +1135,18 @@ public class WebViewDialog extends Dialog {
       ViewGroup.MarginLayoutParams mlp =
         (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
-      // Apply margins based on Android version
-      if (keyboardVisible) {
-        mlp.bottomMargin = ime.bottom;
-      } else if (_options.getEnabledSafeMargin()) {
-        mlp.bottomMargin = bars.bottom;
-      } else {
-        mlp.bottomMargin = 0;
-      }
+      // Apply safe margin inset to bottom margin if enabled in options or fallback to 0px
+      int navBottom = _options.getEnabledSafeMargin() ? bars.bottom : 0;
+
+      // Apply top inset only if useTopInset option is enabled or fallback to 0px
+      int navTop = _options.getUseTopInset() ? bars.top : 0;
 
       // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
-      // otherwise check if useTopInset flag is enabled or fallback to 0px.
-      mlp.topMargin = isAndroid15Plus ? 0 : _options.getUseTopInset() ? bars.top : 0;
+      mlp.topMargin = isAndroid15Plus ? 0 : navTop;
+
+      // Apply larger of navigation bar or keyboard inset to bottom margin
+      mlp.bottomMargin = Math.max(navBottom, ime.bottom);
+
       mlp.leftMargin = bars.left;
       mlp.rightMargin = bars.right;
       v.setLayoutParams(mlp);
