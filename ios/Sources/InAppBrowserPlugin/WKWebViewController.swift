@@ -1209,12 +1209,16 @@ fileprivate extension WKWebViewController {
     }
 
     private func tryOpenCustomScheme(_ url: URL) -> Bool {
-        // For non-http(s) only
-        if UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-            return true
+        let app = UIApplication.shared
+
+        if app.canOpenURL(url) {
+            app.open(url, options: [:], completionHandler: nil)
+            return true // external app opened -> cancel WebView load
         }
-        return false
+
+        // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
+        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
+        return true
     }
 
     private func tryOpenUniversalLink(_ url: URL, completion: @escaping (Bool) -> Void) {
@@ -1793,16 +1797,16 @@ extension WKWebViewController: WKNavigationDelegate {
                 return
             }
 
-            if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue),
-               let result = self.delegate?.webViewController?(self, decidePolicy: url, navigationType: navigationType) {
-                actionPolicy = result ? .allow : .cancel
-            }
-
             if self.shouldBlockHost(host) {
                 print("[InAppBrowser] Blocked host detected: \(host)")
                 self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": url.absoluteString])
                 decisionHandler(.cancel)
                 return
+            }
+
+            if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue),
+               let result = self.delegate?.webViewController?(self, decidePolicy: url, navigationType: navigationType) {
+                actionPolicy = result ? .allow : .cancel
             }
 
             self.injectJavaScriptInterface()
