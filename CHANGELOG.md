@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.22.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.3...7.22.4) (2025-10-16)
+
+## [7.22.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.2...7.22.3) (2025-10-15)
+
+
+### Bug Fixes
+
+* lock and lint ([bed1e0f](https://github.com/Cap-go/capacitor-inappbrowser/commit/bed1e0f03e0dcb4f037aeaf46f36e15d6f7433a3))
+
+## [7.22.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.1...7.22.2) (2025-10-15)
+
+
+### Bug Fixes
+
+* lint config ([70f5553](https://github.com/Cap-go/capacitor-inappbrowser/commit/70f55531853aa3fb66ecb185672e45def8685b45))
+
 ## [7.22.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.0...7.22.1) (2025-10-14)
 
 ## [7.22.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.21.0...7.22.0) (2025-10-14)
