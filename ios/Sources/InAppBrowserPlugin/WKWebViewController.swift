@@ -99,6 +99,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, blockedHosts: [String], authorizedAppLinks: [String]) {
+        super.init(nibName: nil, bundle: nil)
+        self.blankNavigationTab = blankNavigationTab
+        self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.source = .remote(url)
+        self.credentials = credentials
+        self.setHeaders(headers: headers)
+        self.setPreventDeeplink(preventDeeplink: preventDeeplink)
+        self.setBlockedHosts(blockedHosts: blockedHosts)
+        self.setAuthorizedAppLinks(authorizedAppLinks: authorizedAppLinks)
+        self.initWebview(isInspectable: isInspectable)
+    }
+
     open var hasDynamicTitle = false
     open var source: WKWebSource?
     /// use `source` instead
@@ -129,6 +142,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
     var blockedHosts: [String] = []
+    var authorizedAppLinks: [String] = []
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -151,6 +165,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func setBlockedHosts(blockedHosts: [String]) {
         self.blockedHosts = blockedHosts
+    }
+
+    func setAuthorizedAppLinks(authorizedAppLinks: [String]) {
+        self.authorizedAppLinks = authorizedAppLinks
     }
 
     internal var customUserAgent: String? {
@@ -1190,6 +1208,22 @@ fileprivate extension WKWebViewController {
         return valid
     }
 
+    private func tryOpenCustomScheme(_ url: URL) -> Bool {
+        // For non-http(s) only
+        if UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            return true
+        }
+        return false
+    }
+
+    private func tryOpenUniversalLink(_ url: URL, completion: @escaping (Bool) -> Void) {
+        // Only for http(s):// and authorized hosts
+        UIApplication.shared.open(url, options: [.universalLinksOnly: true]) { opened in
+            completion(opened) // true => app opened, false => no associated app
+        }
+    }
+
     func openURLWithApp(_ url: URL) -> Bool {
         let application = UIApplication.shared
         if application.canOpenURL(url) {
@@ -1200,35 +1234,85 @@ fileprivate extension WKWebViewController {
         return false
     }
 
-    func handleURLWithApp(_ url: URL, targetFrame: WKFrameInfo?) -> Bool {
-        // If preventDeeplink is true, don't try to open URLs in external apps
-        if self.preventDeeplink {
-            return false
+    private func normalizeHost(_ host: String?) -> String? {
+        guard var h = host?.lowercased() else { return nil }
+        if h.hasPrefix("www.") { h.removeFirst(4) }
+        return h
+    }
+
+    func isUrlAuthorized(_ url: URL, authorizedLinks: [String]) -> Bool {
+        guard !authorizedLinks.isEmpty else { return false }
+
+        let urlHostNorm = normalizeHost(url.host)
+        for auth in authorizedLinks {
+            guard let comp = URLComponents(string: auth) else { continue }
+            let authHostNorm = normalizeHost(comp.host)
+            if urlHostNorm == authHostNorm {
+                return true
+            }
         }
 
+        return false
+    }
+
+    /// Attempts to open URL in an external app if it's a custom scheme OR an authorized universal link.
+    /// Returns via completion whether an external app was opened (true) or not (false).
+    private func handleURLWithApp(_ url: URL, targetFrame: WKFrameInfo?, completion: @escaping (Bool) -> Void) {
+
+        // If preventDeeplink is true, don't try to open URLs in external apps
+        if preventDeeplink {
+            print("[InAppBrowser] preventDeeplink is true, won't try to open URLs in external apps")
+            completion(false)
+            return
+        }
+
+        let scheme = url.scheme?.lowercased() ?? ""
+        let host = url.host?.lowercased() ?? ""
+
+        print("[InAppBrowser] scheme \(scheme), host \(host)")
+
+        // Handle all non-http(s) schemes by default
+        if scheme != "http" && scheme != "https" && scheme != "file" {
+            print("[InAppBrowser] not http(s) scheme, try to open URLs in external apps")
+            completion(tryOpenCustomScheme(url))
+            return
+        }
+
+        // Also handle specific hosts and schemes from UrlsHandledByApp
         let hosts = UrlsHandledByApp.hosts
         let schemes = UrlsHandledByApp.schemes
         let blank = UrlsHandledByApp.blank
 
-        var tryToOpenURLWithApp = false
-
-        // Handle all non-http(s) schemes by default
-        if let scheme = url.scheme?.lowercased(), !scheme.hasPrefix("http") && !scheme.hasPrefix("file") {
-            tryToOpenURLWithApp = true
+        if hosts.contains(host) {
+            print("[InAppBrowser] host \(host) matches one in UrlsHandledByApp, try to open URLs in external apps")
+            completion(tryOpenCustomScheme(url))
+            return
         }
-
-        // Also handle specific hosts and schemes from UrlsHandledByApp
-        if let host = url.host, hosts.contains(host) {
-            tryToOpenURLWithApp = true
-        }
-        if let scheme = url.scheme, schemes.contains(scheme) {
-            tryToOpenURLWithApp = true
+        if schemes.contains(scheme) {
+            print("[InAppBrowser] scheme \(scheme) matches one in UrlsHandledByApp, try to open URLs in external apps")
+            completion(tryOpenCustomScheme(url))
+            return
         }
         if blank && targetFrame == nil {
-            tryToOpenURLWithApp = true
+            print("[InAppBrowser] is blank and targetFrame is nil, try to open URLs in external apps")
+            completion(tryOpenCustomScheme(url))
+            return
         }
 
-        return tryToOpenURLWithApp ? openURLWithApp(url) : false
+        // Authorized Universal Link hosts: prefer app via universalLinksOnly
+        print("[InAppBrowser] Authorized App Links: \(self.authorizedAppLinks)")
+        if isUrlAuthorized(url, authorizedLinks: self.authorizedAppLinks) {
+            print("[InAppBrowser] Authorized Universal Link detected \(scheme + host), try to open URLs in external apps")
+            tryOpenUniversalLink(url) { opened in
+                print("[InAppBrowser] Handle as Universal Link: \(opened)")
+                completion(opened) // opened => cancel navigation; not opened => allow WebView
+            }
+            return
+        }
+
+        // Default: let WebView load
+        print("[InAppBrowser] default completion handler: false")
+        completion(false)
     }
 
     @objc func backDidClick(sender: AnyObject) {
@@ -1667,53 +1751,63 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        var actionPolicy: WKNavigationActionPolicy = .allow
+        var actionPolicy: WKNavigationActionPolicy = self.preventDeeplink ? .preventDeeplinkActionPolicy : .allow
 
-        if self.preventDeeplink {
-            actionPolicy = .preventDeeplinkActionPolicy
-        }
-
-        guard let u = navigationAction.request.url else {
+        guard let url = navigationAction.request.url else {
+            print("[InAppBrowser] Cannot determine URL from navigationAction")
             decisionHandler(actionPolicy)
             return
         }
 
-        // Check if the URL is an App Store URL
-        if u.absoluteString.contains("apps.apple.com") {
-            UIApplication.shared.open(u, options: [:], completionHandler: nil)
-            // Cancel the navigation in the web view
+        if url.absoluteString.contains("apps.apple.com") {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
             decisionHandler(.cancel)
             return
         }
 
-        if !self.allowsFileURL && u.isFileURL {
-            print("Cannot handle file URLs")
+        if !self.allowsFileURL, url.isFileURL {
+            print("[InAppBrowser] Cannot handle file URLs")
             decisionHandler(.cancel)
             return
         }
 
-        if handleURLWithApp(u, targetFrame: navigationAction.targetFrame) {
-            actionPolicy = .cancel
-        }
+        // Defer the rest of the logic until the async external-app handling checks completes.
+        handleURLWithApp(url, targetFrame: navigationAction.targetFrame) { [weak self] openedExternally in
+            guard let self else {
+                decisionHandler(.cancel)
+                return
+            }
 
-        if u.host == self.source?.url?.host, let cookies = availableCookies, !checkRequestCookies(navigationAction.request, cookies: cookies) {
-            self.load(remote: u)
-            actionPolicy = .cancel
-        }
+            if openedExternally {
+                decisionHandler(.cancel)
+                return
+            }
 
-        if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue), let result = delegate?.webViewController?(self, decidePolicy: u, navigationType: navigationType) {
-            actionPolicy = result ? .allow : .cancel
-        }
+            let host = url.host ?? ""
 
-        // Check for blocked hosts using the extracted function
-        if let host = u.host, shouldBlockHost(host) {
-            print("[InAppBrowser] Blocked host detected: \(host)")
-            self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": u.absoluteString])
-            actionPolicy = .cancel
-        }
+            if host == self.source?.url?.host,
+               let cookies = self.availableCookies,
+               !self.checkRequestCookies(navigationAction.request, cookies: cookies) {
+                self.load(remote: url)
+                decisionHandler(.cancel)
+                return
+            }
 
-        self.injectJavaScriptInterface()
-        decisionHandler(actionPolicy)
+            if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue),
+               let result = self.delegate?.webViewController?(self, decidePolicy: url, navigationType: navigationType) {
+                actionPolicy = result ? .allow : .cancel
+            }
+
+            if self.shouldBlockHost(host) {
+                print("[InAppBrowser] Blocked host detected: \(host)")
+                self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": url.absoluteString])
+                decisionHandler(.cancel)
+                return
+            }
+
+            self.injectJavaScriptInterface()
+            decisionHandler(actionPolicy)
+        }
     }
 }
 
