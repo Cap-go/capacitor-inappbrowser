@@ -659,6 +659,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         );
                         webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
                         webViewDialog.presentWebView();
+                        call.resolve();
                     }
                 }
             );
