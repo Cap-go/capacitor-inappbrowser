@@ -428,8 +428,19 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
-   * List of URL base patterns that should be treated as authorized App Links, Android only.
-   * Only links starting with any of these base URLs will be opened in the InAppBrowser.
+   * List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS).
+   *
+   * - On both platforms, only HTTPS links whose host matches any entry in this list
+   *   will attempt to open via the corresponding native application.
+   * - If the app is not installed or the system cannot handle the link, the URL
+   *   will continue loading inside the in-app browser.
+   * - Matching is host-based (case-insensitive), ignoring the "www." prefix.
+   * - When `preventDeeplink` is enabled, all external handling is blocked regardless of this list.
+   *
+   * @example
+   * ```ts
+   * ["https://example.com", "https://subdomain.app.io"]
+   * ```
    *
    * @since 7.12.0
    * @default []

@@ -359,6 +359,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let blockedHostsRaw = call.getArray("blockedHosts", [])
         let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
 
+        let authorizedAppLinksRaw = call.getArray("authorizedAppLinks", [])
+        let authorizedAppLinks = authorizedAppLinksRaw.compactMap { $0 as? String }
+
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
@@ -375,8 +378,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 preventDeeplink: preventDeeplink,
                 blankNavigationTab: toolbarType == "blank",
                 enabledSafeBottomMargin: enabledSafeBottomMargin,
-                blockedHosts: blockedHosts
-            )
+                blockedHosts: blockedHosts,
+                authorizedAppLinks: authorizedAppLinks,
+                )
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
@@ -621,7 +625,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["canGoBack": false])
                 return
             }
-            
+
             let canGoBack = webViewController.goBack()
             call.resolve(["canGoBack": canGoBack])
         }
