@@ -2148,7 +2148,12 @@ public class WebViewDialog extends Dialog {
                             context.startActivity(intent);
                             return true;
                         } catch (ActivityNotFoundException | URISyntaxException e) {
-                            // Do nothing
+                            Log.w("InAppBrowser", "No handler for external URL: " + url, e);
+                            // Notify that a page load error occurred
+                            if (_options.getCallbacks() != null && request.isForMainFrame()) {
+                                _options.getCallbacks().pageLoadError();
+                            }
+                            return true; // prevent WebView from attempting to load the custom scheme
                         }
                     }
 

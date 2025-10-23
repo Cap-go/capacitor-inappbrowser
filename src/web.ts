@@ -65,4 +65,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log('goBack');
     return;
   }
+
+  async getPluginVersion(): Promise<{ version: string }> {
+    return { version: 'web' };
+  }
 }

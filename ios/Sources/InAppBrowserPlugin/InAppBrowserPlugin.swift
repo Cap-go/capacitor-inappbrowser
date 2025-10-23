@@ -24,6 +24,7 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+    private let PLUGIN_VERSION: String = "7.25.0"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -39,7 +40,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
@@ -359,6 +361,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let blockedHostsRaw = call.getArray("blockedHosts", [])
         let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
 
+        let authorizedAppLinksRaw = call.getArray("authorizedAppLinks", [])
+        let authorizedAppLinks = authorizedAppLinksRaw.compactMap { $0 as? String }
+
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
@@ -375,8 +380,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 preventDeeplink: preventDeeplink,
                 blankNavigationTab: toolbarType == "blank",
                 enabledSafeBottomMargin: enabledSafeBottomMargin,
-                blockedHosts: blockedHosts
-            )
+                blockedHosts: blockedHosts,
+                authorizedAppLinks: authorizedAppLinks,
+                )
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
@@ -840,4 +846,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let brightness = (red * 299 + green * 587 + blue * 114) / 1000
         return brightness < 0.5
     }
+
+    @objc func getPluginVersion(_ call: CAPPluginCall) {
+        call.resolve(["version": self.PLUGIN_VERSION])
+    }
+
 }
