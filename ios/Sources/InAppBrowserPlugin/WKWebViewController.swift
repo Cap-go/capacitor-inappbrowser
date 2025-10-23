@@ -202,6 +202,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
     open var showArrowAsClose = false
     open var preShowScript: String?
+    open var preShowScriptInjectionTime: String = "pageLoad" // "documentStart" or "pageLoad"
     open var leftNavigationBarItemTypes: [BarButtonItemType] = []
     open var rightNavigaionBarItemTypes: [BarButtonItemType] = []
 
@@ -601,15 +602,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
+        // Enable background task processing
+        webConfiguration.processPool = WKProcessPool()
+
+        // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
+        webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
+
         // Enhanced configuration for Google Pay support (only when enabled)
         if enableGooglePaySupport {
             print("[InAppBrowser] Enabling Google Pay support features for iOS")
 
             // Allow arbitrary loads in web views for Payment Request API
             webConfiguration.setValue(true, forKey: "allowsArbitraryLoads")
-
-            // Enable JavaScript popup support for Google Pay
-            webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
 
             // Inject Google Pay support script
             let googlePayScript = WKUserScript(
@@ -928,6 +932,30 @@ public extension WKWebViewController {
         """
 
         executeScript(script: script)
+    }
+
+    func injectPreShowScriptAtDocumentStart() {
+        guard let preShowScript = self.preShowScript,
+              !preShowScript.isEmpty,
+              self.preShowScriptInjectionTime == "documentStart",
+              let webView = self.webView else {
+            return
+        }
+
+        let userScript = WKUserScript(
+            source: preShowScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        webView.configuration.userContentController.addUserScript(userScript)
+        print("[InAppBrowser] Injected preShowScript at document start")
+
+        // Reload the webview so the script executes at document start
+        if let currentURL = webView.url {
+            load(remote: currentURL)
+        } else if let source = self.source {
+            load(source: source)
+        }
     }
 
     open func cleanupWebView() {
@@ -1274,6 +1302,14 @@ fileprivate extension WKWebViewController {
         let host = url.host?.lowercased() ?? ""
 
         print("[InAppBrowser] scheme \(scheme), host \(host)")
+
+        // Don't try to open internal WebKit URLs externally (about:, data:, blob:, etc.)
+        let internalSchemes = ["about", "data", "blob", "javascript"]
+        if internalSchemes.contains(scheme) {
+            print("[InAppBrowser] internal WebKit scheme detected, allowing navigation")
+            completion(false)
+            return
+        }
 
         // Handle all non-http(s) schemes by default
         if scheme != "http" && scheme != "https" && scheme != "file" {
@@ -1674,8 +1710,13 @@ extension WKWebViewController: WKNavigationDelegate {
     }
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
-            // injectPreShowScript will block, don't execute on the main thread
-            if self.preShowScript != nil && !self.preShowScript!.isEmpty {
+            // Only inject preShowScript if it wasn't already injected at document start
+            let shouldInjectScript = self.preShowScript != nil &&
+                !self.preShowScript!.isEmpty &&
+                self.preShowScriptInjectionTime != "documentStart"
+
+            if shouldInjectScript {
+                // injectPreShowScript will block, don't execute on the main thread
                 DispatchQueue.global(qos: .userInitiated).async {
                     self.injectPreShowScript()
                     DispatchQueue.main.async { [weak self] in
@@ -1685,7 +1726,11 @@ extension WKWebViewController: WKNavigationDelegate {
             } else {
                 self.capBrowserPlugin?.presentView()
             }
-        } else if self.preShowScript != nil && !self.preShowScript!.isEmpty && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
+        } else if self.preShowScript != nil &&
+                    !self.preShowScript!.isEmpty &&
+                    self.capBrowserPlugin?.isPresentAfterPageLoad == true &&
+                    self.preShowScriptInjectionTime != "documentStart" {
+            // Only inject if not already injected at document start
             DispatchQueue.global(qos: .userInitiated).async {
                 self.injectPreShowScript()
             }
