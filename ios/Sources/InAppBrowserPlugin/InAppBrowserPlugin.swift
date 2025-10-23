@@ -24,6 +24,7 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+    private let PLUGIN_VERSION: String = ""
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -39,7 +40,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
@@ -844,4 +846,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let brightness = (red * 299 + green * 587 + blue * 114) / 1000
         return brightness < 0.5
     }
+
+    @objc func getPluginVersion(_ call: CAPPluginCall) {
+        call.resolve(["version": self.PLUGIN_VERSION])
+    }
+
 }
