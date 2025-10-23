@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.23.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.4...7.23.0) (2025-10-23)
+
+
+### Features
+
+* handle cases when custom scheme can't be opened ([be872dd](https://github.com/Cap-go/capacitor-inappbrowser/commit/be872dd88e472e1e46348c035c563a634366143a))
+* **ios:** support authorizedAppLinks within iOS universal link handling ([c04e0bc](https://github.com/Cap-go/capacitor-inappbrowser/commit/c04e0bcf3c6be6cc3b99f3b400b8ebcd0be80b76))
+
 ## [7.22.4](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.3...7.22.4) (2025-10-16)
 
 ## [7.22.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.2...7.22.3) (2025-10-15)
