@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.25.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.24.0...7.25.0) (2025-10-23)
+
+
+### Features
+
+* update Discord release webhook username to include repository name ([627edc8](https://github.com/Cap-go/capacitor-inappbrowser/commit/627edc87c56d949881065c82ec32fc4383f48608))
+
+
+### Bug Fixes
+
+* remove footer in discord ([65de5b5](https://github.com/Cap-go/capacitor-inappbrowser/commit/65de5b5b212e870382f04c52a906b320b70ebcd8))
+
 ## [7.24.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.23.0...7.24.0) (2025-10-23)
 
 
