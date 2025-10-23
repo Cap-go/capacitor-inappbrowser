@@ -361,6 +361,16 @@ export interface OpenWebViewOptions {
    */
   preShowScript?: string;
   /**
+   * preShowScriptInjectionTime: controls when the preShowScript is injected.
+   * - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase)
+   * - "pageLoad": injects after page load (default, original behavior)
+   * @since 7.26.0
+   * @default "pageLoad"
+   * @example
+   * preShowScriptInjectionTime: "documentStart"
+   */
+  preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
+  /**
    * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
    * @since 6.9.0
    */

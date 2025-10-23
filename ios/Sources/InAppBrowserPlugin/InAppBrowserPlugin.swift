@@ -488,6 +488,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.preShowScript = call.getString("preShowScript")
+            webViewController.preShowScriptInjectionTime = call.getString("preShowScriptInjectionTime", "pageLoad")
+            
+            // If script should be injected at document start, inject it now
+            if webViewController.preShowScriptInjectionTime == "documentStart" {
+                webViewController.injectPreShowScriptAtDocumentStart()
+            }
+            
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
