@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.24.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.23.0...7.24.0) (2025-10-23)
+
+
+### Features
+
+* add getPluginVersion method to InAppBrowserPlugin and update workflows for changelog generation ([2d98ecb](https://github.com/Cap-go/capacitor-inappbrowser/commit/2d98ecba55f44b5f16b5dba52b1f4165c1682a86))
+* remove default content message from Discord release webhook ([125e671](https://github.com/Cap-go/capacitor-inappbrowser/commit/125e67127bdc6c1e83d6c50face05632487e413f))
+
 ## [7.23.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.22.4...7.23.0) (2025-10-23)
 
 
