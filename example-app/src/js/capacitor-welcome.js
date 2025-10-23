@@ -70,6 +70,29 @@ window.customElements.define(
         <p>
           This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
         </p>
+        <h2>Custom URL</h2>
+        <p>
+          Enter a URL to open in the in-app browser.
+        </p>
+        <p>
+          <input type="text" id="custom-url-input" placeholder="https://example.com" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; box-sizing: border-box;" />
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="prevent-deeplink-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Prevent Deeplinks (block external app opening)</span>
+          </label>
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="spoof-firebase-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Spoof Firebase (inject Service Worker polyfill)</span>
+          </label>
+        </p>
+        <p>
+          <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
+        </p>
+        <hr />
         <h2>In-App Browser Demo</h2>
         <p>
           Open the Capacitor InAppBrowser plugin documentation in an in-app browser.
@@ -100,6 +123,194 @@ window.customElements.define(
 
     connectedCallback() {
       const self = this;
+
+      // Helper function to validate URL
+      function isValidUrl(string) {
+        try {
+          const url = new URL(string);
+          return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch (_) {
+          return false;
+        }
+      }
+
+      // Custom URL handler
+      self.shadowRoot
+        .querySelector("#open-custom-url")
+        .addEventListener("click", async function (e) {
+          const input = self.shadowRoot.querySelector("#custom-url-input");
+          const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
+          const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
+          const url = input.value.trim();
+          const preventDeeplink = preventDeeplinkToggle.checked;
+          const spoofFirebase = spoofFirebaseToggle.checked;
+          
+          if (!url) {
+            alert("Please enter a URL");
+            return;
+          }
+          
+          // Auto-prepend https:// if no protocol is specified
+          let urlToOpen = url;
+          if (!url.startsWith('http://') && !url.startsWith('https://')) {
+            urlToOpen = 'https://' + url;
+          }
+          
+          if (!isValidUrl(urlToOpen)) {
+            alert("Please enter a valid URL (e.g., https://example.com)");
+            return;
+          }
+          
+          // Firebase polyfill script
+          const firebasePolyfill = `
+            (function() {
+              console.log('[InAppBrowser] Injecting comprehensive Firebase Messaging polyfill');
+              
+              // Override browser detection first
+              Object.defineProperty(navigator, 'userAgent', {
+                get: function() {
+                  return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+                }
+              });
+              
+              // Create a mock ServiceWorkerRegistration
+              const mockRegistration = {
+                active: null,
+                installing: null,
+                waiting: null,
+                scope: '/',
+                update: function() { return Promise.resolve(); },
+                unregister: function() { return Promise.resolve(true); },
+                pushManager: {
+                  subscribe: function() { return Promise.resolve({ endpoint: '', keys: {} }); },
+                  getSubscription: function() { return Promise.resolve(null); },
+                  permissionState: function() { return Promise.resolve('granted'); }
+                }
+              };
+              
+              // Polyfill for navigator.serviceWorker
+              if (!window.navigator.serviceWorker) {
+                console.log('[InAppBrowser] Service Worker not available natively');
+                
+                window.navigator.serviceWorker = {
+                  register: function(scriptURL, options) {
+                    console.log('[InAppBrowser] Service Worker registration attempted:', scriptURL);
+                    return Promise.resolve(mockRegistration);
+                  },
+                  getRegistration: function() { return Promise.resolve(mockRegistration); },
+                  getRegistrations: function() { return Promise.resolve([mockRegistration]); },
+                  ready: Promise.resolve(mockRegistration),
+                  controller: null,
+                  addEventListener: function() {},
+                  removeEventListener: function() {}
+                };
+              }
+              
+              // Polyfill for window.ServiceWorker
+              if (!window.ServiceWorker) {
+                window.ServiceWorker = function() {};
+                window.ServiceWorker.state = 'activated';
+              }
+              
+              // Polyfill for Notification API
+              if (!window.Notification) {
+                window.Notification = function(title, options) {
+                  console.log('[InAppBrowser] Notification created:', title);
+                  this.title = title;
+                  this.body = options?.body || '';
+                  this.icon = options?.icon || '';
+                  this.tag = options?.tag || '';
+                  this.data = options?.data || {};
+                  this.requireInteraction = options?.requireInteraction || false;
+                  this.silent = options?.silent || false;
+                  this.timestamp = Date.now();
+                };
+                window.Notification.permission = 'granted';
+                window.Notification.requestPermission = function() {
+                  return Promise.resolve('granted');
+                };
+                window.Notification.prototype.close = function() {
+                  console.log('[InAppBrowser] Notification closed');
+                };
+                window.Notification.prototype.addEventListener = function() {};
+                window.Notification.prototype.removeEventListener = function() {};
+              }
+              
+              // Polyfill for PushManager
+              if (!window.PushManager) {
+                window.PushManager = function() {};
+              }
+              
+              // Polyfill for BackgroundSyncManager
+              if (!self.sync || !self.registration) {
+                if (!self.sync) {
+                  self.sync = {
+                    register: function() { return Promise.resolve(); },
+                    getTags: function() { return Promise.resolve([]); }
+                  };
+                }
+                if (!self.registration) {
+                  self.registration = mockRegistration;
+                }
+              }
+              
+              console.log('[InAppBrowser] Firebase polyfill injection complete');
+            })();
+          `;
+          
+          const options = {
+            url: urlToOpen,
+            toolbarColor: "#007bff",
+            toolbarType: ToolBarType.NAVIGATION,
+            backgroundColor: BackgroundColor.WHITE,
+            title: "Custom URL",
+            showReloadButton: true,
+            visibleTitle: true,
+            enabledSafeBottomMargin: true,
+            preventDeeplink: preventDeeplink,
+          };
+          
+          // Add Firebase spoofing if enabled
+          if (spoofFirebase) {
+            options.isPresentAfterPageLoad = true;
+            options.preShowScript = firebasePolyfill;
+            options.preShowScriptInjectionTime = 'documentStart';
+          }
+          
+          try {
+            await InAppBrowser.openWebView(options);
+
+            // Add event listeners after opening the browser
+            InAppBrowser.addListener("urlChangeEvent", (result) => {
+              console.log("URL changed:", result.url);
+            });
+
+            InAppBrowser.addListener("closeEvent", () => {
+              console.log("Close button pressed");
+            });
+
+            InAppBrowser.addListener("browserPageLoaded", () => {
+              console.log("Page loaded");
+            });
+
+            InAppBrowser.addListener("pageLoadError", () => {
+              console.log("Page load error");
+            });
+          } catch (e) {
+            console.error("Error opening custom URL:", e);
+            alert("Error opening URL. Please check the URL and try again.");
+          }
+        });
+
+      // Add Enter key support for the input field
+      self.shadowRoot
+        .querySelector("#custom-url-input")
+        .addEventListener("keypress", async function (e) {
+          if (e.key === 'Enter') {
+            const button = self.shadowRoot.querySelector("#open-custom-url");
+            button.click();
+          }
+        });
 
       self.shadowRoot
         .querySelector("#open-browser")

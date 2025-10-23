@@ -24,7 +24,7 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let PLUGIN_VERSION: String = "7.25.0"
+    private let PLUGIN_VERSION: String = "7.26.0"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -488,6 +488,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.preShowScript = call.getString("preShowScript")
+            webViewController.preShowScriptInjectionTime = call.getString("preShowScriptInjectionTime", "pageLoad")
+
+            // If script should be injected at document start, inject it now
+            if webViewController.preShowScriptInjectionTime == "documentStart" {
+                webViewController.injectPreShowScriptAtDocumentStart()
+            }
+
             webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
