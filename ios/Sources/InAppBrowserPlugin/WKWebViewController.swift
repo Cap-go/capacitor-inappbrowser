@@ -601,10 +601,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.userContentController = userContentController
         webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
-        
+
         // Enable background task processing
         webConfiguration.processPool = WKProcessPool()
-        
+
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
 
@@ -933,7 +933,7 @@ public extension WKWebViewController {
 
         executeScript(script: script)
     }
-    
+
     func injectPreShowScriptAtDocumentStart() {
         guard let preShowScript = self.preShowScript,
               !preShowScript.isEmpty,
@@ -941,7 +941,7 @@ public extension WKWebViewController {
               let webView = self.webView else {
             return
         }
-        
+
         let userScript = WKUserScript(
             source: preShowScript,
             injectionTime: .atDocumentStart,
@@ -949,7 +949,7 @@ public extension WKWebViewController {
         )
         webView.configuration.userContentController.addUserScript(userScript)
         print("[InAppBrowser] Injected preShowScript at document start")
-        
+
         // Reload the webview so the script executes at document start
         if let currentURL = webView.url {
             load(remote: currentURL)
@@ -1711,10 +1711,10 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
             // Only inject preShowScript if it wasn't already injected at document start
-            let shouldInjectScript = self.preShowScript != nil && 
-                                   !self.preShowScript!.isEmpty && 
-                                   self.preShowScriptInjectionTime != "documentStart"
-            
+            let shouldInjectScript = self.preShowScript != nil &&
+                !self.preShowScript!.isEmpty &&
+                self.preShowScriptInjectionTime != "documentStart"
+
             if shouldInjectScript {
                 // injectPreShowScript will block, don't execute on the main thread
                 DispatchQueue.global(qos: .userInitiated).async {
@@ -1726,10 +1726,10 @@ extension WKWebViewController: WKNavigationDelegate {
             } else {
                 self.capBrowserPlugin?.presentView()
             }
-        } else if self.preShowScript != nil && 
-                  !self.preShowScript!.isEmpty && 
-                  self.capBrowserPlugin?.isPresentAfterPageLoad == true &&
-                  self.preShowScriptInjectionTime != "documentStart" {
+        } else if self.preShowScript != nil &&
+                    !self.preShowScript!.isEmpty &&
+                    self.capBrowserPlugin?.isPresentAfterPageLoad == true &&
+                    self.preShowScriptInjectionTime != "documentStart" {
             // Only inject if not already injected at document start
             DispatchQueue.global(qos: .userInitiated).async {
                 self.injectPreShowScript()
