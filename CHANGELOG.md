@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.26.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.25.0...7.26.0) (2025-10-23)
+
+
+### Features
+
+* add preShowScriptInjectionTime on iOS ([0bde9d9](https://github.com/Cap-go/capacitor-inappbrowser/commit/0bde9d96095b87ec0239eeae1649ef778b681b8d))
+
+
+### Bug Fixes
+
+* lint ([9a216ed](https://github.com/Cap-go/capacitor-inappbrowser/commit/9a216ed13cf0c492ca038ba3f4e5224fe7e75666))
+
 ## [7.25.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.24.0...7.25.0) (2025-10-23)
 
 
