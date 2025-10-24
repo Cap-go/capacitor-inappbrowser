@@ -389,10 +389,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Failed to initialize WebViewController")
                 return
             }
-            
+
             // Set native navigation gestures before view loads
             webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview
-            
+
             // Update the webview's gesture property (if webview already exists)
             webViewController.updateNavigationGestures()
 

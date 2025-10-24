@@ -399,7 +399,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         if self.webView == nil {
             self.initWebview()
         }
-        
+
         // Apply navigation gestures setting
         updateNavigationGestures()
 
@@ -945,7 +945,7 @@ public extension WKWebViewController {
               let webView = self.webView else {
             return
         }
-        
+
         let userScript = WKUserScript(
             source: preShowScript,
             injectionTime: .atDocumentStart,
@@ -953,7 +953,7 @@ public extension WKWebViewController {
         )
         webView.configuration.userContentController.addUserScript(userScript)
         print("[InAppBrowser] Injected preShowScript at document start")
-        
+
         // Reload the webview so the script executes at document start
         if let currentURL = webView.url {
             load(remote: currentURL)
@@ -961,7 +961,7 @@ public extension WKWebViewController {
             load(source: source)
         }
     }
-    
+
     func updateNavigationGestures() {
         self.webView?.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
     }
