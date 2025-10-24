@@ -45,6 +45,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewFeature;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -366,6 +368,14 @@ public class WebViewDialog extends Dialog {
             // Ensure secure context for Payment Request API
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 _webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+            }
+            
+            // Enable Payment Request API only if feature is supported
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.PAYMENT_REQUEST)) {
+                WebSettingsCompat.setPaymentRequestEnabled(_webView.getSettings(), true);
+                Log.d("InAppBrowser", "Payment Request API enabled");
+            } else {
+                Log.d("InAppBrowser", "Payment Request API not supported on this device");
             }
         }
 

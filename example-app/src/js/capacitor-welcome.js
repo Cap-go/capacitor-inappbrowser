@@ -89,6 +89,12 @@ window.customElements.define(
             <span>Spoof Firebase (inject Service Worker polyfill)</span>
           </label>
         </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="enable-google-pay-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Enable Google Pay Support</span>
+          </label>
+        </p>
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
@@ -141,9 +147,11 @@ window.customElements.define(
           const input = self.shadowRoot.querySelector("#custom-url-input");
           const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
           const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
+          const enableGooglePayToggle = self.shadowRoot.querySelector("#enable-google-pay-toggle");
           const url = input.value.trim();
           const preventDeeplink = preventDeeplinkToggle.checked;
           const spoofFirebase = spoofFirebaseToggle.checked;
+          const enableGooglePay = enableGooglePayToggle.checked;
           
           if (!url) {
             alert("Please enter a URL");
@@ -268,6 +276,7 @@ window.customElements.define(
             visibleTitle: true,
             enabledSafeBottomMargin: true,
             preventDeeplink: preventDeeplink,
+            enableGooglePaySupport: enableGooglePay,
           };
           
           // Add Firebase spoofing if enabled

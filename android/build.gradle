@@ -60,4 +60,5 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation "androidx.browser:browser:$androidxBrowserVersion"
     implementation 'com.google.android.material:material:1.13.0'
+    implementation 'androidx.webkit:webkit:1.14.0'
 }
