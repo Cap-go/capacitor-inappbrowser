@@ -235,22 +235,22 @@ public class WebViewDialog extends Dialog {
         public void print() {
             // Run on UI thread since printing requires UI operations
             ((Activity) context).runOnUiThread(
-                    new Runnable() {
-                        @Override
-                        public void run() {
-                            // Create a print job from the WebView content
-                            PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
-                            String jobName = "Document_" + System.currentTimeMillis();
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        // Create a print job from the WebView content
+                        PrintManager printManager = (PrintManager) context.getSystemService(Context.PRINT_SERVICE);
+                        String jobName = "Document_" + System.currentTimeMillis();
 
-                            PrintDocumentAdapter printAdapter;
+                        PrintDocumentAdapter printAdapter;
 
-                            // For API 21+ (Lollipop and above)
-                            printAdapter = webView.createPrintDocumentAdapter(jobName);
+                        // For API 21+ (Lollipop and above)
+                        printAdapter = webView.createPrintDocumentAdapter(jobName);
 
-                            printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
-                        }
+                        printManager.print(jobName, printAdapter, new PrintAttributes.Builder().build());
                     }
-                );
+                }
+            );
         }
     }
 
@@ -409,9 +409,9 @@ public class WebViewDialog extends Dialog {
                     Log.d(
                         "InAppBrowser",
                         "Has camera permission: " +
-                        (activity != null &&
-                            activity.checkSelfPermission(android.Manifest.permission.CAMERA) ==
-                            android.content.pm.PackageManager.PERMISSION_GRANTED)
+                            (activity != null &&
+                                activity.checkSelfPermission(android.Manifest.permission.CAMERA) ==
+                                android.content.pm.PackageManager.PERMISSION_GRANTED)
                     );
 
                     // Check if the file chooser is already open
@@ -440,16 +440,18 @@ public class WebViewDialog extends Dialog {
                     // For image inputs, try to detect capture attribute using JavaScript
                     if (acceptType.equals("image/*")) {
                         // Check if HTML content contains capture attribute on file inputs (synchronous check)
-                        webView.evaluateJavascript("document.querySelector('input[type=\"file\"][capture]') !== null", hasCaptureValue -> {
-                            Log.d("InAppBrowser", "Quick capture check: " + hasCaptureValue);
-                            if (Boolean.parseBoolean(hasCaptureValue.replace("\"", ""))) {
-                                Log.d("InAppBrowser", "Found capture attribute in quick check");
+                        webView.evaluateJavascript(
+                            "document.querySelector('input[type=\"file\"][capture]') !== null",
+                            (hasCaptureValue) -> {
+                                Log.d("InAppBrowser", "Quick capture check: " + hasCaptureValue);
+                                if (Boolean.parseBoolean(hasCaptureValue.replace("\"", ""))) {
+                                    Log.d("InAppBrowser", "Found capture attribute in quick check");
+                                }
                             }
-                        });
+                        );
 
                         // Fixed JavaScript with proper error handling
-                        String js =
-                            """
+                        String js = """
                             try {
                               (function() {
                                 var captureAttr = null;
@@ -492,7 +494,7 @@ public class WebViewDialog extends Dialog {
                             }
                             """;
 
-                        webView.evaluateJavascript(js, value -> {
+                        webView.evaluateJavascript(js, (value) -> {
                             Log.d("InAppBrowser", "Capture attribute JS result: " + value);
 
                             // If we already found capture in URL, use that directly
@@ -516,7 +518,7 @@ public class WebViewDialog extends Dialog {
 
                             // Look for hints in the web page source
                             Log.d("InAppBrowser", "Looking for camera hints in page content");
-                            webView.evaluateJavascript("(function() { return document.documentElement.innerHTML; })()", htmlSource -> {
+                            webView.evaluateJavascript("(function() { return document.documentElement.innerHTML; })()", (htmlSource) -> {
                                 if (htmlSource != null && htmlSource.length() > 10) {
                                     boolean hasCameraOrSelfieKeyword =
                                         htmlSource.contains("capture=") || htmlSource.contains("camera") || htmlSource.contains("selfie");
@@ -632,7 +634,7 @@ public class WebViewDialog extends Dialog {
                                             .register(
                                                 "camera_capture",
                                                 new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                                                result -> {
+                                                (result) -> {
                                                     if (result.getResultCode() == Activity.RESULT_OK) {
                                                         if (tempCameraUri != null) {
                                                             mFilePathCallback.onReceiveValue(new Uri[] { tempCameraUri });
@@ -733,9 +735,9 @@ public class WebViewDialog extends Dialog {
                     Log.d(
                         "InAppBrowser",
                         "onCreateWindow called - isUserGesture: " +
-                        isUserGesture +
-                        ", GooglePaySupport: " +
-                        _options.getEnableGooglePaySupport()
+                            isUserGesture +
+                            ", GooglePaySupport: " +
+                            _options.getEnableGooglePaySupport()
                     );
 
                     // Only handle popup windows if Google Pay support is enabled
@@ -926,22 +928,26 @@ public class WebViewDialog extends Dialog {
 
         // Apply system insets to WebView content view (compatible with all Android versions)
         ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
-            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
             Boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
             ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
-            // // Apply margins based on Android version
-            if (_options.getEnabledSafeMargin()) {
-                mlp.bottomMargin = insets.bottom;
-            } else {
-                mlp.bottomMargin = 0;
-            }
+            // Apply safe margin inset to bottom margin if enabled in options or fallback to 0px
+            int navBottom = _options.getEnabledSafeMargin() ? bars.bottom : 0;
 
-            // Use system top inset only when explicitly enabled otherwise keep legacy 0px margin
-            mlp.topMargin = _options.getUseTopInset() ? insets.top : 0;
-            mlp.leftMargin = insets.left;
-            mlp.rightMargin = insets.right;
+            // Apply top inset only if useTopInset option is enabled or fallback to 0px
+            int navTop = _options.getUseTopInset() ? bars.top : 0;
+
+            // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
+            mlp.topMargin = isAndroid15Plus ? 0 : navTop;
+
+            // Apply larger of navigation bar or keyboard inset to bottom margin
+            mlp.bottomMargin = Math.max(navBottom, ime.bottom);
+
+            mlp.leftMargin = bars.left;
+            mlp.rightMargin = bars.right;
             v.setLayoutParams(mlp);
 
             return WindowInsetsCompat.CONSUMED;
@@ -1040,8 +1046,7 @@ public class WebViewDialog extends Dialog {
         }
 
         try {
-            String script =
-                """
+            String script = """
                 (function() {
                   if (window.AndroidInterface) {
                     // Create mobileApp object for backward compatibility
@@ -1103,8 +1108,7 @@ public class WebViewDialog extends Dialog {
         }
 
         try {
-            String googlePayScript =
-                """
+            String googlePayScript = """
                 (function() {
                   console.log('[InAppBrowser] Injecting Google Pay support enhancements');
 
@@ -1174,7 +1178,7 @@ public class WebViewDialog extends Dialog {
             _webView.post(() -> {
                 if (_webView != null) {
                     try {
-                        _webView.evaluateJavascript(googlePayScript, result -> {
+                        _webView.evaluateJavascript(googlePayScript, (result) -> {
                             Log.d("InAppBrowser", "Google Pay polyfills injected successfully");
                         });
                     } catch (Exception e) {
@@ -1293,7 +1297,7 @@ public class WebViewDialog extends Dialog {
                     .register(
                         "file_chooser",
                         new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                        result -> {
+                        (result) -> {
                             if (result.getResultCode() == Activity.RESULT_OK) {
                                 Intent data = result.getData();
                                 if (data != null) {
@@ -1333,7 +1337,7 @@ public class WebViewDialog extends Dialog {
                         .register(
                             "file_chooser",
                             new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                            result -> {
+                            (result) -> {
                                 if (result.getResultCode() == Activity.RESULT_OK) {
                                     Intent data = result.getData();
                                     if (data != null) {
@@ -1787,7 +1791,7 @@ public class WebViewDialog extends Dialog {
                 }
 
                 // Set the click listener
-                buttonNearDoneView.setOnClickListener(view -> _options.getCallbacks().buttonNearDoneClicked());
+                buttonNearDoneView.setOnClickListener((view) -> _options.getCallbacks().buttonNearDoneClicked());
             } else {
                 ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
                 buttonNearDoneView.setVisibility(View.GONE);
@@ -1804,7 +1808,7 @@ public class WebViewDialog extends Dialog {
             shareButton.setColorFilter(iconColor);
 
             // The color filter is now applied in applyColorToAllButtons
-            shareButton.setOnClickListener(view -> {
+            shareButton.setOnClickListener((view) -> {
                 JSObject shareDisclaimer = _options.getShareDisclaimer();
                 if (shareDisclaimer != null) {
                     new AlertDialog.Builder(_context)
@@ -1905,7 +1909,7 @@ public class WebViewDialog extends Dialog {
             body = result.getString("body");
             code = result.getInt("code");
             JSONObject headers = result.getJSONObject("headers");
-            for (Iterator<String> it = headers.keys(); it.hasNext();) {
+            for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
                 String headerName = it.next();
                 String header = headers.getString(headerName);
                 responseHeaders.put(headerName, header);
@@ -2297,8 +2301,7 @@ public class WebViewDialog extends Dialog {
                                         String.format("h[atob('%s')]=atob('%s');", toBase64(header.getKey()), toBase64(header.getValue()))
                                     );
                                 }
-                                String jsTemplate =
-                                    """
+                                String jsTemplate = """
                                     try {
                                       function getHeaders() {
                                         const h = {};
@@ -2683,8 +2686,7 @@ public class WebViewDialog extends Dialog {
 
                 // Clear file inputs for security/privacy before destroying WebView
                 try {
-                    String clearInputsScript =
-                        """
+                    String clearInputsScript = """
                         (function() {
                           try {
                             var inputs = document.querySelectorAll('input[type="file"]');
@@ -2820,8 +2822,7 @@ public class WebViewDialog extends Dialog {
         datePickerInjected = true;
 
         // This script adds minimal fixes for date inputs to use Material Design
-        String script =
-            """
+        String script = """
             (function() {
               try {
                 // Find all date inputs
@@ -2909,7 +2910,7 @@ public class WebViewDialog extends Dialog {
         String timeStamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
         String imageFileName = "JPEG_" + timeStamp + "_";
         File storageDir = activity.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-        File image = File.createTempFile(imageFileName/* prefix */, ".jpg"/* suffix */, storageDir/* directory */);
+        File image = File.createTempFile(imageFileName /* prefix */, ".jpg" /* suffix */, storageDir /* directory */);
         return image;
     }
 }

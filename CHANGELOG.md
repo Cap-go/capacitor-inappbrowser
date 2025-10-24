@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.26.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.0...7.26.1) (2025-10-23)
+
+
+### Bug Fixes
+
+* adds missing call.resolve() back ([e174f03](https://github.com/Cap-go/capacitor-inappbrowser/commit/e174f03a099d443d526d419f99638386782a8973))
+* adds review suggestions ([0210ca6](https://github.com/Cap-go/capacitor-inappbrowser/commit/0210ca6d9192ae10a89b67d4a6ae57b45122f322))
+* **android:** fixes window resize on keyboard show/hide ([9322746](https://github.com/Cap-go/capacitor-inappbrowser/commit/932274631fbf5674d9319c2ff87187d4c49ee4e7))
+* fixes lint errors ([7f62cb9](https://github.com/Cap-go/capacitor-inappbrowser/commit/7f62cb9236ffb8de5b0d51586b962956fa5cd175))
+* lint ([5206ff6](https://github.com/Cap-go/capacitor-inappbrowser/commit/5206ff634ec1e60c2b0240c3e1e23965c9b7dbe4))
+* review fixes ([880fe7b](https://github.com/Cap-go/capacitor-inappbrowser/commit/880fe7b4a31a1323296713b7d2624b8b54ab1ae5))
+* simpler solution which work on different devices ([f964e63](https://github.com/Cap-go/capacitor-inappbrowser/commit/f964e63ff23109e3300e1b9300b264666724470a))
+
+## [7.26.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.25.0...7.26.0) (2025-10-23)
+
+
+### Features
+
+* add preShowScriptInjectionTime on iOS ([0bde9d9](https://github.com/Cap-go/capacitor-inappbrowser/commit/0bde9d96095b87ec0239eeae1649ef778b681b8d))
+
+
+### Bug Fixes
+
+* lint ([9a216ed](https://github.com/Cap-go/capacitor-inappbrowser/commit/9a216ed13cf0c492ca038ba3f4e5224fe7e75666))
+
 ## [7.25.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.24.0...7.25.0) (2025-10-23)
 
 
