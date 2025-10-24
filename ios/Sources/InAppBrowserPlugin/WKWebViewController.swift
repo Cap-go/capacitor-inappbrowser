@@ -143,6 +143,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var enabledSafeBottomMargin: Bool = false
     var blockedHosts: [String] = []
     var authorizedAppLinks: [String] = []
+    var activeNativeNavigationForWebview: Bool = true
 
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
@@ -398,6 +399,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         if self.webView == nil {
             self.initWebview()
         }
+        
+        // Apply navigation gestures setting
+        updateNavigationGestures()
 
         // Force all buttons to use tint color
         updateButtonTintColors()
@@ -689,7 +693,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.uiDelegate = self
         webView.navigationDelegate = self
 
-        webView.allowsBackForwardNavigationGestures = true
+        webView.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
         webView.isMultipleTouchEnabled = true
 
         webView.addObserver(self, forKeyPath: estimatedProgressKeyPath, options: .new, context: nil)
@@ -941,7 +945,7 @@ public extension WKWebViewController {
               let webView = self.webView else {
             return
         }
-
+        
         let userScript = WKUserScript(
             source: preShowScript,
             injectionTime: .atDocumentStart,
@@ -949,13 +953,17 @@ public extension WKWebViewController {
         )
         webView.configuration.userContentController.addUserScript(userScript)
         print("[InAppBrowser] Injected preShowScript at document start")
-
+        
         // Reload the webview so the script executes at document start
         if let currentURL = webView.url {
             load(remote: currentURL)
         } else if let source = self.source {
             load(source: source)
         }
+    }
+    
+    func updateNavigationGestures() {
+        self.webView?.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
     }
 
     open func cleanupWebView() {
