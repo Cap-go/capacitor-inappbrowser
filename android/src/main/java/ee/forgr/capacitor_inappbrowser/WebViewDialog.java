@@ -356,6 +356,11 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+        // Open links in external browser for target="_blank" if preventDeepLink is false
+        if (!_options.getPreventDeeplink()) {
+            _webView.getSettings().setSupportMultipleWindows(true);
+        }
+
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
             Log.d("InAppBrowser", "Enabling Google Pay support features");
@@ -737,8 +742,27 @@ public class WebViewDialog extends Dialog {
                         "onCreateWindow called - isUserGesture: " +
                             isUserGesture +
                             ", GooglePaySupport: " +
-                            _options.getEnableGooglePaySupport()
+                            _options.getEnableGooglePaySupport() +
+                            ", preventDeeplink: " +
+                            _options.getPreventDeeplink()
                     );
+
+                    // When preventDeeplink is false, open target="_blank" links externally
+                    if (!_options.getPreventDeeplink() && isUserGesture) {
+                        try {
+                            WebView.HitTestResult result = view.getHitTestResult();
+                            String data = result.getExtra();
+                            if (data != null && !data.isEmpty()) {
+                                Log.d("InAppBrowser", "Opening target=_blank link externally: " + data);
+                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
+                                browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                _webView.getContext().startActivity(browserIntent);
+                                return false;
+                            }
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error opening external link: " + e.getMessage());
+                        }
+                    }
 
                     // Only handle popup windows if Google Pay support is enabled
                     if (_options.getEnableGooglePaySupport() && isUserGesture) {
