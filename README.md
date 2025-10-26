@@ -8,6 +8,10 @@
 
 Capacitor plugin in app browser with urlChangeEvent, two way communication, camera and microphone usage, etc.
 
+## Documentation
+
+The most complete doc is available here: https://capgo.app/docs/plugins/inappbrowser/
+
 ## Install
 
 ```bash
