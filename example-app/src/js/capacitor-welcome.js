@@ -163,8 +163,6 @@ window.customElements.define(
           const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
           const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
           const enableGooglePayToggle = self.shadowRoot.querySelector("#enable-google-pay-toggle");
-          const preventDeeplink = preventDeeplinkToggle.checked;
-          const spoofFirebase = spoofFirebaseToggle.checked;
           const enableGooglePay = enableGooglePayToggle.checked;
           const toolbarTypeSelect = self.shadowRoot.querySelector("#toolbar-type-select");
           const nativeNavigationGesturesToggle = self.shadowRoot.querySelector("#native-navigation-gestures-toggle");
