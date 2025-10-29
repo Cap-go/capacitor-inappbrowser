@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.27.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.6...7.27.0) (2025-10-29)
+
+
+### Features
+
+* implement activeNativeNavigationForWebview for iOS ([558a5e8](https://github.com/Cap-go/capacitor-inappbrowser/commit/558a5e89b7197d4f8cbc007f52438cb1d9d8a444))
+
+
+### Bug Fixes
+
+* lint ([6894b83](https://github.com/Cap-go/capacitor-inappbrowser/commit/6894b8326b2e3714e6faaa038c2f1a7dd08934a3))
+
 ## [7.26.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.5...7.26.6) (2025-10-29)
 
 
