@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.26.6](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.5...7.26.6) (2025-10-29)
+
+
+### Bug Fixes
+
+* CI/CD config ([aba3268](https://github.com/Cap-go/capacitor-inappbrowser/commit/aba32681a6fa06df83a7dec51c629dc0198b3611))
+* update AI model in build workflow ([9748164](https://github.com/Cap-go/capacitor-inappbrowser/commit/9748164ab2f4f601bf67f4537331998639570c70))
+* update github action ([4a26793](https://github.com/Cap-go/capacitor-inappbrowser/commit/4a2679321ce8f51758c4d020034530db8f4ebf56))
+
 ## [7.26.5](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.4...7.26.5) (2025-10-27)
 
 
