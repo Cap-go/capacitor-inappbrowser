@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.27.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.27.0...7.27.1) (2025-10-29)
+
+
+### Bug Fixes
+
+* GooglePay support for Android WebView ([0cf2df5](https://github.com/Cap-go/capacitor-inappbrowser/commit/0cf2df5ea0b59d27d83cdc1f748ea1c41d6c7b56))
+
 ## [7.27.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.26.6...7.27.0) (2025-10-29)
 
 

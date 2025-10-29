@@ -50,7 +50,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String PLUGIN_VERSION = "7.27.0";
+    private final String PLUGIN_VERSION = "7.27.1";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
