@@ -74,8 +74,9 @@ window.customElements.define(
         <p>
           Enter a URL to open in the in-app browser.
         </p>
-        <p>
-          <input type="text" id="custom-url-input" placeholder="https://example.com" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; box-sizing: border-box;" />
+        <p style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="custom-url-input" value="https://google.com" placeholder="https://example.com" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; box-sizing: border-box;" />
+          <button id="clear-url-button" style="background-color: #dc3545; color: white; border: none; border-radius: 3px; padding: 8px 12px; cursor: pointer; font-size: 0.9em; margin-bottom: 10px;">🗑️</button>
         </p>
         <p style="margin-bottom: 10px;">
           <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
@@ -93,6 +94,20 @@ window.customElements.define(
           <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
             <input type="checkbox" id="enable-google-pay-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
             <span>Enable Google Pay Support</span>
+          <label style="display: block; font-size: 0.9em; margin-bottom: 5px;">
+            <span>Toolbar Type:</span>
+          </label>
+          <select id="toolbar-type-select" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.9em; box-sizing: border-box;">
+            <option value="navigation">Navigation (back/forward/reload)</option>
+            <option value="activity">Activity (close/share)</option>
+            <option value="compact">Compact (close only)</option>
+            <option value="blank">Blank (no toolbar)</option>
+          </select>
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="native-navigation-gestures-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Native Navigation Gestures (swipe left/right)</span>
           </label>
         </p>
         <p>
@@ -148,10 +163,16 @@ window.customElements.define(
           const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
           const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
           const enableGooglePayToggle = self.shadowRoot.querySelector("#enable-google-pay-toggle");
-          const url = input.value.trim();
           const preventDeeplink = preventDeeplinkToggle.checked;
           const spoofFirebase = spoofFirebaseToggle.checked;
           const enableGooglePay = enableGooglePayToggle.checked;
+          const toolbarTypeSelect = self.shadowRoot.querySelector("#toolbar-type-select");
+          const nativeNavigationGesturesToggle = self.shadowRoot.querySelector("#native-navigation-gestures-toggle");
+          const url = input.value.trim();
+          const preventDeeplink = preventDeeplinkToggle.checked;
+          const spoofFirebase = spoofFirebaseToggle.checked;
+          const toolbarType = toolbarTypeSelect.value;
+          const nativeNavigationGestures = nativeNavigationGesturesToggle.checked;
           
           if (!url) {
             alert("Please enter a URL");
@@ -269,14 +290,15 @@ window.customElements.define(
           const options = {
             url: urlToOpen,
             toolbarColor: "#007bff",
-            toolbarType: ToolBarType.NAVIGATION,
+            toolbarType: toolbarType,
             backgroundColor: BackgroundColor.WHITE,
             title: "Custom URL",
-            showReloadButton: true,
+            showReloadButton: toolbarType === 'navigation',
             visibleTitle: true,
             enabledSafeBottomMargin: true,
             preventDeeplink: preventDeeplink,
             enableGooglePaySupport: enableGooglePay,
+            activeNativeNavigationForWebview: nativeNavigationGestures,
           };
           
           // Add Firebase spoofing if enabled
@@ -319,6 +341,15 @@ window.customElements.define(
             const button = self.shadowRoot.querySelector("#open-custom-url");
             button.click();
           }
+        });
+
+      // Add clear button handler
+      self.shadowRoot
+        .querySelector("#clear-url-button")
+        .addEventListener("click", function (e) {
+          const input = self.shadowRoot.querySelector("#custom-url-input");
+          input.value = '';
+          input.focus();
         });
 
       self.shadowRoot

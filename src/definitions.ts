@@ -227,8 +227,10 @@ export interface OpenWebViewOptions {
    */
   backgroundColor?: BackgroundColor;
   /**
-   * If true, active the native navigation within the webview, Android only
-   * @default false
+   * If true, enables native navigation gestures within the webview.
+   * - Android: Native back button navigates within webview history
+   * - iOS: Enables swipe left/right gestures for back/forward navigation
+   * @default false (Android), true (iOS - enabled by default)
    * @example
    * activeNativeNavigationForWebview: true,
    * disableGoBackOnNativeApplication: true

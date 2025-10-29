@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - development
+    paths-ignore:
+      - 'example-app/**'
+      - '.github/**'
 
 jobs:
   bump-version:

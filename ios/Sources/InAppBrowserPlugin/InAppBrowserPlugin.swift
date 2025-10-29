@@ -24,7 +24,7 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let PLUGIN_VERSION: String = "7.26.1"
+    private let PLUGIN_VERSION: String = "7.27.0"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -354,6 +354,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let ignoreUntrustedSSLError = call.getBool("ignoreUntrustedSSLError", false)
         let enableGooglePaySupport = call.getBool("enableGooglePaySupport", false)
+        let activeNativeNavigationForWebview = call.getBool("activeNativeNavigationForWebview", true)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
@@ -388,6 +389,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Failed to initialize WebViewController")
                 return
             }
+
+            // Set native navigation gestures before view loads
+            webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview
+
+            // Update the webview's gesture property (if webview already exists)
+            webViewController.updateNavigationGestures()
 
             if self.bridge?.statusBarVisible == true {
                 let subviews = self.bridge?.webView?.superview?.subviews
