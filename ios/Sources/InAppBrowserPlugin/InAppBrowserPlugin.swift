@@ -24,7 +24,7 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
-    private let pluginVersion: String = "7.28.1"
+    private let pluginVersion: String = "7.28.2"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
