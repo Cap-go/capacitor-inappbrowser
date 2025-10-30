@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.29.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.28.2...7.29.0) (2025-10-30)
+
+
+### Features
+
+* add support for custom dimensions in InAppBrowser for Android and iOS ([e3838c7](https://github.com/Cap-go/capacitor-inappbrowser/commit/e3838c75f2b071d5eb5c5117210380f2c0dc57b1))
+
 ## [7.28.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.28.1...7.28.2) (2025-10-30)
 
 
