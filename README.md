@@ -8,6 +8,19 @@
 
 Capacitor plugin in app browser with urlChangeEvent, two way communication, camera and microphone usage, etc.
 
+## Why InAppBrowser?
+
+The official Capacitor Browser plugin has strict security limitations that prevent advanced features. InAppBrowser removes these restrictions, enabling:
+
+- **Two-way communication** between your app and the browser
+- **JavaScript injection** for dynamic content manipulation
+- **Camera and microphone access** within the browser context
+- **URL change monitoring** for navigation tracking
+- **Custom toolbars and UI** for branded experiences
+- **Cookie and cache management** for session control
+
+Perfect for OAuth flows, embedded web apps, video calls, and any scenario requiring deep integration with web content.
+
 ## Documentation
 
 The most complete doc is available here: https://capgo.app/docs/plugins/inappbrowser/
