@@ -162,6 +162,42 @@ public class Options {
     private boolean useTopInset = false;
     private boolean enableGooglePaySupport = false;
     private List<String> blockedHosts = new ArrayList<>();
+    private Integer width = null;
+    private Integer height = null;
+    private Integer x = null;
+    private Integer y = null;
+
+    public Integer getWidth() {
+        return width;
+    }
+
+    public void setWidth(Integer width) {
+        this.width = width;
+    }
+
+    public Integer getHeight() {
+        return height;
+    }
+
+    public void setHeight(Integer height) {
+        this.height = height;
+    }
+
+    public Integer getX() {
+        return x;
+    }
+
+    public void setX(Integer x) {
+        this.x = x;
+    }
+
+    public Integer getY() {
+        return y;
+    }
+
+    public void setY(Integer y) {
+        this.y = y;
+    }
 
     public int getTextZoom() {
         return textZoom;

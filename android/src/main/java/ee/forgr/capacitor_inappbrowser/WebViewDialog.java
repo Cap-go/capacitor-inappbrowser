@@ -337,7 +337,8 @@ public class WebViewDialog extends Dialog {
                 });
         }
 
-        getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        // Set dimensions if specified, otherwise fullscreen
+        applyDimensions();
 
         this._webView = findViewById(R.id.browser_view);
 
@@ -2955,5 +2956,62 @@ public class WebViewDialog extends Dialog {
         File storageDir = activity.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File image = File.createTempFile(imageFileName /* prefix */, ".jpg" /* suffix */, storageDir /* directory */);
         return image;
+    }
+
+    /**
+     * Apply dimensions to the webview window
+     */
+    private void applyDimensions() {
+        Integer width = _options.getWidth();
+        Integer height = _options.getHeight();
+        Integer x = _options.getX();
+        Integer y = _options.getY();
+
+        WindowManager.LayoutParams params = getWindow().getAttributes();
+
+        // If both width and height are specified, use custom dimensions
+        if (width != null && height != null) {
+            params.width = (int) getPixels(width);
+            params.height = (int) getPixels(height);
+            params.x = (x != null) ? (int) getPixels(x) : 0;
+            params.y = (y != null) ? (int) getPixels(y) : 0;
+        } else {
+            // Default to fullscreen
+            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            params.height = WindowManager.LayoutParams.MATCH_PARENT;
+            params.x = 0;
+            params.y = 0;
+        }
+
+        getWindow().setAttributes(params);
+    }
+
+    /**
+     * Update dimensions at runtime
+     */
+    public void updateDimensions(Integer width, Integer height, Integer x, Integer y) {
+        // Update options
+        if (width != null) {
+            _options.setWidth(width);
+        }
+        if (height != null) {
+            _options.setHeight(height);
+        }
+        if (x != null) {
+            _options.setX(x);
+        }
+        if (y != null) {
+            _options.setY(y);
+        }
+
+        // Apply new dimensions
+        applyDimensions();
+    }
+
+    /**
+     * Convert density-independent pixels (dp) to actual pixels
+     */
+    private float getPixels(int dp) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, _context.getResources().getDisplayMetrics());
     }
 }

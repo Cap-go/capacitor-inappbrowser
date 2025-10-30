@@ -41,6 +41,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
@@ -367,6 +368,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let credentials = self.readCredentials(call)
 
+        // Read dimension options
+        let width = call.getFloat("width")
+        let height = call.getFloat("height")
+        let x = call.getFloat("x")
+        let y = call.getFloat("y")
+
         DispatchQueue.main.async {
             guard let url = URL(string: urlString) else {
                 call.reject("Invalid URL format")
@@ -388,6 +395,20 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
                 return
+            }
+
+            // Set dimensions if provided
+            if let width = width {
+                webViewController.customWidth = CGFloat(width)
+            }
+            if let height = height {
+                webViewController.customHeight = CGFloat(height)
+            }
+            if let x = x {
+                webViewController.customX = CGFloat(x)
+            }
+            if let y = y {
+                webViewController.customY = CGFloat(y)
             }
 
             // Set native navigation gestures before view loads
@@ -863,6 +884,29 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getPluginVersion(_ call: CAPPluginCall) {
         call.resolve(["version": self.pluginVersion])
+    }
+
+    @objc func updateDimensions(_ call: CAPPluginCall) {
+        let width = call.getFloat("width")
+        let height = call.getFloat("height")
+        let x = call.getFloat("x")
+        let y = call.getFloat("y")
+
+        DispatchQueue.main.async {
+            guard let webViewController = self.webViewController else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.updateDimensions(
+                width: width != nil ? CGFloat(width!) : nil,
+                height: height != nil ? CGFloat(height!) : nil,
+                x: x != nil ? CGFloat(x!) : nil,
+                y: y != nil ? CGFloat(y!) : nil
+            )
+
+            call.resolve()
+        }
     }
 
 }

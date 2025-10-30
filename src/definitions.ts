@@ -510,6 +510,61 @@ export interface OpenWebViewOptions {
    * blockedHosts: ["*.tracking.com", "ads.example.com"]
    */
   blockedHosts?: string[];
+
+  /**
+   * Width of the webview in pixels.
+   * If not set, webview will be fullscreen width.
+   * @default undefined (fullscreen)
+   * @example
+   * width: 400
+   */
+  width?: number;
+
+  /**
+   * Height of the webview in pixels.
+   * If not set, webview will be fullscreen height.
+   * @default undefined (fullscreen)
+   * @example
+   * height: 600
+   */
+  height?: number;
+
+  /**
+   * X position of the webview in pixels from the left edge.
+   * Only effective when width is set.
+   * @default 0
+   * @example
+   * x: 50
+   */
+  x?: number;
+
+  /**
+   * Y position of the webview in pixels from the top edge.
+   * Only effective when height is set.
+   * @default 0
+   * @example
+   * y: 100
+   */
+  y?: number;
+}
+
+export interface DimensionOptions {
+  /**
+   * Width of the webview in pixels
+   */
+  width?: number;
+  /**
+   * Height of the webview in pixels
+   */
+  height?: number;
+  /**
+   * X position from the left edge in pixels
+   */
+  x?: number;
+  /**
+   * Y position from the top edge in pixels
+   */
+  y?: number;
 }
 
 export interface InAppBrowserPlugin {
@@ -639,6 +694,15 @@ export interface InAppBrowserPlugin {
    * @since 1.0.0
    */
   reload(): Promise<any>;
+
+  /**
+   * Update the dimensions of the webview.
+   * Allows changing the size and position of the webview at runtime.
+   *
+   * @param options Dimension options (width, height, x, y)
+   * @returns Promise that resolves when dimensions are updated
+   */
+  updateDimensions(options: DimensionOptions): Promise<void>;
 }
 
 /**

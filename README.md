@@ -18,6 +18,7 @@ The official Capacitor Browser plugin has strict security limitations that preve
 - **URL change monitoring** for navigation tracking
 - **Custom toolbars and UI** for branded experiences
 - **Cookie and cache management** for session control
+- **Custom sizes** for extra control of the display position
 
 Perfect for OAuth flows, embedded web apps, video calls, and any scenario requiring deep integration with web content.
 
@@ -37,6 +38,31 @@ npx cap sync
 import { InAppBrowser } from '@capgo/inappbrowser'
 
 InAppBrowser.open({ url: "YOUR_URL" });
+```
+
+### Open WebView with Custom Dimensions
+
+By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+// Open with custom dimensions (400x600 at position 50,100)
+InAppBrowser.openWebView({
+  url: "YOUR_URL",
+  width: 400,
+  height: 600,
+  x: 50,
+  y: 100
+});
+
+// Update dimensions at runtime
+InAppBrowser.updateDimensions({
+  width: 500,
+  height: 700,
+  x: 100,
+  y: 150
+});
 ```
 
 ### Open WebView with Safe Margin
@@ -190,6 +216,7 @@ window.mobileApp.close();
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload()`](#reload)
+* [`updateDimensions(...)`](#updatedimensions)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -552,6 +579,22 @@ Reload the current web page.
 --------------------
 
 
+### updateDimensions(...)
+
+```typescript
+updateDimensions(options: DimensionOptions) => Promise<void>
+```
+
+Update the dimensions of the webview.
+Allows changing the size and position of the webview at runtime.
+
+| Param         | Type                                                          | Description                             |
+| ------------- | ------------------------------------------------------------- | --------------------------------------- |
+| **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a></code> | Dimension options (width, height, x, y) |
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -636,6 +679,10 @@ Reload the current web page.
 | **`useTopInset`**                      | <code>boolean</code>                                                                                                                                                   | When true, applies the system status bar inset as the WebView top margin on Android. Keeps the legacy 0px margin by default for apps that handle padding themselves.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            |        |
 | **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                                | <code>false</code>                                            | 7.13.0 |
 | **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "*.example.com" to block all subdomains - "www.example.*" to block wildcard domain extensions                                                                                                                                                                                                       | <code>[]</code>                                               | 7.17.0 |
+| **`width`**                            | <code>number</code>                                                                                                                                                    | Width of the webview in pixels. If not set, webview will be fullscreen width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>undefined (fullscreen)</code>                           |        |
+| **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |
+| **`x`**                                | <code>number</code>                                                                                                                                                    | X position of the webview in pixels from the left edge. Only effective when width is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
+| **`y`**                                | <code>number</code>                                                                                                                                                    | Y position of the webview in pixels from the top edge. Only effective when height is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
 
 
 #### Headers
@@ -680,6 +727,16 @@ Reload the current web page.
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
 
 
+#### DimensionOptions
+
+| Prop         | Type                | Description                             |
+| ------------ | ------------------- | --------------------------------------- |
+| **`width`**  | <code>number</code> | Width of the webview in pixels          |
+| **`height`** | <code>number</code> | Height of the webview in pixels         |
+| **`x`**      | <code>number</code> | X position from the left edge in pixels |
+| **`y`**      | <code>number</code> | Y position from the top edge in pixels  |
+
+
 ### Type Aliases
 
 
@@ -699,7 +756,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -713,7 +772,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions

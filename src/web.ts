@@ -6,6 +6,7 @@ import type {
   OpenOptions,
   GetCookieOptions,
   ClearCookieOptions,
+  DimensionOptions,
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
@@ -68,5 +69,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
 
   async getPluginVersion(): Promise<{ version: string }> {
     return { version: 'web' };
+  }
+
+  async updateDimensions(options: DimensionOptions): Promise<void> {
+    console.log('updateDimensions', options);
+    // Web platform doesn't support dimension control
+    return;
   }
 }

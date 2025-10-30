@@ -647,6 +647,25 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         // Set Google Pay support option
         options.setEnableGooglePaySupport(Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false)));
 
+        // Set dimensions if provided
+        Integer width = call.getInt("width");
+        Integer height = call.getInt("height");
+        Integer x = call.getInt("x");
+        Integer y = call.getInt("y");
+
+        if (width != null) {
+            options.setWidth(width);
+        }
+        if (height != null) {
+            options.setHeight(height);
+        }
+        if (x != null) {
+            options.setX(x);
+        }
+        if (y != null) {
+            options.setY(y);
+        }
+
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
@@ -929,5 +948,37 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         } catch (final Exception e) {
             call.reject("Could not get plugin version", e);
         }
+    }
+
+    @PluginMethod
+    public void updateDimensions(PluginCall call) {
+        if (webViewDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        Integer width = call.getInt("width");
+        Integer height = call.getInt("height");
+        Integer x = call.getInt("x");
+        Integer y = call.getInt("y");
+
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (webViewDialog != null) {
+                            webViewDialog.updateDimensions(width, height, x, y);
+                            call.resolve();
+                        } else {
+                            call.reject("WebView is not initialized");
+                        }
+                    } catch (Exception e) {
+                        Log.e("InAppBrowser", "Error updating dimensions: " + e.getMessage());
+                        call.reject("Failed to update dimensions: " + e.getMessage());
+                    }
+                }
+            }
+        );
     }
 }

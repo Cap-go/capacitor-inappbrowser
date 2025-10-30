@@ -145,6 +145,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
 
+    // Dimension properties
+    var customWidth: CGFloat?
+    var customHeight: CGFloat?
+    var customX: CGFloat?
+    var customY: CGFloat?
+
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
 
@@ -782,6 +788,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             self.setupViewElements()
             setUpState()
             self.viewWasPresented = true
+
+            // Apply custom dimensions if specified
+            applyCustomDimensions()
         }
 
         // Force update button appearances
@@ -1897,6 +1906,43 @@ extension WKWebViewController: WKNavigationDelegate {
             self.injectJavaScriptInterface()
             decisionHandler(actionPolicy)
         }
+    }
+
+    // MARK: - Dimension Management
+
+    /// Apply custom dimensions to the view if specified
+    open func applyCustomDimensions() {
+        guard let navigationController = navigationController else { return }
+
+        // Only apply custom dimensions if both width and height are specified
+        if let width = customWidth, let height = customHeight {
+            let x = customX ?? 0
+            let y = customY ?? 0
+
+            // Set the frame for the navigation controller's view
+            navigationController.view.frame = CGRect(x: x, y: y, width: width, height: height)
+        }
+        // Otherwise, use default fullscreen behavior (no action needed)
+    }
+
+    /// Update dimensions at runtime
+    open func updateDimensions(width: CGFloat?, height: CGFloat?, x: CGFloat?, y: CGFloat?) {
+        // Update stored dimensions
+        if let width = width {
+            customWidth = width
+        }
+        if let height = height {
+            customHeight = height
+        }
+        if let x = x {
+            customX = x
+        }
+        if let y = y {
+            customY = y
+        }
+
+        // Apply the new dimensions
+        applyCustomDimensions()
     }
 }
 
