@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.28.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.27.3...7.28.0) (2025-10-30)
+
+
+### Features
+
+* add geolocation permission handling for Android and iOS ([5dae585](https://github.com/Cap-go/capacitor-inappbrowser/commit/5dae585c62459ef783ec52a7dad20e620f92b9f3))
+
 ## [7.27.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.27.2...7.27.3) (2025-10-30)
 
 
