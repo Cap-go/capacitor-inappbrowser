@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.27.3](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.27.2...7.27.3) (2025-10-30)
+
+
+### Bug Fixes
+
+* pluginVersion lint issue ([e36f1c9](https://github.com/Cap-go/capacitor-inappbrowser/commit/e36f1c9cff33797e474e38abbd9e1f14841a90bb))
+
 ## [7.27.2](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.27.1...7.27.2) (2025-10-29)
 
 
