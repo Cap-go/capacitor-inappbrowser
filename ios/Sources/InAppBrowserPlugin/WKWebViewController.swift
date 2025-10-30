@@ -1578,13 +1578,13 @@ extension WKWebViewController: WKUIDelegate {
             }
         }
     }
-    
+
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Handle target="_blank" links and popup windows
         // When preventDeeplink is true, we should load these in the same webview instead of opening externally
         if let url = navigationAction.request.url {
             print("[InAppBrowser] Handling popup/new window request for URL: \(url.absoluteString)")
-            
+
             // If preventDeeplink is true, load the URL in the current webview
             if preventDeeplink {
                 print("[InAppBrowser] preventDeeplink is true, loading popup URL in current webview")
@@ -1593,13 +1593,22 @@ extension WKWebViewController: WKUIDelegate {
                 }
                 return nil
             }
-            
+
             // Otherwise, check if we should handle it externally
             // But since preventDeeplink is false here, we won't block it
             return nil
         }
-        
+
         return nil
+    }
+
+    @available(iOS 15.0, *)
+    public func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        print("[InAppBrowser] Geolocation permission requested for origin: \(origin.host)")
+
+        // Grant geolocation permission automatically for openWebView
+        // This allows websites to access location when opened with openWebView
+        decisionHandler(.grant)
     }
 }
 

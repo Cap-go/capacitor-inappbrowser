@@ -732,6 +732,15 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
+                // Handle geolocation permission requests
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin, android.webkit.GeolocationPermissions.Callback callback) {
+                    Log.i("INAPPBROWSER", "onGeolocationPermissionsShowPrompt for origin: " + origin);
+                    // Grant geolocation permission automatically for openWebView
+                    // This allows websites to access location when opened with openWebView
+                    callback.invoke(origin, true, false);
+                }
+
                 // This method will be called at page load, a good place to inject customizations
                 @Override
                 public void onProgressChanged(WebView view, int newProgress) {

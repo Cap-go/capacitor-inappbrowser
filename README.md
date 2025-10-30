@@ -91,6 +91,28 @@ Add the following to your `Info.plist` file:
 <string>We need access to the microphone to record audio.</string>
 ```
 
+### Location usage
+
+#### Android
+
+Add the following to your `AndroidManifest.xml` file:
+
+```xml
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+```
+
+Then the permission will be asked when location is requested by a website in the webview.
+
+#### iOS
+
+Add the following to your `Info.plist` file:
+
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>We need access to your location to provide location-based services.</string>
+```
+
 ### Two way communication
 
 With this plugin you can send events from the main app to the inappbrowser and vice versa.
