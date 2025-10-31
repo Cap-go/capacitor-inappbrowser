@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.29.1](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.29.0...7.29.1) (2025-10-31)
+
+
+### Bug Fixes
+
+* allow Touch Passthrough when not fullscreen ([10ca8a2](https://github.com/Cap-go/capacitor-inappbrowser/commit/10ca8a2d05b59b8d99cf663998613628a4fd81e5))
+
 ## [7.29.0](https://github.com/Cap-go/capacitor-inappbrowser/compare/7.28.2...7.29.0) (2025-10-30)
 
 
