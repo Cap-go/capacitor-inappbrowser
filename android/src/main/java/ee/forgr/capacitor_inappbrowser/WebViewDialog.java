@@ -266,6 +266,22 @@ public class WebViewDialog extends Dialog {
         );
         setContentView(R.layout.activity_browser);
 
+        // If custom dimensions are set, configure for touch passthrough
+        if (_options != null && _options.getWidth() != null && _options.getHeight() != null) {
+            Window window = getWindow();
+            if (window != null) {
+                // Make the dialog background transparent
+                window.setBackgroundDrawableResource(android.R.color.transparent);
+                // Don't dim the background
+                window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                // Allow touches outside to pass through
+                window.setFlags(
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                );
+            }
+        }
+
         // Set fitsSystemWindows only for Android 10 (API 29)
         if (android.os.Build.VERSION.SDK_INT == android.os.Build.VERSION_CODES.Q) {
             View coordinator = findViewById(R.id.coordinator_layout);

@@ -603,7 +603,36 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             }
 
-            self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
+            // Configure modal presentation for touch passthrough if custom dimensions are set
+            if let width = width, let height = height {
+                self.navigationWebViewController?.modalPresentationStyle = .overFullScreen
+
+                // Create a pass-through container
+                let containerView = PassThroughView()
+                containerView.backgroundColor = .clear
+                containerView.targetFrame = CGRect(
+                    x: CGFloat(x ?? 0),
+                    y: CGFloat(y ?? 0),
+                    width: CGFloat(width),
+                    height: CGFloat(height)
+                )
+
+                // Replace the navigation controller's view with our pass-through container
+                if let navController = self.navigationWebViewController {
+                    let originalView = navController.view!
+                    navController.view = containerView
+                    containerView.addSubview(originalView)
+                    originalView.frame = CGRect(
+                        x: CGFloat(x ?? 0),
+                        y: CGFloat(y ?? 0),
+                        width: CGFloat(width),
+                        height: CGFloat(height)
+                    )
+                }
+            } else {
+                self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
+            }
+
             self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
             if toolbarType == "blank" {
                 self.navigationWebViewController?.navigationBar.isHidden = true

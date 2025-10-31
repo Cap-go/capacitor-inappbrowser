@@ -1951,6 +1951,23 @@ class BlockBarButtonItem: UIBarButtonItem {
     var block: ((WKWebViewController) -> Void)?
 }
 
+/// Custom view that passes touches outside a target frame to the underlying view
+class PassThroughView: UIView {
+    var targetFrame: CGRect?
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        // If we have a target frame and the touch is outside it, pass through
+        if let frame = targetFrame {
+            if !frame.contains(point) {
+                return nil  // Pass through to underlying views
+            }
+        }
+
+        // Otherwise, handle normally
+        return super.hitTest(point, with: event)
+    }
+}
+
 extension WKNavigationActionPolicy {
     static let preventDeeplinkActionPolicy = WKNavigationActionPolicy(rawValue: WKNavigationActionPolicy.allow.rawValue + 2)!
 }

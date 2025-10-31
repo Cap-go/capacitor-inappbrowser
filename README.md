@@ -65,6 +65,8 @@ InAppBrowser.updateDimensions({
 });
 ```
 
+**Touch Passthrough**: When custom dimensions are set (not fullscreen), touches outside the webview bounds will pass through to the underlying Capacitor webview, allowing the user to interact with your app in the exposed areas. This enables picture-in-picture style experiences where the InAppBrowser floats above your content.
+
 ### Open WebView with Safe Margin
 
 To create a webView with a 20px bottom margin (safe margin area outside the browser):
