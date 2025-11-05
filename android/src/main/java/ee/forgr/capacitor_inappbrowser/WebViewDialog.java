@@ -275,10 +275,7 @@ public class WebViewDialog extends Dialog {
                 // Don't dim the background
                 window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
                 // Allow touches outside to pass through
-                window.setFlags(
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                );
+                window.setFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
             }
         }
 
