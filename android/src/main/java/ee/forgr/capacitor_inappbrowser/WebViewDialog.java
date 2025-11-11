@@ -2688,7 +2688,7 @@ public class WebViewDialog extends Dialog {
             case (205) -> "Reset Content";
             case (206) -> "Partial Content";
             case (207) -> "Partial Update OK";
-            case (300) -> "Mutliple Choices";
+            case (300) -> "Multiple Choices";
             case (301) -> "Moved Permanently";
             case (302) -> "Moved Temporarily";
             case (303) -> "See Other";
