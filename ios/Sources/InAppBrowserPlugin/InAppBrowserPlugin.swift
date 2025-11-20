@@ -374,6 +374,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let x = call.getFloat("x")
         let y = call.getFloat("y")
 
+        // Validate dimension parameters
+        if width != nil && height == nil {
+            call.reject("Height must be specified when width is provided")
+            return
+        }
+
         DispatchQueue.main.async {
             guard let url = URL(string: urlString) else {
                 call.reject("Invalid URL format")
@@ -604,17 +610,22 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             // Configure modal presentation for touch passthrough if custom dimensions are set
-            if let width = width, let height = height {
+            if width != nil || height != nil {
                 self.navigationWebViewController?.modalPresentationStyle = .overFullScreen
 
                 // Create a pass-through container
                 let containerView = PassThroughView()
                 containerView.backgroundColor = .clear
+                
+                // Calculate dimensions - use screen width if only height is provided
+                let finalWidth = width != nil ? CGFloat(width!) : UIScreen.main.bounds.width
+                let finalHeight = height != nil ? CGFloat(height!) : UIScreen.main.bounds.height
+                
                 containerView.targetFrame = CGRect(
                     x: CGFloat(x ?? 0),
                     y: CGFloat(y ?? 0),
-                    width: CGFloat(width),
-                    height: CGFloat(height)
+                    width: finalWidth,
+                    height: finalHeight
                 )
 
                 // Replace the navigation controller's view with our pass-through container
@@ -625,8 +636,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     originalView.frame = CGRect(
                         x: CGFloat(x ?? 0),
                         y: CGFloat(y ?? 0),
-                        width: CGFloat(width),
-                        height: CGFloat(height)
+                        width: finalWidth,
+                        height: finalHeight
                     )
                 }
             } else {

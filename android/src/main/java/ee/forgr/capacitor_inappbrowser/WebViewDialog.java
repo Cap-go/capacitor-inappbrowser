@@ -267,7 +267,7 @@ public class WebViewDialog extends Dialog {
         setContentView(R.layout.activity_browser);
 
         // If custom dimensions are set, configure for touch passthrough
-        if (_options != null && _options.getWidth() != null && _options.getHeight() != null) {
+        if (_options != null && (_options.getWidth() != null || _options.getHeight() != null)) {
             Window window = getWindow();
             if (window != null) {
                 // Make the dialog background transparent
@@ -2990,6 +2990,12 @@ public class WebViewDialog extends Dialog {
             params.width = (int) getPixels(width);
             params.height = (int) getPixels(height);
             params.x = (x != null) ? (int) getPixels(x) : 0;
+            params.y = (y != null) ? (int) getPixels(y) : 0;
+        } else if (height != null && width == null) {
+            // If only height is specified, use custom height with fullscreen width
+            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+            params.height = (int) getPixels(height);
+            params.x = 0;
             params.y = (y != null) ? (int) getPixels(y) : 0;
         } else {
             // Default to fullscreen
