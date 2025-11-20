@@ -86,7 +86,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
-    
+
     public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, blockedHosts: [String]) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
@@ -154,7 +154,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
     private var isWebViewInitialized = false
-    
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -171,7 +170,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     func setPreventDeeplink(preventDeeplink: Bool) {
         self.preventDeeplink = preventDeeplink
     }
-    
+
     func setBlockedHosts(blockedHosts: [String]) {
         self.blockedHosts = blockedHosts
     }
@@ -395,9 +394,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-      
+
         if self.isBeingDismissed || self.isMovingFromParent {
-              self.cleanupWebView()
+            self.cleanupWebView()
         }
 
         if let capacitorStatusBar = capacitorStatusBar {
@@ -1933,7 +1932,7 @@ extension WKWebViewController: WKNavigationDelegate {
 
             // Set the frame for the navigation controller's view
             navigationController.view.frame = CGRect(x: x, y: y, width: width, height: height)
-        } 
+        }
         // If only height is specified, use fullscreen width
         else if let height = customHeight, customWidth == nil {
             let x = customX ?? 0
@@ -1995,12 +1994,12 @@ extension WKNavigationActionPolicy {
 
 class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
     weak var delegate: WKScriptMessageHandler?
-    
+
     init(_ delegate: WKScriptMessageHandler) {
         self.delegate = delegate
         super.init()
     }
-    
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         self.delegate?.userContentController(userContentController, didReceive: message)
     }

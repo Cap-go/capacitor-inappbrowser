@@ -616,11 +616,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 // Create a pass-through container
                 let containerView = PassThroughView()
                 containerView.backgroundColor = .clear
-                
+
                 // Calculate dimensions - use screen width if only height is provided
                 let finalWidth = width != nil ? CGFloat(width!) : UIScreen.main.bounds.width
                 let finalHeight = height != nil ? CGFloat(height!) : UIScreen.main.bounds.height
-                
+
                 containerView.targetFrame = CGRect(
                     x: CGFloat(x ?? 0),
                     y: CGFloat(y ?? 0),
