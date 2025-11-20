@@ -1914,13 +1914,22 @@ extension WKWebViewController: WKNavigationDelegate {
     open func applyCustomDimensions() {
         guard let navigationController = navigationController else { return }
 
-        // Only apply custom dimensions if both width and height are specified
+        // Apply custom dimensions if both width and height are specified
         if let width = customWidth, let height = customHeight {
             let x = customX ?? 0
             let y = customY ?? 0
 
             // Set the frame for the navigation controller's view
             navigationController.view.frame = CGRect(x: x, y: y, width: width, height: height)
+        } 
+        // If only height is specified, use fullscreen width
+        else if let height = customHeight, customWidth == nil {
+            let x = customX ?? 0
+            let y = customY ?? 0
+            let screenWidth = UIScreen.main.bounds.width
+
+            // Set the frame with fullscreen width and custom height
+            navigationController.view.frame = CGRect(x: x, y: y, width: screenWidth, height: height)
         }
         // Otherwise, use default fullscreen behavior (no action needed)
     }

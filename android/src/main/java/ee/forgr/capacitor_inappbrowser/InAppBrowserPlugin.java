@@ -653,6 +653,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         Integer x = call.getInt("x");
         Integer y = call.getInt("y");
 
+        // Validate dimension parameters
+        if (width != null && height == null) {
+            call.reject("Height must be specified when width is provided");
+            return;
+        }
+
         if (width != null) {
             options.setWidth(width);
         }
