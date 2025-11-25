@@ -4,6 +4,7 @@
     "config:base",
     "schedule:earlyMondays"
   ],
+  "dependencyDashboard": false,
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
@@ -22,9 +23,31 @@
       "enabled": false
     },
     {
+      "matchPackagePatterns": ["^com\\.google\\..*"],
+      "matchCurrentVersion": "/^.*-android$/",
+      "allowedVersions": "/^.*-android$/"
+    },
+    {
       "matchPackagePatterns": ["^com\\.android\\.tools\\.build\\:gradle$"],
       "matchManagers": ["gradle"],
       "enabled": false
+    },
+    {
+      "matchPackageNames": ["ionic-team/capacitor-swift-pm"],
+      "matchManagers": ["swift-pm"],
+      "enabled": false
+    },
+    {
+      "matchDepTypes": ["peerDependencies"],
+      "matchPackageNames": ["@capacitor/core"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "enabled": false
+    },
+    {
+      "matchDepTypes": ["peerDependencies"],
+      "matchPackageNames": ["@capacitor/core"],
+      "rangeStrategy": "replace",
+      "allowedVersions": "/^>=\\d+\\.0\\.0$/"
     }
   ]
 }

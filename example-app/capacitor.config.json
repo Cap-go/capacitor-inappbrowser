@@ -1,0 +1,10 @@
+{
+  "appId": "app.capgo.inappbrowser",
+  "appName": "Inappbrowser Example",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false
+    }
+  }
+}

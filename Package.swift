@@ -2,15 +2,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "CapgoCapacitorInappbrowser",
+    name: "CapgoInappbrowser",
     platforms: [.iOS(.v14)],
     products: [
         .library(
-            name: "CapgoCapacitorInappbrowser",
+            name: "CapgoInappbrowser",
             targets: ["InappbrowserPlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.4.2")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
     ],
     targets: [
         .target(
@@ -19,7 +19,7 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
-            path: "ios/Sources/InappbrowserPlugin"),
+            path: "ios/Sources/InAppBrowserPlugin"),
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],

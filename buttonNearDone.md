@@ -170,6 +170,6 @@ InAppBrowser.openWebView({
 ```ts
 InAppBrowser.addListener('buttonNearDoneClick', async (msg) => {
   // Write your code here
-  await InAppBrowser.setUrl({ url: 'https://web.capgo.app/login' })
+  await InAppBrowser.setUrl({ url: 'https://console.capgo.app/login' })
 })
 ```

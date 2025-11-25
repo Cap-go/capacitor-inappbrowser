@@ -1,4 +1,4 @@
-import type { PluginListenerHandle } from "@capacitor/core";
+import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface UrlEvent {
   /**
@@ -22,30 +22,30 @@ export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: object) => void;
 
 export enum BackgroundColor {
-  WHITE = "white",
-  BLACK = "black",
+  WHITE = 'white',
+  BLACK = 'black',
 }
 export enum ToolBarType {
   /**
    * Shows a simple toolbar with just a close button and share button
    * @since 0.1.0
    */
-  ACTIVITY = "activity",
+  ACTIVITY = 'activity',
   /**
    * Shows a simple toolbar with just a close button
    * @since 7.6.8
    */
-  COMPACT = "compact",
+  COMPACT = 'compact',
   /**
    * Shows a full navigation toolbar with back/forward buttons
    * @since 0.1.0
    */
-  NAVIGATION = "navigation",
+  NAVIGATION = 'navigation',
   /**
    * Shows no toolbar
    * @since 0.1.0
    */
-  BLANK = "blank",
+  BLANK = 'blank',
 }
 
 export interface Headers {
@@ -107,6 +107,14 @@ export interface DisclaimerOptions {
   cancelBtn: string;
 }
 
+export interface CloseWebviewOptions {
+  /**
+   * Whether the webview closing is animated or not, ios only
+   * @default true
+   */
+  isAnimated?: boolean;
+}
+
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
@@ -119,8 +127,8 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * headers: {
-   *   'Custom-Header': 'test-value',
-   *   'Authorization': 'Bearer test-token'
+   *   "Custom-Header": "test-value",
+   *   "Authorization": "Bearer test-token"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -130,8 +138,8 @@ export interface OpenWebViewOptions {
    * @since 6.1.0
    * @example
    * credentials: {
-   *   username: 'test-user',
-   *   password: 'test-pass'
+   *   username: "test-user",
+   *   password: "test-pass"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -154,12 +162,12 @@ export interface OpenWebViewOptions {
    *
    * @example
    * // In your webpage loaded in the webview:
-   * document.getElementById('closeBtn').addEventListener('click', () => {
+   * document.getElementById("closeBtn").addEventListener("click", () => {
    *   window.mobileApp.close();
    * });
    *
    * // Send data to the app
-   * window.mobileApp.postMessage({ action: 'login', data: { user: 'test' }});
+   * window.mobileApp.postMessage({ action: "login", data: { user: "test" }});
    *
    * @since 6.10.0
    */
@@ -176,10 +184,10 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * shareDisclaimer: {
-   *   title: 'Disclaimer',
-   *   message: 'This is a test disclaimer',
-   *   confirmBtn: 'Accept',
-   *   cancelBtn: 'Decline'
+   *   title: "Disclaimer",
+   *   message: "This is a test disclaimer",
+   *   confirmBtn: "Accept",
+   *   cancelBtn: "Decline"
    * }
    * Test URL: https://capgo.app
    */
@@ -194,7 +202,7 @@ export interface OpenWebViewOptions {
    * @default ToolBarType.DEFAULT
    * @example
    * toolbarType: ToolBarType.ACTIVITY,
-   * title: 'Activity Toolbar Test'
+   * title: "Activity Toolbar Test"
    * Test URL: https://capgo.app
    */
   toolbarType?: ToolBarType;
@@ -208,7 +216,7 @@ export interface OpenWebViewOptions {
   /**
    * Title of the browser
    * @since 0.1.0
-   * @default 'New Window'
+   * @default "New Window"
    * @example "Camera Test"
    */
   title?: string;
@@ -219,8 +227,10 @@ export interface OpenWebViewOptions {
    */
   backgroundColor?: BackgroundColor;
   /**
-   * If true, active the native navigation within the webview, Android only
-   * @default false
+   * If true, enables native navigation gestures within the webview.
+   * - Android: Native back button navigates within webview history
+   * - iOS: Enables swipe left/right gestures for back/forward navigation
+   * @default false (Android), true (iOS - enabled by default)
    * @example
    * activeNativeNavigationForWebview: true,
    * disableGoBackOnNativeApplication: true
@@ -272,35 +282,35 @@ export interface OpenWebViewOptions {
    * @default false
    * @example
    * closeModal: true,
-   * closeModalTitle: 'Close Window',
-   * closeModalDescription: 'Are you sure you want to close?',
-   * closeModalOk: 'Yes, close',
-   * closeModalCancel: 'No, stay'
+   * closeModalTitle: "Close Window",
+   * closeModalDescription: "Are you sure you want to close?",
+   * closeModalOk: "Yes, close",
+   * closeModalCancel: "No, stay"
    * Test URL: https://capgo.app
    */
   closeModal?: boolean;
   /**
    * CloseModalTitle: title of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalTitle?: string;
   /**
    * CloseModalDescription: description of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Are you sure you want to close this window?'
+   * @default "Are you sure you want to close this window?"
    */
   closeModalDescription?: string;
   /**
    * CloseModalOk: text of the confirm button when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalOk?: string;
   /**
    * CloseModalCancel: text of the cancel button when user clicks on close button
    * @since 1.1.0
-   * @default 'Cancel'
+   * @default "Cancel"
    */
   closeModalCancel?: string;
   /**
@@ -312,9 +322,9 @@ export interface OpenWebViewOptions {
   /**
    * toolbarColor: color of the toolbar in hex format
    * @since 1.2.5
-   * @default '#ffffff'
+   * @default "#ffffff"
    * @example
-   * toolbarColor: '#FF5733'
+   * toolbarColor: "#FF5733"
    * Test URL: https://capgo.app
    */
   toolbarColor?: string;
@@ -324,7 +334,7 @@ export interface OpenWebViewOptions {
    * @since 6.10.0
    * @default calculated based on toolbarColor brightness
    * @example
-   * toolbarTextColor: '#FFFFFF'
+   * toolbarTextColor: "#FFFFFF"
    * Test URL: https://capgo.app
    */
   toolbarTextColor?: string;
@@ -353,6 +363,16 @@ export interface OpenWebViewOptions {
    */
   preShowScript?: string;
   /**
+   * preShowScriptInjectionTime: controls when the preShowScript is injected.
+   * - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase)
+   * - "pageLoad": injects after page load (default, original behavior)
+   * @since 7.26.0
+   * @default "pageLoad"
+   * @example
+   * preShowScriptInjectionTime: "documentStart"
+   */
+  preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
+  /**
    * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
    * @since 6.9.0
    */
@@ -375,12 +395,12 @@ export interface OpenWebViewOptions {
    * @example
    * buttonNearDone: {
    *   ios: {
-   *     iconType: 'sf-symbol',
-   *     icon: 'star.fill'
+   *     iconType: "sf-symbol",
+   *     icon: "star.fill"
    *   },
    *   android: {
-   *     iconType: 'asset',
-   *     icon: 'public/monkey.svg',
+   *     iconType: "asset",
+   *     icon: "public/monkey.svg",
    *     width: 24,
    *     height: 24
    *   }
@@ -389,11 +409,11 @@ export interface OpenWebViewOptions {
    */
   buttonNearDone?: {
     ios: {
-      iconType: "sf-symbol" | "asset";
+      iconType: 'sf-symbol' | 'asset';
       icon: string;
     };
     android: {
-      iconType: "asset" | "vector";
+      iconType: 'asset' | 'vector';
       icon: string;
       width?: number;
       height?: number;
@@ -420,16 +440,142 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
-   * List of URL base patterns that should be treated as authorized App Links, Android only.
-   * Only links starting with any of these base URLs will be opened in the InAppBrowser.
+   * List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS).
+   *
+   * - On both platforms, only HTTPS links whose host matches any entry in this list
+   *   will attempt to open via the corresponding native application.
+   * - If the app is not installed or the system cannot handle the link, the URL
+   *   will continue loading inside the in-app browser.
+   * - Matching is host-based (case-insensitive), ignoring the "www." prefix.
+   * - When `preventDeeplink` is enabled, all external handling is blocked regardless of this list.
+   *
+   * @example
+   * ```ts
+   * ["https://example.com", "https://subdomain.app.io"]
+   * ```
    *
    * @since 7.12.0
    * @default []
    */
   authorizedAppLinks?: string[];
+
+  /**
+   * If true, the webView will not take the full height and will have a 20px margin at the bottom.
+   * This creates a safe margin area outside the browser view.
+   * @since 7.13.0
+   * @default false
+   * @example
+   * enabledSafeBottomMargin: true
+   */
+  enabledSafeBottomMargin?: boolean;
+
+  /**
+   * When true, applies the system status bar inset as the WebView top margin on Android.
+   * Keeps the legacy 0px margin by default for apps that handle padding themselves.
+   * @default false
+   * @example
+   * useTopInset: true
+   */
+  useTopInset?: boolean;
+
+  /**
+   * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
+   * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.
+   * Only enable this if you need Google Pay functionality as it allows popup windows.
+   *
+   * When enabled:
+   * - Allows popup windows for Google Pay authentication
+   * - Sets proper CORS headers for Payment Request API
+   * - Enables multiple window support in WebView
+   * - Configures secure context for payment processing
+   *
+   * @since 7.13.0
+   * @default false
+   * @example
+   * enableGooglePaySupport: true
+   * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
+   */
+  enableGooglePaySupport?: boolean;
+
+  /**
+   * blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations.
+   * Any request inside WebView to a URL with a host matching any of these patterns will be blocked.
+   * Supports wildcard patterns like:
+   * - "*.example.com" to block all subdomains
+   * - "www.example.*" to block wildcard domain extensions
+   *
+   * @since 7.17.0
+   * @default []
+   * @example
+   * blockedHosts: ["*.tracking.com", "ads.example.com"]
+   */
+  blockedHosts?: string[];
+
+  /**
+   * Width of the webview in pixels.
+   * If not set, webview will be fullscreen width.
+   * @default undefined (fullscreen)
+   * @example
+   * width: 400
+   */
+  width?: number;
+
+  /**
+   * Height of the webview in pixels.
+   * If not set, webview will be fullscreen height.
+   * @default undefined (fullscreen)
+   * @example
+   * height: 600
+   */
+  height?: number;
+
+  /**
+   * X position of the webview in pixels from the left edge.
+   * Only effective when width is set.
+   * @default 0
+   * @example
+   * x: 50
+   */
+  x?: number;
+
+  /**
+   * Y position of the webview in pixels from the top edge.
+   * Only effective when height is set.
+   * @default 0
+   * @example
+   * y: 100
+   */
+  y?: number;
+}
+
+export interface DimensionOptions {
+  /**
+   * Width of the webview in pixels
+   */
+  width?: number;
+  /**
+   * Height of the webview in pixels
+   */
+  height?: number;
+  /**
+   * X position from the left edge in pixels
+   */
+  x?: number;
+  /**
+   * Y position from the top edge in pixels
+   */
+  y?: number;
 }
 
 export interface InAppBrowserPlugin {
+  /**
+   * Navigates back in the WebView's history if possible
+   *
+   * @since 7.21.0
+   * @returns Promise that resolves with true if navigation was possible, false otherwise
+   */
+  goBack(): Promise<{ canGoBack: boolean }>;
+
   /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
@@ -466,14 +612,14 @@ export interface InAppBrowserPlugin {
   /**
    * Close the webview.
    */
-  close(): Promise<any>;
+  close(options?: CloseWebviewOptions): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
-   * - `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+   * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
    * @since 0.1.0
    */
@@ -497,34 +643,23 @@ export interface InAppBrowserPlugin {
    *
    * @since 0.0.1
    */
-  addListener(
-    eventName: "urlChangeEvent",
-    listenerFunc: UrlChangeListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
 
-  addListener(
-    eventName: "buttonNearDoneClick",
-    listenerFunc: ButtonNearListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener): Promise<PluginListenerHandle>;
 
   /**
    * Listen for close click only for openWebView
    *
    * @since 0.4.0
    */
-  addListener(
-    eventName: "closeEvent",
-    listenerFunc: UrlChangeListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when user clicks on confirm button when disclaimer is required
+   * Will be triggered when user clicks on confirm button when disclaimer is required,
+   * works with openWebView shareDisclaimer and closeModal
    *
    * @since 0.0.1
    */
-  addListener(
-    eventName: "confirmBtnClicked",
-    listenerFunc: ConfirmBtnListener,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'confirmBtnClicked', listenerFunc: ConfirmBtnListener): Promise<PluginListenerHandle>;
   /**
    * Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
    * detail is the data you want to send to the main app, it's a requirement of Capacitor we cannot send direct objects
@@ -533,25 +668,19 @@ export interface InAppBrowserPlugin {
    * This method is inject at runtime in the webview
    */
   addListener(
-    eventName: "messageFromWebview",
+    eventName: 'messageFromWebview',
     listenerFunc: (event: { detail: Record<string, any> }) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
    * Will be triggered when page is loaded
    */
-  addListener(
-    eventName: "browserPageLoaded",
-    listenerFunc: () => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'browserPageLoaded', listenerFunc: () => void): Promise<PluginListenerHandle>;
 
   /**
    * Will be triggered when page load error
    */
-  addListener(
-    eventName: "pageLoadError",
-    listenerFunc: () => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'pageLoadError', listenerFunc: () => void): Promise<PluginListenerHandle>;
   /**
    * Remove all listeners for this plugin.
    *
@@ -565,6 +694,15 @@ export interface InAppBrowserPlugin {
    * @since 1.0.0
    */
   reload(): Promise<any>;
+
+  /**
+   * Update the dimensions of the webview.
+   * Allows changing the size and position of the webview at runtime.
+   *
+   * @param options Dimension options (width, height, x, y)
+   * @returns Promise that resolves when dimensions are updated
+   */
+  updateDimensions(options: DimensionOptions): Promise<void>;
 }
 
 /**
@@ -577,7 +715,7 @@ export interface InAppBrowserPlugin {
  * window.mobileApp.close();
  *
  * // Sending a message from webview to the native app
- * window.mobileApp.postMessage({ key: 'value' });
+ * window.mobileApp.postMessage({ key: "value" });
  *
  * @since 6.10.0
  */
@@ -591,9 +729,9 @@ export interface InAppBrowserWebViewAPIs {
      *
      * @example
      * // Add a button to close the webview
-     * const closeButton = document.createElement('button');
-     * closeButton.textContent = 'Close WebView';
-     * closeButton.addEventListener('click', () => {
+     * const closeButton = document.createElement("button");
+     * closeButton.textContent = "Close WebView";
+     * closeButton.addEventListener("click", () => {
      *   window.mobileApp.close();
      * });
      * document.body.appendChild(closeButton);
@@ -610,12 +748,20 @@ export interface InAppBrowserWebViewAPIs {
      * @example
      * // Send data to native app
      * window.mobileApp.postMessage({
-     *   action: 'dataSubmitted',
-     *   data: { username: 'test', email: 'test@example.com' }
+     *   action: "dataSubmitted",
+     *   data: { username: "test", email: "test@example.com" }
      * });
      *
      * @since 6.10.0
      */
     postMessage(message: Record<string, any>): void;
   };
+
+  /**
+   * Get the native Capacitor plugin version
+   *
+   * @returns {Promise<{ id: string }>} an Promise with version for this device
+   * @throws An error if the something went wrong
+   */
+  getPluginVersion(): Promise<{ version: string }>;
 }
