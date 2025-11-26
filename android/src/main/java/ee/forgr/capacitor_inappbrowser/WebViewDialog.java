@@ -114,6 +114,9 @@ public class WebViewDialog extends Dialog {
     private boolean datePickerInjected = false; // Track if we've injected date picker fixes
     private final WebView capacitorWebView;
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
+  // Allow-Download bridge map: URL -> expiryTimestamp (ms)
+  private final Map<String, Long> allowDownloadExpiryMap = new HashMap<>();
+  private static final long ALLOW_DOWNLOAD_TTL_MS = 5_000L; // 5s TTL
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
 
@@ -149,25 +152,52 @@ public class WebViewDialog extends Dialog {
     // Add this class to provide safer JavaScript interface
     private class JavaScriptInterface {
 
-        @JavascriptInterface
-        public void postMessage(String message) {
-            try {
-                // Handle message from JavaScript safely
-                if (message == null || message.isEmpty()) {
-                    Log.e("InAppBrowser", "Received empty message from WebView");
-                    return;
-                }
+      @JavascriptInterface
+      public void postMessage(String message) {
+        try {
+          if (message == null || message.isEmpty()) {
+            Log.e("InAppBrowser", "Received empty message from WebView");
+            return;
+          }
 
-                if (_options == null || _options.getCallbacks() == null) {
-                    Log.e("InAppBrowser", "Cannot handle postMessage - options or callbacks are null");
-                    return;
+          // Try to parse JSON message to handle structured messages from the injected JS bridge
+          try {
+            String trimmed = message.trim();
+            if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+              JSONObject obj = new JSONObject(message);
+              JSONObject detail = obj.has("detail") ? obj.optJSONObject("detail") : null;
+              if (detail != null) {
+                String type = detail.optString("type", null);
+                String url = detail.optString("url", null);
+                if ("allowDownload".equals(type) && url != null && !url.isEmpty()) {
+                  long expiry = System.currentTimeMillis() + ALLOW_DOWNLOAD_TTL_MS;
+                  synchronized (allowDownloadExpiryMap) {
+                    allowDownloadExpiryMap.put(url, expiry);
+                  }
+                  Log.i("InAppBrowser", "Native: allowDownload registered for url=" + url + " until=" + expiry);
+                  // forward to plugin callback as well if set
+                  if (_options != null && _options.getCallbacks() != null) {
+                    _options.getCallbacks().javascriptCallback(message);
+                  }
+                  return;
                 }
-
-                _options.getCallbacks().javascriptCallback(message);
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
+              }
             }
+          } catch (Exception e) {
+            // Not JSON or parsing failed — fallthrough to forward raw string
+            Log.d("InAppBrowser", "postMessage: not JSON or parse error: " + e.getMessage());
+          }
+
+          // Default: forward raw string to plugin callback if present
+          if (_options != null && _options.getCallbacks() != null) {
+            _options.getCallbacks().javascriptCallback(message);
+          } else {
+            Log.w("InAppBrowser", "postMessage: no callbacks available to forward message");
+          }
+        } catch (Exception e) {
+          Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage(), e);
         }
+      }
 
         @JavascriptInterface
         public void close() {
@@ -373,6 +403,17 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+      // Ensure cookies accepted and third-party cookies allowed for main webview
+      try {
+        android.webkit.CookieManager cm = android.webkit.CookieManager.getInstance();
+        cm.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+          cm.setAcceptThirdPartyCookies(_webView, true);
+        }
+      } catch (Throwable t) {
+        Log.w("InAppBrowser", "Could not configure CookieManager: " + t.getMessage());
+      }
+
         // Open links in external browser for target="_blank" if preventDeepLink is false
         if (!_options.getPreventDeeplink()) {
             _webView.getSettings().setSupportMultipleWindows(true);
@@ -409,7 +450,18 @@ public class WebViewDialog extends Dialog {
         }
 
         _webView.setWebViewClient(new WebViewClient());
-
+// Attach DownloadListener to main WebView so attachments are captured centrally
+      _webView.setDownloadListener(new android.webkit.DownloadListener() {
+        @Override
+        public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
+          Log.d("InAppBrowser", "Main WebView DownloadListener -> url=" + url + " mimeType=" + mimeType + " contentDisposition=" + contentDisposition);
+          try {
+            startDownloadFromUrl(url, userAgent, contentDisposition, mimeType);
+          } catch (Throwable t) {
+            Log.e("InAppBrowser", "Main download start failed: " + t.getMessage(), t);
+          }
+        }
+      });
         _webView.setWebChromeClient(
             new WebChromeClient() {
                 // Enable file open dialog
@@ -2161,6 +2213,27 @@ public class WebViewDialog extends Dialog {
                     }
                     Context context = view.getContext();
                     String url = request.getUrl().toString();
+
+                  try {
+                    synchronized (allowDownloadExpiryMap) {
+                      Long expiry = allowDownloadExpiryMap.get(url);
+                      if (expiry != null) {
+                        if (System.currentTimeMillis() <= expiry) {
+                          Log.i("InAppBrowser", "Allowed download URL matched (bridge) -> starting in-app download: " + url);
+                          // Start native download; prevent normal navigation to avoid duplicate handling
+                          startDownloadFromUrl(url, null, null, null);
+                          allowDownloadExpiryMap.remove(url);
+                          return true;
+                        } else {
+                          // expired
+                          allowDownloadExpiryMap.remove(url);
+                        }
+                      }
+                    }
+                  } catch (Exception e) {
+                    Log.w("InAppBrowser", "Error checking allowDownload map: " + e.getMessage());
+                  }
+
                     Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
 
                     boolean isNotHttpOrHttps = !url.startsWith("https://") && !url.startsWith("http://");
@@ -2306,13 +2379,14 @@ public class WebViewDialog extends Dialog {
                     return UUID.randomUUID().toString();
                 }
 
-                private String toBase64(String raw) {
-                    String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
-                    if (s.endsWith("=")) {
-                        s = s.substring(0, s.length() - 2);
-                    }
-                    return s;
+              private String toBase64(String raw) {
+                String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
+                // Remove any padding '=' characters
+                while (s.endsWith("=")) {
+                  s = s.substring(0, s.length() - 1);
                 }
+                return s;
+              }
 
                 //
                 //        void handleRedirect(String currentUrl, Response response) {
@@ -2993,6 +3067,145 @@ public class WebViewDialog extends Dialog {
         File image = File.createTempFile(imageFileName /* prefix */, ".jpg" /* suffix */, storageDir /* directory */);
         return image;
     }
+
+  /**
+   * Start a native download via DownloadManager, preserving cookies and UA when possible.
+   * Improved filename extraction from Content-Disposition and mimeType.
+   * Place this method at class level (after createImageFile()).
+   */
+  private void startDownloadFromUrl(final String url, final String userAgent, final String contentDisposition, final String mimeType) {
+    if (url == null || url.isEmpty()) {
+      Log.w("InAppBrowser", "startDownloadFromUrl: url is empty");
+      return;
+    }
+
+    final String ua = (userAgent != null && !userAgent.isEmpty())
+            ? userAgent
+            : (_webView != null ? _webView.getSettings().getUserAgentString() : System.getProperty("http.agent"));
+
+    final String cookies = android.webkit.CookieManager.getInstance().getCookie(url);
+
+    // 1) Try to extract filename from contentDisposition
+    String filename = null;
+    try {
+      if (contentDisposition != null) {
+        // RFC5987 filename* (e.g., filename*=UTF-8''%e2%82%ac%20rates.pdf)
+        java.util.regex.Matcher mStar = java.util.regex.Pattern.compile("filename\\*=(?:UTF-8'')?([^;\\r\\n]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
+        if (mStar.find()) {
+          try {
+            String raw = mStar.group(1).trim();
+            // raw can be percent-encoded
+            filename = java.net.URLDecoder.decode(raw.replaceAll("^\"|\"$", ""), "UTF-8");
+          } catch (Exception ignore) {
+          }
+        }
+        if (filename == null) {
+          // filename="..." or filename=...
+          java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename=\"?([^\";]+)\"?", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
+          if (m.find()) {
+            filename = m.group(1).trim();
+          }
+        }
+      }
+    } catch (Throwable t) {
+      Log.w("InAppBrowser", "Error parsing contentDisposition: " + t.getMessage());
+    }
+
+    // 2) Fallback to URLUtil.guessFileName
+    if (filename == null || filename.isEmpty()) {
+      try {
+        filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType);
+      } catch (Throwable t) {
+        filename = null;
+      }
+    }
+
+    // 3) If still no filename, use a safe default
+    if (filename == null || filename.isEmpty()) {
+      filename = "file.bin";
+    }
+
+    // 4) Ensure extension present; if not, infer from mimeType
+    String namePart = filename;
+    String extPart = "";
+    int lastDot = filename.lastIndexOf('.');
+    if (lastDot > 0 && lastDot < filename.length() - 1) {
+      namePart = filename.substring(0, lastDot);
+      extPart = filename.substring(lastDot + 1);
+    } else {
+      // try to get extension from mime type
+      try {
+        if (mimeType != null && !mimeType.isEmpty()) {
+          String ext = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
+          if (ext != null && !ext.isEmpty()) {
+            extPart = ext;
+          }
+        }
+      } catch (Throwable ignore) {}
+    }
+
+    // 5) Sanitize namePart and extPart, keep only valid chars for filesystem
+    try {
+      // Remove path separators and invalid chars from name part
+      namePart = namePart.replaceAll("[\\\\/:*?\"<>|]+", "_");
+      namePart = namePart.replaceAll("\\s+", "_");
+      namePart = namePart.replaceAll("[\\p{Cntrl}]", "");
+      // Truncate if too long
+      if (namePart.length() > 120) {
+        namePart = namePart.substring(0, 120);
+      }
+
+      // Sanitize extension
+      extPart = extPart.replaceAll("[^A-Za-z0-9]", "");
+      if (extPart.length() > 10) extPart = extPart.substring(0, 10);
+
+    } catch (Throwable t) {
+      Log.w("InAppBrowser", "Error sanitizing filename parts: " + t.getMessage());
+    }
+
+    final String finalFileName = (extPart != null && !extPart.isEmpty()) ? (namePart + "." + extPart) : (namePart + ".bin");
+
+    Log.d("InAppBrowser", "startDownloadFromUrl -> url=" + url + " filename=" + finalFileName + " mimeType=" + mimeType + " contentDisposition=" + contentDisposition);
+
+    activity.runOnUiThread(() -> {
+      try {
+        Uri downloadUri;
+        try {
+          downloadUri = Uri.parse(url);
+        } catch (Exception e) {
+          // fallback: encode spaces and unsafe chars
+          String safeUrl = url.replace(" ", "%20");
+          downloadUri = Uri.parse(safeUrl);
+        }
+
+        android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(downloadUri);
+
+        if (mimeType != null && !mimeType.isEmpty()) {
+          request.setMimeType(mimeType);
+        }
+        if (ua != null && !ua.isEmpty()) request.addRequestHeader("User-Agent", ua);
+        if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
+
+        request.setTitle(finalFileName);
+        request.setDescription("Downloading file...");
+        request.allowScanningByMediaScanner();
+        request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+
+        // Destination: public Downloads
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
+
+        android.app.DownloadManager dm = (android.app.DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+        if (dm != null) {
+          long id = dm.enqueue(request);
+          Log.d("InAppBrowser", "DownloadManager enqueued id=" + id + " file=" + finalFileName + " url=" + url);
+        } else {
+          Log.e("InAppBrowser", "DownloadManager not available");
+        }
+      } catch (Throwable e) {
+        Log.e("InAppBrowser", "startDownloadFromUrl error: " + e.getMessage(), e);
+      }
+    });
+  }
 
     /**
      * Apply dimensions to the webview window
