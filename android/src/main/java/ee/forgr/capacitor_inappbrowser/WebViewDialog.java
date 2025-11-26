@@ -3090,6 +3090,21 @@ public class WebViewDialog extends Dialog {
         return image;
     }
 
+  private String downloadReasonToString(int reason) {
+    return switch (reason) {
+      case android.app.DownloadManager.ERROR_CANNOT_RESUME -> "ERROR_CANNOT_RESUME";
+      case android.app.DownloadManager.ERROR_DEVICE_NOT_FOUND -> "ERROR_DEVICE_NOT_FOUND";
+      case android.app.DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "ERROR_FILE_ALREADY_EXISTS";
+      case android.app.DownloadManager.ERROR_FILE_ERROR -> "ERROR_FILE_ERROR";
+      case android.app.DownloadManager.ERROR_HTTP_DATA_ERROR -> "ERROR_HTTP_DATA_ERROR";
+      case android.app.DownloadManager.ERROR_INSUFFICIENT_SPACE -> "ERROR_INSUFFICIENT_SPACE";
+      case android.app.DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "ERROR_TOO_MANY_REDIRECTS";
+      case android.app.DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "ERROR_UNHANDLED_HTTP_CODE";
+      case android.app.DownloadManager.ERROR_UNKNOWN -> "ERROR_UNKNOWN";
+      default -> String.valueOf(reason);
+    };
+  }
+
   /**
    * Start a native download via DownloadManager, preserving cookies and UA when possible.
    * Improved filename extraction from Content-Disposition and mimeType.
@@ -3110,7 +3125,9 @@ public class WebViewDialog extends Dialog {
     String filename = null;
     try {
       if (contentDisposition != null) {
-        java.util.regex.Matcher mStar = java.util.regex.Pattern.compile("filename\\*=(?:UTF-8'')?([^;\\r\\n]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
+        java.util.regex.Matcher mStar = java.util.regex.Pattern
+                .compile("filename\\*=(?:UTF-8'')?([^;\\r\\n]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(contentDisposition);
         if (mStar.find()) {
           try {
             String raw = mStar.group(1).trim();
@@ -3118,7 +3135,9 @@ public class WebViewDialog extends Dialog {
           } catch (Exception ignore) {}
         }
         if (filename == null) {
-          java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename=\"?([^\";]+)\"?", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
+          java.util.regex.Matcher m = java.util.regex.Pattern
+                  .compile("filename=\"?([^\";]+)\"?", java.util.regex.Pattern.CASE_INSENSITIVE)
+                  .matcher(contentDisposition);
           if (m.find()) {
             filename = m.group(1).trim();
           }
@@ -3188,6 +3207,10 @@ public class WebViewDialog extends Dialog {
         request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
 
+        // Allow downloads over metered networks and roaming to avoid "queued" policies
+        request.setAllowedOverMetered(true);
+        request.setAllowedOverRoaming(true);
+
         android.app.DownloadManager dm = (android.app.DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         if (dm != null) {
           long id = dm.enqueue(request);
@@ -3195,6 +3218,105 @@ public class WebViewDialog extends Dialog {
             activeDownloadFileNames.put(id, finalFileName);
           }
           Log.d("InAppBrowser", "DownloadManager enqueued id=" + id + " file=" + finalFileName + " url=" + url);
+
+          // Post-enqueue check: wait 5s, then check status; if still PENDING, wait another 5s; if still not running/successful -> fallback
+          // IMPORTANT: capture UA and cookies here so the background thread doesn't access WebView methods.
+          final String capturedUA = ua;
+          final String capturedCookies = cookies;
+          executorService.execute(() -> {
+            try {
+              // Primera espera
+              Thread.sleep(5000);
+
+              android.app.DownloadManager.Query q1 = new android.app.DownloadManager.Query();
+              q1.setFilterById(id);
+              android.database.Cursor cursor1 = dm.query(q1);
+              int status1 = -1;
+              int reason1 = -1;
+              String sourceUri1 = null;
+              if (cursor1 != null) {
+                try {
+                  if (cursor1.moveToFirst()) {
+                    int statusIdx = cursor1.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS);
+                    int reasonIdx = cursor1.getColumnIndex(android.app.DownloadManager.COLUMN_REASON);
+                    int uriIdx = cursor1.getColumnIndex(android.app.DownloadManager.COLUMN_URI);
+                    status1 = statusIdx != -1 ? cursor1.getInt(statusIdx) : -1;
+                    reason1 = reasonIdx != -1 ? cursor1.getInt(reasonIdx) : -1;
+                    sourceUri1 = (uriIdx != -1) ? cursor1.getString(uriIdx) : null;
+                  }
+                } finally {
+                  try { cursor1.close(); } catch (Exception ignore) {}
+                }
+              }
+              Log.d("InAppBrowser", "Post-enqueue check1 id=" + id + " status=" + status1 + " reason=" + reason1);
+
+              // If PENDING, give it one more chance
+              if (status1 == android.app.DownloadManager.STATUS_PENDING) {
+                Thread.sleep(5000);
+
+                android.app.DownloadManager.Query q2 = new android.app.DownloadManager.Query();
+                q2.setFilterById(id);
+                android.database.Cursor cursor2 = dm.query(q2);
+                int status2 = -1;
+                int reason2 = -1;
+                String sourceUri2 = null;
+                if (cursor2 != null) {
+                  try {
+                    if (cursor2.moveToFirst()) {
+                      int statusIdx = cursor2.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS);
+                      int reasonIdx = cursor2.getColumnIndex(android.app.DownloadManager.COLUMN_REASON);
+                      int uriIdx = cursor2.getColumnIndex(android.app.DownloadManager.COLUMN_URI);
+                      status2 = statusIdx != -1 ? cursor2.getInt(statusIdx) : -1;
+                      reason2 = reasonIdx != -1 ? cursor2.getInt(reasonIdx) : -1;
+                      sourceUri2 = (uriIdx != -1) ? cursor2.getString(uriIdx) : null;
+                    }
+                  } finally {
+                    try { cursor2.close(); } catch (Exception ignore) {}
+                  }
+                }
+                Log.d("InAppBrowser", "Post-enqueue check2 id=" + id + " status=" + status2 + " reason=" + reason2);
+
+                // Si sigue PENDING después de 10s, considerarlo atascado y fallback
+                if (status2 == android.app.DownloadManager.STATUS_PENDING) {
+                  Log.w("InAppBrowser", "DownloadManager still pending after 10s (id=" + id + "). Falling back to manual download.");
+                  String attemptedFileName;
+                  synchronized (activeDownloadFileNames) { attemptedFileName = activeDownloadFileNames.remove(id); }
+                  // intenta obtener URL desde sourceUri2, si null usa sourceUri1
+                  String fallbackUrl = sourceUri2 != null ? sourceUri2 : sourceUri1;
+                  String fallbackCookies = (capturedCookies != null && !capturedCookies.isEmpty()) ? capturedCookies : "";
+                  String fallbackUA = (capturedUA != null && !capturedUA.isEmpty()) ? capturedUA : System.getProperty("http.agent");
+
+                  // elimina la tarea DM para limpiar la cola
+                  try { dm.remove(id); } catch (Exception ignore) {}
+
+                  // Ejecuta fallback (está bien llamar esto desde background)
+                  downloadWithHttpURLConnection(fallbackUrl, attemptedFileName, mimeType, fallbackCookies, fallbackUA);
+                } else if (status2 != android.app.DownloadManager.STATUS_RUNNING && status2 != android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                  // No arrancó correctamente -> fallback
+                  Log.w("InAppBrowser", "DownloadManager status after 10s not running/successful (id=" + id + "), doing fallback.");
+                  String attemptedFileName;
+                  synchronized (activeDownloadFileNames) { attemptedFileName = activeDownloadFileNames.remove(id); }
+                  String fallbackUrl = sourceUri2 != null ? sourceUri2 : sourceUri1;
+                  String fallbackCookies = (capturedCookies != null && !capturedCookies.isEmpty()) ? capturedCookies : "";
+                  String fallbackUA = (capturedUA != null && !capturedUA.isEmpty()) ? capturedUA : System.getProperty("http.agent");
+                  try { dm.remove(id); } catch (Exception ignore) {}
+                  downloadWithHttpURLConnection(fallbackUrl, attemptedFileName, mimeType, fallbackCookies, fallbackUA);
+                }
+              } else if (status1 != android.app.DownloadManager.STATUS_RUNNING && status1 != android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                // Si no estaba pending pero tampoco corriendo, fallback ahora
+                Log.w("InAppBrowser", "DownloadManager did not run after enqueue (id=" + id + "), performing fallback.");
+                String attemptedFileName;
+                synchronized (activeDownloadFileNames) { attemptedFileName = activeDownloadFileNames.remove(id); }
+                String fallbackUrl = sourceUri1;
+                String fallbackCookies = (capturedCookies != null && !capturedCookies.isEmpty()) ? capturedCookies : "";
+                String fallbackUA = (capturedUA != null && !capturedUA.isEmpty()) ? capturedUA : System.getProperty("http.agent");
+                try { dm.remove(id); } catch (Exception ignore) {}
+                downloadWithHttpURLConnection(fallbackUrl, attemptedFileName, mimeType, fallbackCookies, fallbackUA);
+              } // else status running or successful -> leave it to DownloadManager and BroadcastReceiver
+            } catch (Throwable t) {
+              Log.e("InAppBrowser", "post-enqueue status check error: " + t.getMessage(), t);
+            }
+          });
 
           // register receiver once (lazy)
           if (downloadCompleteReceiver == null) {
@@ -3211,10 +3333,17 @@ public class WebViewDialog extends Dialog {
               }
             };
             try {
-              getContext().registerReceiver(downloadCompleteReceiver, new IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+              IntentFilter filter = new IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Android 12+ requires explicit exported flag for non-system receivers
+                getContext().registerReceiver(downloadCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+              } else {
+                getContext().registerReceiver(downloadCompleteReceiver, filter);
+              }
               Log.d("InAppBrowser", "Download complete receiver registered");
             } catch (Exception e) {
               Log.w("InAppBrowser", "Could not register download receiver: " + e.getMessage());
+              // We intentionally continue: the post-enqueue checks will still detect stuck downloads
             }
           }
         } else {
