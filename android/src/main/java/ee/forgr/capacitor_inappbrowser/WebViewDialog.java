@@ -8,6 +8,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -117,6 +118,11 @@ public class WebViewDialog extends Dialog {
   // Allow-Download bridge map: URL -> expiryTimestamp (ms)
   private final Map<String, Long> allowDownloadExpiryMap = new HashMap<>();
   private static final long ALLOW_DOWNLOAD_TTL_MS = 5_000L; // 5s TTL
+  // track active downloads so we can query status when completion arrives
+  private final Map<Long, String> activeDownloadFileNames = new HashMap<>(); // downloadId -> filename
+
+  // Receiver reference so we can unregister later (single instance)
+  private android.content.BroadcastReceiver downloadCompleteReceiver = null;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
 
@@ -2892,6 +2898,22 @@ public class WebViewDialog extends Dialog {
             }
         }
 
+      try {
+        if (downloadCompleteReceiver != null) {
+          try { getContext().unregisterReceiver(downloadCompleteReceiver); } catch (Exception ignore) {}
+          downloadCompleteReceiver = null;
+        }
+      } catch (Exception e) {
+        Log.w("InAppBrowser", "Error unregistering download receiver: " + e.getMessage());
+      }
+      synchronized (activeDownloadFileNames) { activeDownloadFileNames.clear(); }
+
+      try {
+        super.dismiss();
+      } catch (Exception e) {
+        Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
+      }
+
         // Clear any remaining proxied requests
         synchronized (proxiedRequestsHashmap) {
             proxiedRequestsHashmap.clear();
@@ -3071,7 +3093,6 @@ public class WebViewDialog extends Dialog {
   /**
    * Start a native download via DownloadManager, preserving cookies and UA when possible.
    * Improved filename extraction from Content-Disposition and mimeType.
-   * Place this method at class level (after createImageFile()).
    */
   private void startDownloadFromUrl(final String url, final String userAgent, final String contentDisposition, final String mimeType) {
     if (url == null || url.isEmpty()) {
@@ -3085,22 +3106,18 @@ public class WebViewDialog extends Dialog {
 
     final String cookies = android.webkit.CookieManager.getInstance().getCookie(url);
 
-    // 1) Try to extract filename from contentDisposition
+    // Try to extract filename from contentDisposition, fallback to URLUtil
     String filename = null;
     try {
       if (contentDisposition != null) {
-        // RFC5987 filename* (e.g., filename*=UTF-8''%e2%82%ac%20rates.pdf)
         java.util.regex.Matcher mStar = java.util.regex.Pattern.compile("filename\\*=(?:UTF-8'')?([^;\\r\\n]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
         if (mStar.find()) {
           try {
             String raw = mStar.group(1).trim();
-            // raw can be percent-encoded
             filename = java.net.URLDecoder.decode(raw.replaceAll("^\"|\"$", ""), "UTF-8");
-          } catch (Exception ignore) {
-          }
+          } catch (Exception ignore) {}
         }
         if (filename == null) {
-          // filename="..." or filename=...
           java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename=\"?([^\";]+)\"?", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(contentDisposition);
           if (m.find()) {
             filename = m.group(1).trim();
@@ -3111,21 +3128,15 @@ public class WebViewDialog extends Dialog {
       Log.w("InAppBrowser", "Error parsing contentDisposition: " + t.getMessage());
     }
 
-    // 2) Fallback to URLUtil.guessFileName
     if (filename == null || filename.isEmpty()) {
       try {
         filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimeType);
       } catch (Throwable t) {
-        filename = null;
+        filename = "file.bin";
       }
     }
 
-    // 3) If still no filename, use a safe default
-    if (filename == null || filename.isEmpty()) {
-      filename = "file.bin";
-    }
-
-    // 4) Ensure extension present; if not, infer from mimeType
+    // sanitize and ensure ext
     String namePart = filename;
     String extPart = "";
     int lastDot = filename.lastIndexOf('.');
@@ -3133,32 +3144,21 @@ public class WebViewDialog extends Dialog {
       namePart = filename.substring(0, lastDot);
       extPart = filename.substring(lastDot + 1);
     } else {
-      // try to get extension from mime type
       try {
         if (mimeType != null && !mimeType.isEmpty()) {
           String ext = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType);
-          if (ext != null && !ext.isEmpty()) {
-            extPart = ext;
-          }
+          if (ext != null && !ext.isEmpty()) extPart = ext;
         }
       } catch (Throwable ignore) {}
     }
 
-    // 5) Sanitize namePart and extPart, keep only valid chars for filesystem
     try {
-      // Remove path separators and invalid chars from name part
       namePart = namePart.replaceAll("[\\\\/:*?\"<>|]+", "_");
       namePart = namePart.replaceAll("\\s+", "_");
       namePart = namePart.replaceAll("[\\p{Cntrl}]", "");
-      // Truncate if too long
-      if (namePart.length() > 120) {
-        namePart = namePart.substring(0, 120);
-      }
-
-      // Sanitize extension
+      if (namePart.length() > 120) namePart = namePart.substring(0, 120);
       extPart = extPart.replaceAll("[^A-Za-z0-9]", "");
       if (extPart.length() > 10) extPart = extPart.substring(0, 10);
-
     } catch (Throwable t) {
       Log.w("InAppBrowser", "Error sanitizing filename parts: " + t.getMessage());
     }
@@ -3173,16 +3173,12 @@ public class WebViewDialog extends Dialog {
         try {
           downloadUri = Uri.parse(url);
         } catch (Exception e) {
-          // fallback: encode spaces and unsafe chars
           String safeUrl = url.replace(" ", "%20");
           downloadUri = Uri.parse(safeUrl);
         }
 
         android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(downloadUri);
-
-        if (mimeType != null && !mimeType.isEmpty()) {
-          request.setMimeType(mimeType);
-        }
+        if (mimeType != null && !mimeType.isEmpty()) request.setMimeType(mimeType);
         if (ua != null && !ua.isEmpty()) request.addRequestHeader("User-Agent", ua);
         if (cookies != null && !cookies.isEmpty()) request.addRequestHeader("Cookie", cookies);
 
@@ -3190,21 +3186,303 @@ public class WebViewDialog extends Dialog {
         request.setDescription("Downloading file...");
         request.allowScanningByMediaScanner();
         request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-
-        // Destination: public Downloads
         request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
 
         android.app.DownloadManager dm = (android.app.DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
         if (dm != null) {
           long id = dm.enqueue(request);
+          synchronized (activeDownloadFileNames) {
+            activeDownloadFileNames.put(id, finalFileName);
+          }
           Log.d("InAppBrowser", "DownloadManager enqueued id=" + id + " file=" + finalFileName + " url=" + url);
+
+          // register receiver once (lazy)
+          if (downloadCompleteReceiver == null) {
+            downloadCompleteReceiver = new android.content.BroadcastReceiver() {
+              @Override
+              public void onReceive(Context ctx, Intent intent) {
+                try {
+                  long completedId = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+                  if (completedId == -1L) return;
+                  handleDownloadCompletion(completedId);
+                } catch (Throwable ex) {
+                  Log.e("InAppBrowser", "Download complete receiver error: " + ex.getMessage(), ex);
+                }
+              }
+            };
+            try {
+              getContext().registerReceiver(downloadCompleteReceiver, new IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+              Log.d("InAppBrowser", "Download complete receiver registered");
+            } catch (Exception e) {
+              Log.w("InAppBrowser", "Could not register download receiver: " + e.getMessage());
+            }
+          }
         } else {
           Log.e("InAppBrowser", "DownloadManager not available");
+          // fallback immediately
+          executorService.execute(() -> downloadWithHttpURLConnection(url, finalFileName, mimeType, cookies, ua));
         }
       } catch (Throwable e) {
         Log.e("InAppBrowser", "startDownloadFromUrl error: " + e.getMessage(), e);
+        // fallback
+        executorService.execute(() -> downloadWithHttpURLConnection(url, finalFileName, mimeType, cookies, ua));
       }
     });
+  }
+
+  private void handleDownloadCompletion(long downloadId) {
+    try {
+      android.app.DownloadManager dm = (android.app.DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
+      if (dm == null) {
+        Log.w("InAppBrowser", "DownloadManager not available in handleDownloadCompletion");
+        return;
+      }
+
+      android.app.DownloadManager.Query q = new android.app.DownloadManager.Query();
+      q.setFilterById(downloadId);
+      android.database.Cursor c = dm.query(q);
+      if (c == null) {
+        Log.w("InAppBrowser", "DownloadManager query returned null cursor for id=" + downloadId);
+        return;
+      }
+
+      try {
+        if (!c.moveToFirst()) {
+          Log.w("InAppBrowser", "DownloadManager cursor empty for id=" + downloadId);
+          return;
+        }
+
+        int statusIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS);
+        int reasonIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_REASON);
+        int localUriIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI);
+        int uriIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_URI);
+
+        int status = statusIdx != -1 ? c.getInt(statusIdx) : -1;
+        int reason = reasonIdx != -1 ? c.getInt(reasonIdx) : -1;
+        String localUri = localUriIdx != -1 ? c.getString(localUriIdx) : null;
+        String sourceUri = uriIdx != -1 ? c.getString(uriIdx) : null;
+
+        String fileName;
+        synchronized (activeDownloadFileNames) {
+          fileName = activeDownloadFileNames.remove(downloadId);
+        }
+
+        Log.d("InAppBrowser", "Download complete id=" + downloadId + " status=" + status + " reason=" + reason + " localUri=" + localUri + " sourceUri=" + sourceUri + " filename=" + fileName);
+
+        if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+          String delivered = fileName != null ? fileName : (localUri != null ? localUri : ("download_" + downloadId));
+          Log.i("InAppBrowser", "Download successful: " + delivered);
+
+          // Try to notify plugin callbacks.downloadFinished(String) if available (via reflection).
+          boolean notified = false;
+          try {
+            if (_options != null && _options.getCallbacks() != null) {
+              Object callbacks = _options.getCallbacks();
+              try {
+                java.lang.reflect.Method m = callbacks.getClass().getMethod("downloadFinished", String.class);
+                if (m != null) {
+                  m.invoke(callbacks, delivered);
+                  notified = true;
+                }
+              } catch (NoSuchMethodException ns) {
+                // Method not present - fallthrough to JS notification
+              } catch (Exception invokeEx) {
+                Log.w("InAppBrowser", "Error invoking downloadFinished via reflection: " + invokeEx.getMessage());
+              }
+            }
+          } catch (Throwable t) {
+            Log.w("InAppBrowser", "Reflection attempt for downloadFinished failed: " + t.getMessage());
+          }
+
+          if (!notified) {
+            // Fallback: notify the WebView JS and, if possible, the generic javascriptCallback
+            try {
+              JSONObject payload = new JSONObject();
+              payload.put("type", "downloadFinished");
+              payload.put("file", delivered);
+              postMessageToJS(payload);
+            } catch (Exception je) {
+              Log.w("InAppBrowser", "Could not post downloadFinished to JS: " + je.getMessage());
+            }
+
+            try {
+              if (_options != null && _options.getCallbacks() != null) {
+                Object callbacks = _options.getCallbacks();
+                try {
+                  java.lang.reflect.Method jscb = callbacks.getClass().getMethod("javascriptCallback", String.class);
+                  if (jscb != null) {
+                    String msg = String.format("{\"detail\":{\"type\":\"downloadFinished\",\"file\":\"%s\"}}", delivered.replace("\"", "\\\""));
+                    jscb.invoke(callbacks, msg);
+                  }
+                } catch (NoSuchMethodException ignore) {
+                  // nothing to call
+                } catch (Exception e) {
+                  Log.w("InAppBrowser", "Error invoking javascriptCallback for downloadFinished: " + e.getMessage());
+                }
+              }
+            } catch (Throwable t) {
+              Log.w("InAppBrowser", "Error while attempting to call javascriptCallback: " + t.getMessage());
+            }
+          }
+
+          return;
+        }
+
+        // Non-successful status -> attempt fallback manual download
+        Log.w("InAppBrowser", "DownloadManager reported failure for id=" + downloadId + " reason=" + reason + ". Falling back to manual download.");
+        String attemptedFileName = (fileName != null) ? fileName : ("download_" + downloadId);
+
+        final String fallbackUrl = (sourceUri != null && !sourceUri.isEmpty()) ? sourceUri : null;
+        final String fallbackCookies = (fallbackUrl != null) ? android.webkit.CookieManager.getInstance().getCookie(fallbackUrl) : android.webkit.CookieManager.getInstance().getCookie("");
+        final String fallbackUA = (_webView != null) ? _webView.getSettings().getUserAgentString() : System.getProperty("http.agent");
+
+        // Run fallback download on executor
+        executorService.execute(() -> {
+          try {
+            downloadWithHttpURLConnection(fallbackUrl, attemptedFileName, null, fallbackCookies, fallbackUA);
+          } catch (Throwable t) {
+            Log.e("InAppBrowser", "Fallback download failed for id=" + downloadId + ": " + t.getMessage(), t);
+          }
+        });
+      } finally {
+        try {
+          c.close();
+        } catch (Exception ignore) {}
+      }
+    } catch (Throwable t) {
+      Log.e("InAppBrowser", "handleDownloadCompletion error: " + t.getMessage(), t);
+    }
+  }
+
+  private void downloadWithHttpURLConnection(String url, String fileName, String mimeType, String cookies, String userAgent) {
+    if (url == null || url.isEmpty()) {
+      Log.e("InAppBrowser", "fallback download: url null or empty");
+      return;
+    }
+
+    InputStream input = null;
+    java.io.OutputStream output = null;
+    java.net.HttpURLConnection conn = null;
+    try {
+      java.net.URL u = new java.net.URL(url);
+      conn = (java.net.HttpURLConnection) u.openConnection();
+      conn.setInstanceFollowRedirects(true);
+      if (userAgent != null && !userAgent.isEmpty()) conn.setRequestProperty("User-Agent", userAgent);
+      if (cookies != null && !cookies.isEmpty()) conn.setRequestProperty("Cookie", cookies);
+      conn.setConnectTimeout(15000);
+      conn.setReadTimeout(30000);
+
+      int response = conn.getResponseCode();
+      Log.d("InAppBrowser", "fallback download response code: " + response + " for url: " + url);
+      if (response / 100 != 2) {
+        Log.w("InAppBrowser", "fallback download non-2xx response: " + response);
+        return;
+      }
+
+      input = conn.getInputStream();
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        // Use MediaStore to write to Downloads (recommended for Android 10+)
+        android.content.ContentResolver cr = _context.getContentResolver();
+        android.content.ContentValues values = new android.content.ContentValues();
+        values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+        if (mimeType != null && !mimeType.isEmpty()) values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType);
+        values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+
+        Uri uri = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (uri == null) {
+          Log.e("InAppBrowser", "fallback download: cannot create MediaStore entry");
+          return;
+        }
+        output = cr.openOutputStream(uri);
+        if (output == null) {
+          Log.e("InAppBrowser", "fallback download: cannot open output stream for MediaStore uri");
+          return;
+        }
+      } else {
+        // Legacy: write to public Downloads (may require WRITE_EXTERNAL_STORAGE on old Android)
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
+          Log.w("InAppBrowser", "fallback download: cannot create downloads dir");
+        }
+        File outFile = new File(downloadsDir, fileName);
+        output = new java.io.FileOutputStream(outFile);
+      }
+
+      byte[] buffer = new byte[8192];
+      int len;
+      while ((len = input.read(buffer)) != -1) {
+        output.write(buffer, 0, len);
+      }
+      output.flush();
+      Log.i("InAppBrowser", "fallback download saved file: " + fileName);
+
+      // Notify plugin / JS in a safe, non-breaking way
+      String delivered = fileName;
+      boolean notified = false;
+
+      // 1) Try reflection to call downloadFinished(String) if the callbacks object implements it
+      try {
+        if (_options != null && _options.getCallbacks() != null) {
+          Object callbacks = _options.getCallbacks();
+          try {
+            java.lang.reflect.Method m = callbacks.getClass().getMethod("downloadFinished", String.class);
+            if (m != null) {
+              m.invoke(callbacks, delivered);
+              notified = true;
+              Log.d("InAppBrowser", "Notified callbacks.downloadFinished via reflection");
+            }
+          } catch (NoSuchMethodException ns) {
+            // Method not present - will fallback to JS notification
+            Log.d("InAppBrowser", "callbacks.downloadFinished not present, will fallback to JS event");
+          } catch (Exception invokeEx) {
+            Log.w("InAppBrowser", "Error invoking downloadFinished via reflection: " + invokeEx.getMessage());
+          }
+        }
+      } catch (Throwable t) {
+        Log.w("InAppBrowser", "Reflection attempt for downloadFinished failed: " + t.getMessage());
+      }
+
+      // 2) If not notified, post a message to the WebView JS and try generic javascriptCallback if available
+      if (!notified) {
+        try {
+          JSONObject payload = new JSONObject();
+          payload.put("type", "downloadFinished");
+          payload.put("file", delivered);
+          postMessageToJS(payload);
+          Log.d("InAppBrowser", "Posted downloadFinished event to WebView JS");
+        } catch (Exception je) {
+          Log.w("InAppBrowser", "Could not post downloadFinished to JS: " + je.getMessage());
+        }
+
+        try {
+          if (_options != null && _options.getCallbacks() != null) {
+            Object callbacks = _options.getCallbacks();
+            try {
+              java.lang.reflect.Method jscb = callbacks.getClass().getMethod("javascriptCallback", String.class);
+              if (jscb != null) {
+                String msg = String.format("{\"detail\":{\"type\":\"downloadFinished\",\"file\":\"%s\"}}", delivered.replace("\"", "\\\""));
+                jscb.invoke(callbacks, msg);
+                Log.d("InAppBrowser", "Invoked callbacks.javascriptCallback with downloadFinished message");
+              }
+            } catch (NoSuchMethodException ignore) {
+              // nothing to call
+            } catch (Exception e) {
+              Log.w("InAppBrowser", "Error invoking javascriptCallback for downloadFinished: " + e.getMessage());
+            }
+          }
+        } catch (Throwable t) {
+          Log.w("InAppBrowser", "Error while attempting to call javascriptCallback: " + t.getMessage());
+        }
+      }
+
+    } catch (Throwable t) {
+      Log.e("InAppBrowser", "fallback download error: " + t.getMessage(), t);
+    } finally {
+      try { if (input != null) input.close(); } catch (Exception ignored) {}
+      try { if (output != null) output.close(); } catch (Exception ignored) {}
+      if (conn != null) conn.disconnect();
+    }
   }
 
     /**
