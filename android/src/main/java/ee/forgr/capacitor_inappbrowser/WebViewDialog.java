@@ -1,14 +1,20 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.DownloadManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -52,8 +58,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
-import androidx.activity.result.ActivityResult;
-import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -64,6 +71,8 @@ import androidx.webkit.WebViewFeature;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
+import org.json.JSONException;
+import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -86,8 +95,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
 
@@ -302,6 +309,7 @@ public class WebViewDialog extends Dialog {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
         setContentView(R.layout.activity_browser);
+        registerDownloadCompleteReceiver();
 
         // If custom dimensions are set, configure for touch passthrough
         if (_options != null && (_options.getWidth() != null || _options.getHeight() != null)) {
@@ -2831,6 +2839,7 @@ public class WebViewDialog extends Dialog {
 
     @Override
     public void dismiss() {
+      unregisterDownloadCompleteReceiver();
         // First, stop any ongoing operations and disable further interactions
         if (_webView != null) {
             try {
@@ -2882,6 +2891,9 @@ public class WebViewDialog extends Dialog {
                 _webView = null;
             }
         }
+
+      activeDownloadFileNames.clear();
+      allowDownloadExpiryMap.clear();
 
         // Shutdown executor service safely
         if (executorService != null && !executorService.isShutdown()) {
@@ -3205,7 +3217,21 @@ public class WebViewDialog extends Dialog {
         request.setDescription("Downloading file...");
         request.allowScanningByMediaScanner();
         request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
+        // Set destination in a way that avoids WRITE_EXTERNAL_STORAGE requirement when possible
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          // On Android 10+ we rely on system handling (DM/MediaStore); keep public Downloads target
+          request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
+        } else {
+          // Pre-Q devices: if we have WRITE_EXTERNAL_STORAGE permission, write to public Downloads
+          if (activity != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, finalFileName);
+          } else {
+            // No permission -> write into app-specific external files dir to avoid permission requirement
+            // This will place the file under Android/data/<package>/files/Download/
+            request.setDestinationInExternalFilesDir(getContext(), Environment.DIRECTORY_DOWNLOADS, finalFileName);
+            Log.d("InAppBrowser", "No WRITE_EXTERNAL_STORAGE permission - using app-specific external files dir for download");
+          }
+        }
 
         // Allow downloads over metered networks and roaming to avoid "queued" policies
         request.setAllowedOverMetered(true);
@@ -3367,6 +3393,8 @@ public class WebViewDialog extends Dialog {
         return;
       }
 
+      final Context ctx = getContext();
+
       android.app.DownloadManager.Query q = new android.app.DownloadManager.Query();
       q.setFilterById(downloadId);
       android.database.Cursor c = dm.query(q);
@@ -3391,6 +3419,13 @@ public class WebViewDialog extends Dialog {
         String localUri = localUriIdx != -1 ? c.getString(localUriIdx) : null;
         String sourceUri = uriIdx != -1 ? c.getString(uriIdx) : null;
 
+        // Extraer campos adicionales que algunos proveedores rellenan
+        int localFilenameIdx = c.getColumnIndex("local_filename");
+        int mediaTypeIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_MEDIA_TYPE);
+        String localFilename = localFilenameIdx != -1 ? c.getString(localFilenameIdx) : null;
+        String cursorMediaType = mediaTypeIdx != -1 ? c.getString(mediaTypeIdx) : null;
+        Log.d("InAppBrowser", "download cursor extras: localFilename=" + localFilename + " mediaType=" + cursorMediaType);
+
         String fileName;
         synchronized (activeDownloadFileNames) {
           fileName = activeDownloadFileNames.remove(downloadId);
@@ -3401,6 +3436,80 @@ public class WebViewDialog extends Dialog {
         if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
           String delivered = fileName != null ? fileName : (localUri != null ? localUri : ("download_" + downloadId));
           Log.i("InAppBrowser", "Download successful: " + delivered);
+
+          // Determine MIME type (try ContentResolver first, then extension)
+          String mimeType = null;
+          try {
+            if (ctx != null && localUri != null) {
+              try {
+                Uri parsed = Uri.parse(localUri);
+                mimeType = ctx.getContentResolver().getType(parsed);
+              } catch (Exception ignore) {}
+            }
+            if ((mimeType == null || mimeType.isEmpty()) && delivered != null) {
+              int dot = delivered.lastIndexOf('.');
+              if (dot > 0 && dot < delivered.length() - 1) {
+                String ext = delivered.substring(dot + 1).toLowerCase();
+                mimeType = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+              }
+            }
+          } catch (Throwable t) {
+            Log.w("InAppBrowser", "Could not determine mimeType: " + t.getMessage());
+          }
+
+          // Try to construct a URI we can share/open:
+          Uri notifyUri = null;
+          try {
+            if (localUri != null) {
+              try {
+                Uri parsed = Uri.parse(localUri);
+                String scheme = parsed.getScheme();
+                if ("content".equalsIgnoreCase(scheme)) {
+                  notifyUri = parsed;
+                } else if ("file".equalsIgnoreCase(scheme) || parsed.getPath() != null) {
+                  // convert file:// URI or plain path to a File and use FileProvider
+                  File f = new File(parsed.getPath());
+                  if (f.exists() && ctx != null) {
+                    try {
+                      notifyUri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", f);
+                    } catch (Exception ex) {
+                      // fallback to the original parsed URI if anything fails
+                      notifyUri = parsed;
+                    }
+                  } else {
+                    // file doesn't exist; leave notifyUri null and fall back to searching by filename
+                    notifyUri = null;
+                  }
+                } else {
+                  notifyUri = parsed;
+                }
+              } catch (Exception e) {
+                Log.w("InAppBrowser", "Could not parse localUri: " + e.getMessage());
+              }
+            }
+
+            if (notifyUri == null && localFilename != null && ctx != null) {
+              File possibleLocal = new File(localFilename);
+              if (possibleLocal.exists()) {
+                try {
+                  notifyUri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", possibleLocal);
+                } catch (Exception ex) {
+                  Log.w("InAppBrowser", "FileProvider failed for localFilename: " + ex.getMessage());
+                  notifyUri = null;
+                }
+              }
+            }
+          } catch (Throwable tx) {
+            Log.w("InAppBrowser", "Error building notifyUri: " + tx.getMessage());
+            notifyUri = null;
+          }
+
+          // Notify user: show system notification and allow opening the file
+          try {
+            notifyDownloadSaved(notifyUri, delivered, mimeType);
+          } catch (Throwable nt) {
+            Log.w("InAppBrowser", "notifyDownloadSaved failed: " + nt.getMessage());
+          }
 
           // Try to notify plugin callbacks.downloadFinished(String) if available (via reflection).
           boolean notified = false;
@@ -3482,7 +3591,63 @@ public class WebViewDialog extends Dialog {
       Log.e("InAppBrowser", "handleDownloadCompletion error: " + t.getMessage(), t);
     }
   }
+  // Reemplaza tu método notifyDownloadSaved por este (dentro de la clase WebViewDialog)
+  private void notifyDownloadSaved(@Nullable Uri fileUri, @Nullable String fileName, @Nullable String mimeType) {
+    Log.i("InAppBrowser", "notifyDownloadSaved: name=" + fileName + " uri=" + fileUri + " mime=" + mimeType);
+    try {
+      Context ctx = getContext();
+      if (ctx == null) return;
 
+      String channelId = "inappbrowser_downloads";
+      String channelName = "Descargas de la app";
+      NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+
+      // Crear canal si hace falta (Android O+)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        NotificationChannel ch = nm.getNotificationChannel(channelId);
+        if (ch == null) {
+          ch = new NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT);
+          ch.setDescription("Notificaciones de descargas guardadas");
+          nm.createNotificationChannel(ch);
+        }
+      }
+
+      // Intent para abrir el fichero (o la app Descargas si no hay URI)
+      Intent openIntent;
+      if (fileUri != null) {
+        openIntent = new Intent(Intent.ACTION_VIEW);
+        openIntent.setDataAndType(fileUri, (mimeType != null && !mimeType.isEmpty()) ? mimeType : "*/*");
+        openIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+      } else {
+        // Usa la constante de DownloadManager para abrir la UI de Descargas del sistema
+        openIntent = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+      }
+
+      // Crear chooser para mayor compatibilidad
+      Intent chooser = Intent.createChooser(openIntent, "Abrir archivo");
+
+      int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        flags |= PendingIntent.FLAG_IMMUTABLE;
+      }
+
+      PendingIntent pi = PendingIntent.getActivity(ctx, (int) System.currentTimeMillis(), chooser, flags);
+
+      NotificationCompat.Builder nb = new NotificationCompat.Builder(ctx, channelId)
+              .setSmallIcon(android.R.drawable.stat_sys_download_done)
+              .setContentTitle("Descarga guardada")
+              .setContentText(fileName != null ? fileName : "Archivo descargado")
+              .setAutoCancel(true)
+              .setContentIntent(pi)
+              .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+      int notifId = Math.abs(("dl_" + (fileName != null ? fileName : String.valueOf(System.currentTimeMillis()))).hashCode() % Integer.MAX_VALUE);
+      nm.notify(notifId, nb.build());
+    } catch (Throwable t) {
+      Log.w("InAppBrowser", "notifyDownloadSaved failed: " + t.getMessage());
+    }
+  }
   private void downloadWithHttpURLConnection(String url, String fileName, String mimeType, String cookies, String userAgent) {
     if (url == null || url.isEmpty()) {
       Log.e("InAppBrowser", "fallback download: url null or empty");
@@ -3492,6 +3657,9 @@ public class WebViewDialog extends Dialog {
     InputStream input = null;
     java.io.OutputStream output = null;
     java.net.HttpURLConnection conn = null;
+    Uri savedUri = null;
+    File outFile = null;
+
     try {
       java.net.URL u = new java.net.URL(url);
       conn = (java.net.HttpURLConnection) u.openConnection();
@@ -3511,30 +3679,49 @@ public class WebViewDialog extends Dialog {
       input = conn.getInputStream();
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        // Use MediaStore to write to Downloads (recommended for Android 10+)
-        android.content.ContentResolver cr = _context.getContentResolver();
+        // Use MediaStore to write to Downloads
+        android.content.ContentResolver cr = getContext().getContentResolver();
         android.content.ContentValues values = new android.content.ContentValues();
         values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName);
         if (mimeType != null && !mimeType.isEmpty()) values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mimeType);
         values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
 
-        Uri uri = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-        if (uri == null) {
+        savedUri = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+        if (savedUri == null) {
           Log.e("InAppBrowser", "fallback download: cannot create MediaStore entry");
           return;
         }
-        output = cr.openOutputStream(uri);
+        output = cr.openOutputStream(savedUri);
         if (output == null) {
           Log.e("InAppBrowser", "fallback download: cannot open output stream for MediaStore uri");
           return;
         }
       } else {
-        // Legacy: write to public Downloads (may require WRITE_EXTERNAL_STORAGE on old Android)
-        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (!downloadsDir.exists() && !downloadsDir.mkdirs()) {
-          Log.w("InAppBrowser", "fallback download: cannot create downloads dir");
+// Legacy: prefer public Downloads if app has permission, otherwise use app-specific external files dir
+        File downloadsDir = null;
+        try {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Shouldn't get here (we handle Q+ earlier) but fallback to app files dir
+            downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+          } else {
+            if (activity != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+              downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            } else {
+              // use app-specific external files directory to avoid permission requirement
+              downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+              Log.d("InAppBrowser", "No WRITE_EXTERNAL_STORAGE permission - saving fallback file to app external files dir");
+            }
+          }
+        } catch (Exception e) {
+          Log.w("InAppBrowser", "Could not determine downloads dir, falling back to app files dir: " + e.getMessage());
+          downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
         }
-        File outFile = new File(downloadsDir, fileName);
+
+        if (downloadsDir == null) {
+          Log.e("InAppBrowser", "Unable to access any downloads directory");
+          return;
+        }
+        outFile = new File(downloadsDir, fileName);
         output = new java.io.FileOutputStream(outFile);
       }
 
@@ -3546,23 +3733,18 @@ public class WebViewDialog extends Dialog {
       output.flush();
       Log.i("InAppBrowser", "fallback download saved file: " + fileName);
 
-      // Notify plugin / JS in a safe, non-breaking way
-      String delivered = fileName;
+      // Notify plugin callback / JS if present (existing logic)
       boolean notified = false;
-
-      // 1) Try reflection to call downloadFinished(String) if the callbacks object implements it
       try {
         if (_options != null && _options.getCallbacks() != null) {
           Object callbacks = _options.getCallbacks();
           try {
             java.lang.reflect.Method m = callbacks.getClass().getMethod("downloadFinished", String.class);
             if (m != null) {
-              m.invoke(callbacks, delivered);
+              m.invoke(callbacks, fileName);
               notified = true;
-              Log.d("InAppBrowser", "Notified callbacks.downloadFinished via reflection");
             }
           } catch (NoSuchMethodException ns) {
-            // Method not present - will fallback to JS notification
             Log.d("InAppBrowser", "callbacks.downloadFinished not present, will fallback to JS event");
           } catch (Exception invokeEx) {
             Log.w("InAppBrowser", "Error invoking downloadFinished via reflection: " + invokeEx.getMessage());
@@ -3572,37 +3754,41 @@ public class WebViewDialog extends Dialog {
         Log.w("InAppBrowser", "Reflection attempt for downloadFinished failed: " + t.getMessage());
       }
 
-      // 2) If not notified, post a message to the WebView JS and try generic javascriptCallback if available
       if (!notified) {
         try {
           JSONObject payload = new JSONObject();
           payload.put("type", "downloadFinished");
-          payload.put("file", delivered);
+          payload.put("file", fileName);
           postMessageToJS(payload);
-          Log.d("InAppBrowser", "Posted downloadFinished event to WebView JS");
         } catch (Exception je) {
           Log.w("InAppBrowser", "Could not post downloadFinished to JS: " + je.getMessage());
         }
+      }
 
+      // Notify user via notification + open file intent
+      if (savedUri != null) {
+        // MediaStore path (Android Q+)
+        notifyDownloadSaved(savedUri, fileName, mimeType);
+      } else if (outFile != null) {
+        // Legacy path: create FileProvider Uri
         try {
-          if (_options != null && _options.getCallbacks() != null) {
-            Object callbacks = _options.getCallbacks();
+          Context ctx = getContext();
+          if (ctx != null) {
+            Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", outFile);
+            // Make visible in media provider / Downloads app
             try {
-              java.lang.reflect.Method jscb = callbacks.getClass().getMethod("javascriptCallback", String.class);
-              if (jscb != null) {
-                String msg = String.format("{\"detail\":{\"type\":\"downloadFinished\",\"file\":\"%s\"}}", delivered.replace("\"", "\\\""));
-                jscb.invoke(callbacks, msg);
-                Log.d("InAppBrowser", "Invoked callbacks.javascriptCallback with downloadFinished message");
-              }
-            } catch (NoSuchMethodException ignore) {
-              // nothing to call
-            } catch (Exception e) {
-              Log.w("InAppBrowser", "Error invoking javascriptCallback for downloadFinished: " + e.getMessage());
-            }
+              android.media.MediaScannerConnection.scanFile(ctx, new String[]{ outFile.getAbsolutePath() }, null, null);
+            } catch (Exception ignore) {}
+            notifyDownloadSaved(uri, fileName, mimeType);
           }
-        } catch (Throwable t) {
-          Log.w("InAppBrowser", "Error while attempting to call javascriptCallback: " + t.getMessage());
+        } catch (Throwable ex) {
+          Log.w("InAppBrowser", "Could not create FileProvider uri: " + ex.getMessage());
+          // fallback: notify by name only (no URI)
+          notifyDownloadSaved(null, fileName, mimeType);
         }
+      } else {
+        // Unknown case, notify by name only
+        notifyDownloadSaved(null, fileName, mimeType);
       }
 
     } catch (Throwable t) {
@@ -3611,6 +3797,45 @@ public class WebViewDialog extends Dialog {
       try { if (input != null) input.close(); } catch (Exception ignored) {}
       try { if (output != null) output.close(); } catch (Exception ignored) {}
       if (conn != null) conn.disconnect();
+    }
+  }
+
+  /**
+   * Registra el BroadcastReceiver para detectar cuando se completen las descargas
+   */
+  private void registerDownloadCompleteReceiver() {
+    if (downloadCompleteReceiver != null) {
+      return; // Ya está registrado
+    }
+
+    downloadCompleteReceiver = new android.content.BroadcastReceiver() {
+      @Override
+      public void onReceive(Context context, Intent intent) {
+        long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+        if (downloadId != -1 && activeDownloadFileNames.containsKey(downloadId)) {
+          handleDownloadCompletion(downloadId);
+        }
+      }
+    };
+
+    _context.registerReceiver(
+            downloadCompleteReceiver,
+            new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            Context.RECEIVER_NOT_EXPORTED
+    );
+  }
+
+  /**
+   * Desregistra el BroadcastReceiver de descargas
+   */
+  private void unregisterDownloadCompleteReceiver() {
+    if (downloadCompleteReceiver != null) {
+      try {
+        _context.unregisterReceiver(downloadCompleteReceiver);
+      } catch (IllegalArgumentException e) {
+        // Ya estaba desregistrado
+      }
+      downloadCompleteReceiver = null;
     }
   }
 
