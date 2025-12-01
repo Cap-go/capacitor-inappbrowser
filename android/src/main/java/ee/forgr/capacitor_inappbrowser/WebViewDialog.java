@@ -1373,132 +1373,275 @@ public class WebViewDialog extends Dialog {
         }
     }
 
-    private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
-        mFilePathCallback = filePathCallback;
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+  private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
+    mFilePathCallback = filePathCallback;
+    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+    intent.addCategory(Intent.CATEGORY_OPENABLE);
 
-        // Fix MIME type handling
-        if (acceptType == null || acceptType.isEmpty() || acceptType.equals("undefined")) {
-            acceptType = "*/*";
-        } else {
-            // Handle common web input accept types
-            if (acceptType.equals("image/*")) {
-                // Keep as is - image/*
-            } else if (acceptType.contains("image/")) {
-                // Specific image type requested but keep it general for better compatibility
-                acceptType = "image/*";
-            } else if (acceptType.equals("audio/*") || acceptType.contains("audio/")) {
-                acceptType = "audio/*";
-            } else if (acceptType.equals("video/*") || acceptType.contains("video/")) {
-                acceptType = "video/*";
-            } else if (acceptType.startsWith(".") || acceptType.contains(",")) {
-                // Handle file extensions like ".pdf, .docx" by using a general mime type
-                if (acceptType.contains(".pdf")) {
-                    acceptType = "application/pdf";
-                } else if (acceptType.contains(".doc") || acceptType.contains(".docx")) {
-                    acceptType = "application/msword";
-                } else if (acceptType.contains(".xls") || acceptType.contains(".xlsx")) {
-                    acceptType = "application/vnd.ms-excel";
-                } else if (acceptType.contains(".txt") || acceptType.contains(".text")) {
-                    acceptType = "text/plain";
-                } else {
-                    // Default for extension lists
-                    acceptType = "*/*";
-                }
-            }
-        }
+    // Normalize acceptType
+    if (acceptType == null || acceptType.isEmpty() || acceptType.equals("undefined")) {
+      acceptType = "*/*";
+    }
 
-        Log.d("InAppBrowser", "File picker using MIME type: " + acceptType);
-        intent.setType(acceptType);
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
+    // Build mimeTypes array to pass as EXTRA_MIME_TYPES (better chooser behavior)
+    String[] mimeTypes = null;
+    try {
+      if (acceptType.contains(",")) {
+        // comma separated list
+        String[] parts = acceptType.split(",");
+        for (int i = 0; i < parts.length; i++) parts[i] = parts[i].trim();
+        mimeTypes = parts;
+      } else if (acceptType.startsWith(".")) {
+        // single extension like ".pdf"
+        String ext = acceptType.replaceFirst("^\\.", "").toLowerCase();
+        String mt = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+        mimeTypes = new String[] { mt != null ? mt : "*/*" };
+      } else if (acceptType.contains("/")) {
+        mimeTypes = new String[] { acceptType };
+      } else if (acceptType.equals("*/*")) {
+        mimeTypes = null; // allow all
+      } else {
+        // fallback try to interpret as extension list
+        mimeTypes = new String[] { acceptType };
+      }
+    } catch (Exception e) {
+      Log.w("InAppBrowser", "Error parsing acceptType: " + e.getMessage());
+      mimeTypes = null;
+    }
 
-        try {
-            if (activity instanceof androidx.activity.ComponentActivity) {
-                androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-                componentActivity
-                    .getActivityResultRegistry()
-                    .register(
+    // If we have explicit mime types, set both type and EXTRA_MIME_TYPES
+    if (mimeTypes != null && mimeTypes.length == 1) {
+      intent.setType(mimeTypes[0]);
+    } else {
+      // generic
+      intent.setType("*/*");
+      if (mimeTypes != null && mimeTypes.length > 0) {
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+      }
+    }
+
+    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
+    Log.d("InAppBrowser", "File picker intent type=" + intent.getType() + " extraMimeTypes=" + (mimeTypes != null ? java.util.Arrays.toString(mimeTypes) : "null"));
+
+    try {
+      if (activity instanceof androidx.activity.ComponentActivity) {
+        androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
+        componentActivity
+                .getActivityResultRegistry()
+                .register(
                         "file_chooser",
                         new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
                         (result) -> {
+                          try {
                             if (result.getResultCode() == Activity.RESULT_OK) {
+                              Intent data = result.getData();
+                              if (data != null) {
+                                if (data.getClipData() != null) {
+                                  int count = data.getClipData().getItemCount();
+                                  Uri[] results = new Uri[count];
+                                  for (int i = 0; i < count; i++) {
+                                    Uri uri = data.getClipData().getItemAt(i).getUri();
+                                    // Detect and log MIME + filename
+                                    String detectedMime = detectMimeTypeFromUri(getContext(), uri);
+                                    String name = getFileNameFromUri(getContext(), uri);
+                                    Log.i("InAppBrowser", "Selected file [" + i + "]: uri=" + uri + " name=" + name + " mime=" + detectedMime);
+                                    results[i] = uri;
+                                  }
+                                  mFilePathCallback.onReceiveValue(results);
+                                } else if (data.getData() != null) {
+                                  Uri uri = data.getData();
+                                  String detectedMime = detectMimeTypeFromUri(getContext(), uri);
+                                  String name = getFileNameFromUri(getContext(), uri);
+                                  Log.i("InAppBrowser", "Selected file: uri=" + uri + " name=" + name + " mime=" + detectedMime);
+                                  mFilePathCallback.onReceiveValue(new Uri[] { uri });
+                                } else {
+                                  mFilePathCallback.onReceiveValue(null);
+                                }
+                              } else {
+                                mFilePathCallback.onReceiveValue(null);
+                              }
+                            } else {
+                              mFilePathCallback.onReceiveValue(null);
+                            }
+                          } catch (Throwable t) {
+                            Log.e("InAppBrowser", "file chooser result handling error: " + t.getMessage(), t);
+                            if (mFilePathCallback != null) {
+                              mFilePathCallback.onReceiveValue(null);
+                            }
+                          } finally {
+                            mFilePathCallback = null;
+                          }
+                        }
+                )
+                .launch(Intent.createChooser(intent, "Select File"));
+      } else {
+        activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
+      }
+    } catch (ActivityNotFoundException e) {
+      Log.e("InAppBrowser", "No app available for type: " + intent.getType() + ", trying with */*", e);
+      intent.setType("*/*");
+      try {
+        if (activity instanceof androidx.activity.ComponentActivity) {
+          androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
+          componentActivity
+                  .getActivityResultRegistry()
+                  .register(
+                          "file_chooser",
+                          new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                          (result) -> {
+                            try {
+                              if (result.getResultCode() == Activity.RESULT_OK) {
                                 Intent data = result.getData();
                                 if (data != null) {
-                                    if (data.getClipData() != null) {
-                                        // Handle multiple files
-                                        int count = data.getClipData().getItemCount();
-                                        Uri[] results = new Uri[count];
-                                        for (int i = 0; i < count; i++) {
-                                            results[i] = data.getClipData().getItemAt(i).getUri();
-                                        }
-                                        mFilePathCallback.onReceiveValue(results);
-                                    } else if (data.getData() != null) {
-                                        // Handle single file
-                                        mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
+                                  if (data.getClipData() != null) {
+                                    int count = data.getClipData().getItemCount();
+                                    Uri[] results = new Uri[count];
+                                    for (int i = 0; i < count; i++) {
+                                      Uri uri = data.getClipData().getItemAt(i).getUri();
+                                      String detectedMime = detectMimeTypeFromUri(getContext(), uri);
+                                      String name = getFileNameFromUri(getContext(), uri);
+                                      Log.i("InAppBrowser", "Selected file [" + i + "]: uri=" + uri + " name=" + name + " mime=" + detectedMime);
+                                      results[i] = uri;
                                     }
-                                }
-                            } else {
-                                mFilePathCallback.onReceiveValue(null);
-                            }
-                            mFilePathCallback = null;
-                        }
-                    )
-                    .launch(Intent.createChooser(intent, "Select File"));
-            } else {
-                // Fallback for non-ComponentActivity
-                activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
-            }
-        } catch (ActivityNotFoundException e) {
-            // If no app can handle the specific MIME type, try with a more generic one
-            Log.e("InAppBrowser", "No app available for type: " + acceptType + ", trying with */*");
-            intent.setType("*/*");
-            try {
-                if (activity instanceof androidx.activity.ComponentActivity) {
-                    androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-                    componentActivity
-                        .getActivityResultRegistry()
-                        .register(
-                            "file_chooser",
-                            new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                            (result) -> {
-                                if (result.getResultCode() == Activity.RESULT_OK) {
-                                    Intent data = result.getData();
-                                    if (data != null) {
-                                        if (data.getClipData() != null) {
-                                            // Handle multiple files
-                                            int count = data.getClipData().getItemCount();
-                                            Uri[] results = new Uri[count];
-                                            for (int i = 0; i < count; i++) {
-                                                results[i] = data.getClipData().getItemAt(i).getUri();
-                                            }
-                                            mFilePathCallback.onReceiveValue(results);
-                                        } else if (data.getData() != null) {
-                                            // Handle single file
-                                            mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
-                                        }
-                                    }
-                                } else {
+                                    mFilePathCallback.onReceiveValue(results);
+                                  } else if (data.getData() != null) {
+                                    Uri uri = data.getData();
+                                    String detectedMime = detectMimeTypeFromUri(getContext(), uri);
+                                    String name = getFileNameFromUri(getContext(), uri);
+                                    Log.i("InAppBrowser", "Selected file: uri=" + uri + " name=" + name + " mime=" + detectedMime);
+                                    mFilePathCallback.onReceiveValue(new Uri[] { uri });
+                                  } else {
                                     mFilePathCallback.onReceiveValue(null);
+                                  }
+                                } else {
+                                  mFilePathCallback.onReceiveValue(null);
                                 }
-                                mFilePathCallback = null;
+                              } else {
+                                mFilePathCallback.onReceiveValue(null);
+                              }
+                            } catch (Throwable t) {
+                              Log.e("InAppBrowser", "file chooser fallback result handling error: " + t.getMessage(), t);
+                              if (mFilePathCallback != null) mFilePathCallback.onReceiveValue(null);
+                            } finally {
+                              mFilePathCallback = null;
                             }
-                        )
-                        .launch(Intent.createChooser(intent, "Select File"));
-                } else {
-                    // Fallback for non-ComponentActivity
-                    activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
-                }
-            } catch (ActivityNotFoundException ex) {
-                // If still failing, report error
-                Log.e("InAppBrowser", "No app can handle file picker", ex);
-                if (mFilePathCallback != null) {
-                    mFilePathCallback.onReceiveValue(null);
-                    mFilePathCallback = null;
-                }
-            }
+                          }
+                  )
+                  .launch(Intent.createChooser(intent, "Select File"));
+        } else {
+          activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
         }
+      } catch (ActivityNotFoundException ex) {
+        Log.e("InAppBrowser", "No app can handle file picker", ex);
+        if (mFilePathCallback != null) {
+          mFilePathCallback.onReceiveValue(null);
+          mFilePathCallback = null;
+        }
+      }
     }
+  }
+
+  // Helper: get display name for a content Uri
+  private String getFileNameFromUri(Context ctx, Uri uri) {
+    if (uri == null || ctx == null) return null;
+    String name = null;
+    if ("content".equalsIgnoreCase(uri.getScheme())) {
+      android.database.Cursor cursor = null;
+      try {
+        cursor = ctx.getContentResolver().query(uri, new String[] { android.provider.OpenableColumns.DISPLAY_NAME }, null, null, null);
+        if (cursor != null && cursor.moveToFirst()) {
+          int idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+          if (idx != -1) name = cursor.getString(idx);
+        }
+      } catch (Exception e) {
+        Log.w("InAppBrowser", "getFileNameFromUri query failed: " + e.getMessage());
+      } finally {
+        try { if (cursor != null) cursor.close(); } catch (Exception ignore) {}
+      }
+    }
+    if (name == null) {
+      String path = uri.getPath();
+      if (path != null) {
+        int last = path.lastIndexOf('/');
+        if (last != -1) name = path.substring(last + 1);
+        else name = path;
+      }
+    }
+    return name;
+  }
+
+  // Helper: detect mime type reliably (ContentResolver -> extension -> magic bytes)
+  private String detectMimeTypeFromUri(Context ctx, Uri uri) {
+    if (uri == null || ctx == null) return null;
+    String mime = null;
+    try {
+      // 1) ContentResolver
+      mime = ctx.getContentResolver().getType(uri);
+    } catch (Exception ignore) {}
+
+    // 2) Try extension from display name or path
+    if ((mime == null || mime.isEmpty())) {
+      String name = getFileNameFromUri(ctx, uri);
+      if (name != null) {
+        int dot = name.lastIndexOf('.');
+        if (dot > 0 && dot < name.length() - 1) {
+          String ext = name.substring(dot + 1).toLowerCase();
+          mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+        }
+      }
+    }
+
+    // 3) Inspect magic bytes for common types if still unknown or generic
+    if (mime == null || mime.equals("*/*")) {
+      java.io.InputStream is = null;
+      try {
+        is = ctx.getContentResolver().openInputStream(uri);
+        if (is != null) {
+          byte[] header = new byte[16];
+          int read = is.read(header);
+          if (read > 0) {
+            // PDF: %PDF-
+            if (read >= 4 && header[0] == '%' && header[1] == 'P' && header[2] == 'D' && header[3] == 'F') {
+              mime = "application/pdf";
+            }
+            // PNG
+            else if (read >= 4 && (header[0] & 0xFF) == 0x89 && header[1] == 'P' && header[2] == 'N' && header[3] == 'G') {
+              mime = "image/png";
+            }
+            // JPG
+            else if (read >= 3 && (header[0] & 0xFF) == 0xFF && (header[1] & 0xFF) == 0xD8 && (header[2] & 0xFF) == 0xFF) {
+              mime = "image/jpeg";
+            }
+            // ZIP / Office OOXML (docx/xlsx/pptx)
+            else if (read >= 2 && header[0] == 'P' && header[1] == 'K') {
+              // Could be zip or office
+              mime = "application/zip";
+            }
+            // plain text heuristic: many bytes printable
+            else {
+              boolean printable = true;
+              int printableCount = 0;
+              int total = Math.min(read, 64);
+              for (int i = 0; i < total; i++) {
+                int b = header[i] & 0xFF;
+                if (b == 9 || b == 10 || b == 13 || (b >= 32 && b <= 126)) printableCount++;
+              }
+              if (total > 0 && printableCount >= (total * 0.9)) {
+                mime = "text/plain";
+              }
+            }
+          }
+        }
+      } catch (Exception e) {
+        Log.w("InAppBrowser", "Error probing mime by magic bytes: " + e.getMessage());
+      } finally {
+        try { if (is != null) is.close(); } catch (Exception ignore) {}
+      }
+    }
+
+    if (mime == null) mime = "*/*";
+    return mime;
+  }
 
     public void reload() {
         if (_webView == null) {
