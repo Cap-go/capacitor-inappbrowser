@@ -849,19 +849,95 @@ public class WebViewDialog extends Dialog {
 
                     // When preventDeeplink is false, open target="_blank" links externally
                     if (!_options.getPreventDeeplink() && isUserGesture) {
-                        try {
-                            WebView.HitTestResult result = view.getHitTestResult();
-                            String data = result.getExtra();
-                            if (data != null && !data.isEmpty()) {
-                                Log.d("InAppBrowser", "Opening target=_blank link externally: " + data);
-                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
+                      try {
+                        Log.d("InAppBrowser", "onCreateWindow: creating temporary popup WebView to capture target URL for external open");
+
+                        // Create a temporary WebView to capture the URL the page is trying to open in the new window
+                        final WebView popupWebView = new WebView(activity);
+                        popupWebView.getSettings().setJavaScriptEnabled(true);
+                        popupWebView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+                        popupWebView.getSettings().setSupportMultipleWindows(true);
+
+                        // Intercept the first load attempt and open it externally.
+                        popupWebView.setWebViewClient(new WebViewClient() {
+                          private boolean handled = false;
+
+                          @Override
+                          public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                            if (handled) return true;
+                            handled = true;
+                            try {
+                              Log.d("InAppBrowser", "Popup WebView intercepted URL for external open: " + url);
+                              Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                              browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                              _webView.getContext().startActivity(browserIntent);
+                            } catch (ActivityNotFoundException e) {
+                              Log.e("InAppBrowser", "No app found to handle this popup URL: " + e.getMessage(), e);
+                            } catch (Exception ex) {
+                              Log.e("InAppBrowser", "Error launching external intent for popup URL: " + ex.getMessage(), ex);
+                            } finally {
+                              // Cleanup the temporary WebView on the UI thread
+                              try {
+                                activity.runOnUiThread(() -> {
+                                  try {
+                                    if (popupWebView.getParent() != null) {
+                                      ((ViewGroup) popupWebView.getParent()).removeView(popupWebView);
+                                    }
+                                  } catch (Throwable ignore) {}
+                                  try { popupWebView.destroy(); } catch (Throwable ignore) {}
+                                });
+                              } catch (Throwable ignore) {}
+                            }
+                            return true;
+                          }
+
+                          @Override
+                          public void onPageFinished(WebView view, String url) {
+                            super.onPageFinished(view, url);
+                            // In some cases the URL may arrive here if shouldOverrideUrlLoading was not called;
+                            // as a defensive measure, also open externally from here the first time the page finishes.
+                            if (!handled) {
+                              handled = true;
+                              try {
+                                Log.d("InAppBrowser", "Popup WebView onPageFinished intercept: " + url);
+                                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                                 browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 _webView.getContext().startActivity(browserIntent);
-                                return false;
+                              } catch (Exception e) {
+                                Log.e("InAppBrowser", "Error opening popup URL externally from onPageFinished: " + e.getMessage(), e);
+                              } finally {
+                                try {
+                                  activity.runOnUiThread(() -> {
+                                    try {
+                                      if (popupWebView.getParent() != null) {
+                                        ((ViewGroup) popupWebView.getParent()).removeView(popupWebView);
+                                      }
+                                    } catch (Throwable ignore) {}
+                                    try { popupWebView.destroy(); } catch (Throwable ignore) {}
+                                  });
+                                } catch (Throwable ignore) {}
+                              }
                             }
-                        } catch (Exception e) {
-                            Log.e("InAppBrowser", "Error opening external link: " + e.getMessage());
+                          }
+                        });
+
+                        // Supply the temporary WebView to the transport and return true to indicate we handled the window
+                        try {
+                          WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                          transport.setWebView(popupWebView);
+                          resultMsg.sendToTarget();
+                          Log.d("InAppBrowser", "Temporary popup WebView installed to capture the target URL");
+                          return true;
+                        } catch (ClassCastException ccEx) {
+                          Log.w("InAppBrowser", "Transport object not WebViewTransport: " + ccEx.getMessage());
+                          // Fallback: cannot install transport, return false to allow default behavior
+                          return false;
                         }
+                      } catch (Exception e) {
+                        Log.e("InAppBrowser", "onCreateWindow external-open fallback error: " + e.getMessage(), e);
+                        // In case of error, allow default behavior (do not block)
+                        return false;
+                      }
                     }
 
                     // Only handle popup windows if Google Pay support is enabled
