@@ -4048,22 +4048,16 @@ public class WebViewDialog extends Dialog {
                 // Legacy: prefer public Downloads if app has permission, otherwise use app-specific external files dir
                 File downloadsDir = null;
                 try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        // Shouldn't get here (we handle Q+ earlier) but fallback to app files dir
-                        downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                    } else {
-                        if (
-                            activity != null &&
-                            ContextCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-                            PackageManager.PERMISSION_GRANTED
-                        ) {
-                            downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                        } else {
-                            // use app-specific external files directory to avoid permission requirement
-                            downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
-                            Log.d("InAppBrowser", "No WRITE_EXTERNAL_STORAGE permission - saving fallback file to app external files dir");
-                        }
-                    }
+                  if (activity != null && ContextCompat.checkSelfPermission(activity,
+                          Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
+                                          PackageManager.PERMISSION_GRANTED
+                  ) {
+                    downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                  } else {
+                    // use app-specific external files directory to avoid permission requirement
+                    downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                    Log.d("InAppBrowser", "No WRITE_EXTERNAL_STORAGE permission - saving fallback file to app external files dir");
+                  }
                 } catch (Exception e) {
                     Log.w("InAppBrowser", "Could not determine downloads dir, falling back to app files dir: " + e.getMessage());
                     downloadsDir = getContext().getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
