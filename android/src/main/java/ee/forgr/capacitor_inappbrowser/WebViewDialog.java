@@ -4173,11 +4173,12 @@ public class WebViewDialog extends Dialog {
             }
         };
 
-        _context.registerReceiver(
-            downloadCompleteReceiver,
-            new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            Context.RECEIVER_NOT_EXPORTED
-        );
+        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            _context.registerReceiver(downloadCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            _context.registerReceiver(downloadCompleteReceiver, filter);
+        }
     }
 
     /**
