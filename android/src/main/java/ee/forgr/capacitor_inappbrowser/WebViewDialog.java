@@ -1549,9 +1549,12 @@ public class WebViewDialog extends Dialog {
                           }
                         }
                 )
-                .launch(Intent.createChooser(intent, "Select File"));
+                .launch(Intent.createChooser(intent, getStringResourceOrDefault("select_file", "Select file")));
       } else {
-        activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
+        activity.startActivityForResult(
+                Intent.createChooser(intent, getStringResourceOrDefault("select_file", "Select file")),
+                FILE_CHOOSER_REQUEST_CODE
+        );
       }
     } catch (ActivityNotFoundException e) {
       Log.e("InAppBrowser", "No app available for type: " + intent.getType() + ", trying with */*", e);
@@ -3638,7 +3641,7 @@ public class WebViewDialog extends Dialog {
         String localUri = localUriIdx != -1 ? c.getString(localUriIdx) : null;
         String sourceUri = uriIdx != -1 ? c.getString(uriIdx) : null;
 
-        // Extraer campos adicionales que algunos proveedores rellenan
+        // Extract additional fields that some providers fill in.
         int localFilenameIdx = c.getColumnIndex("local_filename");
         int mediaTypeIdx = c.getColumnIndex(android.app.DownloadManager.COLUMN_MEDIA_TYPE);
         String localFilename = localFilenameIdx != -1 ? c.getString(localFilenameIdx) : null;
@@ -3810,7 +3813,7 @@ public class WebViewDialog extends Dialog {
       Log.e("InAppBrowser", "handleDownloadCompletion error: " + t.getMessage(), t);
     }
   }
-  // Reemplaza tu método notifyDownloadSaved por este (dentro de la clase WebViewDialog)
+
   private void notifyDownloadSaved(@Nullable Uri fileUri, @Nullable String fileName, @Nullable String mimeType) {
     Log.i("InAppBrowser", "notifyDownloadSaved: name=" + fileName + " uri=" + fileUri + " mime=" + mimeType);
     try {
@@ -3821,7 +3824,7 @@ public class WebViewDialog extends Dialog {
       String channelName = "Descargas de la app";
       NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
 
-      // Crear canal si hace falta (Android O+)
+      // Create channel if needed (Android O+)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         NotificationChannel ch = nm.getNotificationChannel(channelId);
         if (ch == null) {
@@ -3831,20 +3834,19 @@ public class WebViewDialog extends Dialog {
         }
       }
 
-      // Intent para abrir el fichero (o la app Descargas si no hay URI)
+      // Intent to open the file (or the Downloads app if there is no URI)
       Intent openIntent;
       if (fileUri != null) {
         openIntent = new Intent(Intent.ACTION_VIEW);
         openIntent.setDataAndType(fileUri, (mimeType != null && !mimeType.isEmpty()) ? mimeType : "*/*");
         openIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
       } else {
-        // Usa la constante de DownloadManager para abrir la UI de Descargas del sistema
+        // Use the DownloadManager constant to open the system Downloads UI
         openIntent = new Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
       }
 
-      // Crear chooser para mayor compatibilidad
-      Intent chooser = Intent.createChooser(openIntent, "Abrir archivo");
+      Intent chooser = Intent.createChooser(openIntent, "Open file");
 
       int flags = PendingIntent.FLAG_UPDATE_CURRENT;
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -3855,8 +3857,8 @@ public class WebViewDialog extends Dialog {
 
       NotificationCompat.Builder nb = new NotificationCompat.Builder(ctx, channelId)
               .setSmallIcon(android.R.drawable.stat_sys_download_done)
-              .setContentTitle("Descarga guardada")
-              .setContentText(fileName != null ? fileName : "Archivo descargado")
+              .setContentTitle("Download saved")
+              .setContentText(fileName != null ? fileName : "File downloaded")
               .setAutoCancel(true)
               .setContentIntent(pi)
               .setPriority(NotificationCompat.PRIORITY_DEFAULT);
@@ -3916,7 +3918,7 @@ public class WebViewDialog extends Dialog {
           return;
         }
       } else {
-// Legacy: prefer public Downloads if app has permission, otherwise use app-specific external files dir
+        // Legacy: prefer public Downloads if app has permission, otherwise use app-specific external files dir
         File downloadsDir = null;
         try {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -4020,11 +4022,11 @@ public class WebViewDialog extends Dialog {
   }
 
   /**
-   * Registra el BroadcastReceiver para detectar cuando se completen las descargas
+   * Register the BroadcastReceiver to detect when downloads are complete.
    */
   private void registerDownloadCompleteReceiver() {
     if (downloadCompleteReceiver != null) {
-      return; // Ya está registrado
+      return; // It was already
     }
 
     downloadCompleteReceiver = new android.content.BroadcastReceiver() {
@@ -4045,14 +4047,14 @@ public class WebViewDialog extends Dialog {
   }
 
   /**
-   * Desregistra el BroadcastReceiver de descargas
+   * Unregister the Download BroadcastReceiver
    */
   private void unregisterDownloadCompleteReceiver() {
     if (downloadCompleteReceiver != null) {
       try {
         _context.unregisterReceiver(downloadCompleteReceiver);
       } catch (IllegalArgumentException e) {
-        // Ya estaba desregistrado
+        // It was already unregistered
       }
       downloadCompleteReceiver = null;
     }
@@ -4119,5 +4121,21 @@ public class WebViewDialog extends Dialog {
      */
     private float getPixels(int dp) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, _context.getResources().getDisplayMetrics());
+    }
+
+    private String getStringResourceOrDefault(String name, String defaultValue) {
+      try {
+        Context ctx = getContext();
+        if (ctx == null) return defaultValue;
+        int resId = ctx.getResources().getIdentifier(name, "string", ctx.getPackageName());
+        if (resId != 0) {
+          // Resource exists -> return localized string
+          return ctx.getString(resId);
+        }
+      } catch (Exception e) {
+        Log.w("InAppBrowser", "getStringResourceOrDefault failed for '" + name + "': " + e.getMessage());
+      }
+      // Fallback to provided default (English)
+      return defaultValue;
     }
 }
