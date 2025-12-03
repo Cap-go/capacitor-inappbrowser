@@ -3945,7 +3945,7 @@ public class WebViewDialog extends Dialog {
             if (ctx == null) return;
 
             String channelId = "inappbrowser_downloads";
-            String channelName = "Descargas de la app";
+            String channelName = getStringResourceOrDefault("download_channel_name", "App Downloads");
             NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
 
             // Create channel if needed (Android O+)
@@ -3953,7 +3953,7 @@ public class WebViewDialog extends Dialog {
                 NotificationChannel ch = nm.getNotificationChannel(channelId);
                 if (ch == null) {
                     ch = new NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT);
-                    ch.setDescription("Notificaciones de descargas guardadas");
+                    ch.setDescription(getStringResourceOrDefault("download_channel_description", "Download completion notifications"));
                     nm.createNotificationChannel(ch);
                 }
             }
