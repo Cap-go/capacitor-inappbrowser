@@ -38,6 +38,7 @@
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
     "eslint": "eslint .",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
+    "prettier:fix": "npm run prettier -- --write",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api InAppBrowserPlugin --output-readme README.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
@@ -58,12 +59,12 @@
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.31.0",
     "husky": "^9.1.7",
-    "prettier": "^3.4.2",
-    "prettier-plugin-java": "^2.6.7",
+    "prettier": "^3.6.2",
+    "prettier-plugin-java": "^2.7.6",
     "rimraf": "^6.0.1",
     "rollup": "^4.34.6",
     "swiftlint": "^2.0.0",
-    "typescript": "^5.7.3"
+    "typescript": "^5.1.6"
   },
   "peerDependencies": {
     "@capacitor/core": ">=7.0.0"
