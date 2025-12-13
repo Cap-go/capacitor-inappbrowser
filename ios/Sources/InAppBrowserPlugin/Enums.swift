@@ -16,23 +16,23 @@ public enum WKWebSource: Equatable {
 
     public var url: URL? {
         switch self {
-        case .remote(let u): return u
-        case .file(let u, access: _): return u
+        case .remote(let urlValue): return urlValue
+        case .file(let urlValue, access: _): return urlValue
         default: return nil
         }
     }
 
     public var remoteURL: URL? {
         switch self {
-        case .remote(let u): return u
+        case .remote(let urlValue): return urlValue
         default: return nil
         }
     }
 
     public var absoluteString: String? {
         switch self {
-        case .remote(let u): return u.absoluteString
-        case .file(let u, access: _): return u.absoluteString
+        case .remote(let urlValue): return urlValue.absoluteString
+        case .file(let urlValue, access: _): return urlValue.absoluteString
         default: return nil
         }
     }

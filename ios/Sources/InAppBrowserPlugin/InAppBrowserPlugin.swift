@@ -174,11 +174,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("IOS settings not found")
                 return
             }
-            if !(iosSettingsRaw is JSObject) {
+            guard let iosSettings = iosSettingsRaw as? JSObject else {
                 call.reject("IOS settings are not an object")
                 return
             }
-            let iosSettings = iosSettingsRaw as! JSObject
 
             guard let iconType = iosSettings["iconType"] as? String else {
                 call.reject("buttonNearDone.iconType is empty")
@@ -371,8 +370,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read dimension options
         let width = call.getFloat("width")
         let height = call.getFloat("height")
-        let x = call.getFloat("x")
-        let y = call.getFloat("y")
+        let xPos = call.getFloat("x")
+        let yPos = call.getFloat("y")
 
         // Validate dimension parameters
         if width != nil && height == nil {
@@ -410,11 +409,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if let height = height {
                 webViewController.customHeight = CGFloat(height)
             }
-            if let x = x {
-                webViewController.customX = CGFloat(x)
+            if let xPos = xPos {
+                webViewController.customX = CGFloat(xPos)
             }
-            if let y = y {
-                webViewController.customY = CGFloat(y)
+            if let yPos = yPos {
+                webViewController.customY = CGFloat(yPos)
             }
 
             // Set native navigation gestures before view loads
@@ -618,8 +617,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 containerView.backgroundColor = .clear
 
                 // Calculate dimensions - use screen width if only height is provided
-                let finalWidth = width != nil ? CGFloat(width!) : UIScreen.main.bounds.width
-                let finalHeight = height != nil ? CGFloat(height!) : UIScreen.main.bounds.height
+                let finalWidth = width.map { CGFloat($0) } ?? UIScreen.main.bounds.width
+                let finalHeight = height.map { CGFloat($0) } ?? UIScreen.main.bounds.height
 
                 containerView.targetFrame = CGRect(
                     x: CGFloat(x ?? 0),
@@ -629,8 +628,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 )
 
                 // Replace the navigation controller's view with our pass-through container
-                if let navController = self.navigationWebViewController {
-                    let originalView = navController.view!
+                if let navController = self.navigationWebViewController,
+                   let originalView = navController.view {
                     navController.view = containerView
                     containerView.addSubview(originalView)
                     originalView.frame = CGRect(
@@ -760,7 +759,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         do {
             let regex = try NSRegularExpression(pattern: hexColorRegex)
             let range = NSRange(location: 0, length: input.utf16.count)
-            if let _ = regex.firstMatch(in: input, options: [], range: range) {
+            if regex.firstMatch(in: input, options: [], range: range) != nil {
                 return true
             }
         } catch {
@@ -876,20 +875,23 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func showPrivacyScreen() {
         if privacyScreen == nil {
-            self.privacyScreen = UIImageView()
+            let newPrivacyScreen = UIImageView()
+            self.privacyScreen = newPrivacyScreen
             if let launchImage = UIImage(named: "LaunchImage") {
-                privacyScreen!.image = launchImage
-                privacyScreen!.frame = UIScreen.main.bounds
-                privacyScreen!.contentMode = .scaleAspectFill
-                privacyScreen!.isUserInteractionEnabled = false
+                newPrivacyScreen.image = launchImage
+                newPrivacyScreen.frame = UIScreen.main.bounds
+                newPrivacyScreen.contentMode = .scaleAspectFill
+                newPrivacyScreen.isUserInteractionEnabled = false
             } else if let launchImage = UIImage(named: "Splash") {
-                privacyScreen!.image = launchImage
-                privacyScreen!.frame = UIScreen.main.bounds
-                privacyScreen!.contentMode = .scaleAspectFill
-                privacyScreen!.isUserInteractionEnabled = false
+                newPrivacyScreen.image = launchImage
+                newPrivacyScreen.frame = UIScreen.main.bounds
+                newPrivacyScreen.contentMode = .scaleAspectFill
+                newPrivacyScreen.isUserInteractionEnabled = false
             }
         }
-        self.navigationWebViewController?.view.addSubview(self.privacyScreen!)
+        if let screen = self.privacyScreen {
+            self.navigationWebViewController?.view.addSubview(screen)
+        }
     }
 
     private func hidePrivacyScreen() {
@@ -929,8 +931,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func updateDimensions(_ call: CAPPluginCall) {
         let width = call.getFloat("width")
         let height = call.getFloat("height")
-        let x = call.getFloat("x")
-        let y = call.getFloat("y")
+        let xPos = call.getFloat("x")
+        let yPos = call.getFloat("y")
 
         DispatchQueue.main.async {
             guard let webViewController = self.webViewController else {
@@ -939,10 +941,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.updateDimensions(
-                width: width != nil ? CGFloat(width!) : nil,
-                height: height != nil ? CGFloat(height!) : nil,
-                x: x != nil ? CGFloat(x!) : nil,
-                y: y != nil ? CGFloat(y!) : nil
+                width: width.map { CGFloat($0) },
+                height: height.map { CGFloat($0) },
+                xPos: xPos.map { CGFloat($0) },
+                yPos: yPos.map { CGFloat($0) }
             )
 
             call.resolve()
