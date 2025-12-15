@@ -735,8 +735,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             self.previousToolbarState = (navigation.toolbar.tintColor, navigation.toolbar.isHidden)
         }
 
-        if let s = self.source {
-            self.load(source: s)
+        if let sourceValue = self.source {
+            self.load(source: sourceValue)
         } else {
             print("[\(type(of: self))][Error] Invalid url")
         }
@@ -909,8 +909,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 // MARK: - Public Methods
 public extension WKWebViewController {
 
-    func load(source s: WKWebSource) {
-        switch s {
+    func load(source sourceValue: WKWebSource) {
+        switch sourceValue {
         case .remote(let url):
             self.load(remote: url)
         case .file(let url, access: let access):
@@ -1188,16 +1188,14 @@ fileprivate extension WKWebViewController {
         forwardBarButtonItem.isEnabled = webView?.canGoForward ?? false
 
         let updateReloadBarButtonItem: (UIBarButtonItem, Bool) -> UIBarButtonItem = {
-            [unowned self] barButtonItem, isLoading in
+            [weak self] barButtonItem, isLoading in
+            guard let self = self else { return barButtonItem }
             switch barButtonItem {
-            case self.reloadBarButtonItem:
-                fallthrough
-            case self.stopBarButtonItem:
+            case self.reloadBarButtonItem, self.stopBarButtonItem:
                 return isLoading ? self.stopBarButtonItem : self.reloadBarButtonItem
             default:
-                break
+                return barButtonItem
             }
-            return barButtonItem
         }
 
         let isLoading = webView?.isLoading ?? false
@@ -1295,9 +1293,9 @@ fileprivate extension WKWebViewController {
     }
 
     private func normalizeHost(_ host: String?) -> String? {
-        guard var h = host?.lowercased() else { return nil }
-        if h.hasPrefix("www.") { h.removeFirst(4) }
-        return h
+        guard var hostValue = host?.lowercased() else { return nil }
+        if hostValue.hasPrefix("www.") { hostValue.removeFirst(4) }
+        return hostValue
     }
 
     func isUrlAuthorized(_ url: URL, authorizedLinks: [String]) -> Bool {
@@ -1411,8 +1409,8 @@ fileprivate extension WKWebViewController {
         webView?.stopLoading()
         if webView?.url != nil {
             webView?.reload()
-        } else if let s = self.source {
-            self.load(source: s)
+        } else if let sourceValue = self.source {
+            self.load(source: sourceValue)
         }
     }
 
@@ -1423,17 +1421,17 @@ fileprivate extension WKWebViewController {
     @objc func activityDidClick(sender: AnyObject) {
         print("[DEBUG] Activity button clicked, shareSubject: \(self.shareSubject ?? "nil")")
 
-        guard let s = self.source else {
+        guard let sourceValue = self.source else {
             print("[DEBUG] Activity button: No source available")
             return
         }
 
         let items: [Any]
-        switch s {
-        case .remote(let u):
-            items = [u]
-        case .file(let u, access: _):
-            items = [u]
+        switch sourceValue {
+        case .remote(let urlValue):
+            items = [urlValue]
+        case .file(let urlValue, access: _):
+            items = [urlValue]
         case .string(let str, base: _):
             items = [str]
         }
@@ -1482,7 +1480,9 @@ fileprivate extension WKWebViewController {
     private func showShareSheet(items: [Any], sender: AnyObject) {
         let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
         activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
-        activityViewController.popoverPresentationController?.barButtonItem = (sender as! UIBarButtonItem)
+        if let barButtonItem = sender as? UIBarButtonItem {
+            activityViewController.popoverPresentationController?.barButtonItem = barButtonItem
+        }
         self.present(activityViewController, animated: true, completion: nil)
     }
 
@@ -1763,16 +1763,15 @@ extension WKWebViewController: WKNavigationDelegate {
     public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         updateBarButtonItems()
         self.progressView?.progress = 0
-        if let u = webView.url {
-            self.url = u
-            delegate?.webViewController?(self, didStart: u)
+        if let urlValue = webView.url {
+            self.url = urlValue
+            delegate?.webViewController?(self, didStart: urlValue)
         }
     }
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if !didpageInit && self.capBrowserPlugin?.isPresentAfterPageLoad == true {
             // Only inject preShowScript if it wasn't already injected at document start
-            let shouldInjectScript = self.preShowScript != nil &&
-                !self.preShowScript!.isEmpty &&
+            let shouldInjectScript = self.preShowScript.map { !$0.isEmpty } ?? false &&
                 self.preShowScriptInjectionTime != "documentStart"
 
             if shouldInjectScript {
@@ -1927,26 +1926,26 @@ extension WKWebViewController: WKNavigationDelegate {
 
         // Apply custom dimensions if both width and height are specified
         if let width = customWidth, let height = customHeight {
-            let x = customX ?? 0
-            let y = customY ?? 0
+            let xPos = customX ?? 0
+            let yPos = customY ?? 0
 
             // Set the frame for the navigation controller's view
-            navigationController.view.frame = CGRect(x: x, y: y, width: width, height: height)
+            navigationController.view.frame = CGRect(x: xPos, y: yPos, width: width, height: height)
         }
         // If only height is specified, use fullscreen width
         else if let height = customHeight, customWidth == nil {
-            let x = customX ?? 0
-            let y = customY ?? 0
+            let xPos = customX ?? 0
+            let yPos = customY ?? 0
             let screenWidth = UIScreen.main.bounds.width
 
             // Set the frame with fullscreen width and custom height
-            navigationController.view.frame = CGRect(x: x, y: y, width: screenWidth, height: height)
+            navigationController.view.frame = CGRect(x: xPos, y: yPos, width: screenWidth, height: height)
         }
         // Otherwise, use default fullscreen behavior (no action needed)
     }
 
     /// Update dimensions at runtime
-    open func updateDimensions(width: CGFloat?, height: CGFloat?, x: CGFloat?, y: CGFloat?) {
+    open func updateDimensions(width: CGFloat?, height: CGFloat?, xPos: CGFloat?, yPos: CGFloat?) {
         // Update stored dimensions
         if let width = width {
             customWidth = width
@@ -1954,11 +1953,11 @@ extension WKWebViewController: WKNavigationDelegate {
         if let height = height {
             customHeight = height
         }
-        if let x = x {
-            customX = x
+        if let xPos = xPos {
+            customX = xPos
         }
-        if let y = y {
-            customY = y
+        if let yPos = yPos {
+            customY = yPos
         }
 
         // Apply the new dimensions
