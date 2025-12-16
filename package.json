@@ -23,6 +23,7 @@
   "bugs": {
     "url": "https://github.com/Cap-go/capacitor-inappbrowser/issues"
   },
+  "homepage": "https://capgo.app/docs/plugins/inappbrowser/",
   "keywords": [
     "capacitor",
     "plugin",
