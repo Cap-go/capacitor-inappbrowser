@@ -753,11 +753,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     @objc func restateViewHeight() {
         var bottomPadding = CGFloat(0.0)
         var topPadding = CGFloat(0.0)
-        if #available(iOS 11.0, *) {
-            let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow })
-            bottomPadding = window?.safeAreaInsets.bottom ?? 0.0
-            topPadding = window?.safeAreaInsets.top ?? 0.0
-        }
+        let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow })
+        bottomPadding = window?.safeAreaInsets.bottom ?? 0.0
+        topPadding = window?.safeAreaInsets.top ?? 0.0
         if UIDevice.current.orientation.isPortrait {
             // Don't force toolbar visibility
             if self.viewHeightPortrait == nil {
