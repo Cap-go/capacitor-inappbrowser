@@ -386,9 +386,7 @@ public class WebViewDialog extends Dialog {
             _webView.getSettings().setGeolocationEnabled(true);
 
             // Ensure secure context for Payment Request API
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                _webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-            }
+            _webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
 
             // Enable Payment Request API only if feature is supported
             if (WebViewFeature.isFeatureSupported(WebViewFeature.PAYMENT_REQUEST)) {
