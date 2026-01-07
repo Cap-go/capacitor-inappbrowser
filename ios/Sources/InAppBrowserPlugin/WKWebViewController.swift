@@ -715,9 +715,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.isMultipleTouchEnabled = true
 
         // Apply disableOverscroll setting
-        if self.disableOverscroll {
-            webView.scrollView.bounces = false
-        }
+        webView.scrollView.bounces = !self.disableOverscroll
 
         webView.addObserver(self, forKeyPath: estimatedProgressKeyPath, options: .new, context: nil)
         if websiteTitleInNavigationBar {

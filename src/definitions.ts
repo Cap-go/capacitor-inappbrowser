@@ -557,7 +557,7 @@ export interface OpenWebViewOptions {
    *
    * Note: This option only affects iOS. Android does not have this bounce effect by default.
    *
-   * @since 8.1.0
+   * @since 8.0.2
    * @default false
    * @example
    * disableOverscroll: true
