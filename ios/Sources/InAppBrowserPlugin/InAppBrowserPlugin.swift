@@ -373,7 +373,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let xPos = call.getFloat("x")
         let yPos = call.getFloat("y")
 
-        // Read disableOverscroll option
+        // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
         // Validate dimension parameters

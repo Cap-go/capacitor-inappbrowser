@@ -714,7 +714,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
         webView.isMultipleTouchEnabled = true
 
-        // Apply disableOverscroll setting
+        // Disable bounce effect by setting scrollView.bounces to false when disableOverscroll is true
         webView.scrollView.bounces = !self.disableOverscroll
 
         webView.addObserver(self, forKeyPath: estimatedProgressKeyPath, options: .new, context: nil)
