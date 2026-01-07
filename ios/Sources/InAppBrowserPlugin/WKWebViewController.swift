@@ -144,6 +144,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var blockedHosts: [String] = []
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
+    var disableOverscroll: Bool = false
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -712,6 +713,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         webView.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
         webView.isMultipleTouchEnabled = true
+
+        // Apply disableOverscroll setting
+        if self.disableOverscroll {
+            webView.scrollView.bounces = false
+        }
 
         webView.addObserver(self, forKeyPath: estimatedProgressKeyPath, options: .new, context: nil)
         if websiteTitleInNavigationBar {

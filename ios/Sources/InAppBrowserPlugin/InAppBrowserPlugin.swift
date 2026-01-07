@@ -373,6 +373,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let xPos = call.getFloat("x")
         let yPos = call.getFloat("y")
 
+        // Read disableOverscroll option
+        let disableOverscroll = call.getBool("disableOverscroll", false)
+
         // Validate dimension parameters
         if width != nil && height == nil {
             call.reject("Height must be specified when width is provided")
@@ -415,6 +418,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if let yPos = yPos {
                 webViewController.customY = CGFloat(yPos)
             }
+
+            // Set disableOverscroll option
+            webViewController.disableOverscroll = disableOverscroll
 
             // Set native navigation gestures before view loads
             webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview
