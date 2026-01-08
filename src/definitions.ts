@@ -546,6 +546,23 @@ export interface OpenWebViewOptions {
    * y: 100
    */
   y?: number;
+
+  /**
+   * Disables the bounce (overscroll) effect on iOS WebView.
+   * When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries.
+   * This is useful for:
+   * - Creating a more native, app-like experience
+   * - Preventing accidental overscroll states
+   * - Avoiding issues when keyboard opens/closes
+   *
+   * Note: This option only affects iOS. Android does not have this bounce effect by default.
+   *
+   * @since 8.0.2
+   * @default false
+   * @example
+   * disableOverscroll: true
+   */
+  disableOverscroll?: boolean;
 }
 
 export interface DimensionOptions {
