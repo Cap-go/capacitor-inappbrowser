@@ -621,8 +621,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 let finalHeight = height.map { CGFloat($0) } ?? UIScreen.main.bounds.height
 
                 containerView.targetFrame = CGRect(
-                    x: CGFloat(x ?? 0),
-                    y: CGFloat(y ?? 0),
+                    x: CGFloat(xPos ?? 0),
+                    y: CGFloat(yPos ?? 0),
                     width: finalWidth,
                     height: finalHeight
                 )
@@ -633,8 +633,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     navController.view = containerView
                     containerView.addSubview(originalView)
                     originalView.frame = CGRect(
-                        x: CGFloat(x ?? 0),
-                        y: CGFloat(y ?? 0),
+                        x: CGFloat(xPos ?? 0),
+                        y: CGFloat(yPos ?? 0),
                         width: finalWidth,
                         height: finalHeight
                     )
