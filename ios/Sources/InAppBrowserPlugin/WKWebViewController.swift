@@ -123,6 +123,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var cookies: [HTTPCookie]?
     open var headers: [String: String]?
     open var capBrowserPlugin: InAppBrowserPlugin?
+    var instanceId: String = ""
     var shareDisclaimer: [String: Any]?
     var shareSubject: String?
     var didpageInit = false
@@ -517,15 +518,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
+    private func payload(with data: [String: Any] = [:]) -> [String: Any] {
+        guard !instanceId.isEmpty else {
+            return data
+        }
+        var payload = data
+        payload["id"] = instanceId
+        return payload
+    }
+
+    private func emit(_ eventName: String, data: [String: Any] = [:]) {
+        capBrowserPlugin?.notifyListeners(eventName, data: payload(with: data))
+    }
+
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "messageHandler" {
             if let messageBody = message.body as? [String: Any] {
                 print("Received message from JavaScript:", messageBody)
-                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: messageBody)
+                emit("messageFromWebview", data: messageBody)
             } else {
                 print("Received non-dictionary message from JavaScript:", message.body)
-                self.capBrowserPlugin?.notifyListeners("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
+                emit("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
             }
         } else if message.name == "preShowScriptSuccess" {
             guard let semaphore = preShowSemaphore else {
@@ -900,7 +914,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
         case "URL":
 
-            self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            emit("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             self.injectJavaScriptInterface()
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
@@ -943,6 +957,10 @@ public extension WKWebViewController {
     }
     func reload() {
         webView?.reload()
+    }
+
+    func websiteDataStore() -> WKWebsiteDataStore? {
+        return webView?.configuration.websiteDataStore
     }
 
     func executeScript(script: String, completion: ((Any?, Error?) -> Void)? = nil) {
@@ -1273,7 +1291,7 @@ fileprivate extension WKWebViewController {
         }
 
         // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
-        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
+        emit("pageLoadError")
         return true
     }
 
@@ -1404,7 +1422,7 @@ fileprivate extension WKWebViewController {
     }
 
     @objc func buttonNearDoneDidClick(sender: AnyObject) {
-        self.capBrowserPlugin?.notifyListeners("buttonNearDoneClick", data: [:])
+        emit("buttonNearDoneClick")
     }
 
     @objc func reloadDidClick(sender: AnyObject) {
@@ -1456,7 +1474,7 @@ fileprivate extension WKWebViewController {
                 style: UIAlertAction.Style.default,
                 handler: { _ in
                     // Notify that confirm was clicked
-                    self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
+                    self.emit("confirmBtnClicked", data: ["url": currentUrl])
 
                     // Show the share dialog
                     self.showShareSheet(items: items, sender: sender)
@@ -1496,7 +1514,7 @@ fileprivate extension WKWebViewController {
         if canDismiss {
             let currentUrl = webView?.url?.absoluteString ?? ""
             cleanupWebView()
-            self.capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+            self.capBrowserPlugin?.handleWebViewDidClose(id: instanceId, url: currentUrl)
             dismiss(animated: true, completion: nil)
         }
     }
@@ -1508,7 +1526,7 @@ fileprivate extension WKWebViewController {
             let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
             alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
                 // Notify that confirm was clicked
-                self.capBrowserPlugin?.notifyListeners("confirmBtnClicked", data: ["url": currentUrl])
+                self.emit("confirmBtnClicked", data: ["url": currentUrl])
                 self.closeView()
             }))
             alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))
@@ -1528,7 +1546,7 @@ fileprivate extension WKWebViewController {
     func close() {
         let currentUrl = webView?.url?.absoluteString ?? ""
         cleanupWebView()
-        capBrowserPlugin?.notifyListeners("closeEvent", data: ["url": currentUrl])
+        capBrowserPlugin?.handleWebViewDidClose(id: instanceId, url: currentUrl)
         dismiss(animated: true, completion: nil)
     }
 
@@ -1781,11 +1799,11 @@ extension WKWebViewController: WKNavigationDelegate {
                 DispatchQueue.global(qos: .userInitiated).async {
                     self.injectPreShowScript()
                     DispatchQueue.main.async { [weak self] in
-                        self?.capBrowserPlugin?.presentView()
+                        self?.capBrowserPlugin?.presentView(webViewId: self?.instanceId)
                     }
                 }
             } else {
-                self.capBrowserPlugin?.presentView()
+                self.capBrowserPlugin?.presentView(webViewId: instanceId)
             }
         } else if self.preShowScript != nil &&
                     !self.preShowScript!.isEmpty &&
@@ -1810,7 +1828,7 @@ extension WKWebViewController: WKNavigationDelegate {
             delegate?.webViewController?(self, didFinish: url)
         }
         self.injectJavaScriptInterface()
-        self.capBrowserPlugin?.notifyListeners("browserPageLoaded", data: [:])
+        emit("browserPageLoaded")
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -1820,7 +1838,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
+        emit("pageLoadError")
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -1830,7 +1848,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        self.capBrowserPlugin?.notifyListeners("pageLoadError", data: [:])
+        emit("pageLoadError")
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
@@ -1905,7 +1923,7 @@ extension WKWebViewController: WKNavigationDelegate {
 
             if self.shouldBlockHost(host) {
                 print("[InAppBrowser] Blocked host detected: \(host)")
-                self.capBrowserPlugin?.notifyListeners("urlChangeEvent", data: ["url": url.absoluteString])
+                emit("urlChangeEvent", data: ["url": url.absoluteString])
                 decisionHandler(.cancel)
                 return
             }
