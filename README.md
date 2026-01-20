@@ -48,7 +48,7 @@ By default, the webview opens in fullscreen. You can set custom dimensions to co
 import { InAppBrowser } from '@capgo/inappbrowser'
 
 // Open with custom dimensions (400x600 at position 50,100)
-InAppBrowser.openWebView({
+const { id } = await InAppBrowser.openWebView({
   url: "YOUR_URL",
   width: 400,
   height: 600,
@@ -58,6 +58,7 @@ InAppBrowser.openWebView({
 
 // Update dimensions at runtime
 InAppBrowser.updateDimensions({
+  id, // Optional, if omitted targets the active webview
   width: 500,
   height: 700,
   x: 100,
@@ -163,7 +164,10 @@ With this plugin you can send events from the main app to the inappbrowser and v
 #### Main app to inappbrowser, detail object is mendatory
 
 ```js
-InAppBrowser.postMessage({ detail: { message: "myMessage" } });
+const { id } = await InAppBrowser.openWebView({ url: "YOUR_URL" });
+InAppBrowser.postMessage({ id, detail: { message: "myMessage" } });
+// Or broadcast to all open webviews
+InAppBrowser.postMessage({ detail: { message: "broadcast" } });
 ```
 
 #### Receive event from native in the inappbrowser
@@ -184,7 +188,7 @@ window.mobileApp.postMessage({ detail: { message: "myMessage" } });
 
 ```js
 InAppBrowser.addEventListener("messageFromWebview", (event) => {
-  console.log(event);
+  console.log(event.id, event.detail);
 });
 ```
 
@@ -198,11 +202,11 @@ window.mobileApp.close();
 
 <docgen-index>
 
-* [`goBack()`](#goback)
+* [`goBack(...)`](#goback)
 * [`open(...)`](#open)
 * [`clearCookies(...)`](#clearcookies)
-* [`clearAllCookies()`](#clearallcookies)
-* [`clearCache()`](#clearcache)
+* [`clearAllCookies(...)`](#clearallcookies)
+* [`clearCache(...)`](#clearcache)
 * [`getCookies(...)`](#getcookies)
 * [`close(...)`](#close)
 * [`openWebView(...)`](#openwebview)
@@ -217,7 +221,7 @@ window.mobileApp.close();
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
 * [`removeAllListeners()`](#removealllisteners)
-* [`reload()`](#reload)
+* [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -228,13 +232,17 @@ window.mobileApp.close();
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-### goBack()
+### goBack(...)
 
 ```typescript
-goBack() => Promise<{ canGoBack: boolean; }>
+goBack(options?: { id?: string | undefined; } | undefined) => Promise<{ canGoBack: boolean; }>
 ```
 
 Navigates back in the WebView's history if possible
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Returns:** <code>Promise&lt;{ canGoBack: boolean; }&gt;</code>
 
@@ -269,6 +277,7 @@ clearCookies(options: ClearCookieOptions) => Promise<any>
 ```
 
 Clear cookies of url
+When `id` is omitted, applies to all open webviews.
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
@@ -281,13 +290,18 @@ Clear cookies of url
 --------------------
 
 
-### clearAllCookies()
+### clearAllCookies(...)
 
 ```typescript
-clearAllCookies() => Promise<any>
+clearAllCookies(options?: { id?: string | undefined; } | undefined) => Promise<any>
 ```
 
 Clear all cookies
+When `id` is omitted, applies to all open webviews.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -296,13 +310,18 @@ Clear all cookies
 --------------------
 
 
-### clearCache()
+### clearCache(...)
 
 ```typescript
-clearCache() => Promise<any>
+clearCache(options?: { id?: string | undefined; } | undefined) => Promise<any>
 ```
 
 Clear cache
+When `id` is omitted, applies to all open webviews.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -335,6 +354,7 @@ close(options?: CloseWebviewOptions | undefined) => Promise<any>
 ```
 
 Close the webview.
+When `id` is omitted, closes the active webview.
 
 | Param         | Type                                                                |
 | ------------- | ------------------------------------------------------------------- |
@@ -348,7 +368,7 @@ Close the webview.
 ### openWebView(...)
 
 ```typescript
-openWebView(options: OpenWebViewOptions) => Promise<any>
+openWebView(options: OpenWebViewOptions) => Promise<{ id: string; }>
 ```
 
 Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
@@ -362,7 +382,7 @@ When you open a webview with this method, a JavaScript interface is automaticall
 | ------------- | ----------------------------------------------------------------- |
 | **`options`** | <code><a href="#openwebviewoptions">OpenWebViewOptions</a></code> |
 
-**Returns:** <code>Promise&lt;any&gt;</code>
+**Returns:** <code>Promise&lt;{ id: string; }&gt;</code>
 
 **Since:** 0.1.0
 
@@ -372,14 +392,15 @@ When you open a webview with this method, a JavaScript interface is automaticall
 ### executeScript(...)
 
 ```typescript
-executeScript({ code }: { code: string; }) => Promise<void>
+executeScript(options: { code: string; id?: string; }) => Promise<void>
 ```
 
 Injects JavaScript code into the InAppBrowser window.
+When `id` is omitted, executes in all open webviews.
 
-| Param     | Type                           |
-| --------- | ------------------------------ |
-| **`__0`** | <code>{ code: string; }</code> |
+| Param         | Type                                        |
+| ------------- | ------------------------------------------- |
+| **`options`** | <code>{ code: string; id?: string; }</code> |
 
 --------------------
 
@@ -387,16 +408,17 @@ Injects JavaScript code into the InAppBrowser window.
 ### postMessage(...)
 
 ```typescript
-postMessage(options: { detail: Record<string, any>; }) => Promise<void>
+postMessage(options: { detail: Record<string, any>; id?: string; }) => Promise<void>
 ```
 
 Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener("messageFromNative", listenerFunc: (event: <a href="#record">Record</a>&lt;string, any&gt;) =&gt; void)
 detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
 Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
+When `id` is omitted, broadcasts to all open webviews.
 
-| Param         | Type                                                                      |
-| ------------- | ------------------------------------------------------------------------- |
-| **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; }</code> |
+| Param         | Type                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; id?: string; }</code> |
 
 --------------------
 
@@ -404,14 +426,15 @@ Your object has to be serializable to JSON, so no functions or other non-JSON-se
 ### setUrl(...)
 
 ```typescript
-setUrl(options: { url: string; }) => Promise<any>
+setUrl(options: { url: string; id?: string; }) => Promise<any>
 ```
 
 Sets the URL of the webview.
+When `id` is omitted, targets the active webview.
 
-| Param         | Type                          |
-| ------------- | ----------------------------- |
-| **`options`** | <code>{ url: string; }</code> |
+| Param         | Type                                       |
+| ------------- | ------------------------------------------ |
+| **`options`** | <code>{ url: string; id?: string; }</code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -498,7 +521,7 @@ works with openWebView shareDisclaimer and closeModal
 ### addListener('messageFromWebview', ...)
 
 ```typescript
-addListener(eventName: 'messageFromWebview', listenerFunc: (event: { detail: Record<string, any>; }) => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'messageFromWebview', listenerFunc: (event: { id?: string; detail?: Record<string, any>; rawMessage?: string; }) => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when event is sent from webview(inappbrowser), to send an event to the main app use window.mobileApp.postMessage({ "detail": { "message": "myMessage" } })
@@ -507,10 +530,10 @@ Your object has to be serializable to JSON, no functions or other non-JSON-seria
 
 This method is inject at runtime in the webview
 
-| Param              | Type                                                                                          |
-| ------------------ | --------------------------------------------------------------------------------------------- |
-| **`eventName`**    | <code>'messageFromWebview'</code>                                                             |
-| **`listenerFunc`** | <code>(event: { detail: <a href="#record">Record</a>&lt;string, any&gt;; }) =&gt; void</code> |
+| Param              | Type                                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'messageFromWebview'</code>                                                                                                |
+| **`listenerFunc`** | <code>(event: { id?: string; detail?: <a href="#record">Record</a>&lt;string, any&gt;; rawMessage?: string; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -520,15 +543,15 @@ This method is inject at runtime in the webview
 ### addListener('browserPageLoaded', ...)
 
 ```typescript
-addListener(eventName: 'browserPageLoaded', listenerFunc: () => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'browserPageLoaded', listenerFunc: (event: { id?: string; }) => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when page is loaded
 
-| Param              | Type                             |
-| ------------------ | -------------------------------- |
-| **`eventName`**    | <code>'browserPageLoaded'</code> |
-| **`listenerFunc`** | <code>() =&gt; void</code>       |
+| Param              | Type                                              |
+| ------------------ | ------------------------------------------------- |
+| **`eventName`**    | <code>'browserPageLoaded'</code>                  |
+| **`listenerFunc`** | <code>(event: { id?: string; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -538,15 +561,15 @@ Will be triggered when page is loaded
 ### addListener('pageLoadError', ...)
 
 ```typescript
-addListener(eventName: 'pageLoadError', listenerFunc: () => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'pageLoadError', listenerFunc: (event: { id?: string; }) => void) => Promise<PluginListenerHandle>
 ```
 
 Will be triggered when page load error
 
-| Param              | Type                         |
-| ------------------ | ---------------------------- |
-| **`eventName`**    | <code>'pageLoadError'</code> |
-| **`listenerFunc`** | <code>() =&gt; void</code>   |
+| Param              | Type                                              |
+| ------------------ | ------------------------------------------------- |
+| **`eventName`**    | <code>'pageLoadError'</code>                      |
+| **`listenerFunc`** | <code>(event: { id?: string; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -566,13 +589,17 @@ Remove all listeners for this plugin.
 --------------------
 
 
-### reload()
+### reload(...)
 
 ```typescript
-reload() => Promise<any>
+reload(options?: { id?: string | undefined; } | undefined) => Promise<any>
 ```
 
 Reload the current web page.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
@@ -584,15 +611,16 @@ Reload the current web page.
 ### updateDimensions(...)
 
 ```typescript
-updateDimensions(options: DimensionOptions) => Promise<void>
+updateDimensions(options: DimensionOptions & { id?: string; }) => Promise<void>
 ```
 
 Update the dimensions of the webview.
 Allows changing the size and position of the webview at runtime.
+When `id` is omitted, targets the active webview.
 
-| Param         | Type                                                          | Description                             |
-| ------------- | ------------------------------------------------------------- | --------------------------------------- |
-| **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a></code> | Dimension options (width, height, x, y) |
+| Param         | Type                                                                             | Description                             |
+| ------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
+| **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a> & { id?: string; }</code> | Dimension options (width, height, x, y) |
 
 --------------------
 
@@ -611,9 +639,10 @@ Allows changing the size and position of the webview at runtime.
 
 #### ClearCookieOptions
 
-| Prop      | Type                |
-| --------- | ------------------- |
-| **`url`** | <code>string</code> |
+| Prop      | Type                | Description                                                    |
+| --------- | ------------------- | -------------------------------------------------------------- |
+| **`id`**  | <code>string</code> | Target webview id. When omitted, applies to all open webviews. |
+| **`url`** | <code>string</code> |                                                                |
 
 
 #### HttpCookie
@@ -635,9 +664,10 @@ Allows changing the size and position of the webview at runtime.
 
 #### CloseWebviewOptions
 
-| Prop             | Type                 | Description                                              | Default           |
-| ---------------- | -------------------- | -------------------------------------------------------- | ----------------- |
-| **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only | <code>true</code> |
+| Prop             | Type                 | Description                                                        | Default           |
+| ---------------- | -------------------- | ------------------------------------------------------------------ | ----------------- |
+| **`id`**         | <code>string</code>  | Target webview id to close. If omitted, closes the active webview. |                   |
+| **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only           | <code>true</code> |
 
 
 #### OpenWebViewOptions
@@ -720,6 +750,7 @@ Allows changing the size and position of the webview at runtime.
 
 | Prop      | Type                | Description               | Since |
 | --------- | ------------------- | ------------------------- | ----- |
+| **`id`**  | <code>string</code> | Webview instance id.      |       |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
 
 
@@ -727,6 +758,7 @@ Allows changing the size and position of the webview at runtime.
 
 | Prop      | Type                | Description                    | Since |
 | --------- | ------------------- | ------------------------------ | ----- |
+| **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
 
 
@@ -759,7 +791,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -773,7 +807,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
