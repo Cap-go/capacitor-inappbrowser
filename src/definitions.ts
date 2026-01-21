@@ -48,6 +48,17 @@ export enum ToolBarType {
   BLANK = 'blank',
 }
 
+export enum InvisibilityMode {
+  /**
+   * WebView is aware it is hidden (dimensions may be zero).
+   */
+  AWARE = 'AWARE',
+  /**
+   * WebView is hidden but reported as fullscreen (Android only).
+   */
+  FAKE_VISIBLE = 'FAKE_VISIBLE',
+}
+
 export interface Headers {
   [key: string]: string;
 }
@@ -576,6 +587,17 @@ export interface OpenWebViewOptions {
    * hidden: true
    */
   hidden?: boolean;
+
+  /**
+   * Controls how a hidden webview reports its visibility and size.
+   * - AWARE: webview is aware it's hidden (dimensions may be zero).
+   * - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (Android only).
+   *
+   * @default InvisibilityMode.AWARE
+   * @example
+   * invisibilityMode: InvisibilityMode.FAKE_VISIBLE
+   */
+  invisibilityMode?: InvisibilityMode;
 }
 
 export interface DimensionOptions {

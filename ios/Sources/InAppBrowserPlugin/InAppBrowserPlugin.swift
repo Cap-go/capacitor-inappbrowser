@@ -24,6 +24,10 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+    enum InvisibilityMode: String {
+        case aware = "AWARE"
+        case fakeVisible = "FAKE_VISIBLE"
+    }
     private let pluginVersion: String = "8.0.6"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
@@ -50,6 +54,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var currentPluginCall: CAPPluginCall?
     var isPresentAfterPageLoad = false
     var isHidden = false
+    var invisibilityMode: InvisibilityMode = .aware
     var webViewController: WKWebViewController?
     private var closeModalTitle: String?
     private var closeModalDescription: String?
@@ -297,6 +302,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
+        let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE") ?? "AWARE"
+        self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if call.getString("preShowScript") != nil && !call.getBool("isPresentAfterPageLoad", false) {
@@ -700,7 +707,20 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if hidden {
                 // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
                 if let window = UIApplication.shared.windows.first, let webView = webViewController.capableWebView {
-                    webView.frame = .zero
+                    switch self.invisibilityMode {
+                    case .aware:
+                        webView.frame = .zero
+                        webView.alpha = 1
+                        webView.isOpaque = true
+                        webView.isUserInteractionEnabled = false
+                    case .fakeVisible:
+                        webView.frame = window.bounds
+                        webView.alpha = 0
+                        webView.isOpaque = false
+                        webView.backgroundColor = .clear
+                        webView.scrollView.backgroundColor = .clear
+                        webView.isUserInteractionEnabled = false
+                    }
                     window.addSubview(webView)
                 }
             } else if !self.isPresentAfterPageLoad {

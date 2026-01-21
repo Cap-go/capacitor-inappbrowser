@@ -14,6 +14,23 @@ import java.util.regex.Pattern;
 
 public class Options {
 
+    public enum InvisibilityMode {
+        AWARE,
+        FAKE_VISIBLE;
+
+        public static InvisibilityMode fromString(String value) {
+            if (value == null) {
+                return AWARE;
+            }
+
+            try {
+                return InvisibilityMode.valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return AWARE;
+            }
+        }
+    }
+
     public static class ButtonNearDone {
 
         public enum AllIconTypes {
@@ -167,6 +184,7 @@ public class Options {
     private Integer x = null;
     private Integer y = null;
     private boolean hidden = false;
+    private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
 
     public Integer getWidth() {
         return width;
@@ -491,5 +509,13 @@ public class Options {
 
     public void setHidden(boolean hidden) {
         this.hidden = hidden;
+    }
+
+    public InvisibilityMode getInvisibilityMode() {
+        return invisibilityMode;
+    }
+
+    public void setInvisibilityMode(InvisibilityMode invisibilityMode) {
+        this.invisibilityMode = invisibilityMode;
     }
 }
