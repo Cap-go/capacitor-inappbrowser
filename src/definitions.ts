@@ -563,6 +563,21 @@ export interface OpenWebViewOptions {
    * disableOverscroll: true
    */
   disableOverscroll?: boolean;
+
+  /**
+   * Opens the webview in hidden mode (not visible to user but fully functional).
+   * When hidden, the webview loads and executes JavaScript but is not displayed.
+   * All control methods (executeScript, postMessage, setUrl, etc.) work while hidden.
+   * Use close() to clean up the hidden webview when done.
+   *
+   * Note: iOS only. Uses zero-frame trick to keep WKWebView JS execution active.
+   *
+   * @since 8.0.7
+   * @default false
+   * @example
+   * hidden: true
+   */
+  hidden?: boolean;
 }
 
 export interface DimensionOptions {

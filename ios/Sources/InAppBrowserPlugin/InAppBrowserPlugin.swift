@@ -49,6 +49,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var isSetupDone = false
     var currentPluginCall: CAPPluginCall?
     var isPresentAfterPageLoad = false
+    var isHidden = false
     var webViewController: WKWebViewController?
     private var closeModalTitle: String?
     private var closeModalDescription: String?
@@ -294,6 +295,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
+        let hidden = call.getBool("hidden", false)
+        self.isHidden = hidden
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if call.getString("preShowScript") != nil && !call.getBool("isPresentAfterPageLoad", false) {
@@ -694,7 +697,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
-            if !self.isPresentAfterPageLoad {
+            if hidden {
+                // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
+                if let window = UIApplication.shared.windows.first, let webView = webViewController.capableWebView {
+                    webView.frame = .zero
+                    window.addSubview(webView)
+                }
+            } else if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
             call.resolve()
@@ -867,11 +876,18 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             let currentUrl = self.webViewController?.url?.absoluteString ?? ""
 
-            self.webViewController?.cleanupWebView()
-
-            self.navigationWebViewController?.dismiss(animated: isAnimated) {
+            if self.isHidden {
+                self.webViewController?.capableWebView?.removeFromSuperview()
+                self.webViewController?.cleanupWebView()
                 self.webViewController = nil
                 self.navigationWebViewController = nil
+                self.isHidden = false
+            } else {
+                self.webViewController?.cleanupWebView()
+                self.navigationWebViewController?.dismiss(animated: isAnimated) {
+                    self.webViewController = nil
+                    self.navigationWebViewController = nil
+                }
             }
 
             self.notifyListeners("closeEvent", data: ["url": currentUrl])
