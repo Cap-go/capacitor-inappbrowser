@@ -570,8 +570,6 @@ export interface OpenWebViewOptions {
    * All control methods (executeScript, postMessage, setUrl, etc.) work while hidden.
    * Use close() to clean up the hidden webview when done.
    *
-   * Note: iOS only. Uses zero-frame trick to keep WKWebView JS execution active.
-   *
    * @since 8.0.7
    * @default false
    * @example

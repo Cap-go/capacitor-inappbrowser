@@ -881,7 +881,9 @@ public class WebViewDialog extends Dialog {
         setupToolbar();
         setWebViewClient();
 
-        if (!this._options.isPresentAfterPageLoad()) {
+        if (this._options.isHidden()) {
+            _options.getPluginCall().resolve();
+        } else if (!this._options.isPresentAfterPageLoad()) {
             show();
             _options.getPluginCall().resolve();
         }

@@ -166,6 +166,7 @@ public class Options {
     private Integer height = null;
     private Integer x = null;
     private Integer y = null;
+    private boolean hidden = false;
 
     public Integer getWidth() {
         return width;
@@ -482,5 +483,13 @@ public class Options {
 
     public void setBlockedHosts(List<String> blockedHosts) {
         this.blockedHosts = blockedHosts;
+    }
+
+    public boolean isHidden() {
+        return hidden;
+    }
+
+    public void setHidden(boolean hidden) {
+        this.hidden = hidden;
     }
 }
