@@ -24,6 +24,10 @@ extension UIColor {
  */
 @objc(InAppBrowserPlugin)
 public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+    enum InvisibilityMode: String {
+        case aware = "AWARE"
+        case fakeVisible = "FAKE_VISIBLE"
+    }
     private let pluginVersion: String = "8.0.6"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
@@ -49,6 +53,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var isSetupDone = false
     var currentPluginCall: CAPPluginCall?
     var isPresentAfterPageLoad = false
+    var isHidden = false
+    var invisibilityMode: InvisibilityMode = .aware
     var webViewController: WKWebViewController?
     private var closeModalTitle: String?
     private var closeModalDescription: String?
@@ -294,6 +300,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
+        let hidden = call.getBool("hidden", false)
+        self.isHidden = hidden
+        let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE") ?? "AWARE"
+        self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if call.getString("preShowScript") != nil && !call.getBool("isPresentAfterPageLoad", false) {
@@ -694,7 +704,41 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
-            if !self.isPresentAfterPageLoad {
+            if hidden {
+                // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
+                // Use scene-based API (UIApplication.shared.windows deprecated in iOS 15)
+                let window = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .first { $0.activationState == .foregroundActive }?
+                    .windows
+                    .first { $0.isKeyWindow }
+
+                guard let window = window else {
+                    call.reject("Failed to get active window for hidden webview")
+                    return
+                }
+
+                guard let webView = webViewController.capableWebView else {
+                    call.reject("Failed to get webview for hidden mode")
+                    return
+                }
+
+                switch self.invisibilityMode {
+                case .aware:
+                    webView.frame = .zero
+                    webView.alpha = 1
+                    webView.isOpaque = true
+                    webView.isUserInteractionEnabled = false
+                case .fakeVisible:
+                    webView.frame = window.bounds
+                    webView.alpha = 0
+                    webView.isOpaque = false
+                    webView.backgroundColor = .clear
+                    webView.scrollView.backgroundColor = .clear
+                    webView.isUserInteractionEnabled = false
+                }
+                window.addSubview(webView)
+            } else if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
             call.resolve()
@@ -867,11 +911,18 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             let currentUrl = self.webViewController?.url?.absoluteString ?? ""
 
-            self.webViewController?.cleanupWebView()
-
-            self.navigationWebViewController?.dismiss(animated: isAnimated) {
+            if self.isHidden {
+                self.webViewController?.capableWebView?.removeFromSuperview()
+                self.webViewController?.cleanupWebView()
                 self.webViewController = nil
                 self.navigationWebViewController = nil
+                self.isHidden = false
+            } else {
+                self.webViewController?.cleanupWebView()
+                self.navigationWebViewController?.dismiss(animated: isAnimated) {
+                    self.webViewController = nil
+                    self.navigationWebViewController = nil
+                }
             }
 
             self.notifyListeners("closeEvent", data: ["url": currentUrl])

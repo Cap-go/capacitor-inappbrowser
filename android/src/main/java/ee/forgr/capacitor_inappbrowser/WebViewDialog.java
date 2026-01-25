@@ -881,9 +881,39 @@ public class WebViewDialog extends Dialog {
         setupToolbar();
         setWebViewClient();
 
-        if (!this._options.isPresentAfterPageLoad()) {
+        if (this._options.isHidden()) {
+            if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
+                show();
+                applyHiddenMode();
+            }
+            _options.getPluginCall().resolve();
+        } else if (!this._options.isPresentAfterPageLoad()) {
             show();
             _options.getPluginCall().resolve();
+        }
+    }
+
+    private void applyHiddenMode() {
+        Window window = getWindow();
+        if (window == null) {
+            return;
+        }
+
+        window.setBackgroundDrawableResource(android.R.color.transparent);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+
+        View decorView = window.getDecorView();
+        if (decorView != null) {
+            decorView.setAlpha(0f);
+            decorView.setVisibility(View.VISIBLE);
+        }
+
+        if (_webView != null) {
+            _webView.setAlpha(0f);
+            _webView.setVisibility(View.VISIBLE);
         }
     }
 

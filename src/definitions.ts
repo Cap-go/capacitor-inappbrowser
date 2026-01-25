@@ -48,6 +48,17 @@ export enum ToolBarType {
   BLANK = 'blank',
 }
 
+export enum InvisibilityMode {
+  /**
+   * WebView is aware it is hidden (dimensions may be zero).
+   */
+  AWARE = 'AWARE',
+  /**
+   * WebView is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).
+   */
+  FAKE_VISIBLE = 'FAKE_VISIBLE',
+}
+
 export interface Headers {
   [key: string]: string;
 }
@@ -563,6 +574,30 @@ export interface OpenWebViewOptions {
    * disableOverscroll: true
    */
   disableOverscroll?: boolean;
+
+  /**
+   * Opens the webview in hidden mode (not visible to user but fully functional).
+   * When hidden, the webview loads and executes JavaScript but is not displayed.
+   * All control methods (executeScript, postMessage, setUrl, etc.) work while hidden.
+   * Use close() to clean up the hidden webview when done.
+   *
+   * @since 8.0.7
+   * @default false
+   * @example
+   * hidden: true
+   */
+  hidden?: boolean;
+
+  /**
+   * Controls how a hidden webview reports its visibility and size.
+   * - AWARE: webview is aware it's hidden (dimensions may be zero).
+   * - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).
+   *
+   * @default InvisibilityMode.AWARE
+   * @example
+   * invisibilityMode: InvisibilityMode.FAKE_VISIBLE
+   */
+  invisibilityMode?: InvisibilityMode;
 }
 
 export interface DimensionOptions {
