@@ -16,6 +16,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
@@ -116,6 +117,14 @@ public class WebViewDialog extends Dialog {
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
+    private boolean isHiddenModeActive = false;
+    private WindowManager.LayoutParams previousWindowAttributes;
+    private Drawable previousWindowBackground;
+    private ViewGroup.LayoutParams previousWebViewLayoutParams;
+    private float previousDecorAlpha = 1f;
+    private int previousDecorVisibility = View.VISIBLE;
+    private float previousWebViewAlpha = 1f;
+    private int previousWebViewVisibility = View.VISIBLE;
 
     Semaphore preShowSemaphore = null;
     String preShowError = null;
@@ -194,6 +203,41 @@ public class WebViewDialog extends Dialog {
                 Log.e("InAppBrowser", "Error in close: " + e.getMessage());
             }
         }
+
+        @JavascriptInterface
+        public void hide() {
+            if (!isJavaScriptControlAllowed()) {
+                Log.w("InAppBrowser", "hide() blocked: allowWebViewJsVisibilityControl is false");
+                return;
+            }
+            if (activity == null) {
+                Log.e("InAppBrowser", "Cannot hide - activity is null");
+                return;
+            }
+            activity.runOnUiThread(() -> setHidden(true));
+        }
+
+        @JavascriptInterface
+        public void show() {
+            if (!isJavaScriptControlAllowed()) {
+                Log.w("InAppBrowser", "show() blocked: allowWebViewJsVisibilityControl is false");
+                return;
+            }
+            if (activity == null) {
+                Log.e("InAppBrowser", "Cannot show - activity is null");
+                return;
+            }
+            activity.runOnUiThread(() -> {
+                if (!isShowing()) {
+                    show();
+                }
+                setHidden(false);
+            });
+        }
+    }
+
+    private boolean isJavaScriptControlAllowed() {
+        return _options != null && _options.getAllowWebViewJsVisibilityControl();
     }
 
     public class PreShowScriptInterface {
@@ -899,22 +943,98 @@ public class WebViewDialog extends Dialog {
             return;
         }
 
+        if (previousWindowAttributes == null) {
+            previousWindowAttributes = new WindowManager.LayoutParams();
+            previousWindowAttributes.copyFrom(window.getAttributes());
+        }
+        if (previousWindowBackground == null) {
+            previousWindowBackground = window.getDecorView().getBackground();
+        }
+
+        View decorView = window.getDecorView();
+        if (decorView != null) {
+            previousDecorAlpha = decorView.getAlpha();
+            previousDecorVisibility = decorView.getVisibility();
+        }
+
+        if (_webView != null) {
+            previousWebViewAlpha = _webView.getAlpha();
+            previousWebViewVisibility = _webView.getVisibility();
+            previousWebViewLayoutParams = _webView.getLayoutParams();
+        }
+
         window.setBackgroundDrawableResource(android.R.color.transparent);
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 
-        View decorView = window.getDecorView();
         if (decorView != null) {
             decorView.setAlpha(0f);
             decorView.setVisibility(View.VISIBLE);
         }
 
         if (_webView != null) {
-            _webView.setAlpha(0f);
-            _webView.setVisibility(View.VISIBLE);
+            if (_options.getInvisibilityMode() == Options.InvisibilityMode.AWARE) {
+                _webView.setAlpha(0f);
+                _webView.setVisibility(View.INVISIBLE);
+                _webView.setLayoutParams(new ViewGroup.LayoutParams(0, 0));
+            } else {
+                _webView.setAlpha(0f);
+                _webView.setVisibility(View.VISIBLE);
+            }
         }
+
+        isHiddenModeActive = true;
+    }
+
+    private void restoreVisibleMode() {
+        Window window = getWindow();
+        if (window == null) {
+            return;
+        }
+
+        if (previousWindowAttributes != null) {
+            window.setAttributes(previousWindowAttributes);
+        }
+        if (previousWindowBackground != null) {
+            window.setBackgroundDrawable(previousWindowBackground);
+        }
+
+        View decorView = window.getDecorView();
+        if (decorView != null) {
+            decorView.setAlpha(previousDecorAlpha);
+            decorView.setVisibility(previousDecorVisibility);
+        }
+
+        if (_webView != null) {
+            if (previousWebViewLayoutParams != null) {
+                _webView.setLayoutParams(previousWebViewLayoutParams);
+            }
+            _webView.setAlpha(previousWebViewAlpha);
+            _webView.setVisibility(previousWebViewVisibility);
+        }
+
+        isHiddenModeActive = false;
+    }
+
+    public void setHidden(boolean hidden) {
+        if (hidden) {
+            if (!isHiddenModeActive) {
+                applyHiddenMode();
+            }
+        } else {
+            if (isHiddenModeActive) {
+                restoreVisibleMode();
+            }
+        }
+        if (_options != null) {
+            _options.setHidden(hidden);
+        }
+    }
+
+    public boolean isHiddenModeActive() {
+        return isHiddenModeActive;
     }
 
     /**
@@ -1132,7 +1252,27 @@ public class WebViewDialog extends Dialog {
         }
 
         try {
-            String script = """
+            String mobileAppExtras = "";
+            if (isJavaScriptControlAllowed()) {
+                mobileAppExtras = """
+                        , hide: function() {
+                          try {
+                            window.AndroidInterface.hide();
+                          } catch(e) {
+                            console.error('Error in mobileApp.hide:', e);
+                          }
+                        },
+                        show: function() {
+                          try {
+                            window.AndroidInterface.show();
+                          } catch(e) {
+                            console.error('Error in mobileApp.show:', e);
+                          }
+                        }
+                """;
+            }
+
+            String script = String.format("""
                 (function() {
                   if (window.AndroidInterface) {
                     // Create mobileApp object for backward compatibility
@@ -1152,7 +1292,7 @@ public class WebViewDialog extends Dialog {
                           } catch(e) {
                             console.error('Error in mobileApp.close:', e);
                           }
-                        }
+                        }%s
                       };
                     }
                   }
@@ -1167,7 +1307,7 @@ public class WebViewDialog extends Dialog {
                     };
                   }
                 })();
-                """;
+                """, mobileAppExtras);
 
             _webView.post(() -> {
                 if (_webView != null) {

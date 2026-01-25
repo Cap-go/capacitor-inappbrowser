@@ -170,6 +170,7 @@ export interface OpenWebViewOptions {
    * The webview automatically injects a JavaScript interface providing:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event)
+   * - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig
    *
    * @example
    * // In your webpage loaded in the webview:
@@ -666,6 +667,19 @@ export interface InAppBrowserPlugin {
    */
   close(options?: CloseWebviewOptions): Promise<any>;
   /**
+   * Hide the webview without closing it.
+   * Use show() to bring it back.
+   *
+   * @since 8.0.8
+   */
+  hide(): Promise<void>;
+  /**
+   * Show a previously hidden webview.
+   *
+   * @since 8.0.8
+   */
+  show(): Promise<void>;
+  /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
    * JavaScript Interface:
@@ -807,6 +821,20 @@ export interface InAppBrowserWebViewAPIs {
      * @since 6.10.0
      */
     postMessage(message: Record<string, any>): void;
+
+    /**
+     * Hide the WebView from JavaScript (requires allowWebViewJsVisibilityControl: true in CapacitorConfig)
+     *
+     * @since 8.0.8
+     */
+    hide(): void;
+
+    /**
+     * Show the WebView from JavaScript (requires allowWebViewJsVisibilityControl: true in CapacitorConfig)
+     *
+     * @since 8.0.8
+     */
+    show(): void;
   };
 
   /**

@@ -42,6 +42,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "reload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "hide", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
@@ -82,6 +83,64 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         self.bridge?.viewController?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
+    }
+
+    private func activeWindow() -> UIWindow? {
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .windows
+            .first { $0.isKeyWindow }
+    }
+
+    private func attachWebViewToWindow(_ webView: WKWebView) -> Bool {
+        guard let window = activeWindow() else {
+            return false
+        }
+
+        webView.removeFromSuperview()
+
+        switch self.invisibilityMode {
+        case .aware:
+            webView.frame = .zero
+            webView.alpha = 1
+            webView.isOpaque = true
+        case .fakeVisible:
+            webView.frame = window.bounds
+            webView.alpha = 0
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
+        }
+
+        webView.isUserInteractionEnabled = false
+        window.addSubview(webView)
+        return true
+    }
+
+    private func attachWebViewToController(_ webViewController: WKWebViewController, webView: WKWebView) {
+        webView.removeFromSuperview()
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webViewController.view.addSubview(webView)
+
+        let bottomAnchor = webViewController.enabledSafeBottomMargin
+            ? webViewController.view.safeAreaLayoutGuide.bottomAnchor
+            : webViewController.view.bottomAnchor
+
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: webViewController.view.safeAreaLayoutGuide.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: webViewController.view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: webViewController.view.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+
+        if let backgroundColor = webViewController.view.backgroundColor {
+            webView.backgroundColor = backgroundColor
+            webView.scrollView.backgroundColor = backgroundColor
+        }
+        webView.alpha = 1
+        webView.isOpaque = true
+        webView.isUserInteractionEnabled = true
     }
 
     @objc func clearAllCookies(_ call: CAPPluginCall) {
@@ -302,6 +361,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
+        let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl") ?? false
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE") ?? "AWARE"
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -414,6 +474,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Failed to initialize WebViewController")
                 return
             }
+
+            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
 
             // Set dimensions if provided
             if let width = width {
@@ -705,39 +767,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
             if hidden {
-                // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
-                // Use scene-based API (UIApplication.shared.windows deprecated in iOS 15)
-                let window = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .first { $0.activationState == .foregroundActive }?
-                    .windows
-                    .first { $0.isKeyWindow }
-
-                guard let window = window else {
-                    call.reject("Failed to get active window for hidden webview")
-                    return
-                }
-
                 guard let webView = webViewController.capableWebView else {
                     call.reject("Failed to get webview for hidden mode")
                     return
                 }
-
-                switch self.invisibilityMode {
-                case .aware:
-                    webView.frame = .zero
-                    webView.alpha = 1
-                    webView.isOpaque = true
-                    webView.isUserInteractionEnabled = false
-                case .fakeVisible:
-                    webView.frame = window.bounds
-                    webView.alpha = 0
-                    webView.isOpaque = false
-                    webView.backgroundColor = .clear
-                    webView.scrollView.backgroundColor = .clear
-                    webView.isUserInteractionEnabled = false
+                // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
+                if !self.attachWebViewToWindow(webView) {
+                    call.reject("Failed to get active window for hidden webview")
+                    return
                 }
-                window.addSubview(webView)
             } else if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
@@ -775,6 +813,60 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         self.webViewController?.load(remote: url)
         call.resolve()
+    }
+
+    private func setHiddenState(_ hidden: Bool, call: CAPPluginCall?) {
+        DispatchQueue.main.async {
+            guard let webViewController = self.webViewController,
+                  let webView = webViewController.capableWebView else {
+                call?.reject("WebView is not initialized")
+                return
+            }
+
+            self.isHidden = hidden
+
+            if hidden {
+                if let navController = self.navigationWebViewController, navController.presentingViewController != nil {
+                    navController.view.isHidden = true
+                    navController.view.isUserInteractionEnabled = false
+                }
+
+                if !self.attachWebViewToWindow(webView) {
+                    call?.reject("Failed to get active window for hidden webview")
+                    return
+                }
+            } else {
+                if webView.superview !== webViewController.view {
+                    self.attachWebViewToController(webViewController, webView: webView)
+                }
+
+                if let navController = self.navigationWebViewController {
+                    navController.view.isHidden = false
+                    navController.view.isUserInteractionEnabled = true
+
+                    if navController.presentingViewController == nil {
+                        self.bridge?.viewController?.present(navController, animated: true, completion: {
+                            call?.resolve()
+                        })
+                        return
+                    }
+                }
+            }
+
+            call?.resolve()
+        }
+    }
+
+    func setHiddenFromJavaScript(_ hidden: Bool) {
+        self.setHiddenState(hidden, call: nil)
+    }
+
+    @objc func hide(_ call: CAPPluginCall) {
+        self.setHiddenState(true, call: call)
+    }
+
+    @objc func show(_ call: CAPPluginCall) {
+        self.setHiddenState(false, call: call)
     }
 
     @objc func executeScript(_ call: CAPPluginCall) {
@@ -910,12 +1002,20 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async {
             let currentUrl = self.webViewController?.url?.absoluteString ?? ""
+            let isPresented = self.navigationWebViewController?.presentingViewController != nil
 
             if self.isHidden {
                 self.webViewController?.capableWebView?.removeFromSuperview()
                 self.webViewController?.cleanupWebView()
-                self.webViewController = nil
-                self.navigationWebViewController = nil
+                if isPresented {
+                    self.navigationWebViewController?.dismiss(animated: isAnimated) {
+                        self.webViewController = nil
+                        self.navigationWebViewController = nil
+                    }
+                } else {
+                    self.webViewController = nil
+                    self.navigationWebViewController = nil
+                }
                 self.isHidden = false
             } else {
                 self.webViewController?.cleanupWebView()
