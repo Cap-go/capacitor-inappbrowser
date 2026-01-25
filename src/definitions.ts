@@ -54,7 +54,7 @@ export enum InvisibilityMode {
    */
   AWARE = 'AWARE',
   /**
-   * WebView is hidden but reported as fullscreen (Android only).
+   * WebView is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).
    */
   FAKE_VISIBLE = 'FAKE_VISIBLE',
 }
@@ -591,7 +591,7 @@ export interface OpenWebViewOptions {
   /**
    * Controls how a hidden webview reports its visibility and size.
    * - AWARE: webview is aware it's hidden (dimensions may be zero).
-   * - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (Android only).
+   * - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).
    *
    * @default InvisibilityMode.AWARE
    * @example

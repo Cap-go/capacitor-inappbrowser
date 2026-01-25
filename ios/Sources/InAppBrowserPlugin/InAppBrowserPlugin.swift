@@ -706,23 +706,38 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if hidden {
                 // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
-                if let window = UIApplication.shared.windows.first, let webView = webViewController.capableWebView {
-                    switch self.invisibilityMode {
-                    case .aware:
-                        webView.frame = .zero
-                        webView.alpha = 1
-                        webView.isOpaque = true
-                        webView.isUserInteractionEnabled = false
-                    case .fakeVisible:
-                        webView.frame = window.bounds
-                        webView.alpha = 0
-                        webView.isOpaque = false
-                        webView.backgroundColor = .clear
-                        webView.scrollView.backgroundColor = .clear
-                        webView.isUserInteractionEnabled = false
-                    }
-                    window.addSubview(webView)
+                // Use scene-based API (UIApplication.shared.windows deprecated in iOS 15)
+                let window = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .first { $0.activationState == .foregroundActive }?
+                    .windows
+                    .first { $0.isKeyWindow }
+
+                guard let window = window else {
+                    call.reject("Failed to get active window for hidden webview")
+                    return
                 }
+
+                guard let webView = webViewController.capableWebView else {
+                    call.reject("Failed to get webview for hidden mode")
+                    return
+                }
+
+                switch self.invisibilityMode {
+                case .aware:
+                    webView.frame = .zero
+                    webView.alpha = 1
+                    webView.isOpaque = true
+                    webView.isUserInteractionEnabled = false
+                case .fakeVisible:
+                    webView.frame = window.bounds
+                    webView.alpha = 0
+                    webView.isOpaque = false
+                    webView.backgroundColor = .clear
+                    webView.scrollView.backgroundColor = .clear
+                    webView.isUserInteractionEnabled = false
+                }
+                window.addSubview(webView)
             } else if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
             }
