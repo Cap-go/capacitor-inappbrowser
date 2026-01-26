@@ -11,7 +11,7 @@ let package = Package(
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.1"),
         .package(name: "CapacitorCamera", path: "../../../node_modules/.bun/@capacitor+camera@8.0.0+15e98482558ccfe6/node_modules/@capacitor/camera"),
         .package(name: "CapacitorSplashScreen", path: "../../../node_modules/.bun/@capacitor+splash-screen@8.0.0+15e98482558ccfe6/node_modules/@capacitor/splash-screen"),
         .package(name: "CapgoInappbrowser", path: "../../../node_modules/.bun/@capgo+inappbrowser@file+../node_modules/@capgo/inappbrowser")
