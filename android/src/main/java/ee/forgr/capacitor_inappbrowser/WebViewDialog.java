@@ -1138,13 +1138,20 @@ public class WebViewDialog extends Dialog {
         // Apply system insets to WebView content view (compatible with all Android versions)
         ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
+            Insets mandatoryGestures = windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
             Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
             Boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
             ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
             // Apply safe margin inset to bottom margin if enabled in options or fallback to 0px
-            int navBottom = _options.getEnabledSafeMargin() ? bars.bottom : 0;
+            int safeBottomInset = Math.max(
+                bars.bottom,
+                Math.max(navigationBars.bottom, Math.max(systemGestures.bottom, mandatoryGestures.bottom))
+            );
+            int navBottom = _options.getEnabledSafeMargin() ? safeBottomInset : 0;
 
             // Apply top inset only if useTopInset option is enabled or fallback to 0px
             int navTop = _options.getUseTopInset() ? bars.top : 0;
@@ -1161,6 +1168,7 @@ public class WebViewDialog extends Dialog {
 
             return WindowInsetsCompat.CONSUMED;
         });
+        ViewCompat.requestApplyInsets(_webView);
 
         // Handle window decoration - version-specific handling
         if (getWindow() != null) {
@@ -2977,20 +2985,8 @@ public class WebViewDialog extends Dialog {
             }
         }
 
-        // Shutdown executor service safely
-        if (executorService != null && !executorService.isShutdown()) {
-            try {
-                executorService.shutdown();
-                if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                executorService.shutdownNow();
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
-            }
-        }
+        // Shutdown executor service asynchronously to avoid blocking UI thread
+        shutdownExecutorServiceAsync();
 
         // Clear any remaining proxied requests
         synchronized (proxiedRequestsHashmap) {
@@ -3002,6 +2998,30 @@ public class WebViewDialog extends Dialog {
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
         }
+    }
+
+    private void shutdownExecutorServiceAsync() {
+        if (executorService.isShutdown()) {
+            return;
+        }
+        Thread shutdownThread = new Thread(
+            () -> {
+                try {
+                    executorService.shutdown();
+                    if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                        executorService.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    executorService.shutdownNow();
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
+                }
+            },
+            "InAppBrowser-ExecutorShutdown"
+        );
+        shutdownThread.setDaemon(true);
+        shutdownThread.start();
     }
 
     public void addProxiedRequest(String key, ProxiedRequest request) {
