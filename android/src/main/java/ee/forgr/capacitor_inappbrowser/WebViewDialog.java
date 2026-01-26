@@ -229,7 +229,7 @@ public class WebViewDialog extends Dialog {
             }
             activity.runOnUiThread(() -> {
                 if (!isShowing()) {
-                    show();
+                    WebViewDialog.this.show();
                 }
                 setHidden(false);
             });

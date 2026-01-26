@@ -753,6 +753,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
+                    if (webViewDialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
                     webViewDialog.setHidden(true);
                     call.resolve();
                 }
@@ -771,6 +775,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
+                    if (webViewDialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
                     if (!webViewDialog.isShowing()) {
                         webViewDialog.show();
                     }
