@@ -2985,20 +2985,8 @@ public class WebViewDialog extends Dialog {
             }
         }
 
-        // Shutdown executor service safely
-        if (executorService != null && !executorService.isShutdown()) {
-            try {
-                executorService.shutdown();
-                if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                    executorService.shutdownNow();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                executorService.shutdownNow();
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
-            }
-        }
+        // Shutdown executor service asynchronously to avoid blocking UI thread
+        shutdownExecutorServiceAsync();
 
         // Clear any remaining proxied requests
         synchronized (proxiedRequestsHashmap) {
@@ -3010,6 +2998,30 @@ public class WebViewDialog extends Dialog {
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
         }
+    }
+
+    private void shutdownExecutorServiceAsync() {
+        if (executorService.isShutdown()) {
+            return;
+        }
+        Thread shutdownThread = new Thread(
+            () -> {
+                try {
+                    executorService.shutdown();
+                    if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
+                        executorService.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    executorService.shutdownNow();
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
+                }
+            },
+            "InAppBrowser-ExecutorShutdown"
+        );
+        shutdownThread.setDaemon(true);
+        shutdownThread.start();
     }
 
     public void addProxiedRequest(String key, ProxiedRequest request) {
