@@ -943,13 +943,9 @@ public class WebViewDialog extends Dialog {
             return;
         }
 
-        if (previousWindowAttributes == null) {
-            previousWindowAttributes = new WindowManager.LayoutParams();
-            previousWindowAttributes.copyFrom(window.getAttributes());
-        }
-        if (previousWindowBackground == null) {
-            previousWindowBackground = window.getDecorView().getBackground();
-        }
+        previousWindowAttributes = new WindowManager.LayoutParams();
+        previousWindowAttributes.copyFrom(window.getAttributes());
+        previousWindowBackground = window.getDecorView().getBackground();
 
         View decorView = window.getDecorView();
         if (decorView != null) {
@@ -1015,6 +1011,13 @@ public class WebViewDialog extends Dialog {
             _webView.setVisibility(previousWebViewVisibility);
         }
 
+        previousWindowAttributes = null;
+        previousWindowBackground = null;
+        previousWebViewLayoutParams = null;
+        previousDecorAlpha = 1f;
+        previousDecorVisibility = View.VISIBLE;
+        previousWebViewAlpha = 1f;
+        previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
     }
 
