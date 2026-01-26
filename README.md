@@ -230,20 +230,6 @@ window.mobileApp.close();
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-### CapacitorConfig
-
-Enable WebView JS hide/show control via CapacitorConfig (not via `openWebView`):
-
-```ts
-const config: CapacitorConfig = {
-  plugins: {
-    InAppBrowser: {
-      allowWebViewJsVisibilityControl: true,
-    },
-  },
-};
-```
-
 ### goBack()
 
 ```typescript
@@ -367,7 +353,8 @@ Close the webview.
 hide() => Promise<void>
 ```
 
-Hide the webview without closing it. Use show() to bring it back.
+Hide the webview without closing it.
+Use show() to bring it back.
 
 **Since:** 8.0.8
 
@@ -399,7 +386,6 @@ JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
 - `window.mobileApp.close()`: Closes the webview from JavaScript
 - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
-- `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig
 
 | Param         | Type                                                              |
 | ------------- | ----------------------------------------------------------------- |
@@ -691,7 +677,7 @@ Allows changing the size and position of the webview at runtime.
 | **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                                                                                            | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                               | 0.1.0  |
 | **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>                                                                                                                    | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                               | 6.1.0  |
 | **`materialPicker`**                   | <code>boolean</code>                                                                                                                                                   | materialPicker: if true, uses Material Design theme for date and time pickers on Android. This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 7.4.1  |
-| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig                                                                                                                                                                    |                                                               | 6.10.0 |
+| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig                                                                                                                                                               |                                                               | 6.10.0 |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
