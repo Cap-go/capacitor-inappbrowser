@@ -1255,24 +1255,25 @@ public class WebViewDialog extends Dialog {
             String mobileAppExtras = "";
             if (isJavaScriptControlAllowed()) {
                 mobileAppExtras = """
-                        , hide: function() {
-                          try {
-                            window.AndroidInterface.hide();
-                          } catch(e) {
-                            console.error('Error in mobileApp.hide:', e);
-                          }
-                        },
-                        show: function() {
-                          try {
-                            window.AndroidInterface.show();
-                          } catch(e) {
-                            console.error('Error in mobileApp.show:', e);
-                          }
-                        }
-                """;
+                            , hide: function() {
+                              try {
+                                window.AndroidInterface.hide();
+                              } catch(e) {
+                                console.error('Error in mobileApp.hide:', e);
+                              }
+                            },
+                            show: function() {
+                              try {
+                                window.AndroidInterface.show();
+                              } catch(e) {
+                                console.error('Error in mobileApp.show:', e);
+                              }
+                            }
+                    """;
             }
 
-            String script = String.format("""
+            String script = String.format(
+                """
                 (function() {
                   if (window.AndroidInterface) {
                     // Create mobileApp object for backward compatibility
@@ -1307,7 +1308,9 @@ public class WebViewDialog extends Dialog {
                     };
                   }
                 })();
-                """, mobileAppExtras);
+                """,
+                mobileAppExtras
+            );
 
             _webView.post(() -> {
                 if (_webView != null) {
