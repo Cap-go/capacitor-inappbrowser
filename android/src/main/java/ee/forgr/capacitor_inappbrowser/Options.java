@@ -184,6 +184,7 @@ public class Options {
     private Integer x = null;
     private Integer y = null;
     private boolean hidden = false;
+    private boolean allowWebViewJsVisibilityControl = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
 
     public Integer getWidth() {
@@ -509,6 +510,14 @@ public class Options {
 
     public void setHidden(boolean hidden) {
         this.hidden = hidden;
+    }
+
+    public boolean getAllowWebViewJsVisibilityControl() {
+        return allowWebViewJsVisibilityControl;
+    }
+
+    public void setAllowWebViewJsVisibilityControl(boolean allowWebViewJsVisibilityControl) {
+        this.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl;
     }
 
     public InvisibilityMode getInvisibilityMode() {

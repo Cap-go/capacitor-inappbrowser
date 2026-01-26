@@ -48,6 +48,16 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
+  async hide(): Promise<void> {
+    console.log('hide');
+    return;
+  }
+
+  async show(): Promise<void> {
+    console.log('show');
+    return;
+  }
+
   async setUrl(options: { url: string }): Promise<any> {
     console.log('setUrl', options.url);
     return;

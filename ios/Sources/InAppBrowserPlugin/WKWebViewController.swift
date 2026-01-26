@@ -118,6 +118,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open internal(set) var url: URL?
     open var tintColor: UIColor?
     open var allowsFileURL = true
+    open var allowWebViewJsVisibilityControl = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
@@ -543,6 +544,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             semaphore.signal()
         } else if message.name == "close" {
             closeView()
+        } else if message.name == "hide" {
+            guard allowWebViewJsVisibilityControl else {
+                return
+            }
+            capBrowserPlugin?.setHiddenFromJavaScript(true)
+        } else if message.name == "show" {
+            guard allowWebViewJsVisibilityControl else {
+                return
+            }
+            capBrowserPlugin?.setHiddenFromJavaScript(false)
         } else if message.name == "magicPrint" {
             if let webView = self.webView {
                 let printController = UIPrintInteractionController.shared
@@ -560,6 +571,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     func injectJavaScriptInterface() {
+        let extraControls = allowWebViewJsVisibilityControl ? """
+                                ,
+                                hide: function() {
+                                        window.webkit.messageHandlers.hide.postMessage(null);
+                                },
+                                show: function() {
+                                        window.webkit.messageHandlers.show.postMessage(null);
+                                }
+                """ : ""
         let script = """
                 if (!window.mobileApp) {
                         window.mobileApp = {
@@ -570,7 +590,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 },
                                 close: function() {
                                         window.webkit.messageHandlers.close.postMessage(null);
-                                }
+                                }\(extraControls)
                         };
                 }
                 """
@@ -605,6 +625,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "preShowScriptError")
         userContentController.add(weakHandler, name: "preShowScriptSuccess")
         userContentController.add(weakHandler, name: "close")
+        userContentController.add(weakHandler, name: "hide")
+        userContentController.add(weakHandler, name: "show")
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
@@ -1005,6 +1027,8 @@ public extension WKWebViewController {
         webView.configuration.userContentController.removeAllUserScripts()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "hide")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "show")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")

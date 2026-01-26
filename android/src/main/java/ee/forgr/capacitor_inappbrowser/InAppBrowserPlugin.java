@@ -673,6 +673,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
 
         options.setHidden(Boolean.TRUE.equals(call.getBoolean("hidden", false)));
+        boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
+        options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
 
         this.getActivity().runOnUiThread(
@@ -731,6 +733,53 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     } else {
                         call.reject("WebView is not initialized");
                     }
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void hide(PluginCall call) {
+        if (webViewDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    if (webViewDialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    webViewDialog.setHidden(true);
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void show(PluginCall call) {
+        if (webViewDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    if (webViewDialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!webViewDialog.isShowing()) {
+                        webViewDialog.show();
+                    }
+                    webViewDialog.setHidden(false);
+                    call.resolve();
                 }
             }
         );
