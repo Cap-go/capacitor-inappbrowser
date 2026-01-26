@@ -361,8 +361,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
-        let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl") ?? false
-        let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE") ?? "AWARE"
+        let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
+        let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
         // Validate preShowScript requires isPresentAfterPageLoad

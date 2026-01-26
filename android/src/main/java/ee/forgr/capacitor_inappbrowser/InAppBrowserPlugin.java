@@ -673,11 +673,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
 
         options.setHidden(Boolean.TRUE.equals(call.getBoolean("hidden", false)));
-        boolean allowWebViewJsVisibilityControl = false;
-        JSObject config = getConfig();
-        if (config != null) {
-            allowWebViewJsVisibilityControl = config.optBoolean("allowWebViewJsVisibilityControl", false);
-        }
+        boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
 
