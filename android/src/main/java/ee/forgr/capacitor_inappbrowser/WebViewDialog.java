@@ -1138,13 +1138,20 @@ public class WebViewDialog extends Dialog {
         // Apply system insets to WebView content view (compatible with all Android versions)
         ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
+            Insets mandatoryGestures = windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
             Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
             Boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
             ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
 
             // Apply safe margin inset to bottom margin if enabled in options or fallback to 0px
-            int navBottom = _options.getEnabledSafeMargin() ? bars.bottom : 0;
+            int safeBottomInset = Math.max(
+                bars.bottom,
+                Math.max(navigationBars.bottom, Math.max(systemGestures.bottom, mandatoryGestures.bottom))
+            );
+            int navBottom = _options.getEnabledSafeMargin() ? safeBottomInset : 0;
 
             // Apply top inset only if useTopInset option is enabled or fallback to 0px
             int navTop = _options.getUseTopInset() ? bars.top : 0;
@@ -1161,6 +1168,7 @@ public class WebViewDialog extends Dialog {
 
             return WindowInsetsCompat.CONSUMED;
         });
+        ViewCompat.requestApplyInsets(_webView);
 
         // Handle window decoration - version-specific handling
         if (getWindow() != null) {
