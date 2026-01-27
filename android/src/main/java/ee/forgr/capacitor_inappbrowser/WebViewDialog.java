@@ -404,6 +404,8 @@ public class WebViewDialog extends Dialog {
         applyInsets();
 
         _webView.addJavascriptInterface(new JavaScriptInterface(), "AndroidInterface");
+        // Provide window.mobileApp at document start via native interface
+        _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
         _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
         _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
         _webView.getSettings().setJavaScriptEnabled(true);
@@ -1286,27 +1288,27 @@ public class WebViewDialog extends Dialog {
             String script = String.format(
                 """
                 (function() {
-                  if (window.AndroidInterface) {
-                    // Create mobileApp object for backward compatibility
-                    if (!window.mobileApp) {
-                      window.mobileApp = {
-                        postMessage: function(message) {
-                          try {
-                            var msg = typeof message === 'string' ? message : JSON.stringify(message);
-                            window.AndroidInterface.postMessage(msg);
-                          } catch(e) {
-                            console.error('Error in mobileApp.postMessage:', e);
-                          }
-                        },
-                        close: function() {
-                          try {
-                            window.AndroidInterface.close();
-                          } catch(e) {
-                            console.error('Error in mobileApp.close:', e);
-                          }
-                        }%s
-                      };
-                    }
+                  // Prefer AndroidInterface when available, otherwise fall back to native window.mobileApp
+                  var nativeBridge = window.AndroidInterface || window.mobileApp;
+                  if (nativeBridge) {
+                    // Wrap native bridge to normalize behavior (stringify objects, expose close/hide/show)
+                    window.mobileApp = {
+                      postMessage: function(message) {
+                        try {
+                          var msg = typeof message === 'string' ? message : JSON.stringify(message);
+                          nativeBridge.postMessage(msg);
+                        } catch(e) {
+                          console.error('Error in mobileApp.postMessage:', e);
+                        }
+                      },
+                      close: function() {
+                        try {
+                          nativeBridge.close();
+                        } catch(e) {
+                          console.error('Error in mobileApp.close:', e);
+                        }
+                      }%s
+                    };
                   }
                   // Override window.print function to use our PrintInterface
                   if (window.PrintInterface) {
