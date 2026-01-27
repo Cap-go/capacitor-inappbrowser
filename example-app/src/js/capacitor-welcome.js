@@ -3,6 +3,7 @@ import {
   InAppBrowser,
   ToolBarType,
   BackgroundColor,
+  InvisibilityMode,
 } from "@capgo/inappbrowser";
 
 // Default URL configuration
@@ -92,6 +93,12 @@ window.customElements.define(
         </p>
         <p style="margin-bottom: 10px;">
           <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="spoof-useragent-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Use Spoofed User Agent (Android Chrome)</span>
+          </label>
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
             <input type="checkbox" id="enable-google-pay-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
             <span>Enable Google Pay Support</span>
           <label style="display: block; font-size: 0.9em; margin-bottom: 5px;">
@@ -137,6 +144,34 @@ window.customElements.define(
         <div id="webapp-status" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.8em; color: #666;">
           <strong>Setup:</strong> Make sure to copy url.js.example to url.js and configure your local server URL.
         </div>
+        <hr />
+        <h2>Hidden WebView Test</h2>
+        <p>
+          Test the hidden webview feature. Opens example.com invisibly, extracts DOM content via JavaScript, and displays it here.
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="hidden-fake-visible-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Fake visible (fullscreen metrics)</span>
+          </label>
+        </p>
+        <p>
+          <button class="button" id="test-hidden-webview" style="background-color: #6f42c1;">👻 Load Hidden WebView</button>
+          <button class="button" id="close-hidden-webview" style="background-color: #dc3545; margin-left: 8px;">✖ Close Hidden</button>
+          <button class="button" id="check-hidden-visibility" style="background-color: #17a2b8; margin-left: 8px;">👁️ Check visibility</button>
+          <button class="button" id="check-hidden-dimensions" style="background-color: #20c997; margin-left: 8px;">📏 Check dimensions</button>
+        </p>
+        <div id="hidden-webview-status" style="margin-top: 10px; padding: 10px; background-color: #e7e3f1; border-radius: 5px; font-size: 0.8em; color: #333;">
+          <strong>Status:</strong> <span id="hidden-status-text">Not started</span>
+        </div>
+        <div id="hidden-webview-result" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.75em; color: #333; max-height: 300px; overflow-y: auto; display: none;">
+          <strong>DOM Content:</strong>
+          <pre id="dom-content-output" style="white-space: pre-wrap; word-break: break-word; margin-top: 8px;"></pre>
+        </div>
+        <div id="hidden-webview-metrics" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.75em; color: #333; max-height: 300px; overflow-y: auto; display: none;">
+          <strong>Dimensions:</strong>
+          <pre id="metrics-output" style="white-space: pre-wrap; word-break: break-word; margin-top: 8px;"></pre>
+        </div>
       </main>
     </div>
     `;
@@ -162,6 +197,7 @@ window.customElements.define(
           const input = self.shadowRoot.querySelector("#custom-url-input");
           const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
           const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
+          const spoofUserAgentToggle = self.shadowRoot.querySelector("#spoof-useragent-toggle");
           const enableGooglePayToggle = self.shadowRoot.querySelector("#enable-google-pay-toggle");
           const enableGooglePay = enableGooglePayToggle.checked;
           const toolbarTypeSelect = self.shadowRoot.querySelector("#toolbar-type-select");
@@ -169,6 +205,7 @@ window.customElements.define(
           const url = input.value.trim();
           const preventDeeplink = preventDeeplinkToggle.checked;
           const spoofFirebase = spoofFirebaseToggle.checked;
+          const spoofUserAgent = spoofUserAgentToggle.checked;
           const toolbarType = toolbarTypeSelect.value;
           const nativeNavigationGestures = nativeNavigationGesturesToggle.checked;
           
@@ -298,6 +335,12 @@ window.customElements.define(
             enableGooglePaySupport: enableGooglePay,
             activeNativeNavigationForWebview: nativeNavigationGestures,
           };
+          
+          if (spoofUserAgent) {
+            options.headers = {
+              'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
+            };
+          }
           
           // Add Firebase spoofing if enabled
           if (spoofFirebase) {
@@ -466,6 +509,210 @@ window.customElements.define(
             );
           }
         });
+
+      // Hidden WebView Test
+      self.shadowRoot
+        .querySelector("#test-hidden-webview")
+        .addEventListener("click", async function (e) {
+          const statusText = self.shadowRoot.querySelector("#hidden-status-text");
+          const resultDiv = self.shadowRoot.querySelector("#hidden-webview-result");
+          const metricsDiv = self.shadowRoot.querySelector("#hidden-webview-metrics");
+          const domOutput = self.shadowRoot.querySelector("#dom-content-output");
+          const metricsOutput = self.shadowRoot.querySelector("#metrics-output");
+          const fakeVisibleToggle = self.shadowRoot.querySelector("#hidden-fake-visible-toggle");
+          
+          try {
+            statusText.textContent = "Opening hidden webview...";
+            resultDiv.style.display = "none";
+            metricsDiv.style.display = "none";
+
+            await InAppBrowser.removeAllListeners();
+            await InAppBrowser.openWebView({
+              url: "https://example.com",
+              hidden: true,
+              invisibilityMode: fakeVisibleToggle && fakeVisibleToggle.checked
+                ? InvisibilityMode.FAKE_VISIBLE
+                : InvisibilityMode.AWARE,
+            });
+            
+            statusText.textContent = "WebView opened (hidden). Waiting for page load...";
+           
+            InAppBrowser.addListener("messageFromWebview", (event) => {
+              console.log("Message from hidden webview:", event);
+              if (event.detail && event.detail.type === 'domContent') {
+                statusText.textContent = `DOM extracted from: ${event.detail.title} (${event.detail.url})`;
+                domOutput.textContent = event.detail.content;
+                resultDiv.style.display = "block";
+              } else if (event.detail && event.detail.type === 'visibilityState') {
+                statusText.textContent = `document.visibilityState: ${event.detail.state}`;
+              } else if (event.detail && event.detail.type === 'dimensions') {
+                statusText.textContent = "Dimensions received.";
+                metricsOutput.textContent = JSON.stringify(event.detail.data, null, 2);
+                metricsDiv.style.display = "block";
+              }
+            });
+
+            InAppBrowser.addListener("browserPageLoaded", async () => {
+              statusText.textContent = "Page loaded! Extracting DOM content...";
+            
+              setTimeout(async () => {
+                try {
+                  await InAppBrowser.executeScript({
+                    code: `
+                      (function() {
+                        var domContent = document.documentElement.outerHTML;
+                        var payload = JSON.stringify({
+                          detail: {
+                            type: 'domContent',
+                            content: domContent,
+                            title: document.title,
+                            url: window.location.href
+                          }
+                        });
+                        
+                        // Try mobileApp first (both platforms with bridge)
+                        if (window.mobileApp && window.mobileApp.postMessage) {
+                          window.mobileApp.postMessage(JSON.parse(payload));
+                        }
+                        // Fallback to AndroidInterface (Android native)
+                        else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
+                          window.AndroidInterface.postMessage(payload);
+                        }
+                        // Fallback to webkit messageHandlers (iOS native)
+                        else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                          window.webkit.messageHandlers.messageHandler.postMessage(payload);
+                        }
+                        else {
+                          console.error('No message interface available');
+                        }
+                      })();
+                    `
+                  });
+                  statusText.textContent = "Script executed. Waiting for DOM content...";
+                } catch (scriptError) {
+                  console.error("Script execution error:", scriptError);
+                  statusText.textContent = "Error executing script: " + scriptError.message;
+                }
+              }, 500);
+            });          
+          } catch (e) {
+            console.error("Error with hidden webview:", e);
+            statusText.textContent = "Error: " + e.message;
+          }
+        });
+
+      // Close Hidden WebView
+        self.shadowRoot
+          .querySelector("#close-hidden-webview")
+          .addEventListener("click", async function (e) {
+            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
+            try {
+              await InAppBrowser.close();
+              statusText.textContent = "Hidden webview closed.";
+            } catch (e) {
+              console.error("Error closing hidden webview:", e);
+              statusText.textContent = "Error closing: " + e.message;
+            }
+          });
+
+        self.shadowRoot
+          .querySelector("#check-hidden-visibility")
+          .addEventListener("click", async function (e) {
+            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
+            try {
+              statusText.textContent = "Checking document.visibilityState...";
+              await InAppBrowser.executeScript({
+                code: `
+                  (function() {
+                    var state = document.visibilityState;
+                    var payload = JSON.stringify({
+                      detail: {
+                        type: 'visibilityState',
+                        state: state
+                      }
+                    });
+
+                    if (window.mobileApp && window.mobileApp.postMessage) {
+                      window.mobileApp.postMessage(JSON.parse(payload));
+                    }
+                    else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
+                      window.AndroidInterface.postMessage(payload);
+                    }
+                    else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                      window.webkit.messageHandlers.messageHandler.postMessage(payload);
+                    }
+                    else {
+                      console.error('No message interface available');
+                    }
+                  })();
+                `
+              });
+            } catch (e) {
+              console.error("Error checking visibility:", e);
+              statusText.textContent = "Hidden webview not open or script failed.";
+            }
+          });
+
+        self.shadowRoot
+          .querySelector("#check-hidden-dimensions")
+          .addEventListener("click", async function (e) {
+            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
+            try {
+              statusText.textContent = "Checking dimensions...";
+              await InAppBrowser.executeScript({
+                code: `
+                  (function() {
+                    var data = {
+                      window: {
+                        innerWidth: window.innerWidth,
+                        innerHeight: window.innerHeight,
+                        outerWidth: window.outerWidth,
+                        outerHeight: window.outerHeight,
+                        devicePixelRatio: window.devicePixelRatio
+                      },
+                      viewport: {
+                        visualViewportWidth: window.visualViewport ? window.visualViewport.width : null,
+                        visualViewportHeight: window.visualViewport ? window.visualViewport.height : null
+                      },
+                      document: {
+                        clientWidth: document.documentElement ? document.documentElement.clientWidth : null,
+                        clientHeight: document.documentElement ? document.documentElement.clientHeight : null,
+                        scrollWidth: document.documentElement ? document.documentElement.scrollWidth : null,
+                        scrollHeight: document.documentElement ? document.documentElement.scrollHeight : null,
+                        bodyClientWidth: document.body ? document.body.clientWidth : null,
+                        bodyClientHeight: document.body ? document.body.clientHeight : null,
+                        bodyScrollWidth: document.body ? document.body.scrollWidth : null,
+                        bodyScrollHeight: document.body ? document.body.scrollHeight : null
+                      }
+                    };
+
+                    var payload = JSON.stringify({
+                      detail: {
+                        type: 'dimensions',
+                        data: data
+                      }
+                    });
+
+                    if (window.mobileApp && window.mobileApp.postMessage) {
+                      window.mobileApp.postMessage(JSON.parse(payload));
+                    }
+                    else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
+                      window.AndroidInterface.postMessage(payload);
+                    }
+                    else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                      window.webkit.messageHandlers.messageHandler.postMessage(payload);
+                    }
+                    else {
+                      console.error('No message interface available');
+                    }
+                  })();
+                `
+              });
+            } catch (e) {
+              console.error("Error checking dimensions:", e);
+              statusText.textContent = "Hidden webview not open or script failed.";
+            }
+          });
 
       // Test webapp with activity toolbar (comparison test)
       self.shadowRoot
