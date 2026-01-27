@@ -31,9 +31,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.lang.reflect.Field;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
@@ -56,6 +61,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     private CustomTabsClient customTabsClient;
     private CustomTabsSession currentSession;
     private WebViewDialog webViewDialog = null;
+    private final Map<String, WebViewDialog> webViewDialogs = new HashMap<>();
+    private final Deque<String> webViewStack = new ArrayDeque<>();
+    private String activeWebViewId = null;
     private String currentUrl = "";
 
     private PermissionRequest currentPermissionRequest;
@@ -71,7 +79,68 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         );
     }
 
+    private void registerWebView(String id, WebViewDialog dialog) {
+        webViewDialogs.put(id, dialog);
+        webViewStack.remove(id);
+        webViewStack.addLast(id);
+        activeWebViewId = id;
+        webViewDialog = dialog;
+    }
+
+    private void unregisterWebView(String id) {
+        webViewDialogs.remove(id);
+        webViewStack.remove(id);
+        activeWebViewId = webViewStack.peekLast();
+        webViewDialog = activeWebViewId != null ? webViewDialogs.get(activeWebViewId) : null;
+        if (webViewDialog != null) {
+            String url = webViewDialog.getUrl();
+            if (url != null) {
+                currentUrl = url;
+            }
+        }
+    }
+
+    private String resolveTargetId(PluginCall call) {
+        String id = call.getString("id");
+        return id != null ? id : activeWebViewId;
+    }
+
+    private WebViewDialog resolveDialog(String id) {
+        if (id != null) {
+            return webViewDialogs.get(id);
+        }
+        if (activeWebViewId != null) {
+            WebViewDialog dialog = webViewDialogs.get(activeWebViewId);
+            if (dialog != null) {
+                return dialog;
+            }
+        }
+        return webViewDialog;
+    }
+
+    private WebViewDialog findFileChooserDialog() {
+        if (activeWebViewId != null) {
+            WebViewDialog dialog = webViewDialogs.get(activeWebViewId);
+            if (dialog != null && dialog.mFilePathCallback != null) {
+                return dialog;
+            }
+        }
+
+        if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
+            return webViewDialog;
+        }
+
+        for (WebViewDialog dialog : webViewDialogs.values()) {
+            if (dialog != null && dialog.mFilePathCallback != null) {
+                return dialog;
+            }
+        }
+
+        return null;
+    }
+
     private void handleFileChooserResult(ActivityResult result) {
+        WebViewDialog webViewDialog = findFileChooserDialog();
         if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
             Uri[] results = null;
             Intent data = result.getData();
@@ -224,6 +293,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             return;
         }
 
+        String targetId = call.getString("id");
+        WebViewDialog webViewDialog = resolveDialog(targetId);
         if (webViewDialog == null) {
             call.reject("WebView is not initialized");
             return;
@@ -235,12 +306,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void run() {
                     try {
-                        if (webViewDialog != null) {
-                            webViewDialog.setUrl(url);
-                            call.resolve();
-                        } else {
-                            call.reject("WebView is not initialized");
-                        }
+                        webViewDialog.setUrl(url);
+                        call.resolve();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error setting URL: " + e.getMessage());
                         call.reject("Failed to set URL: " + e.getMessage());
@@ -262,7 +329,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         Boolean preventDeeplink = call.getBoolean("preventDeeplink", false);
         Boolean isPresentAfterPageLoad = call.getBoolean("isPresentAfterPageLoad", false);
 
-        if (url == null || TextUtils.isEmpty(url)) {
+        if (TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
         }
         currentUrl = url;
@@ -352,13 +419,29 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         Log.i("DelCookies", String.format("Script to run:\n%s", scriptToRun));
 
+        String targetId = call.getString("id");
+        ArrayList<WebViewDialog> targetDialogs = new ArrayList<>();
+
+        if (targetId != null) {
+            WebViewDialog dialog = webViewDialogs.get(targetId);
+            if (dialog == null) {
+                call.reject("WebView is not initialized");
+                return;
+            }
+            targetDialogs.add(dialog);
+        } else if (!webViewDialogs.isEmpty()) {
+            targetDialogs.addAll(webViewDialogs.values());
+        }
+
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        if (webViewDialog != null) {
-                            webViewDialog.executeScript(scriptToRun.toString());
+                        if (!targetDialogs.isEmpty()) {
+                            for (WebViewDialog dialog : targetDialogs) {
+                                dialog.executeScript(scriptToRun.toString());
+                            }
                             call.resolve();
                         } else {
                             call.reject("WebView is not initialized");
@@ -401,6 +484,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             call.reject("Invalid URL");
         }
         currentUrl = url;
+        final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();
         options.setUrl(url);
         options.setHeaders(call.getObject("headers"));
@@ -545,32 +629,36 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new WebViewCallbacks() {
                 @Override
                 public void urlChangeEvent(String url) {
-                    notifyListeners("urlChangeEvent", new JSObject().put("url", url));
+                    notifyListeners("urlChangeEvent", new JSObject().put("id", webViewId).put("url", url));
+                    if (webViewId.equals(activeWebViewId)) {
+                        currentUrl = url;
+                    }
                 }
 
                 @Override
                 public void closeEvent(String url) {
-                    notifyListeners("closeEvent", new JSObject().put("url", url));
+                    notifyListeners("closeEvent", new JSObject().put("id", webViewId).put("url", url));
+                    unregisterWebView(webViewId);
                 }
 
                 @Override
                 public void pageLoaded() {
-                    notifyListeners("browserPageLoaded", new JSObject());
+                    notifyListeners("browserPageLoaded", new JSObject().put("id", webViewId));
                 }
 
                 @Override
                 public void pageLoadError() {
-                    notifyListeners("pageLoadError", new JSObject());
+                    notifyListeners("pageLoadError", new JSObject().put("id", webViewId));
                 }
 
                 @Override
                 public void buttonNearDoneClicked() {
-                    notifyListeners("buttonNearDoneClick", new JSObject());
+                    notifyListeners("buttonNearDoneClick", new JSObject().put("id", webViewId));
                 }
 
                 @Override
                 public void confirmBtnClicked(String url) {
-                    notifyListeners("confirmBtnClicked", new JSObject().put("url", url));
+                    notifyListeners("confirmBtnClicked", new JSObject().put("id", webViewId).put("url", url));
                 }
 
                 @Override
@@ -591,6 +679,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                             String key = keys.next();
                             jsObject.put(key, jsonMessage.get(key));
                         }
+                        jsObject.put("id", webViewId);
 
                         // Notify listeners with the parsed message
                         notifyListeners("messageFromWebview", jsObject);
@@ -600,6 +689,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         // If JSON parsing fails, send the raw message as a string
                         JSObject jsObject = new JSObject();
                         jsObject.put("rawMessage", message);
+                        jsObject.put("id", webViewId);
                         notifyListeners("messageFromWebview", jsObject);
                     }
                 }
@@ -681,16 +771,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
-                    webViewDialog = new WebViewDialog(
+                    WebViewDialog dialog = new WebViewDialog(
                         getContext(),
                         android.R.style.Theme_NoTitleBar,
                         options,
                         InAppBrowserPlugin.this,
                         getBridge().getWebView()
                     );
-                    webViewDialog.activity = InAppBrowserPlugin.this.getActivity();
-                    webViewDialog.presentWebView();
-                    call.resolve();
+                    dialog.setInstanceId(webViewId);
+                    dialog.activity = InAppBrowserPlugin.this.getActivity();
+                    registerWebView(webViewId, dialog);
+                    dialog.presentWebView();
+                    call.resolve(new JSObject().put("id", webViewId));
                 }
             }
         );
@@ -711,10 +803,6 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void postMessage(PluginCall call) {
-        if (webViewDialog == null) {
-            call.reject("WebView is not initialized");
-            return;
-        }
         JSObject eventData = call.getObject("detail");
         // Log event data
         if (eventData == null) {
@@ -722,11 +810,32 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             return;
         }
 
+        String targetId = call.getString("id");
         Log.d("InAppBrowserPlugin", "Event data: " + eventData.toString());
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
+                    if (targetId != null) {
+                        WebViewDialog dialog = webViewDialogs.get(targetId);
+                        if (dialog == null) {
+                            call.reject("WebView is not initialized");
+                            return;
+                        }
+                        dialog.postMessageToJS(eventData);
+                        call.resolve();
+                        return;
+                    }
+
+                    if (!webViewDialogs.isEmpty()) {
+                        for (WebViewDialog dialog : webViewDialogs.values()) {
+                            dialog.postMessageToJS(eventData);
+                        }
+                        call.resolve();
+                        return;
+                    }
+
+                    // TODO: Legacy, can be removed(?)
                     if (webViewDialog != null) {
                         webViewDialog.postMessageToJS(eventData);
                         call.resolve();
@@ -793,16 +902,32 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             return;
         }
 
-        if (webViewDialog == null) {
-            call.reject("WebView is not initialized");
-            return;
-        }
-
+        String targetId = call.getString("id");
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        if (targetId != null) {
+                            WebViewDialog dialog = webViewDialogs.get(targetId);
+                            if (dialog == null) {
+                                call.reject("WebView is not initialized");
+                                return;
+                            }
+                            dialog.executeScript(script);
+                            call.resolve();
+                            return;
+                        }
+
+                        if (!webViewDialogs.isEmpty()) {
+                            for (WebViewDialog dialog : webViewDialogs.values()) {
+                                dialog.executeScript(script);
+                            }
+                            call.resolve();
+                            return;
+                        }
+
+                        // TODO: Legacy, can be removed(?)
                         if (webViewDialog != null) {
                             webViewDialog.executeScript(script);
                             call.resolve();
@@ -824,6 +949,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
+                    String targetId = resolveTargetId(call);
+                    WebViewDialog webViewDialog = resolveDialog(targetId);
                     if (webViewDialog != null) {
                         boolean canGoBack = webViewDialog.goBack();
                         JSObject result = new JSObject();
@@ -845,6 +972,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
+                    String targetId = resolveTargetId(call);
+                    WebViewDialog webViewDialog = resolveDialog(targetId);
                     if (webViewDialog != null) {
                         webViewDialog.reload();
                         call.resolve();
@@ -858,6 +987,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void lsuakdchgbbaHandleProxiedRequest(PluginCall call) {
+        String webviewId = call.getString("webviewId");
+        WebViewDialog webViewDialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
         if (webViewDialog != null) {
             Boolean ok = call.getBoolean("ok", false);
             String id = call.getString("id");
@@ -878,7 +1009,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void close(PluginCall call) {
-        if (webViewDialog == null) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog dialog = resolveDialog(targetId);
+        if (dialog == null) {
             // Fallback: try to bring main activity to foreground
             try {
                 Intent intent = new Intent(getContext(), getBridge().getActivity().getClass());
@@ -897,10 +1030,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void run() {
                     try {
-                        if (webViewDialog != null) {
+                        if (dialog != null) {
                             String currentUrl = "";
                             try {
-                                currentUrl = webViewDialog.getUrl();
+                                currentUrl = dialog.getUrl();
                                 if (currentUrl == null) {
                                     currentUrl = "";
                                 }
@@ -910,10 +1043,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                             }
 
                             // Notify listeners about the close event
-                            notifyListeners("closeEvent", new JSObject().put("url", currentUrl));
+                            JSObject eventData = new JSObject().put("url", currentUrl);
+                            if (targetId != null) {
+                                eventData.put("id", targetId);
+                            }
+                            notifyListeners("closeEvent", eventData);
 
-                            webViewDialog.dismiss();
-                            webViewDialog = null;
+                            dialog.dismiss();
+                            if (targetId != null) {
+                                unregisterWebView(targetId);
+                            } else {
+                                webViewDialog = null;
+                            }
                             call.resolve();
                         } else {
                             // Secondary fallback inside UI thread
@@ -971,7 +1112,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     @Override
                     public void onNavigationEvent(int navigationEvent, Bundle extras) {
                         // Only fire browserPageLoaded for Custom Tabs, not for WebView
-                        if (navigationEvent == NAVIGATION_FINISHED && webViewDialog == null) {
+                        if (navigationEvent == NAVIGATION_FINISHED && webViewDialogs.isEmpty() && webViewDialog == null) {
                             notifyListeners("browserPageLoaded", new JSObject());
                         }
                     }
@@ -983,14 +1124,17 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @Override
     protected void handleOnDestroy() {
-        if (webViewDialog != null) {
+        for (WebViewDialog dialog : webViewDialogs.values()) {
             try {
-                webViewDialog.dismiss();
+                dialog.dismiss();
             } catch (Exception e) {
                 // Ignore, dialog may already be dismissed
             }
-            webViewDialog = null;
         }
+        webViewDialogs.clear();
+        webViewStack.clear();
+        activeWebViewId = null;
+        webViewDialog = null;
         currentPermissionRequest = null;
         customTabsClient = null;
         currentSession = null;
@@ -1010,6 +1154,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void updateDimensions(PluginCall call) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog webViewDialog = resolveDialog(targetId);
         if (webViewDialog == null) {
             call.reject("WebView is not initialized");
             return;

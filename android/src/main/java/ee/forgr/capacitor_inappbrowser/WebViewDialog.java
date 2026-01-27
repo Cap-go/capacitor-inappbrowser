@@ -114,6 +114,7 @@ public class WebViewDialog extends Dialog {
     private boolean isInitialized = false;
     private boolean datePickerInjected = false; // Track if we've injected date picker fixes
     private final WebView capacitorWebView;
+    private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
@@ -153,6 +154,14 @@ public class WebViewDialog extends Dialog {
         this.permissionHandler = permissionHandler;
         this.isInitialized = false;
         this.capacitorWebView = capacitorWebView;
+    }
+
+    public void setInstanceId(String id) {
+        this.instanceId = id != null ? id : "";
+    }
+
+    public String getInstanceId() {
+        return instanceId;
     }
 
     // Add this class to provide safer JavaScript interface
@@ -2559,31 +2568,38 @@ public class WebViewDialog extends Dialog {
                                             code: res.status,
                                             body: (await res.text())
                                           } : null),
-                                          id: '%s'
+                                          id: '%s',
+                                          webviewId: '%s'
                                         });
                                       }).catch((e) => {
                                         Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
                                           ok: false,
                                           result: e.toString(),
-                                          id: '%s'
+                                          id: '%s',
+                                          webviewId: '%s'
                                         });
                                       });
                                     } catch (e) {
                                       Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
                                         ok: false,
                                         result: e.toString(),
-                                        id: '%s'
+                                        id: '%s',
+                                        webviewId: '%s'
                                       });
                                     }
                                     """;
+                                String dialogId = instanceId != null ? instanceId : "";
                                 String s = String.format(
                                     jsTemplate,
                                     headers,
                                     toBase64(request.getUrl().toString()),
                                     request.getMethod(),
                                     requestId,
+                                    dialogId,
                                     requestId,
-                                    requestId
+                                    dialogId,
+                                    requestId,
+                                    dialogId
                                 );
                                 // Log.i("HTTP", s);
                                 capacitorWebView.evaluateJavascript(s, null);
