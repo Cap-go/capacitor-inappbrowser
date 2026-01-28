@@ -1,4 +1,5 @@
 import { SplashScreen } from "@capacitor/splash-screen";
+import { SystemBars, SystemBarType } from "@capacitor/core";
 import {
   InAppBrowser,
   ToolBarType,
@@ -131,6 +132,25 @@ window.customElements.define(
         <p>
           <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
         </p>
+        <hr />
+        <h2>System Bars</h2>
+        <p>
+          Use the SystemBars API to show the system UI after changing visibility.
+        </p>
+        <p>
+          <button class="button" id="system-bars-show-all">Show All System Bars</button>
+          <button class="button" id="system-bars-show-status">Show Status Bar</button>
+          <button class="button" id="system-bars-show-navigation">Show Navigation Bar</button>
+          <button class="button" id="system-bars-hide-navigation">Hide Navigation Bar</button>
+        </p>
+        <h2>WebView Visibility</h2>
+        <p>
+          Hide or show the current InAppBrowser webview. Use the toolbar button near Done to hide it too.
+        </p>
+        <p>
+          <button class="button" id="webview-hide">Hide WebView</button>
+          <button class="button" id="webview-show">Show WebView</button>
+        </p>
         <h2>Back Button Test</h2>
         <p>
           Test the back button issue with our custom test webapp. This opens a PHP webapp designed to reproduce navigation issues.
@@ -160,6 +180,7 @@ window.customElements.define(
           <button class="button" id="close-hidden-webview" style="background-color: #dc3545; margin-left: 8px;">✖ Close Hidden</button>
           <button class="button" id="check-hidden-visibility" style="background-color: #17a2b8; margin-left: 8px;">👁️ Check visibility</button>
           <button class="button" id="check-hidden-dimensions" style="background-color: #20c997; margin-left: 8px;">📏 Check dimensions</button>
+          <button class="button" id="refresh-hidden-dom" style="background-color: #6c757d; margin-left: 8px;">🔄 Refresh DOM</button>
         </p>
         <div id="hidden-webview-status" style="margin-top: 10px; padding: 10px; background-color: #e7e3f1; border-radius: 5px; font-size: 0.8em; color: #333;">
           <strong>Status:</strong> <span id="hidden-status-text">Not started</span>
@@ -187,6 +208,41 @@ window.customElements.define(
           return url.protocol === 'http:' || url.protocol === 'https:';
         } catch (_) {
           return false;
+        }
+      }
+
+      async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
+        statusText.textContent = "Refreshing DOM content...";
+        try {
+          await InAppBrowser.executeScript({
+            code: `
+              (function() {
+                var domContent = document.documentElement.outerHTML;
+                var payload = JSON.stringify({
+                  detail: {
+                    type: 'domContent',
+                    content: domContent,
+                    title: document.title,
+                    url: window.location.href
+                  }
+                });
+                
+                // Try mobileApp first (both platforms with bridge)
+                if (window.mobileApp && window.mobileApp.postMessage) {
+                  window.mobileApp.postMessage(JSON.parse(payload));
+                }
+                else {
+                  console.error('No message interface available');
+                }
+              })();
+            `
+          });
+          statusText.textContent = "DOM refresh triggered. Waiting for content...";
+        } catch (scriptError) {
+          console.error("Script execution error:", scriptError);
+          statusText.textContent = "Error refreshing DOM: " + scriptError.message;
+          resultDiv.style.display = "none";
+          domOutput.textContent = "";
         }
       }
 
@@ -334,6 +390,18 @@ window.customElements.define(
             preventDeeplink: preventDeeplink,
             enableGooglePaySupport: enableGooglePay,
             activeNativeNavigationForWebview: nativeNavigationGestures,
+            buttonNearDone: {
+              ios: {
+                iconType: "sf-symbol",
+                icon: "eye.slash",
+              },
+              android: {
+                iconType: "vector",
+                icon: "ic_launcher_foreground",
+                width: 24,
+                height: 24,
+              },
+            },
           };
           
           if (spoofUserAgent) {
@@ -454,6 +522,74 @@ window.customElements.define(
           }
         });
 
+      self.shadowRoot
+        .querySelector("#system-bars-show-all")
+        .addEventListener("click", async function () {
+          try {
+            await SystemBars.show();
+          } catch (e) {
+            console.error("Error showing system bars:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#system-bars-show-status")
+        .addEventListener("click", async function () {
+          try {
+            await SystemBars.show({ bar: SystemBarType.StatusBar });
+          } catch (e) {
+            console.error("Error showing status bar:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#system-bars-show-navigation")
+        .addEventListener("click", async function () {
+          try {
+            await SystemBars.show({ bar: SystemBarType.NavigationBar });
+          } catch (e) {
+            console.error("Error showing navigation bar:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#system-bars-hide-navigation")
+        .addEventListener("click", async function () {
+          try {
+            await SystemBars.hide({ bar: SystemBarType.NavigationBar });
+          } catch (e) {
+            console.error("Error hiding navigation bar:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#webview-hide")
+        .addEventListener("click", async function () {
+          try {
+            await InAppBrowser.hide();
+          } catch (e) {
+            console.error("Error hiding webview:", e);
+          }
+        });
+
+      self.shadowRoot
+        .querySelector("#webview-show")
+        .addEventListener("click", async function () {
+          try {
+            await InAppBrowser.show();
+          } catch (e) {
+            console.error("Error showing webview:", e);
+          }
+        });
+
+      InAppBrowser.addListener("buttonNearDoneClick", async () => {
+        try {
+          await InAppBrowser.hide();
+        } catch (e) {
+          console.error("Error hiding webview from toolbar button:", e);
+        }
+      });
+
       // Test webapp with navigation toolbar (main test for back button issue)
       self.shadowRoot
         .querySelector("#open-test-webapp")
@@ -533,6 +669,18 @@ window.customElements.define(
               invisibilityMode: fakeVisibleToggle && fakeVisibleToggle.checked
                 ? InvisibilityMode.FAKE_VISIBLE
                 : InvisibilityMode.AWARE,
+              buttonNearDone: {
+                ios: {
+                  iconType: "sf-symbol",
+                  icon: "eye.slash",
+                },
+                android: {
+                  iconType: "vector",
+                  icon: "ic_launcher_foreground",
+                  width: 24,
+                  height: 24,
+                },
+              },
             });
             
             statusText.textContent = "WebView opened (hidden). Waiting for page load...";
@@ -552,47 +700,19 @@ window.customElements.define(
               }
             });
 
+            InAppBrowser.addListener("buttonNearDoneClick", async () => {
+              try {
+                await InAppBrowser.hide();
+              } catch (e) {
+                console.error("Error hiding webview from toolbar button:", e);
+              }
+            });
+
             InAppBrowser.addListener("browserPageLoaded", async () => {
               statusText.textContent = "Page loaded! Extracting DOM content...";
             
               setTimeout(async () => {
-                try {
-                  await InAppBrowser.executeScript({
-                    code: `
-                      (function() {
-                        var domContent = document.documentElement.outerHTML;
-                        var payload = JSON.stringify({
-                          detail: {
-                            type: 'domContent',
-                            content: domContent,
-                            title: document.title,
-                            url: window.location.href
-                          }
-                        });
-                        
-                        // Try mobileApp first (both platforms with bridge)
-                        if (window.mobileApp && window.mobileApp.postMessage) {
-                          window.mobileApp.postMessage(JSON.parse(payload));
-                        }
-                        // Fallback to AndroidInterface (Android native)
-                        else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
-                          window.AndroidInterface.postMessage(payload);
-                        }
-                        // Fallback to webkit messageHandlers (iOS native)
-                        else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                          window.webkit.messageHandlers.messageHandler.postMessage(payload);
-                        }
-                        else {
-                          console.error('No message interface available');
-                        }
-                      })();
-                    `
-                  });
-                  statusText.textContent = "Script executed. Waiting for DOM content...";
-                } catch (scriptError) {
-                  console.error("Script execution error:", scriptError);
-                  statusText.textContent = "Error executing script: " + scriptError.message;
-                }
+                await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
               }, 500);
             });          
           } catch (e) {
@@ -634,12 +754,6 @@ window.customElements.define(
 
                     if (window.mobileApp && window.mobileApp.postMessage) {
                       window.mobileApp.postMessage(JSON.parse(payload));
-                    }
-                    else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
-                      window.AndroidInterface.postMessage(payload);
-                    }
-                    else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                      window.webkit.messageHandlers.messageHandler.postMessage(payload);
                     }
                     else {
                       console.error('No message interface available');
@@ -696,12 +810,6 @@ window.customElements.define(
                     if (window.mobileApp && window.mobileApp.postMessage) {
                       window.mobileApp.postMessage(JSON.parse(payload));
                     }
-                    else if (window.AndroidInterface && window.AndroidInterface.postMessage) {
-                      window.AndroidInterface.postMessage(payload);
-                    }
-                    else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                      window.webkit.messageHandlers.messageHandler.postMessage(payload);
-                    }
                     else {
                       console.error('No message interface available');
                     }
@@ -712,6 +820,15 @@ window.customElements.define(
               console.error("Error checking dimensions:", e);
               statusText.textContent = "Hidden webview not open or script failed.";
             }
+          });
+
+        self.shadowRoot
+          .querySelector("#refresh-hidden-dom")
+          .addEventListener("click", async function () {
+            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
+            const resultDiv = self.shadowRoot.querySelector("#hidden-webview-result");
+            const domOutput = self.shadowRoot.querySelector("#dom-content-output");
+            await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
           });
 
       // Test webapp with activity toolbar (comparison test)
