@@ -551,6 +551,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void closeEvent(String url) {
                     notifyListeners("closeEvent", new JSObject().put("url", url));
+                    webViewDialog = null;
                 }
 
                 @Override

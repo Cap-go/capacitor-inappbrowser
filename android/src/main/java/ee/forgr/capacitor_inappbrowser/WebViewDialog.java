@@ -125,6 +125,8 @@ public class WebViewDialog extends Dialog {
     private int previousDecorVisibility = View.VISIBLE;
     private float previousWebViewAlpha = 1f;
     private int previousWebViewVisibility = View.VISIBLE;
+    private int previousWebViewLayerType = View.LAYER_TYPE_NONE;
+    private boolean hasPreviousWebViewLayerType = false;
 
     Semaphore preShowSemaphore = null;
     String preShowError = null;
@@ -959,27 +961,36 @@ public class WebViewDialog extends Dialog {
             previousWebViewAlpha = _webView.getAlpha();
             previousWebViewVisibility = _webView.getVisibility();
             previousWebViewLayoutParams = _webView.getLayoutParams();
+            previousWebViewLayerType = _webView.getLayerType();
+            hasPreviousWebViewLayerType = true;
         }
 
         window.setBackgroundDrawableResource(android.R.color.transparent);
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 
         if (decorView != null) {
             decorView.setAlpha(0f);
-            decorView.setVisibility(View.VISIBLE);
+            if (_options.getInvisibilityMode() == Options.InvisibilityMode.AWARE) {
+                decorView.setVisibility(View.GONE);
+            } else {
+                decorView.setVisibility(View.INVISIBLE);
+            }
         }
 
         if (_webView != null) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.AWARE) {
+                window.setLayout(1, 1);
                 _webView.setAlpha(0f);
                 _webView.setVisibility(View.INVISIBLE);
                 _webView.setLayoutParams(new ViewGroup.LayoutParams(0, 0));
             } else {
                 _webView.setAlpha(0f);
-                _webView.setVisibility(View.VISIBLE);
+                _webView.setVisibility(View.INVISIBLE);
+                _webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             }
         }
 
@@ -1011,6 +1022,9 @@ public class WebViewDialog extends Dialog {
             }
             _webView.setAlpha(previousWebViewAlpha);
             _webView.setVisibility(previousWebViewVisibility);
+            if (hasPreviousWebViewLayerType) {
+                _webView.setLayerType(previousWebViewLayerType, null);
+            }
         }
 
         previousWindowAttributes = null;
@@ -1020,13 +1034,26 @@ public class WebViewDialog extends Dialog {
         previousDecorVisibility = View.VISIBLE;
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
+        previousWebViewLayerType = View.LAYER_TYPE_NONE;
+        hasPreviousWebViewLayerType = false;
         isHiddenModeActive = false;
     }
 
     public void setHidden(boolean hidden) {
         if (hidden) {
             if (!isHiddenModeActive) {
-                applyHiddenMode();
+                if (getWindow() == null) {
+                    try {
+                        show();
+                        if (getWindow() != null) {
+                            getWindow().getDecorView().post(this::applyHiddenMode);
+                        }
+                    } catch (Exception e) {
+                        Log.w("InAppBrowser", "Unable to show dialog before hiding: " + e.getMessage());
+                    }
+                } else {
+                    applyHiddenMode();
+                }
             }
         } else {
             if (isHiddenModeActive) {
@@ -2853,9 +2880,6 @@ public class WebViewDialog extends Dialog {
         } else if (!_options.getDisableGoBackOnNativeApplication()) {
             String currentUrl = getUrl();
             _options.getCallbacks().closeEvent(currentUrl);
-            if (_webView != null) {
-                _webView.destroy();
-            }
             super.onBackPressed();
         }
     }
