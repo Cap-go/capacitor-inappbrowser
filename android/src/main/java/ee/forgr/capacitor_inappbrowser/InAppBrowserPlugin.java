@@ -776,6 +776,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         call.reject("WebView is not initialized");
                         return;
                     }
+                    if (!webViewDialog.isFakeVisibleMode()) {
+                        call.reject("show() is only supported when invisibilityMode is FAKE_VISIBLE");
+                        return;
+                    }
                     if (!webViewDialog.isShowing()) {
                         webViewDialog.show();
                     }
