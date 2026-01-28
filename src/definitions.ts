@@ -2,6 +2,10 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface UrlEvent {
   /**
+   * Webview instance id.
+   */
+  id?: string;
+  /**
    * Emit when the url changes
    *
    * @since 0.0.1
@@ -9,6 +13,10 @@ export interface UrlEvent {
   url: string;
 }
 export interface BtnEvent {
+  /**
+   * Webview instance id.
+   */
+  id?: string;
   /**
    * Emit when a button is clicked.
    *
@@ -69,6 +77,11 @@ export interface GetCookieOptions {
 }
 
 export interface ClearCookieOptions {
+  /**
+   * Target webview id.
+   * When omitted, applies to all open webviews.
+   */
+  id?: string;
   url: string;
 }
 
@@ -119,6 +132,10 @@ export interface DisclaimerOptions {
 }
 
 export interface CloseWebviewOptions {
+  /**
+   * Target webview id to close. If omitted, closes the active webview.
+   */
+  id?: string;
   /**
    * Whether the webview closing is animated or not, ios only
    * @default true
@@ -627,7 +644,7 @@ export interface InAppBrowserPlugin {
    * @since 7.21.0
    * @returns Promise that resolves with true if navigation was possible, false otherwise
    */
-  goBack(): Promise<{ canGoBack: boolean }>;
+  goBack(options?: { id?: string }): Promise<{ canGoBack: boolean }>;
 
   /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
@@ -638,23 +655,26 @@ export interface InAppBrowserPlugin {
 
   /**
    * Clear cookies of url
+   * When `id` is omitted, applies to all open webviews.
    *
    * @since 0.5.0
    */
   clearCookies(options: ClearCookieOptions): Promise<any>;
   /**
    * Clear all cookies
+   * When `id` is omitted, applies to all open webviews.
    *
    * @since 6.5.0
    */
-  clearAllCookies(): Promise<any>;
+  clearAllCookies(options?: { id?: string }): Promise<any>;
 
   /**
    * Clear cache
+   * When `id` is omitted, applies to all open webviews.
    *
    * @since 6.5.0
    */
-  clearCache(): Promise<any>;
+  clearCache(options?: { id?: string }): Promise<any>;
 
   /**
    * Get cookies for a specific URL.
@@ -664,6 +684,7 @@ export interface InAppBrowserPlugin {
   getCookies(options: GetCookieOptions): Promise<Record<string, string>>;
   /**
    * Close the webview.
+   * When `id` is omitted, closes the active webview.
    */
   close(options?: CloseWebviewOptions): Promise<any>;
   /**
@@ -687,23 +708,27 @@ export interface InAppBrowserPlugin {
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
+   * @returns Promise that resolves with the created webview id.
    * @since 0.1.0
    */
-  openWebView(options: OpenWebViewOptions): Promise<any>;
+  openWebView(options: OpenWebViewOptions): Promise<{ id: string }>;
   /**
    * Injects JavaScript code into the InAppBrowser window.
+   * When `id` is omitted, executes in all open webviews.
    */
-  executeScript({ code }: { code: string }): Promise<void>;
+  executeScript(options: { code: string; id?: string }): Promise<void>;
   /**
    * Sends an event to the webview(inappbrowser). you can listen to this event in the inappbrowser JS with window.addEventListener("messageFromNative", listenerFunc: (event: Record<string, any>) => void)
    * detail is the data you want to send to the webview, it's a requirement of Capacitor we cannot send direct objects
    * Your object has to be serializable to JSON, so no functions or other non-JSON-serializable types are allowed.
+   * When `id` is omitted, broadcasts to all open webviews.
    */
-  postMessage(options: { detail: Record<string, any> }): Promise<void>;
+  postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void>;
   /**
    * Sets the URL of the webview.
+   * When `id` is omitted, targets the active webview.
    */
-  setUrl(options: { url: string }): Promise<any>;
+  setUrl(options: { url: string; id?: string }): Promise<any>;
   /**
    * Listen for url change, only for openWebView
    *
@@ -735,18 +760,24 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'messageFromWebview',
-    listenerFunc: (event: { detail: Record<string, any> }) => void,
+    listenerFunc: (event: { id?: string; detail?: Record<string, any>; rawMessage?: string }) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
    * Will be triggered when page is loaded
    */
-  addListener(eventName: 'browserPageLoaded', listenerFunc: () => void): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'browserPageLoaded',
+    listenerFunc: (event: { id?: string }) => void,
+  ): Promise<PluginListenerHandle>;
 
   /**
    * Will be triggered when page load error
    */
-  addListener(eventName: 'pageLoadError', listenerFunc: () => void): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'pageLoadError',
+    listenerFunc: (event: { id?: string }) => void,
+  ): Promise<PluginListenerHandle>;
   /**
    * Remove all listeners for this plugin.
    *
@@ -759,16 +790,17 @@ export interface InAppBrowserPlugin {
    *
    * @since 1.0.0
    */
-  reload(): Promise<any>;
+  reload(options?: { id?: string }): Promise<any>;
 
   /**
    * Update the dimensions of the webview.
    * Allows changing the size and position of the webview at runtime.
+   * When `id` is omitted, targets the active webview.
    *
    * @param options Dimension options (width, height, x, y)
    * @returns Promise that resolves when dimensions are updated
    */
-  updateDimensions(options: DimensionOptions): Promise<void>;
+  updateDimensions(options: DimensionOptions & { id?: string }): Promise<void>;
 }
 
 /**
