@@ -551,6 +551,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void closeEvent(String url) {
                     notifyListeners("closeEvent", new JSObject().put("url", url));
+                    webViewDialog = null;
                 }
 
                 @Override
@@ -773,6 +774,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 public void run() {
                     if (webViewDialog == null) {
                         call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!webViewDialog.isFakeVisibleMode()) {
+                        call.reject("show() is only supported when invisibilityMode is FAKE_VISIBLE");
                         return;
                     }
                     if (!webViewDialog.isShowing()) {

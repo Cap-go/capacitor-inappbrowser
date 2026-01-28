@@ -965,21 +965,27 @@ public class WebViewDialog extends Dialog {
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 
         if (decorView != null) {
             decorView.setAlpha(0f);
-            decorView.setVisibility(View.VISIBLE);
+            if (_options.getInvisibilityMode() == Options.InvisibilityMode.AWARE) {
+                decorView.setVisibility(View.GONE);
+            } else {
+                decorView.setVisibility(View.INVISIBLE);
+            }
         }
 
         if (_webView != null) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.AWARE) {
+                window.setLayout(1, 1);
                 _webView.setAlpha(0f);
                 _webView.setVisibility(View.INVISIBLE);
                 _webView.setLayoutParams(new ViewGroup.LayoutParams(0, 0));
             } else {
                 _webView.setAlpha(0f);
-                _webView.setVisibility(View.VISIBLE);
+                _webView.setVisibility(View.INVISIBLE);
             }
         }
 
@@ -1026,7 +1032,26 @@ public class WebViewDialog extends Dialog {
     public void setHidden(boolean hidden) {
         if (hidden) {
             if (!isHiddenModeActive) {
-                applyHiddenMode();
+                if (getWindow() == null) {
+                    try {
+                        show();
+                        Window window = getWindow();
+                        if (window == null) {
+                            Log.w("InAppBrowser", "Unable to apply hidden mode: window is null after show()");
+                            return;
+                        }
+                        View decorView = window.getDecorView();
+                        if (decorView == null) {
+                            Log.w("InAppBrowser", "Unable to apply hidden mode: decorView is null after show()");
+                            return;
+                        }
+                        decorView.post(this::applyHiddenMode);
+                    } catch (Exception e) {
+                        Log.w("InAppBrowser", "Unable to show dialog before hiding", e);
+                    }
+                } else {
+                    applyHiddenMode();
+                }
             }
         } else {
             if (isHiddenModeActive) {
@@ -1040,6 +1065,10 @@ public class WebViewDialog extends Dialog {
 
     public boolean isHiddenModeActive() {
         return isHiddenModeActive;
+    }
+
+    public boolean isFakeVisibleMode() {
+        return _options != null && _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE;
     }
 
     /**
@@ -2853,9 +2882,6 @@ public class WebViewDialog extends Dialog {
         } else if (!_options.getDisableGoBackOnNativeApplication()) {
             String currentUrl = getUrl();
             _options.getCallbacks().closeEvent(currentUrl);
-            if (_webView != null) {
-                _webView.destroy();
-            }
             super.onBackPressed();
         }
     }
