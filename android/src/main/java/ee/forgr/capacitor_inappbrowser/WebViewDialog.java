@@ -1035,11 +1035,19 @@ public class WebViewDialog extends Dialog {
                 if (getWindow() == null) {
                     try {
                         show();
-                        if (getWindow() != null) {
-                            getWindow().getDecorView().post(this::applyHiddenMode);
+                        Window window = getWindow();
+                        if (window == null) {
+                            Log.w("InAppBrowser", "Unable to apply hidden mode: window is null after show()");
+                            return;
                         }
+                        View decorView = window.getDecorView();
+                        if (decorView == null) {
+                            Log.w("InAppBrowser", "Unable to apply hidden mode: decorView is null after show()");
+                            return;
+                        }
+                        decorView.post(this::applyHiddenMode);
                     } catch (Exception e) {
-                        Log.w("InAppBrowser", "Unable to show dialog before hiding: " + e.getMessage());
+                        Log.w("InAppBrowser", "Unable to show dialog before hiding", e);
                     }
                 } else {
                     applyHiddenMode();
