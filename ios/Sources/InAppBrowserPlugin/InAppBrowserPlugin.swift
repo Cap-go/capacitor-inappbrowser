@@ -222,11 +222,28 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearAllCookies(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let dataStore = WKWebsiteDataStore.default()
-            let dataTypes = Set([WKWebsiteDataTypeCookies])
+            let targetId = call.getString("id")
+            if let targetId, self.webViewControllers[targetId] == nil {
+                call.reject("WebView is not initialized")
+                return
+            }
 
-            dataStore.removeData(ofTypes: dataTypes,
-                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+            let dataStores = self.dataStores(for: targetId)
+            if dataStores.isEmpty {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let dataTypes = Set([WKWebsiteDataTypeCookies])
+            let group = DispatchGroup()
+            for dataStore in dataStores {
+                group.enter()
+                dataStore.removeData(ofTypes: dataTypes,
+                                     modifiedSince: Date(timeIntervalSince1970: 0)) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
                 call.resolve()
             }
         }
@@ -234,11 +251,28 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearCache(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let dataStore = WKWebsiteDataStore.default()
-            let dataTypes = Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+            let targetId = call.getString("id")
+            if let targetId, self.webViewControllers[targetId] == nil {
+                call.reject("WebView is not initialized")
+                return
+            }
 
-            dataStore.removeData(ofTypes: dataTypes,
-                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+            let dataStores = self.dataStores(for: targetId)
+            if dataStores.isEmpty {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let dataTypes = Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+            let group = DispatchGroup()
+            for dataStore in dataStores {
+                group.enter()
+                dataStore.removeData(ofTypes: dataTypes,
+                                     modifiedSince: Date(timeIntervalSince1970: 0)) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
                 call.resolve()
             }
         }
@@ -879,8 +913,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.reject("Failed to get active window for hidden webview")
                     return
                 }
-            } else if !self.isPresentAfterPageLoad {
-                self.presentView(isAnimated: isAnimated)
             } else if !self.isPresentAfterPageLoad {
                 self.presentView(webViewId: webViewId, isAnimated: isAnimated)
             }
