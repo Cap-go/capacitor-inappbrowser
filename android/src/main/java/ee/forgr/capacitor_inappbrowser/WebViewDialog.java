@@ -1045,6 +1045,9 @@ public class WebViewDialog extends Dialog {
                             Log.w("InAppBrowser", "Unable to apply hidden mode: decorView is null after show()");
                             return;
                         }
+                        // Set flag immediately to prevent race condition if setHidden(false)
+                        // is called before the posted runnable executes
+                        isHiddenModeActive = true;
                         decorView.post(this::applyHiddenMode);
                     } catch (Exception e) {
                         Log.w("InAppBrowser", "Unable to show dialog before hiding", e);
