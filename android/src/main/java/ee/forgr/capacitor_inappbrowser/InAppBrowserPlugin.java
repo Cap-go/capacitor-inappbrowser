@@ -55,7 +55,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String pluginVersion = "8.1.4";
+    private final String pluginVersion = "8.1.10";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -881,6 +881,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 public void run() {
                     if (webViewDialog == null) {
                         call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!webViewDialog.isFakeVisibleMode()) {
+                        call.reject("show() is only supported when invisibilityMode is FAKE_VISIBLE");
                         return;
                     }
                     if (!webViewDialog.isShowing()) {

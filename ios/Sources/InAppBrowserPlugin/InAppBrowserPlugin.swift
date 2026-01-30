@@ -28,7 +28,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.1.4"
+    private let pluginVersion: String = "8.1.10"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -61,6 +61,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var webViewControllers: [String: WKWebViewController] = [:]
     private var webViewStack: [String] = []
     private var activeWebViewId: String?
+    private weak var presentationContainerView: UIView?
+    private var presentationContainerWasInteractive = true
+    private var presentationContainerPreviousAlpha: CGFloat = 1
     private var closeModalTitle: String?
     private var closeModalDescription: String?
     private var closeModalOk: String?
@@ -981,6 +984,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let navController = self.navigationWebViewController, navController.presentingViewController != nil {
                     navController.view.isHidden = true
                     navController.view.isUserInteractionEnabled = false
+                    if let containerView = navController.view.superview {
+                        if self.presentationContainerView == nil || self.presentationContainerView !== containerView {
+                            self.presentationContainerView = containerView
+                            self.presentationContainerWasInteractive = containerView.isUserInteractionEnabled
+                            self.presentationContainerPreviousAlpha = containerView.alpha
+                        }
+                        containerView.isUserInteractionEnabled = false
+                        containerView.alpha = 0
+                    }
                 }
 
                 if !self.attachWebViewToWindow(webView) {
@@ -995,6 +1007,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let navController = self.navigationWebViewController {
                     navController.view.isHidden = false
                     navController.view.isUserInteractionEnabled = true
+                    if let containerView = self.presentationContainerView {
+                        containerView.isUserInteractionEnabled = self.presentationContainerWasInteractive
+                        containerView.alpha = self.presentationContainerPreviousAlpha
+                        self.presentationContainerView = nil
+                        self.presentationContainerWasInteractive = true
+                        self.presentationContainerPreviousAlpha = 1
+                    }
 
                     if navController.presentingViewController == nil {
                         self.bridge?.viewController?.present(navController, animated: true, completion: {

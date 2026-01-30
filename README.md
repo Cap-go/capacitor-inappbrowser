@@ -187,7 +187,7 @@ window.mobileApp.postMessage({ detail: { message: "myMessage" } });
 #### Receive event from inappbrowser in the main app
 
 ```js
-InAppBrowser.addEventListener("messageFromWebview", (event) => {
+InAppBrowser.addListener("messageFromWebview", (event) => {
   console.log(event.id, event.detail);
 });
 ```
