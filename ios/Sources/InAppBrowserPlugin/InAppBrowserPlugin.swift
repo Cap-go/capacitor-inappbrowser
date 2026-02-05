@@ -50,6 +50,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
+    private var navigationControllers: [String: UINavigationController] = [:]
     private var privacyScreen: UIImageView?
     private var isSetupDone = false
     var currentPluginCall: CAPPluginCall?
@@ -57,6 +58,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var isHidden = false
     var invisibilityMode: InvisibilityMode = .aware
     var webViewController: WKWebViewController?
+    private var webViewControllers: [String: WKWebViewController] = [:]
+    private var webViewStack: [String] = []
+    private var activeWebViewId: String?
     private weak var presentationContainerView: UIView?
     private var presentationContainerWasInteractive = true
     private var presentationContainerPreviousAlpha: CGFloat = 1
@@ -77,13 +81,74 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         #endif
     }
 
-    func presentView(isAnimated: Bool = true) {
-        guard let navigationController = self.navigationWebViewController else {
+    private func registerWebView(id: String, webView: WKWebViewController, navigationController: UINavigationController) {
+        webViewControllers[id] = webView
+        navigationControllers[id] = navigationController
+        webViewStack.removeAll { $0 == id }
+        webViewStack.append(id)
+        activeWebViewId = id
+        self.webViewController = webView
+        self.navigationWebViewController = navigationController
+    }
+
+    private func unregisterWebView(id: String) {
+        webViewControllers[id] = nil
+        navigationControllers[id] = nil
+        webViewStack.removeAll { $0 == id }
+        activeWebViewId = webViewStack.last
+        if let activeId = activeWebViewId {
+            self.webViewController = webViewControllers[activeId]
+            self.navigationWebViewController = navigationControllers[activeId]
+        } else {
+            self.webViewController = nil
+            self.navigationWebViewController = nil
+        }
+    }
+
+    private func resolveWebViewController(for id: String?) -> WKWebViewController? {
+        if let id {
+            return webViewControllers[id]
+        }
+        return webViewController
+    }
+
+    private func dataStores(for targetId: String?) -> [WKWebsiteDataStore] {
+        if let targetId {
+            guard let controller = webViewControllers[targetId],
+                  let store = controller.websiteDataStore() else {
+                return []
+            }
+            return [store]
+        }
+
+        let controllers = Array(webViewControllers.values)
+        if controllers.isEmpty {
+            return [WKWebsiteDataStore.default()]
+        }
+
+        var seen = Set<ObjectIdentifier>()
+        var stores: [WKWebsiteDataStore] = []
+        for controller in controllers {
+            if let store = controller.websiteDataStore() {
+                let identifier = ObjectIdentifier(store)
+                if seen.insert(identifier).inserted {
+                    stores.append(store)
+                }
+            }
+        }
+        return stores
+    }
+
+    func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
+        let resolvedId = webViewId ?? activeWebViewId
+        let navigationController = resolvedId.flatMap { navigationControllers[$0] } ?? self.navigationWebViewController
+        guard let navigationController else {
             self.currentPluginCall?.reject("Navigation controller is not initialized")
             return
         }
 
-        self.bridge?.viewController?.present(navigationController, animated: isAnimated, completion: {
+        let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
+        presenter?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
     }
@@ -146,13 +211,42 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         webView.isUserInteractionEnabled = true
     }
 
+    func handleWebViewDidClose(id: String, url: String) {
+        if !id.isEmpty, webViewControllers[id] != nil {
+            self.notifyListeners("closeEvent", data: ["id": id, "url": url])
+            unregisterWebView(id: id)
+            return
+        }
+
+        self.notifyListeners("closeEvent", data: ["url": url])
+        self.webViewController = nil
+        self.navigationWebViewController = nil
+    }
+
     @objc func clearAllCookies(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let dataStore = WKWebsiteDataStore.default()
-            let dataTypes = Set([WKWebsiteDataTypeCookies])
+            let targetId = call.getString("id")
+            if let targetId, self.webViewControllers[targetId] == nil {
+                call.reject("WebView is not initialized")
+                return
+            }
 
-            dataStore.removeData(ofTypes: dataTypes,
-                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+            let dataStores = self.dataStores(for: targetId)
+            if dataStores.isEmpty {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let dataTypes = Set([WKWebsiteDataTypeCookies])
+            let group = DispatchGroup()
+            for dataStore in dataStores {
+                group.enter()
+                dataStore.removeData(ofTypes: dataTypes,
+                                     modifiedSince: Date(timeIntervalSince1970: 0)) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
                 call.resolve()
             }
         }
@@ -160,11 +254,28 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func clearCache(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let dataStore = WKWebsiteDataStore.default()
-            let dataTypes = Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+            let targetId = call.getString("id")
+            if let targetId, self.webViewControllers[targetId] == nil {
+                call.reject("WebView is not initialized")
+                return
+            }
 
-            dataStore.removeData(ofTypes: dataTypes,
-                                 modifiedSince: Date(timeIntervalSince1970: 0)) {
+            let dataStores = self.dataStores(for: targetId)
+            if dataStores.isEmpty {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let dataTypes = Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+            let group = DispatchGroup()
+            for dataStore in dataStores {
+                group.enter()
+                dataStore.removeData(ofTypes: dataTypes,
+                                     modifiedSince: Date(timeIntervalSince1970: 0)) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
                 call.resolve()
             }
         }
@@ -178,20 +289,39 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
-                let group = DispatchGroup()
-                for cookie in cookies {
-                    if cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain) {
-                        group.enter()
-                        WKWebsiteDataStore.default().httpCookieStore.delete(cookie) {
-                            group.leave()
+            let targetId = call.getString("id")
+            if let targetId, self.webViewControllers[targetId] == nil {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let dataStores = self.dataStores(for: targetId)
+            if dataStores.isEmpty {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let outerGroup = DispatchGroup()
+            for dataStore in dataStores {
+                outerGroup.enter()
+                dataStore.httpCookieStore.getAllCookies { cookies in
+                    let innerGroup = DispatchGroup()
+                    for cookie in cookies {
+                        if cookie.domain == host || cookie.domain.hasSuffix(".\(host)") || host.hasSuffix(cookie.domain) {
+                            innerGroup.enter()
+                            dataStore.httpCookieStore.delete(cookie) {
+                                innerGroup.leave()
+                            }
                         }
                     }
+                    innerGroup.notify(queue: .main) {
+                        outerGroup.leave()
+                    }
                 }
+            }
 
-                group.notify(queue: .main) {
-                    call.resolve()
-                }
+            outerGroup.notify(queue: .main) {
+                call.resolve()
             }
         }
     }
@@ -235,6 +365,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("URL must not be empty")
             return
         }
+
+        let webViewId = UUID().uuidString
 
         var buttonNearDoneIcon: UIImage?
         if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
@@ -479,6 +611,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+            webViewController.instanceId = webViewId
+            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
 
             // Set dimensions if provided
             if let width = width {
@@ -630,6 +764,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
+            if let navigationController = self.navigationWebViewController {
+                self.registerWebView(id: webViewId, webView: webViewController, navigationController: navigationController)
+            }
             self.navigationWebViewController?.navigationBar.isTranslucent = false
             self.navigationWebViewController?.toolbar.isTranslucent = false
 
@@ -780,15 +917,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
             } else if !self.isPresentAfterPageLoad {
-                self.presentView(isAnimated: isAnimated)
+                self.presentView(webViewId: webViewId, isAnimated: isAnimated)
             }
-            call.resolve()
+            call.resolve(["id": webViewId])
         }
     }
 
     @objc func goBack(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard let webViewController = self.webViewController else {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
                 call.resolve(["canGoBack": false])
                 return
             }
@@ -799,8 +937,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func reload(_ call: CAPPluginCall) {
-        self.webViewController?.reload()
-        call.resolve()
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.reload()
+            call.resolve()
+        }
     }
 
     @objc func setUrl(_ call: CAPPluginCall) {
@@ -814,7 +960,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        self.webViewController?.load(remote: url)
+        let targetId = call.getString("id")
+        guard let webViewController = self.resolveWebViewController(for: targetId) else {
+            call.reject("WebView is not initialized")
+            return
+        }
+
+        webViewController.load(remote: url)
         call.resolve()
     }
 
@@ -894,7 +1046,28 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         DispatchQueue.main.async {
-            self.webViewController?.executeScript(script: script)
+            if let targetId = call.getString("id") {
+                guard let webViewController = self.webViewControllers[targetId] else {
+                    call.reject("WebView is not initialized")
+                    return
+                }
+                webViewController.executeScript(script: script)
+                call.resolve()
+                return
+            }
+
+            if !self.webViewControllers.isEmpty {
+                self.webViewControllers.values.forEach { $0.executeScript(script: script) }
+                call.resolve()
+                return
+            }
+
+            guard let webViewController = self.webViewController else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.executeScript(script: script)
             call.resolve()
         }
     }
@@ -909,9 +1082,30 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         print("Event data: \(eventData)")
 
         DispatchQueue.main.async {
-            self.webViewController?.postMessageToJS(message: eventData)
+            if let targetId = call.getString("id") {
+                guard let webViewController = self.webViewControllers[targetId] else {
+                    call.reject("WebView is not initialized")
+                    return
+                }
+                webViewController.postMessageToJS(message: eventData)
+                call.resolve()
+                return
+            }
+
+            if !self.webViewControllers.isEmpty {
+                self.webViewControllers.values.forEach { $0.postMessageToJS(message: eventData) }
+                call.resolve()
+                return
+            }
+
+            guard let webViewController = self.webViewController else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.postMessageToJS(message: eventData)
+            call.resolve()
         }
-        call.resolve()
     }
 
     func isHexColorCode(_ input: String) -> Bool {
@@ -1020,31 +1214,45 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let isAnimated = call.getBool("isAnimated", true)
 
         DispatchQueue.main.async {
-            let currentUrl = self.webViewController?.url?.absoluteString ?? ""
-            let isPresented = self.navigationWebViewController?.presentingViewController != nil
-
-            if self.isHidden {
-                self.webViewController?.capableWebView?.removeFromSuperview()
-                self.webViewController?.cleanupWebView()
-                if isPresented {
-                    self.navigationWebViewController?.dismiss(animated: isAnimated) {
-                        self.webViewController = nil
-                        self.navigationWebViewController = nil
-                    }
-                } else {
-                    self.webViewController = nil
-                    self.navigationWebViewController = nil
-                }
-                self.isHidden = false
-            } else {
-                self.webViewController?.cleanupWebView()
-                self.navigationWebViewController?.dismiss(animated: isAnimated) {
-                    self.webViewController = nil
-                    self.navigationWebViewController = nil
-                }
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            if let targetId,
+               let webViewController = self.webViewControllers[targetId],
+               let navigationController = self.navigationControllers[targetId] {
+                let currentUrl = webViewController.url?.absoluteString ?? ""
+                webViewController.cleanupWebView()
+                self.handleWebViewDidClose(id: targetId, url: currentUrl)
+                navigationController.dismiss(animated: isAnimated, completion: nil)
+                call.resolve()
+                return
             }
 
-            self.notifyListeners("closeEvent", data: ["url": currentUrl])
+            guard let webViewController = self.webViewController,
+                  let navigationController = self.navigationWebViewController else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let currentUrl = webViewController.url?.absoluteString ?? ""
+            let isPresented = navigationController.presentingViewController != nil
+
+            if self.isHidden {
+                webViewController.capableWebView?.removeFromSuperview()
+                webViewController.cleanupWebView()
+                if isPresented {
+                    navigationController.dismiss(animated: isAnimated) {
+                        self.handleWebViewDidClose(id: "", url: currentUrl)
+                    }
+                } else {
+                    self.handleWebViewDidClose(id: "", url: currentUrl)
+                }
+                self.isHidden = false
+                call.resolve()
+                return
+            }
+
+            webViewController.cleanupWebView()
+            self.handleWebViewDidClose(id: "", url: currentUrl)
+            navigationController.dismiss(animated: isAnimated, completion: nil)
             call.resolve()
         }
     }
@@ -1111,7 +1319,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let yPos = call.getFloat("y")
 
         DispatchQueue.main.async {
-            guard let webViewController = self.webViewController else {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
                 call.reject("WebView is not initialized")
                 return
             }
