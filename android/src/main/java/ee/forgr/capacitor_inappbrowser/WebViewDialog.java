@@ -1150,30 +1150,18 @@ public class WebViewDialog extends Dialog {
                     appBarLayout.setLayoutParams(params);
                     appBarLayout.setBackgroundColor(finalBgColor);
                     View contentBrowserLayout = findViewById(R.id.content_browser_layout);
-                    View parentContainer = findViewById(android.R.id.content);
-                    if (contentBrowserLayout == null || parentContainer == null) {
-                        Log.w("InAppBrowser", "Required views not found for height calculation");
+                    if (contentBrowserLayout == null) {
+                        Log.w("InAppBrowser", "Content browser layout not found");
                         return;
                     }
 
+                    // Use MATCH_PARENT for height to allow proper scrolling in all orientations
+                    // The AppBarLayout's layout_behavior will handle positioning automatically
                     ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
-                    if (!(layoutParams instanceof ViewGroup.MarginLayoutParams)) {
-                        Log.w("InAppBrowser", "Content browser layout does not support margins");
-                        return;
+                    if (layoutParams != null) {
+                        layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                        contentBrowserLayout.setLayoutParams(layoutParams);
                     }
-                    ViewGroup.MarginLayoutParams mlpContentBrowserLayout = (ViewGroup.MarginLayoutParams) layoutParams;
-
-                    int parentHeight = parentContainer.getHeight();
-                    int appBarHeight = appBarLayout.getHeight(); // can be 0 if not visible with the toolbar type BLANK
-
-                    if (parentHeight <= 0) {
-                        Log.w("InAppBrowser", "Parent dimensions not yet available");
-                        return;
-                    }
-
-                    // Recompute the height of the content browser to be able to set margin bottom as we want to
-                    mlpContentBrowserLayout.height = parentHeight - (statusBarHeight + appBarHeight);
-                    contentBrowserLayout.setLayoutParams(mlpContentBrowserLayout);
                 });
             }
         }
