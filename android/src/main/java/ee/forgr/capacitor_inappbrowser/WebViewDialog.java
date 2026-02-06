@@ -1158,10 +1158,8 @@ public class WebViewDialog extends Dialog {
                     // Use MATCH_PARENT for height to allow proper scrolling in all orientations
                     // The AppBarLayout's layout_behavior will handle positioning automatically
                     ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
-                    if (layoutParams != null) {
-                        layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
-                        contentBrowserLayout.setLayoutParams(layoutParams);
-                    }
+                    layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                    contentBrowserLayout.setLayoutParams(layoutParams);
                 });
             }
         }
