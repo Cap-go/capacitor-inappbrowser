@@ -1102,6 +1102,19 @@ public class WebViewDialog extends Dialog {
         View statusBarColorView = findViewById(R.id.status_bar_color_view);
         View toolbarView = findViewById(R.id.tool_bar);
 
+        // Fix content browser layout height for all Android versions to allow proper scrolling
+        // This fixes landscape scrolling issues where bottom content is unreachable
+        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+        if (contentBrowserLayout != null) {
+            ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
+            if (layoutParams != null) {
+                // Use MATCH_PARENT for height to allow proper scrolling in all orientations
+                // The AppBarLayout's layout_behavior will handle positioning automatically
+                layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                contentBrowserLayout.setLayoutParams(layoutParams);
+            }
+        }
+
         // Special handling for Android 15+
         if (isAndroid15Plus) {
             // Get AppBarLayout which contains the toolbar
@@ -1149,17 +1162,6 @@ public class WebViewDialog extends Dialog {
                     params.topMargin = statusBarHeight;
                     appBarLayout.setLayoutParams(params);
                     appBarLayout.setBackgroundColor(finalBgColor);
-                    View contentBrowserLayout = findViewById(R.id.content_browser_layout);
-                    if (contentBrowserLayout == null) {
-                        Log.w("InAppBrowser", "Content browser layout not found");
-                        return;
-                    }
-
-                    // Use MATCH_PARENT for height to allow proper scrolling in all orientations
-                    // The AppBarLayout's layout_behavior will handle positioning automatically
-                    ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
-                    layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
-                    contentBrowserLayout.setLayoutParams(layoutParams);
                 });
             }
         }
