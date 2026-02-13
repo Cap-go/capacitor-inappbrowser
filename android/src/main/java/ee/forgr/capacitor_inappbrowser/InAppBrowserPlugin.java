@@ -70,6 +70,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     private ActivityResultLauncher<Intent> fileChooserLauncher;
 
+    private PluginCall openSecureWindowSavedCall;
+    private String openSecureWindowRedirectUri;
+
     @Override
     public void load() {
         super.load();
@@ -1187,5 +1190,92 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 }
             }
         );
+    }
+
+    @PluginMethod
+    public void openSecureWindow(PluginCall call) {
+        String authEndpoint = call.getString("authEndpoint");
+
+        if (authEndpoint == null || authEndpoint.isEmpty()) {
+            call.reject("Auth endpoint is required");
+            return;
+        }
+
+        String redirectUri = call.getString("redirectUri");
+        if (redirectUri == null || redirectUri.isEmpty()) {
+            call.reject("Redirect URI is required");
+            return;
+        }
+
+        openSecureWindowSavedCall = call;
+        openSecureWindowRedirectUri = redirectUri;
+
+        // Launch OAuth in custom tab
+        launchCustomTab(authEndpoint);
+    }
+
+    private void launchCustomTab(String url) {
+        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+
+        CustomTabsIntent customTabsIntent = builder.build();
+        customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+        customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        customTabsIntent.intent.putExtra("android.support.customtabs.extra.ENABLE_URLBAR_HIDING", true);
+        customTabsIntent.intent.putExtra("android.support.customtabs.extra.EXTRA_ENABLE_INSTANT_APPS", false);
+        customTabsIntent.intent.putExtra("android.support.customtabs.extra.SEND_TO_EXTERNAL_HANDLER", false);
+        customTabsIntent.intent.putExtra("androidx.browser.customtabs.extra.SHARE_STATE", 2);
+        customTabsIntent.intent.putExtra("androidx.browser.customtabs.extra.DISABLE_BACKGROUND_INTERACTION", false);
+        customTabsIntent.intent.putExtra("org.chromium.chrome.browser.customtabs.EXTRA_DISABLE_DOWNLOAD_BUTTON", true);
+        customTabsIntent.intent.putExtra("org.chromium.chrome.browser.customtabs.EXTRA_DISABLE_STAR_BUTTON", true);
+
+        customTabsIntent.launchUrl(getActivity(), Uri.parse(url));
+    }
+
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+
+        // If we have a saved call and user returned without callback, reject
+        if (openSecureWindowSavedCall != null) {
+            openSecureWindowSavedCall.reject("OAuth cancelled or no callback received");
+            openSecureWindowSavedCall = null;
+        }
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return;
+        }
+
+        Uri uri = intent.getData();
+        if (uri == null) {
+            return;
+        }
+
+        if (openSecureWindowRedirectUri == null) {
+            return;
+        }
+
+        if (uri.getHost() == null || !uri.toString().startsWith(openSecureWindowRedirectUri)) {
+            return;
+        }
+
+        try {
+            // Resolve the original call with the callback url
+            if (openSecureWindowSavedCall != null) {
+                final JSObject ret = new JSObject();
+                ret.put("redirectedUri", uri.toString());
+                openSecureWindowSavedCall.resolve(ret);
+                openSecureWindowSavedCall = null;
+            }
+        } catch (Exception e) {
+            if (openSecureWindowSavedCall != null) {
+                openSecureWindowSavedCall.reject("Failed to process OAuth callback", e);
+                openSecureWindowSavedCall = null;
+            }
+        }
     }
 }
