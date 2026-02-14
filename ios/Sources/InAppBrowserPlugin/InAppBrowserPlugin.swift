@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import WebKit
+import AuthenticationServices
 
 extension UIColor {
 
@@ -47,7 +48,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -68,6 +70,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var closeModalDescription: String?
     private var closeModalOk: String?
     private var closeModalCancel: String?
+    private var openSecureWindowCall: CAPPluginCall?
 
     private func setup() {
         self.isSetupDone = true
@@ -1336,4 +1339,62 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func openSecureWindow(_ call: CAPPluginCall) {
+        guard let urlString = call.getString("authEndpoint") else {
+            call.reject("authEndpoint is required")
+            return
+        }
+
+        guard let url = URL(string: urlString) else {
+            call.reject("Invalid URL")
+            return
+        }
+
+        guard let redirectUri = call.getString("redirectUri") else {
+            call.reject("Redirect URI is required")
+            return
+        }
+
+        // Store the call for later resolution
+        self.openSecureWindowCall = call
+
+        // Open the URL in a secure browser window
+        DispatchQueue.main.async {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: url.scheme) {
+                callbackURL, error in
+
+                // Clean up the stored call
+                self.openSecureWindowCall = nil
+
+                if let error = error {
+                    // Handle error (e.g., user cancelled)
+                    call.reject(error.localizedDescription)
+                    return
+                }
+
+                guard let callbackURL = callbackURL else {
+                    call.reject("No callback URL received")
+                    return
+                }
+
+                if !callbackURL.absoluteString.hasPrefix(redirectUri) {
+                    call.reject("Redirect URI does not match, expected " + redirectUri + " but got " + callbackURL.absoluteString)
+                    return
+                }
+
+                // Resolve the call with the callback URL
+                call.resolve(["redirectedUri": callbackURL.absoluteString])
+            }
+
+            // Present the session
+            session.presentationContextProvider = self
+            session.start()
+        }
+    }
+}
+
+extension InAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()
+    }
 }

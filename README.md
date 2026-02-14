@@ -236,6 +236,7 @@ window.mobileApp.close();
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
+* [`openSecureWindow(...)`](#opensecurewindow)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 * [Enums](#enums)
@@ -665,6 +666,63 @@ When `id` is omitted, targets the active webview.
 --------------------
 
 
+### openSecureWindow(...)
+
+```typescript
+openSecureWindow(options: OpenSecureWindowOptions) => Promise<OpenSecureWindowResponse>
+```
+
+Opens a secured window for OAuth2 authentication.
+For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
+Something like:
+```html
+&lt;html&gt;
+&lt;head&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;script&gt;
+  const searchParams = new URLSearchParams(location.search)
+  if (searchParams.has("code")) {
+    new BroadcastChannel("my-channel-name").postMessage(location.href);
+    window.close();
+  }
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+```
+For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
+And make sure to register it in the app's info.plist:
+```xml
+&lt;key&gt;CFBundleURLTypes&lt;/key&gt;
+&lt;array&gt;
+   &lt;dict&gt;
+      &lt;key&gt;CFBundleURLSchemes&lt;/key&gt;
+      &lt;array&gt;
+         &lt;string&gt;myapp&lt;/string&gt;
+      &lt;/array&gt;
+   &lt;/dict&gt;
+&lt;/array&gt;
+```
+And in the AndroidManifest.xml file:
+```xml
+&lt;activity&gt;
+   &lt;intent-filter&gt;
+      &lt;action android:name="android.intent.action.VIEW" /&gt;
+      &lt;category android:name="android.intent.category.DEFAULT" /&gt;
+      &lt;category android:name="android.intent.category.BROWSABLE" /&gt;
+      &lt;data android:host="oauth_callback" android:scheme="myapp" /&gt;
+   &lt;/intent-filter&gt;
+&lt;/activity&gt;
+```
+
+| Param         | Type                                                                        | Description                                 |
+| ------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| **`options`** | <code><a href="#opensecurewindowoptions">OpenSecureWindowOptions</a></code> | - the options for the openSecureWindow call |
+
+**Returns:** <code>Promise&lt;<a href="#opensecurewindowresponse">OpenSecureWindowResponse</a>&gt;</code>
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -812,6 +870,22 @@ When `id` is omitted, targets the active webview.
 | **`height`** | <code>number</code> | Height of the webview in pixels         |
 | **`x`**      | <code>number</code> | X position from the left edge in pixels |
 | **`y`**      | <code>number</code> | Y position from the top edge in pixels  |
+
+
+#### OpenSecureWindowResponse
+
+| Prop                | Type                | Description                             |
+| ------------------- | ------------------- | --------------------------------------- |
+| **`redirectedUri`** | <code>string</code> | The result of the openSecureWindow call |
+
+
+#### OpenSecureWindowOptions
+
+| Prop                       | Type                | Description                                                                                                                                                     |
+| -------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`authEndpoint`**         | <code>string</code> | The endpoint to open                                                                                                                                            |
+| **`redirectUri`**          | <code>string</code> | The redirect URI to use for the openSecureWindow call. This will be checked to make sure it matches the redirect URI after the window finishes the redirection. |
+| **`broadcastChannelName`** | <code>string</code> | The name of the broadcast channel to listen to, relevant only for web                                                                                           |
 
 
 ### Type Aliases
