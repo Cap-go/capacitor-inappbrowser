@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import WebKit
+import AuthenticationServices
 
 extension UIColor {
 
@@ -69,6 +70,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var closeModalDescription: String?
     private var closeModalOk: String?
     private var closeModalCancel: String?
+    private var openSecureWindowCall: CAPPluginCall?
 
     private func setup() {
         self.isSetupDone = true
@@ -1388,5 +1390,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             session.presentationContextProvider = self
             session.start()
         }
+    }
+}
+
+extension InAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
+    public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()
     }
 }
