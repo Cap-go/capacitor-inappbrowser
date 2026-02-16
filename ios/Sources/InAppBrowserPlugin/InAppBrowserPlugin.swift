@@ -198,8 +198,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             ? webViewController.view.safeAreaLayoutGuide.bottomAnchor
             : webViewController.view.bottomAnchor
 
+        let topAnchor = webViewController.enabledSafeTopMargin
+            ? webViewController.view.safeAreaLayoutGuide.topAnchor
+            : webViewController.view.topAnchor
+
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: webViewController.view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: webViewController.view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: webViewController.view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
@@ -497,6 +501,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
+        let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
@@ -604,6 +609,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 preventDeeplink: preventDeeplink,
                 blankNavigationTab: toolbarType == "blank",
                 enabledSafeBottomMargin: enabledSafeBottomMargin,
+                enabledSafeTopMargin: enabledSafeTopMargin,
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
                 )
@@ -1157,7 +1163,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, enabledSafeTopMargin: true)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")

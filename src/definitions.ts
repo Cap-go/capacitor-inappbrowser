@@ -522,6 +522,17 @@ export interface OpenWebViewOptions {
   enabledSafeBottomMargin?: boolean;
 
   /**
+   * If false, the webView will extend behind the status bar for true full-screen immersive content.
+   * When true (default), respects the safe area at the top of the screen.
+   * Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.
+   * @since 8.2.0
+   * @default true
+   * @example
+   * enabledSafeTopMargin: false  // Full screen, extends behind status bar
+   */
+  enabledSafeTopMargin?: boolean;
+
+  /**
    * When true, applies the system status bar inset as the WebView top margin on Android.
    * Keeps the legacy 0px margin by default for apps that handle padding themselves.
    * @default false
