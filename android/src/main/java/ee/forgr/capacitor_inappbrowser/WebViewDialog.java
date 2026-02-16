@@ -1688,9 +1688,9 @@ public class WebViewDialog extends Dialog {
             _webView.draw(canvas);
 
             // Convert to PNG and encode as base64
-            // PNG is lossless format, quality parameter not applicable
+            // PNG is lossless format, quality parameter not applicable (0 = ignored)
             java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 0, outputStream);
             byte[] byteArray = outputStream.toByteArray();
             String base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP);
 
