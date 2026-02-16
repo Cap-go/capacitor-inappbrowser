@@ -195,8 +195,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             ? webViewController.view.safeAreaLayoutGuide.bottomAnchor
             : webViewController.view.bottomAnchor
 
+        let topAnchor = webViewController.blankNavigationTab
+            ? webViewController.view.topAnchor
+            : webViewController.view.safeAreaLayoutGuide.topAnchor
+
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: webViewController.view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: webViewController.view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: webViewController.view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
