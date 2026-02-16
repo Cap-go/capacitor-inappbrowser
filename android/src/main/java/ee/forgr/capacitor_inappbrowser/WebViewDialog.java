@@ -2377,10 +2377,8 @@ public class WebViewDialog extends Dialog {
 
                     // Check if URL is an internal WebView scheme (data:, blob:, about:, javascript:)
                     // These should always be allowed to load in the WebView
-                    boolean isInternalScheme = url.startsWith("data:") ||
-                                              url.startsWith("blob:") ||
-                                              url.startsWith("about:") ||
-                                              url.startsWith("javascript:");
+                    boolean isInternalScheme =
+                        url.startsWith("data:") || url.startsWith("blob:") || url.startsWith("about:") || url.startsWith("javascript:");
 
                     // If preventDeeplink is true, don't handle any non-http(s) URLs except internal schemes
                     if (_options.getPreventDeeplink()) {
