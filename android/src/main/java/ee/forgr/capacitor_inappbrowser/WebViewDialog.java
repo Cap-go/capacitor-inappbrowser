@@ -3328,7 +3328,8 @@ public class WebViewDialog extends Dialog {
                     // Monitor download completion in a background thread
                     new Thread(() -> {
                         monitorDownload(dm, downloadId, url, fileName, mimeType);
-                    }).start();
+                    })
+                        .start();
                 } else {
                     Log.e("InAppBrowser", "DownloadManager is null");
                     if (_options.getCallbacks() != null) {
@@ -3420,7 +3421,9 @@ public class WebViewDialog extends Dialog {
                     // Notify download failed
                     if (_options.getCallbacks() != null) {
                         activity.runOnUiThread(() -> {
-                            _options.getCallbacks().downloadEvent(url, fileName, mimeType, null, "failed", "Download failed with reason: " + reason);
+                            _options
+                                .getCallbacks()
+                                .downloadEvent(url, fileName, mimeType, null, "failed", "Download failed with reason: " + reason);
                         });
                     }
 
