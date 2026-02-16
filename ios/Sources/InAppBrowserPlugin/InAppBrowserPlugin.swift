@@ -752,6 +752,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // Set Google Pay support
             webViewController.enableGooglePaySupport = enableGooglePaySupport
 
+            // Set download handling
+            webViewController.enableDownloads = call.getBool("enableDownloads", true)
+
             // Set text zoom if specified
             if let textZoom = call.getInt("textZoom") {
                 webViewController.textZoom = textZoom

@@ -14,4 +14,6 @@ public interface WebViewCallbacks {
     public void buttonNearDoneClicked();
 
     public void confirmBtnClicked(String url);
+
+    public void downloadEvent(String url, String fileName, String mimeType, String filePath, String status, String error);
 }

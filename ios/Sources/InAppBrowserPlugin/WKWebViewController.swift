@@ -138,6 +138,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var closeModalCancel = ""
     open var ignoreUntrustedSSLError = false
     open var enableGooglePaySupport = false
+    open var enableDownloads = true
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var blankNavigationTab: Bool = false
@@ -847,7 +848,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Ensure status bar appearance is correct when view appears
         // Make sure we have the latest tint color
-        if let tintColor = self.tintColor {
+        if self.tintColor != nil {
             // Update the status bar background if needed
             if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
                 setupStatusBarBackground(color: backgroundColor)
@@ -1631,15 +1632,8 @@ extension WKWebViewController: WKUIDelegate {
                 strongCompletionHandler()
             }))
 
-            // Try to present the alert
-            do {
-                self.present(alertController, animated: true, completion: nil)
-            } catch {
-                // This won't typically be triggered as present doesn't throw,
-                // but adding as a safeguard
-                print("[InAppBrowser] Error presenting alert: \(error)")
-                strongCompletionHandler()
-            }
+            // Present the alert
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
@@ -1962,6 +1956,61 @@ extension WKWebViewController: WKNavigationDelegate {
         }
     }
 
+    @available(iOS 14.5, *)
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        guard enableDownloads else {
+            decisionHandler(.allow)
+            return
+        }
+
+        // Check if this is a download (non-HTML content that can't be displayed)
+        guard let response = navigationResponse.response as? HTTPURLResponse,
+              let mimeType = response.mimeType,
+              let url = response.url else {
+            decisionHandler(.allow)
+            return
+        }
+
+        // Determine if this should be downloaded based on Content-Disposition or MIME type
+        let contentDisposition = response.allHeaderFields["Content-Disposition"] as? String ?? ""
+        let isAttachment = contentDisposition.lowercased().contains("attachment")
+        let isDownloadableMimeType = !["text/html", "text/plain", "image/jpeg", "image/png", "image/gif", "image/svg+xml"].contains(mimeType)
+
+        if isAttachment || (isDownloadableMimeType && !canDisplay(mimeType: mimeType)) {
+            print("[InAppBrowser] Download detected: \(url.absoluteString), MIME: \(mimeType)")
+
+            // Emit download started event
+            let fileName = url.lastPathComponent
+            emit("downloadEvent", data: [
+                "url": url.absoluteString,
+                "fileName": fileName,
+                "mimeType": mimeType,
+                "status": "started"
+            ])
+
+            // Trigger download
+            decisionHandler(.download)
+            return
+        }
+
+        decisionHandler(.allow)
+    }
+
+    @available(iOS 14.5, *)
+    public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        print("[InAppBrowser] Download started")
+        download.delegate = self
+    }
+
+    // Helper to check if a MIME type can be displayed inline
+    private func canDisplay(mimeType: String) -> Bool {
+        let displayableMimeTypes = [
+            "text/html", "text/plain", "image/jpeg", "image/jpg", "image/png", 
+            "image/gif", "image/svg+xml", "image/webp", "application/pdf"
+        ]
+        return displayableMimeTypes.contains(mimeType.lowercased())
+    }
+
     // MARK: - Dimension Management
 
     /// Apply custom dimensions to the view if specified
@@ -2006,6 +2055,84 @@ extension WKWebViewController: WKNavigationDelegate {
 
         // Apply the new dimensions
         applyCustomDimensions()
+    }
+}
+
+// MARK: - WKDownloadDelegate (iOS 14.5+)
+@available(iOS 14.5, *)
+extension WKWebViewController: WKDownloadDelegate {
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        // Save to temporary directory
+        let tempDir = FileManager.default.temporaryDirectory
+        let destinationURL = tempDir.appendingPathComponent(suggestedFilename)
+        
+        // Remove existing file if present
+        try? FileManager.default.removeItem(at: destinationURL)
+        
+        print("[InAppBrowser] Downloading to: \(destinationURL.path)")
+        completionHandler(destinationURL)
+    }
+    
+    public func downloadDidFinish(_ download: WKDownload) {
+        print("[InAppBrowser] Download finished successfully")
+        
+        // Get the destination URL from the download
+        guard let response = download.originalRequest?.url else {
+            print("[InAppBrowser] Could not get download URL")
+            return
+        }
+        
+        let fileName = response.lastPathComponent
+        let tempDir = FileManager.default.temporaryDirectory
+        let filePath = tempDir.appendingPathComponent(fileName)
+        
+        // Emit download completed event
+        emit("downloadEvent", data: [
+            "url": response.absoluteString,
+            "fileName": fileName,
+            "filePath": filePath.path,
+            "status": "completed"
+        ])
+        
+        // Open the file with QLPreviewController or system viewer
+        DispatchQueue.main.async { [weak self] in
+            self?.openDownloadedFile(at: filePath)
+        }
+    }
+    
+    public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        print("[InAppBrowser] Download failed: \(error.localizedDescription)")
+        
+        guard let url = download.originalRequest?.url else { return }
+        
+        emit("downloadEvent", data: [
+            "url": url.absoluteString,
+            "status": "failed",
+            "error": error.localizedDescription
+        ])
+    }
+    
+    private func openDownloadedFile(at fileURL: URL) {
+        // Use UIDocumentInteractionController to open the file
+        let documentController = UIDocumentInteractionController(url: fileURL)
+        documentController.delegate = self
+        
+        // Try to present preview
+        if documentController.presentPreview(animated: true) {
+            print("[InAppBrowser] Presented file preview")
+        } else {
+            // Fallback to open-in menu
+            let viewController = self.navigationController ?? self
+            documentController.presentOpenInMenu(from: viewController.view.bounds, in: viewController.view, animated: true)
+        }
+    }
+}
+
+// MARK: - UIDocumentInteractionControllerDelegate
+@available(iOS 14.5, *)
+extension WKWebViewController: UIDocumentInteractionControllerDelegate {
+    public func documentInteractionControllerViewControllerForPreview(_ controller: UIDocumentInteractionController) -> UIViewController {
+        return self.navigationController ?? self
     }
 }
 

@@ -25,9 +25,53 @@ export interface BtnEvent {
   url: string;
 }
 
+export interface DownloadEvent {
+  /**
+   * Webview instance id.
+   */
+  id?: string;
+  /**
+   * The URL of the file being downloaded.
+   *
+   * @since 8.2.0
+   */
+  url: string;
+  /**
+   * The suggested filename for the download.
+   *
+   * @since 8.2.0
+   */
+  fileName?: string;
+  /**
+   * The MIME type of the file.
+   *
+   * @since 8.2.0
+   */
+  mimeType?: string;
+  /**
+   * The local file path where the file was saved (available after download completes).
+   *
+   * @since 8.2.0
+   */
+  filePath?: string;
+  /**
+   * Download status: 'started', 'completed', or 'failed'.
+   *
+   * @since 8.2.0
+   */
+  status: 'started' | 'completed' | 'failed';
+  /**
+   * Error message if download failed.
+   *
+   * @since 8.2.0
+   */
+  error?: string;
+}
+
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: object) => void;
+export type DownloadListener = (event: DownloadEvent) => void;
 
 export enum BackgroundColor {
   WHITE = 'white',
@@ -639,6 +683,22 @@ export interface OpenWebViewOptions {
    * invisibilityMode: InvisibilityMode.FAKE_VISIBLE
    */
   invisibilityMode?: InvisibilityMode;
+
+  /**
+   * Enable automatic file download handling in the webview.
+   * When enabled, file downloads are automatically handled:
+   * - Files are downloaded to a temporary directory
+   * - On completion, the system viewer opens the file (iOS uses QLPreviewController, Android uses Intent)
+   * - Download events are emitted for tracking ('downloadEvent' listener)
+   *
+   * Note: On Android API < 29, this may require WRITE_EXTERNAL_STORAGE permission
+   *
+   * @since 8.2.0
+   * @default true
+   * @example
+   * enableDownloads: true
+   */
+  enableDownloads?: boolean;
 }
 
 export interface DimensionOptions {
@@ -801,6 +861,14 @@ export interface InAppBrowserPlugin {
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
+
+  /**
+   * Will be triggered when a file download is initiated or completed in the webview
+   *
+   * @since 8.2.0
+   */
+  addListener(eventName: 'downloadEvent', listenerFunc: DownloadListener): Promise<PluginListenerHandle>;
+
   /**
    * Remove all listeners for this plugin.
    *

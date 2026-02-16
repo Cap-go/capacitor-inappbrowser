@@ -936,6 +936,7 @@ public class WebViewDialog extends Dialog {
 
         setupToolbar();
         setWebViewClient();
+        setupDownloadListener();
 
         if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
@@ -3281,5 +3282,207 @@ public class WebViewDialog extends Dialog {
      */
     private float getPixels(int dp) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, _context.getResources().getDisplayMetrics());
+    }
+
+    /**
+     * Setup download listener for the WebView
+     */
+    private void setupDownloadListener() {
+        if (!_options.getEnableDownloads()) {
+            Log.d("InAppBrowser", "Download handling is disabled");
+            return;
+        }
+
+        _webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            Log.d("InAppBrowser", "Download started: " + url);
+            Log.d("InAppBrowser", "MIME type: " + mimeType);
+            Log.d("InAppBrowser", "Content disposition: " + contentDisposition);
+
+            // Extract filename from content disposition or URL
+            String fileName = extractFileName(contentDisposition, url);
+
+            // Notify download started
+            if (_options.getCallbacks() != null) {
+                _options.getCallbacks().downloadEvent(url, fileName, mimeType, null, "started", null);
+            }
+
+            // Start download using Android DownloadManager
+            try {
+                android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(Uri.parse(url));
+                request.setMimeType(mimeType);
+                request.addRequestHeader("User-Agent", userAgent);
+                request.setDescription("Downloading file");
+                request.setTitle(fileName);
+                request.allowScanningByMediaScanner();
+                request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+
+                // Save file to Downloads directory
+                request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+
+                // Get download service and enqueue file
+                android.app.DownloadManager dm = (android.app.DownloadManager) _context.getSystemService(Context.DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    long downloadId = dm.enqueue(request);
+                    Log.d("InAppBrowser", "Download enqueued with ID: " + downloadId);
+
+                    // Monitor download completion in a background thread
+                    new Thread(() -> {
+                        monitorDownload(dm, downloadId, url, fileName, mimeType);
+                    })
+                        .start();
+                } else {
+                    Log.e("InAppBrowser", "DownloadManager is null");
+                    if (_options.getCallbacks() != null) {
+                        _options.getCallbacks().downloadEvent(url, fileName, mimeType, null, "failed", "DownloadManager not available");
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error starting download: " + e.getMessage());
+                if (_options.getCallbacks() != null) {
+                    _options.getCallbacks().downloadEvent(url, fileName, mimeType, null, "failed", e.getMessage());
+                }
+            }
+        });
+    }
+
+    /**
+     * Extract filename from content disposition or URL
+     */
+    private String extractFileName(String contentDisposition, String url) {
+        String fileName = "download";
+
+        // Try to extract filename from content disposition
+        if (contentDisposition != null && contentDisposition.contains("filename=")) {
+            try {
+                int startIndex = contentDisposition.indexOf("filename=") + 9;
+                int endIndex = contentDisposition.indexOf(";", startIndex);
+                if (endIndex == -1) {
+                    endIndex = contentDisposition.length();
+                }
+                fileName = contentDisposition.substring(startIndex, endIndex).replace("\"", "").trim();
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error extracting filename from content disposition: " + e.getMessage());
+            }
+        }
+
+        // If no filename from content disposition, extract from URL
+        if (fileName.equals("download")) {
+            try {
+                String urlPath = Uri.parse(url).getLastPathSegment();
+                if (urlPath != null && !urlPath.isEmpty()) {
+                    fileName = urlPath;
+                }
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error extracting filename from URL: " + e.getMessage());
+            }
+        }
+
+        return fileName;
+    }
+
+    /**
+     * Monitor download progress and completion
+     */
+    private void monitorDownload(android.app.DownloadManager dm, long downloadId, String url, String fileName, String mimeType) {
+        boolean downloading = true;
+        while (downloading) {
+            android.app.DownloadManager.Query query = new android.app.DownloadManager.Query();
+            query.setFilterById(downloadId);
+            android.database.Cursor cursor = dm.query(query);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                int statusIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS);
+                int status = cursor.getInt(statusIndex);
+
+                if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                    Log.d("InAppBrowser", "Download completed successfully");
+
+                    // Get the downloaded file URI
+                    int uriIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_LOCAL_URI);
+                    String filePath = cursor.getString(uriIndex);
+
+                    // Notify download completed
+                    if (_options.getCallbacks() != null) {
+                        activity.runOnUiThread(() -> {
+                            _options.getCallbacks().downloadEvent(url, fileName, mimeType, filePath, "completed", null);
+                        });
+                    }
+
+                    // Open the downloaded file
+                    openDownloadedFile(filePath, mimeType);
+
+                    downloading = false;
+                } else if (status == android.app.DownloadManager.STATUS_FAILED) {
+                    Log.e("InAppBrowser", "Download failed");
+
+                    int reasonIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_REASON);
+                    int reason = cursor.getInt(reasonIndex);
+
+                    // Notify download failed
+                    if (_options.getCallbacks() != null) {
+                        activity.runOnUiThread(() -> {
+                            _options
+                                .getCallbacks()
+                                .downloadEvent(url, fileName, mimeType, null, "failed", "Download failed with reason: " + reason);
+                        });
+                    }
+
+                    downloading = false;
+                }
+            }
+
+            if (cursor != null) {
+                cursor.close();
+            }
+
+            try {
+                Thread.sleep(1000); // Check every second
+            } catch (InterruptedException e) {
+                Log.e("InAppBrowser", "Download monitoring interrupted: " + e.getMessage());
+                downloading = false;
+            }
+        }
+    }
+
+    /**
+     * Open the downloaded file with an appropriate app
+     */
+    private void openDownloadedFile(String filePath, String mimeType) {
+        if (filePath == null || activity == null) {
+            return;
+        }
+
+        try {
+            Uri fileUri = Uri.parse(filePath);
+            File file = new File(fileUri.getPath());
+
+            if (!file.exists()) {
+                Log.e("InAppBrowser", "Downloaded file does not exist: " + filePath);
+                return;
+            }
+
+            // Use FileProvider to get a content URI for Android 7.0+
+            Uri contentUri;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                contentUri = FileProvider.getUriForFile(_context, _context.getPackageName() + ".fileprovider", file);
+            } else {
+                contentUri = Uri.fromFile(file);
+            }
+
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(contentUri, mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            try {
+                _context.startActivity(intent);
+                Log.d("InAppBrowser", "Opened downloaded file");
+            } catch (ActivityNotFoundException e) {
+                Log.e("InAppBrowser", "No app found to open file: " + e.getMessage());
+                Toast.makeText(_context, "No app found to open this file", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error opening downloaded file: " + e.getMessage());
+        }
     }
 }

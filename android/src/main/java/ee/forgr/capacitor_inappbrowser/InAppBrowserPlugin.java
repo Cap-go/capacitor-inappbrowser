@@ -627,6 +627,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         // Use system top inset for WebView margin when explicitly enabled
         options.setUseTopInset(Boolean.TRUE.equals(call.getBoolean("useTopInset", false)));
 
+        // Enable download handling by default
+        options.setEnableDownloads(Boolean.TRUE.equals(call.getBoolean("enableDownloads", true)));
+
         //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
         options.setCallbacks(
             new WebViewCallbacks() {
@@ -695,6 +698,27 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         jsObject.put("id", webViewId);
                         notifyListeners("messageFromWebview", jsObject);
                     }
+                }
+
+                @Override
+                public void downloadEvent(String url, String fileName, String mimeType, String filePath, String status, String error) {
+                    JSObject jsObject = new JSObject();
+                    jsObject.put("id", webViewId);
+                    jsObject.put("url", url);
+                    if (fileName != null) {
+                        jsObject.put("fileName", fileName);
+                    }
+                    if (mimeType != null) {
+                        jsObject.put("mimeType", mimeType);
+                    }
+                    if (filePath != null) {
+                        jsObject.put("filePath", filePath);
+                    }
+                    jsObject.put("status", status);
+                    if (error != null) {
+                        jsObject.put("error", error);
+                    }
+                    notifyListeners("downloadEvent", jsObject);
                 }
             }
         );
