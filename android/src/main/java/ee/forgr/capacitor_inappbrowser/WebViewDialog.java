@@ -918,7 +918,7 @@ public class WebViewDialog extends Dialog {
         // Load URL with optional HTTP method and body
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
-        
+
         if (httpMethod != null && httpMethod.equalsIgnoreCase("POST") && httpBody != null) {
             // For POST requests with body, use postUrl
             byte[] postData = httpBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -927,7 +927,7 @@ public class WebViewDialog extends Dialog {
             // For GET and other methods, use loadUrl with headers
             _webView.loadUrl(this._options.getUrl(), requestHeaders);
         }
-        
+
         _webView.requestFocus();
         _webView.requestFocusFromTouch();
 
