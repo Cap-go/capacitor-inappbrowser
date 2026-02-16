@@ -250,6 +250,19 @@ public class WebViewDialog extends Dialog {
         return _options != null && _options.getAllowWebViewJsVisibilityControl();
     }
 
+    /**
+     * Checks if the given HTTP method supports a request body.
+     * @param method The HTTP method to check
+     * @return true if the method supports a body (POST, PUT, PATCH), false otherwise
+     */
+    private boolean supportsRequestBody(String method) {
+        if (method == null) {
+            return false;
+        }
+        String upperMethod = method.toUpperCase();
+        return upperMethod.equals("POST") || upperMethod.equals("PUT") || upperMethod.equals("PATCH");
+    }
+
     public class PreShowScriptInterface {
 
         @JavascriptInterface
@@ -919,15 +932,11 @@ public class WebViewDialog extends Dialog {
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
 
-        if (
-            httpMethod != null &&
-            (httpMethod.equalsIgnoreCase("POST") || httpMethod.equalsIgnoreCase("PUT") || httpMethod.equalsIgnoreCase("PATCH")) &&
-            httpBody != null
-        ) {
+        if (supportsRequestBody(httpMethod) && httpBody != null) {
             // For POST/PUT/PATCH requests with body
             // Note: Android WebView has limitations with custom headers on POST
             // Headers may not be sent with the initial request when using postUrl
-            byte[] postData = httpBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
             _webView.postUrl(this._options.getUrl(), postData);
 
             // Log a warning if headers were provided, as they won't be sent with postUrl
