@@ -196,6 +196,29 @@ export interface OpenWebViewOptions {
    */
   credentials?: Credentials;
   /**
+   * HTTP method to use for the initial request.
+   * When specified with 'POST', 'PUT', or other methods that support a body,
+   * you can also provide a `body` parameter with the request payload.
+   * @since 8.2.0
+   * @default "GET"
+   * @example
+   * method: "POST",
+   * body: JSON.stringify({ token: "auth-token", data: "value" }),
+   * headers: { "Content-Type": "application/json" }
+   */
+  method?: string;
+  /**
+   * HTTP body to send with the request when using POST, PUT, or other methods that support a body.
+   * Should be a string (use JSON.stringify for JSON data).
+   * Only used when `method` is specified and supports a request body.
+   * @since 8.2.0
+   * @example
+   * method: "POST",
+   * body: JSON.stringify({ username: "user", password: "pass" }),
+   * headers: { "Content-Type": "application/json" }
+   */
+  body?: string;
+  /**
    * materialPicker: if true, uses Material Design theme for date and time pickers on Android.
    * This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.
    * @since 7.4.1

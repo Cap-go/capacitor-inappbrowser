@@ -575,6 +575,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let credentials = self.readCredentials(call)
 
+        // Read HTTP method and body for custom requests
+        let httpMethod = call.getString("method")
+        let httpBody = call.getString("body")
+
         // Read dimension options
         let width = call.getFloat("width")
         let height = call.getFloat("height")
@@ -616,6 +620,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.instanceId = webViewId
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+
+            // Set HTTP method and body if provided
+            if let method = httpMethod {
+                webViewController.httpMethod = method
+            }
+            if let body = httpBody {
+                webViewController.httpBody = body
+            }
 
             // Set dimensions if provided
             if let width = width {

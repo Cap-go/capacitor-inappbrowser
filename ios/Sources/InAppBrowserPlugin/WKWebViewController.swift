@@ -123,6 +123,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
     open var headers: [String: String]?
+    open var httpMethod: String?
+    open var httpBody: String?
     open var capBrowserPlugin: InAppBrowserPlugin?
     var instanceId: String = ""
     var shareDisclaimer: [String: Any]?
@@ -1078,6 +1080,16 @@ fileprivate extension WKWebViewController {
     }
     func createRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url)
+
+        // Set up HTTP method if specified
+        if let method = httpMethod {
+            request.httpMethod = method.uppercased()
+        }
+
+        // Set up HTTP body if specified
+        if let body = httpBody, let data = body.data(using: .utf8) {
+            request.httpBody = data
+        }
 
         // Set up headers
         if let headers = headers {
