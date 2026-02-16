@@ -493,6 +493,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setHeaders(call.getObject("headers"));
         options.setCredentials(call.getObject("credentials"));
         options.setShowReloadButton(Boolean.TRUE.equals(call.getBoolean("showReloadButton", false)));
+        options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
         options.setVisibleTitle(Boolean.TRUE.equals(call.getBoolean("visibleTitle", true)));
         if (Boolean.TRUE.equals(options.getVisibleTitle())) {
             options.setTitle(call.getString("title", "New Window"));
@@ -662,6 +663,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void confirmBtnClicked(String url) {
                     notifyListeners("confirmBtnClicked", new JSObject().put("id", webViewId).put("url", url));
+                }
+
+                @Override
+                public void screenshotCaptured(String base64) {
+                    notifyListeners("screenshotCapture", new JSObject().put("id", webViewId).put("base64", base64));
                 }
 
                 @Override
@@ -1188,6 +1194,35 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error updating dimensions: " + e.getMessage());
                         call.reject("Failed to update dimensions: " + e.getMessage());
+                    }
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void captureScreenshot(PluginCall call) {
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    String targetId = resolveTargetId(call);
+                    WebViewDialog webViewDialog = resolveDialog(targetId);
+                    if (webViewDialog != null) {
+                        try {
+                            Integer quality = call.getInt("quality", 100);
+                            String screenshot = webViewDialog.captureScreenshot(quality);
+                            JSObject result = new JSObject();
+                            result.put("base64", screenshot);
+                            if (targetId != null) {
+                                result.put("id", targetId);
+                            }
+                            call.resolve(result);
+                        } catch (Exception e) {
+                            call.reject("Failed to capture screenshot: " + e.getMessage());
+                        }
+                    } else {
+                        call.reject("WebView is not initialized");
                     }
                 }
             }

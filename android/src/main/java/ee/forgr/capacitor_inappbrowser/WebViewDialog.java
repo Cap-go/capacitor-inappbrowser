@@ -1672,6 +1672,39 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    public String captureScreenshot(int quality) {
+        if (_webView == null) {
+            throw new RuntimeException("Cannot capture screenshot - WebView is null");
+        }
+
+        try {
+            // Create a bitmap of the WebView
+            Bitmap bitmap = Bitmap.createBitmap(
+                _webView.getWidth(),
+                _webView.getHeight(),
+                Bitmap.Config.ARGB_8888
+            );
+            Canvas canvas = new Canvas(bitmap);
+            _webView.draw(canvas);
+
+            // Convert to PNG and encode as base64
+            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+            bitmap.compress(Bitmap.CompressFormat.PNG, quality, outputStream);
+            byte[] byteArray = outputStream.toByteArray();
+            String base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP);
+
+            // Clean up
+            outputStream.close();
+            bitmap.recycle();
+
+            Log.d("InAppBrowser", "Screenshot captured successfully");
+            return base64;
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error capturing screenshot: " + e.getMessage());
+            throw new RuntimeException("Failed to capture screenshot: " + e.getMessage());
+        }
+    }
+
     public void destroy() {
         if (_webView != null) {
             _webView.destroy();
@@ -1875,6 +1908,30 @@ public class WebViewDialog extends Dialog {
         } else {
             View reloadButtonView = _toolbar.findViewById(R.id.reloadButton);
             reloadButtonView.setVisibility(View.GONE);
+        }
+
+        // Handle screenshot button visibility
+        if (_options.getShowScreenshotButton() && !TextUtils.equals(_options.getToolbarType(), "activity")) {
+            View screenshotButtonView = _toolbar.findViewById(R.id.screenshotButton);
+            screenshotButtonView.setVisibility(View.VISIBLE);
+            screenshotButtonView.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if (_webView != null) {
+                            try {
+                                String screenshot = captureScreenshot(100);
+                                _options.getCallbacks().screenshotCaptured(screenshot);
+                            } catch (Exception e) {
+                                Log.e("InAppBrowser", "Failed to capture screenshot: " + e.getMessage());
+                            }
+                        }
+                    }
+                }
+            );
+        } else {
+            View screenshotButtonView = _toolbar.findViewById(R.id.screenshotButton);
+            screenshotButtonView.setVisibility(View.GONE);
         }
 
         if (TextUtils.equals(_options.getToolbarType(), "activity")) {
@@ -2126,6 +2183,7 @@ public class WebViewDialog extends Dialog {
         ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
         ImageButton closeButton = _toolbar.findViewById(R.id.closeButton);
         ImageButton reloadButton = _toolbar.findViewById(R.id.reloadButton);
+        ImageButton screenshotButton = _toolbar.findViewById(R.id.screenshotButton);
         ImageButton shareButton = _toolbar.findViewById(R.id.shareButton);
         ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
 
@@ -2134,12 +2192,14 @@ public class WebViewDialog extends Dialog {
         forwardButton.setBackgroundColor(backgroundColor);
         closeButton.setBackgroundColor(backgroundColor);
         reloadButton.setBackgroundColor(backgroundColor);
+        screenshotButton.setBackgroundColor(backgroundColor);
 
         // Apply tint colors to buttons
         backButton.setColorFilter(iconColor);
         forwardButton.setColorFilter(iconColor);
         closeButton.setColorFilter(iconColor);
         reloadButton.setColorFilter(iconColor);
+        screenshotButton.setColorFilter(iconColor);
         shareButton.setColorFilter(iconColor);
         buttonNearDoneView.setColorFilter(iconColor);
     }
