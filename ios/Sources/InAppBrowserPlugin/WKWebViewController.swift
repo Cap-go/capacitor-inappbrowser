@@ -991,7 +991,7 @@ public extension WKWebViewController {
         webView?.reload()
     }
 
-    func captureScreenshot(quality: Int = 100, completion: @escaping (String?, Error?) -> Void) {
+    func captureScreenshot(completion: @escaping (String?, Error?) -> Void) {
         guard let webView = webView else {
             completion(nil, NSError(domain: "InAppBrowser", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView is not initialized"]))
             return
@@ -1010,7 +1010,7 @@ public extension WKWebViewController {
                     return
                 }
 
-                // Convert to PNG data
+                // Convert to PNG data (PNG is lossless, quality parameter not applicable)
                 guard let pngData = image.pngData() else {
                     completion(nil, NSError(domain: "InAppBrowser", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"]))
                     return
@@ -1503,7 +1503,7 @@ fileprivate extension WKWebViewController {
     }
 
     @objc func screenshotDidClick(sender: AnyObject) {
-        captureScreenshot(quality: 100) { [weak self] base64, error in
+        captureScreenshot { [weak self] base64, error in
             if let error = error {
                 print("[InAppBrowser] Screenshot capture failed: \(error.localizedDescription)")
                 return

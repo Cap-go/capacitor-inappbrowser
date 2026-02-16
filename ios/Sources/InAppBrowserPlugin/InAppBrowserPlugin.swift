@@ -962,14 +962,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func captureScreenshot(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            let targetId = call.getString("id") ?? self.activeWebViewId
+            let explicitId = call.getString("id")
+            let targetId = explicitId ?? self.activeWebViewId
             guard let webViewController = self.resolveWebViewController(for: targetId) else {
                 call.reject("WebView is not initialized")
                 return
             }
 
-            let quality = call.getInt("quality") ?? 100
-            webViewController.captureScreenshot(quality: quality) { base64, error in
+            webViewController.captureScreenshot { base64, error in
                 if let error = error {
                     call.reject("Failed to capture screenshot: \(error.localizedDescription)")
                     return
@@ -977,8 +977,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
                 if let base64 = base64 {
                     var result: [String: Any] = ["base64": base64]
-                    if let targetId = targetId {
-                        result["id"] = targetId
+                    if let explicitId = explicitId {
+                        result["id"] = explicitId
                     }
                     call.resolve(result)
                 } else {

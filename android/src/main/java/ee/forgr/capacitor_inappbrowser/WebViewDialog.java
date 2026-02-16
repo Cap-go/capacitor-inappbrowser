@@ -1672,7 +1672,7 @@ public class WebViewDialog extends Dialog {
         }
     }
 
-    public String captureScreenshot(int quality) {
+    public String captureScreenshot() {
         if (_webView == null) {
             throw new RuntimeException("Cannot capture screenshot - WebView is null");
         }
@@ -1688,8 +1688,9 @@ public class WebViewDialog extends Dialog {
             _webView.draw(canvas);
 
             // Convert to PNG and encode as base64
+            // PNG is lossless format, quality parameter not applicable
             java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
-            bitmap.compress(Bitmap.CompressFormat.PNG, quality, outputStream);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
             byte[] byteArray = outputStream.toByteArray();
             String base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP);
 
@@ -1920,7 +1921,7 @@ public class WebViewDialog extends Dialog {
                     public void onClick(View view) {
                         if (_webView != null) {
                             try {
-                                String screenshot = captureScreenshot(100);
+                                String screenshot = captureScreenshot();
                                 _options.getCallbacks().screenshotCaptured(screenshot);
                             } catch (Exception e) {
                                 Log.e("InAppBrowser", "Failed to capture screenshot: " + e.getMessage());

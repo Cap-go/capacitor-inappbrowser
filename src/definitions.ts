@@ -689,11 +689,6 @@ export interface ScreenshotOptions {
    * Target webview id to capture. If omitted, captures the active webview.
    */
   id?: string;
-  /**
-   * Image quality (0-100). Higher values produce better quality but larger files.
-   * @default 100
-   */
-  quality?: number;
 }
 
 export interface ScreenshotResult {
@@ -891,11 +886,11 @@ export interface InAppBrowserPlugin {
    * Takes a snapshot of the currently displayed webpage and returns it as a base64-encoded PNG image.
    * When `id` is omitted, captures the active webview.
    *
-   * @param options Screenshot options (id, quality)
+   * @param options Screenshot options (id)
    * @returns Promise that resolves with the screenshot data
    * @since 8.1.0
    * @example
-   * const screenshot = await InAppBrowser.captureScreenshot({ quality: 90 });
+   * const screenshot = await InAppBrowser.captureScreenshot();
    * console.log('Screenshot captured:', screenshot.base64);
    */
   captureScreenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;

@@ -228,6 +228,7 @@ window.mobileApp.close();
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
 * [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
+* [`addListener('screenshotCapture', ...)`](#addlistenerscreenshotcapture-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
@@ -236,6 +237,7 @@ window.mobileApp.close();
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
+* [`captureScreenshot(...)`](#capturescreenshot)
 * [`openSecureWindow(...)`](#opensecurewindow)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -518,6 +520,28 @@ addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) 
 --------------------
 
 
+### addListener('screenshotCapture', ...)
+
+```typescript
+addListener(eventName: 'screenshotCapture', listenerFunc: ScreenshotCaptureListener) => Promise<PluginListenerHandle>
+```
+
+Listen for screenshot capture events.
+Triggered when the user clicks the screenshot button in the toolbar.
+Returns the screenshot as base64-encoded PNG data.
+
+| Param              | Type                                                                            |
+| ------------------ | ------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'screenshotCapture'</code>                                                |
+| **`listenerFunc`** | <code><a href="#screenshotcapturelistener">ScreenshotCaptureListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
 ### addListener('closeEvent', ...)
 
 ```typescript
@@ -666,6 +690,27 @@ When `id` is omitted, targets the active webview.
 --------------------
 
 
+### captureScreenshot(...)
+
+```typescript
+captureScreenshot(options?: ScreenshotOptions | undefined) => Promise<ScreenshotResult>
+```
+
+Captures a screenshot of the webview content.
+Takes a snapshot of the currently displayed webpage and returns it as a base64-encoded PNG image.
+When `id` is omitted, captures the active webview.
+
+| Param         | Type                                                            | Description             |
+| ------------- | --------------------------------------------------------------- | ----------------------- |
+| **`options`** | <code><a href="#screenshotoptions">ScreenshotOptions</a></code> | Screenshot options (id) |
+
+**Returns:** <code>Promise&lt;<a href="#screenshotresult">ScreenshotResult</a>&gt;</code>
+
+**Since:** 8.1.0
+
+--------------------
+
+
 ### openSecureWindow(...)
 
 ```typescript
@@ -788,6 +833,7 @@ And in the AndroidManifest.xml file:
 | **`isInspectable`**                    | <code>boolean</code>                                                                                                                                                   | Whether the website in the webview is inspectable or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            |        |
 | **`isAnimated`**                       | <code>boolean</code>                                                                                                                                                   | Whether the webview opening is animated or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | <code>true</code>                                             |        |
 | **`showReloadButton`**                 | <code>boolean</code>                                                                                                                                                   | Shows a reload button that reloads the web page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>false</code>                                            | 1.0.15 |
+| **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a screenshot button that captures the current webpage. When clicked, the screenshot will be returned via the 'screenshotCapture' event listener.                                                                                                                                                                                                                                                                                                                                                                                                     | <code>false</code>                                            | 8.1.0  |
 | **`closeModal`**                       | <code>boolean</code>                                                                                                                                                   | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            | 1.1.0  |
 | **`closeModalTitle`**                  | <code>string</code>                                                                                                                                                    | CloseModalTitle: title of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | <code>"Close"</code>                                          | 1.1.0  |
 | **`closeModalDescription`**            | <code>string</code>                                                                                                                                                    | CloseModalDescription: description of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>"Are you sure you want to close this window?"</code>    | 1.1.0  |
@@ -854,6 +900,14 @@ And in the AndroidManifest.xml file:
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
 
 
+#### ScreenshotEvent
+
+| Prop         | Type                | Description                                 | Since |
+| ------------ | ------------------- | ------------------------------------------- | ----- |
+| **`id`**     | <code>string</code> | Webview instance id.                        |       |
+| **`base64`** | <code>string</code> | Base64 encoded screenshot data (PNG format) | 8.1.0 |
+
+
 #### BtnEvent
 
 | Prop      | Type                | Description                    | Since |
@@ -870,6 +924,21 @@ And in the AndroidManifest.xml file:
 | **`height`** | <code>number</code> | Height of the webview in pixels         |
 | **`x`**      | <code>number</code> | X position from the left edge in pixels |
 | **`y`**      | <code>number</code> | Y position from the top edge in pixels  |
+
+
+#### ScreenshotResult
+
+| Prop         | Type                | Description                            |
+| ------------ | ------------------- | -------------------------------------- |
+| **`base64`** | <code>string</code> | Base64 encoded image data (PNG format) |
+| **`id`**     | <code>string</code> | Webview instance id                    |
+
+
+#### ScreenshotOptions
+
+| Prop     | Type                | Description                                                            |
+| -------- | ------------------- | ---------------------------------------------------------------------- |
+| **`id`** | <code>string</code> | Target webview id to capture. If omitted, captures the active webview. |
 
 
 #### OpenSecureWindowResponse
@@ -937,6 +1006,11 @@ Construct a type with a set of properties K of type T
 #### ButtonNearListener
 
 <code>(state: object): void</code>
+
+
+#### ScreenshotCaptureListener
+
+<code>(state: <a href="#screenshotevent">ScreenshotEvent</a>): void</code>
 
 
 #### ConfirmBtnListener

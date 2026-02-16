@@ -1206,16 +1206,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
-                    String targetId = resolveTargetId(call);
+                    String explicitId = call.getString("id");
+                    String targetId = explicitId != null ? explicitId : resolveTargetId(call);
                     WebViewDialog webViewDialog = resolveDialog(targetId);
                     if (webViewDialog != null) {
                         try {
-                            Integer quality = call.getInt("quality", 100);
-                            String screenshot = webViewDialog.captureScreenshot(quality);
+                            String screenshot = webViewDialog.captureScreenshot();
                             JSObject result = new JSObject();
                             result.put("base64", screenshot);
-                            if (targetId != null) {
-                                result.put("id", targetId);
+                            if (explicitId != null) {
+                                result.put("id", explicitId);
                             }
                             call.resolve(result);
                         } catch (Exception e) {
