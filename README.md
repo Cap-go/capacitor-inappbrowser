@@ -119,6 +119,8 @@ const htmlContent = `
 `;
 
 // Convert to base64
+// Note: btoa() only works with Latin1 characters. For Unicode content,
+// use TextEncoder or encodeURIComponent instead
 const base64Content = btoa(htmlContent);
 
 // Create data URL
