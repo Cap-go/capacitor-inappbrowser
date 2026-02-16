@@ -857,7 +857,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Ensure status bar appearance is correct when view appears
         // Make sure we have the latest tint color
-        if let tintColor = self.tintColor {
+        if self.tintColor != nil {
             // Update the status bar background if needed
             if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
                 setupStatusBarBackground(color: backgroundColor)
@@ -1511,7 +1511,7 @@ fileprivate extension WKWebViewController {
             
             if let base64 = base64 {
                 print("[InAppBrowser] Screenshot captured successfully")
-                self?.emit("screenshotCapture", ["base64": base64])
+                self?.emit("screenshotCapture", data: ["base64": base64])
             }
         }
     }
@@ -1689,15 +1689,8 @@ extension WKWebViewController: WKUIDelegate {
                 strongCompletionHandler()
             }))
 
-            // Try to present the alert
-            do {
-                self.present(alertController, animated: true, completion: nil)
-            } catch {
-                // This won't typically be triggered as present doesn't throw,
-                // but adding as a safeguard
-                print("[InAppBrowser] Error presenting alert: \(error)")
-                strongCompletionHandler()
-            }
+            // Present the alert
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
