@@ -196,6 +196,41 @@ export interface OpenWebViewOptions {
    */
   credentials?: Credentials;
   /**
+   * HTTP method to use for the initial request.
+   *
+   * **Optional parameter - defaults to GET if not specified.**
+   * Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests.
+   *
+   * When specified with 'POST', 'PUT', or 'PATCH' methods that support a body,
+   * you can also provide a `body` parameter with the request payload.
+   *
+   * **Platform Notes:**
+   * - iOS: Full support for all HTTP methods with headers
+   * - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations
+   *
+   * @since 8.2.0
+   * @default "GET"
+   * @example
+   * method: "POST",
+   * body: JSON.stringify({ token: "auth-token", data: "value" }),
+   * headers: { "Content-Type": "application/json" }
+   */
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | string;
+  /**
+   * HTTP body to send with the request when using POST, PUT, or other methods that support a body.
+   * Should be a string (use JSON.stringify for JSON data).
+   *
+   * **Optional parameter - only used when `method` is specified and supports a request body.**
+   * Omitting this parameter (or using GET method) results in standard behavior without a request body.
+   *
+   * @since 8.2.0
+   * @example
+   * method: "POST",
+   * body: JSON.stringify({ username: "user", password: "pass" }),
+   * headers: { "Content-Type": "application/json" }
+   */
+  body?: string;
+  /**
    * materialPicker: if true, uses Material Design theme for date and time pickers on Android.
    * This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.
    * @since 7.4.1
@@ -520,6 +555,17 @@ export interface OpenWebViewOptions {
    * enabledSafeBottomMargin: true
    */
   enabledSafeBottomMargin?: boolean;
+
+  /**
+   * If false, the webView will extend behind the status bar for true full-screen immersive content.
+   * When true (default), respects the safe area at the top of the screen.
+   * Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.
+   * @since 8.2.0
+   * @default true
+   * @example
+   * enabledSafeTopMargin: false  // Full screen, extends behind status bar
+   */
+  enabledSafeTopMargin?: boolean;
 
   /**
    * When true, applies the system status bar inset as the WebView top margin on Android.

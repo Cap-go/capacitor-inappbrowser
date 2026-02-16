@@ -76,10 +76,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -87,10 +88,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, blockedHosts: [String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String]) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -99,10 +101,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, blockedHosts: [String], authorizedAppLinks: [String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String]) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
+        self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -123,6 +126,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
     open var headers: [String: String]?
+    open var httpMethod: String?
+    open var httpBody: String?
     open var capBrowserPlugin: InAppBrowserPlugin?
     var instanceId: String = ""
     var shareDisclaimer: [String: Any]?
@@ -143,6 +148,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
+    var enabledSafeTopMargin: Bool = true
     var blockedHosts: [String] = []
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
@@ -731,17 +737,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Then set up constraints
         webView.translatesAutoresizingMaskIntoConstraints = false
-        var bottomPadding = self.view.bottomAnchor
+        var bottomAnchor = self.view.bottomAnchor
+        var topAnchor = self.view.safeAreaLayoutGuide.topAnchor
 
         if self.enabledSafeBottomMargin {
-            bottomPadding = self.view.safeAreaLayoutGuide.bottomAnchor
+            bottomAnchor = self.view.safeAreaLayoutGuide.bottomAnchor
+        }
+
+        if !self.enabledSafeTopMargin {
+            topAnchor = self.view.topAnchor
         }
 
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomPadding)
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
         webView.uiDelegate = self
@@ -1078,6 +1089,16 @@ fileprivate extension WKWebViewController {
     }
     func createRequest(url: URL) -> URLRequest {
         var request = URLRequest(url: url)
+
+        // Set up HTTP method if specified
+        if let method = httpMethod {
+            request.httpMethod = method.uppercased()
+        }
+
+        // Set up HTTP body if specified
+        if let body = httpBody, let data = body.data(using: .utf8) {
+            request.httpBody = data
+        }
 
         // Set up headers
         if let headers = headers {

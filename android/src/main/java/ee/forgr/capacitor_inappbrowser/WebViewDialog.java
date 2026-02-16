@@ -250,6 +250,19 @@ public class WebViewDialog extends Dialog {
         return _options != null && _options.getAllowWebViewJsVisibilityControl();
     }
 
+    /**
+     * Checks if the given HTTP method supports a request body.
+     * @param method The HTTP method to check
+     * @return true if the method supports a body (POST, PUT, PATCH), false otherwise
+     */
+    private boolean supportsRequestBody(String method) {
+        if (method == null) {
+            return false;
+        }
+        String upperMethod = method.toUpperCase();
+        return upperMethod.equals("POST") || upperMethod.equals("PUT") || upperMethod.equals("PATCH");
+    }
+
     public class PreShowScriptInterface {
 
         @JavascriptInterface
@@ -915,7 +928,30 @@ public class WebViewDialog extends Dialog {
             }
         }
 
-        _webView.loadUrl(this._options.getUrl(), requestHeaders);
+        // Load URL with optional HTTP method and body
+        String httpMethod = _options.getHttpMethod();
+        String httpBody = _options.getHttpBody();
+
+        if (supportsRequestBody(httpMethod) && httpBody != null) {
+            // For POST/PUT/PATCH requests with body
+            // Note: Android WebView has limitations with custom headers on POST
+            // Headers may not be sent with the initial request when using postUrl
+            byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
+            _webView.postUrl(this._options.getUrl(), postData);
+
+            // Log a warning if headers were provided, as they won't be sent with postUrl
+            if (!requestHeaders.isEmpty()) {
+                Log.w(
+                    "InAppBrowser",
+                    "Custom headers were provided but may not be sent with POST request. " +
+                        "Android WebView's postUrl method has limited header support."
+                );
+            }
+        } else {
+            // For GET and other methods, use loadUrl with headers
+            _webView.loadUrl(this._options.getUrl(), requestHeaders);
+        }
+
         _webView.requestFocus();
         _webView.requestFocusFromTouch();
 
@@ -1181,8 +1217,10 @@ public class WebViewDialog extends Dialog {
             );
             int navBottom = _options.getEnabledSafeMargin() ? safeBottomInset : 0;
 
-            // Apply top inset only if useTopInset option is enabled or fallback to 0px
-            int navTop = _options.getUseTopInset() ? bars.top : 0;
+            // Apply top inset based on enabledSafeTopMargin and useTopInset options
+            // If enabledSafeTopMargin is false, force full screen (no top margin)
+            // Otherwise, use useTopInset to determine if system inset should be applied
+            int navTop = _options.getEnabledSafeTopMargin() && _options.getUseTopInset() ? bars.top : 0;
 
             // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
             mlp.topMargin = isAndroid15Plus ? 0 : navTop;

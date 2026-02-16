@@ -55,7 +55,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String pluginVersion = "8.1.18";
+    private final String pluginVersion = "8.1.19";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -624,6 +624,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         // Set enabledSafeBottomMargin option
         options.setEnabledSafeMargin(Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false)));
 
+        // Set enabledSafeTopMargin option (defaults to true for safe area)
+        options.setEnabledSafeTopMargin(call.getBoolean("enabledSafeTopMargin", true));
+
         // Use system top inset for WebView margin when explicitly enabled
         options.setUseTopInset(Boolean.TRUE.equals(call.getBoolean("useTopInset", false)));
 
@@ -769,6 +772,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
+
+        // Set HTTP method and body if provided
+        String httpMethod = call.getString("method");
+        String httpBody = call.getString("body");
+        if (httpMethod != null) {
+            options.setHttpMethod(httpMethod);
+        }
+        if (httpBody != null) {
+            options.setHttpBody(httpBody);
+        }
 
         this.getActivity().runOnUiThread(
             new Runnable() {
