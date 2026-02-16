@@ -52,7 +52,7 @@ repositories {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation project(':capacitor-android')
-    implementation 'com.caverock:androidsvg:1.4'
+    implementation 'com.caverock:androidsvg-aar:1.4'
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.window:window:1.5.1"
     testImplementation "junit:junit:$junitVersion"
