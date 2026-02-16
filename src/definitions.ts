@@ -55,7 +55,7 @@ export interface DownloadEvent {
    */
   filePath?: string;
   /**
-   * Download status: 'started' or 'completed'.
+   * Download status: 'started', 'completed', or 'failed'.
    *
    * @since 8.2.0
    */

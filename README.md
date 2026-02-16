@@ -931,7 +931,7 @@ And in the AndroidManifest.xml file:
 | **`fileName`** | <code>string</code>                               | The suggested filename for the download.                                           | 8.2.0 |
 | **`mimeType`** | <code>string</code>                               | The MIME type of the file.                                                         | 8.2.0 |
 | **`filePath`** | <code>string</code>                               | The local file path where the file was saved (available after download completes). | 8.2.0 |
-| **`status`**   | <code>'started' \| 'completed' \| 'failed'</code> | Download status: 'started' or 'completed'.                                         | 8.2.0 |
+| **`status`**   | <code>'started' \| 'completed' \| 'failed'</code> | Download status: 'started', 'completed', or 'failed'.                              | 8.2.0 |
 | **`error`**    | <code>string</code>                               | Error message if download failed.                                                  | 8.2.0 |
 
 
