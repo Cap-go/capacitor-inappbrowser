@@ -94,6 +94,24 @@ InAppBrowser.openWebView({
 
 Web platform is not supported. Use `window.open` instead.
 
+### Open WebView in Full Screen Mode
+
+To open the webview in true full screen mode (hiding status bar and navigation bar), use `toolbarType: 'blank'`:
+
+```js
+import { InAppBrowser, ToolBarType } from '@capgo/inappbrowser'
+
+InAppBrowser.openWebView({
+  url: "YOUR_URL",
+  toolbarType: ToolBarType.BLANK
+});
+```
+
+When `toolbarType` is set to `'blank'`, the webview automatically extends to the full screen:
+- **iOS**: The webview extends behind the status bar, providing true edge-to-edge content
+- **Android**: The top inset is automatically disabled, allowing content to fill the entire screen
+
+This is perfect for immersive experiences like video players, games, or full-screen web applications.
 
 ### Test app and code:
 
