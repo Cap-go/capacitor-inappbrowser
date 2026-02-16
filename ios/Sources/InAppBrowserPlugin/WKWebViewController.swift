@@ -316,6 +316,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }()
 
+    fileprivate lazy var screenshotBarButtonItem: UIBarButtonItem = {
+        if #available(iOS 13.0, *) {
+            let image = UIImage(systemName: "camera")
+            return UIBarButtonItem(image: image, style: .plain, target: self, action: #selector(screenshotDidClick(sender:)))
+        } else {
+            // Fallback for iOS 12 and below
+            return UIBarButtonItem(barButtonSystemItem: .camera, target: self, action: #selector(screenshotDidClick(sender:)))
+        }
+    }()
+
     fileprivate lazy var stopBarButtonItem: UIBarButtonItem = {
         if let image = stopBarButtonItemImage {
             return UIBarButtonItem(image: image, style: .plain, target: self, action: #selector(stopDidClick(sender:)))
@@ -981,6 +991,38 @@ public extension WKWebViewController {
         webView?.reload()
     }
 
+    func captureScreenshot(quality: Int = 100, completion: @escaping (String?, Error?) -> Void) {
+        guard let webView = webView else {
+            completion(nil, NSError(domain: "InAppBrowser", code: -1, userInfo: [NSLocalizedDescriptionKey: "WebView is not initialized"]))
+            return
+        }
+
+        DispatchQueue.main.async {
+            let config = WKSnapshotConfiguration()
+            webView.takeSnapshot(with: config) { image, error in
+                if let error = error {
+                    completion(nil, error)
+                    return
+                }
+
+                guard let image = image else {
+                    completion(nil, NSError(domain: "InAppBrowser", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to capture screenshot"]))
+                    return
+                }
+
+                // Convert to PNG data
+                guard let pngData = image.pngData() else {
+                    completion(nil, NSError(domain: "InAppBrowser", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to PNG"]))
+                    return
+                }
+
+                // Convert to base64
+                let base64String = pngData.base64EncodedString()
+                completion(base64String, nil)
+            }
+        }
+    }
+
     func websiteDataStore() -> WKWebsiteDataStore? {
         return webView?.configuration.websiteDataStore
     }
@@ -1117,6 +1159,8 @@ fileprivate extension WKWebViewController {
                 return forwardBarButtonItem
             case .reload:
                 return reloadBarButtonItem
+            case .screenshot:
+                return screenshotBarButtonItem
             case .stop:
                 return stopBarButtonItem
             case .activity:
@@ -1455,6 +1499,20 @@ fileprivate extension WKWebViewController {
             webView?.reload()
         } else if let sourceValue = self.source {
             self.load(source: sourceValue)
+        }
+    }
+
+    @objc func screenshotDidClick(sender: AnyObject) {
+        captureScreenshot(quality: 100) { [weak self] base64, error in
+            if let error = error {
+                print("[InAppBrowser] Screenshot capture failed: \(error.localizedDescription)")
+                return
+            }
+            
+            if let base64 = base64 {
+                print("[InAppBrowser] Screenshot captured successfully")
+                self?.emit("screenshotCapture", ["base64": base64])
+            }
         }
     }
 

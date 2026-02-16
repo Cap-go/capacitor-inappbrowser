@@ -42,6 +42,7 @@ public enum BarButtonItemType {
     case back
     case forward
     case reload
+    case screenshot
     case stop
     case activity
     case done
