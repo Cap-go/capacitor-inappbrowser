@@ -197,6 +197,10 @@ export interface OpenWebViewOptions {
   credentials?: Credentials;
   /**
    * HTTP method to use for the initial request.
+   *
+   * **Optional parameter - defaults to GET if not specified.**
+   * Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests.
+   *
    * When specified with 'POST', 'PUT', or 'PATCH' methods that support a body,
    * you can also provide a `body` parameter with the request payload.
    *
@@ -215,7 +219,10 @@ export interface OpenWebViewOptions {
   /**
    * HTTP body to send with the request when using POST, PUT, or other methods that support a body.
    * Should be a string (use JSON.stringify for JSON data).
-   * Only used when `method` is specified and supports a request body.
+   *
+   * **Optional parameter - only used when `method` is specified and supports a request body.**
+   * Omitting this parameter (or using GET method) results in standard behavior without a request body.
+   *
    * @since 8.2.0
    * @example
    * method: "POST",
