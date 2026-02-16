@@ -2393,7 +2393,8 @@ public class WebViewDialog extends Dialog {
                     // Allow internal schemes to load without further processing
                     if (isInternalScheme) {
                         // Extract scheme for logging (avoid logging full data URLs which may contain sensitive content)
-                        String scheme = url.substring(0, Math.min(url.indexOf(':') + 1, 20));
+                        int colonIndex = url.indexOf(':');
+                        String scheme = (colonIndex > 0) ? url.substring(0, Math.min(colonIndex + 1, 20)) : "unknown:";
                         Log.d("InAppBrowser", "Internal scheme detected, allowing WebView to handle: " + scheme);
                         return false;
                     }
