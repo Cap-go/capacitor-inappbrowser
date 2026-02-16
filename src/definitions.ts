@@ -197,8 +197,13 @@ export interface OpenWebViewOptions {
   credentials?: Credentials;
   /**
    * HTTP method to use for the initial request.
-   * When specified with 'POST', 'PUT', or other methods that support a body,
+   * When specified with 'POST', 'PUT', or 'PATCH' methods that support a body,
    * you can also provide a `body` parameter with the request payload.
+   *
+   * **Platform Notes:**
+   * - iOS: Full support for all HTTP methods with headers
+   * - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations
+   *
    * @since 8.2.0
    * @default "GET"
    * @example
@@ -206,7 +211,7 @@ export interface OpenWebViewOptions {
    * body: JSON.stringify({ token: "auth-token", data: "value" }),
    * headers: { "Content-Type": "application/json" }
    */
-  method?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | string;
   /**
    * HTTP body to send with the request when using POST, PUT, or other methods that support a body.
    * Should be a string (use JSON.stringify for JSON data).

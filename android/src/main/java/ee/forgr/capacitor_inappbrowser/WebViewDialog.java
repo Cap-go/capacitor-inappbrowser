@@ -919,56 +919,27 @@ public class WebViewDialog extends Dialog {
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
 
-        if (httpMethod != null && !httpMethod.equalsIgnoreCase("GET") && httpBody != null) {
-            // For POST/PUT/etc requests with body and headers, use JavaScript fetch API
-            // This allows us to set custom headers which WebView.postUrl doesn't support
-            try {
-                org.json.JSONObject fetchOptions = new org.json.JSONObject();
-                fetchOptions.put("method", httpMethod.toUpperCase());
+        if (
+            httpMethod != null &&
+            (httpMethod.equalsIgnoreCase("POST") || httpMethod.equalsIgnoreCase("PUT") || httpMethod.equalsIgnoreCase("PATCH")) &&
+            httpBody != null
+        ) {
+            // For POST/PUT/PATCH requests with body
+            // Note: Android WebView has limitations with custom headers on POST
+            // Headers may not be sent with the initial request when using postUrl
+            byte[] postData = httpBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            _webView.postUrl(this._options.getUrl(), postData);
 
-                // Add headers as a proper JSON object
-                org.json.JSONObject headersObj = new org.json.JSONObject();
-                for (Map.Entry<String, String> entry : requestHeaders.entrySet()) {
-                    headersObj.put(entry.getKey(), entry.getValue());
-                }
-                fetchOptions.put("headers", headersObj);
-
-                // Add body
-                fetchOptions.put("body", httpBody);
-
-                // Create a safe HTML page that performs the fetch
-                String fetchOptionsJson = fetchOptions.toString().replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/");
-                String targetUrl = this._options.getUrl().replace("\\", "\\\\").replace("'", "\\'");
-
-                String html =
-                    "<!DOCTYPE html>" +
-                    "<html><head><meta charset='UTF-8'></head>" +
-                    "<body><script>" +
-                    "const opts = " +
-                    fetchOptionsJson +
-                    ";" +
-                    "fetch('" +
-                    targetUrl +
-                    "', opts)" +
-                    ".then(response => response.text())" +
-                    ".then(html => {" +
-                    "  document.open();" +
-                    "  document.write(html);" +
-                    "  document.close();" +
-                    "})" +
-                    ".catch(err => {" +
-                    "  document.body.innerHTML = '<h1>Error</h1><pre>' + err.message + '</pre>';" +
-                    "});" +
-                    "</script></body></html>";
-
-                _webView.loadDataWithBaseURL(this._options.getUrl(), html, "text/html", "UTF-8", null);
-            } catch (org.json.JSONException e) {
-                Log.e("InAppBrowser", "Failed to create fetch request: " + e.getMessage(), e);
-                // Fall back to standard loadUrl
-                _webView.loadUrl(this._options.getUrl(), requestHeaders);
+            // Log a warning if headers were provided, as they won't be sent with postUrl
+            if (!requestHeaders.isEmpty()) {
+                Log.w(
+                    "InAppBrowser",
+                    "Custom headers were provided but may not be sent with POST request. " +
+                        "Android WebView's postUrl method has limited header support."
+                );
             }
         } else {
-            // For GET and other methods without body, use loadUrl with headers
+            // For GET and other methods, use loadUrl with headers
             _webView.loadUrl(this._options.getUrl(), requestHeaders);
         }
 
