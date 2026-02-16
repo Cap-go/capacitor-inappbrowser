@@ -1679,11 +1679,7 @@ public class WebViewDialog extends Dialog {
 
         try {
             // Create a bitmap of the WebView
-            Bitmap bitmap = Bitmap.createBitmap(
-                _webView.getWidth(),
-                _webView.getHeight(),
-                Bitmap.Config.ARGB_8888
-            );
+            Bitmap bitmap = Bitmap.createBitmap(_webView.getWidth(), _webView.getHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
             _webView.draw(canvas);
 
