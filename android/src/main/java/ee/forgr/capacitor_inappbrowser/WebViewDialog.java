@@ -1080,10 +1080,6 @@ public class WebViewDialog extends Dialog {
         return isHiddenModeActive;
     }
 
-    public boolean isFakeVisibleMode() {
-        return _options != null && _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE;
-    }
-
     /**
      * Apply window insets to the WebView to properly handle edge-to-edge display
      * and fix status bar overlap issues on Android 15+
