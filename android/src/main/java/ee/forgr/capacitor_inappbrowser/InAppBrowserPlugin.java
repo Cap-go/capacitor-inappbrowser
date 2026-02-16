@@ -621,11 +621,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         // Set enabledSafeBottomMargin option
         options.setEnabledSafeMargin(Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false)));
 
+        // Set enabledSafeTopMargin option (defaults to true for safe area)
+        options.setEnabledSafeTopMargin(call.getBoolean("enabledSafeTopMargin", true));
+
         // Use system top inset for WebView margin when explicitly enabled
-        // Default to false (full screen) when toolbarType is "blank" for consistency with iOS
-        String toolbarType = call.getString("toolbarType", "");
-        boolean defaultUseTopInset = !TextUtils.equals(toolbarType, "blank");
-        options.setUseTopInset(call.getBoolean("useTopInset", defaultUseTopInset));
+        options.setUseTopInset(Boolean.TRUE.equals(call.getBoolean("useTopInset", false)));
 
         //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
         options.setCallbacks(

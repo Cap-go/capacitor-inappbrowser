@@ -1181,8 +1181,10 @@ public class WebViewDialog extends Dialog {
             );
             int navBottom = _options.getEnabledSafeMargin() ? safeBottomInset : 0;
 
-            // Apply top inset only if useTopInset option is enabled or fallback to 0px
-            int navTop = _options.getUseTopInset() ? bars.top : 0;
+            // Apply top inset based on enabledSafeTopMargin and useTopInset options
+            // If enabledSafeTopMargin is false, force full screen (no top margin)
+            // Otherwise, use useTopInset to determine if system inset should be applied
+            int navTop = _options.getEnabledSafeTopMargin() && _options.getUseTopInset() ? bars.top : 0;
 
             // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
             mlp.topMargin = isAndroid15Plus ? 0 : navTop;
