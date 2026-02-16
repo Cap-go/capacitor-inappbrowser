@@ -233,6 +233,7 @@ window.mobileApp.close();
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('downloadEvent', ...)`](#addlistenerdownloadevent-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
@@ -617,6 +618,26 @@ Will be triggered when page load error
 --------------------
 
 
+### addListener('downloadEvent', ...)
+
+```typescript
+addListener(eventName: 'downloadEvent', listenerFunc: DownloadListener) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when a file download is initiated or completed in the webview
+
+| Param              | Type                                                          |
+| ------------------ | ------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadEvent'</code>                                  |
+| **`listenerFunc`** | <code><a href="#downloadlistener">DownloadListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.2.0
+
+--------------------
+
+
 ### removeAllListeners()
 
 ```typescript
@@ -816,6 +837,7 @@ And in the AndroidManifest.xml file:
 | **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                             | <code>false</code>                                            | 8.0.2  |
 | **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
 | **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
+| **`enableDownloads`**                  | <code>boolean</code>                                                                                                                                                   | Enable automatic file download handling in the webview. When enabled, file downloads are automatically handled: - Files are downloaded to a temporary directory - On completion, the system viewer opens the file (iOS uses QLPreviewController, Android uses Intent) - Download events are emitted for tracking ('downloadEvent' listener) Note: On Android API &lt; 29, this may require WRITE_EXTERNAL_STORAGE permission                                                                                                                               | <code>true</code>                                             | 8.2.0  |
 
 
 #### Headers
@@ -860,6 +882,19 @@ And in the AndroidManifest.xml file:
 | --------- | ------------------- | ------------------------------ | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
+
+#### DownloadEvent
+
+| Prop           | Type                                              | Description                                                                        | Since |
+| -------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- | ----- |
+| **`id`**       | <code>string</code>                               | Webview instance id.                                                               |       |
+| **`url`**      | <code>string</code>                               | The URL of the file being downloaded.                                              | 8.2.0 |
+| **`fileName`** | <code>string</code>                               | The suggested filename for the download.                                           | 8.2.0 |
+| **`mimeType`** | <code>string</code>                               | The MIME type of the file.                                                         | 8.2.0 |
+| **`filePath`** | <code>string</code>                               | The local file path where the file was saved (available after download completes). | 8.2.0 |
+| **`status`**   | <code>'started' \| 'completed' \| 'failed'</code> | Download status: 'started' or 'completed'.                                         | 8.2.0 |
+| **`error`**    | <code>string</code>                               | Error message if download failed.                                                  | 8.2.0 |
 
 
 #### DimensionOptions
@@ -942,6 +977,11 @@ Construct a type with a set of properties K of type T
 #### ConfirmBtnListener
 
 <code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
+
+
+#### DownloadListener
+
+<code>(event: <a href="#downloadevent">DownloadEvent</a>): void</code>
 
 
 ### Enums

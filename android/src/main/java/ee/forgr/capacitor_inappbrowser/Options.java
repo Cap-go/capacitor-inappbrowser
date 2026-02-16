@@ -186,6 +186,7 @@ public class Options {
     private boolean hidden = false;
     private boolean allowWebViewJsVisibilityControl = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
+    private boolean enableDownloads = true;
 
     public Integer getWidth() {
         return width;
@@ -526,5 +527,13 @@ public class Options {
 
     public void setInvisibilityMode(InvisibilityMode invisibilityMode) {
         this.invisibilityMode = invisibilityMode;
+    }
+
+    public boolean getEnableDownloads() {
+        return enableDownloads;
+    }
+
+    public void setEnableDownloads(boolean enableDownloads) {
+        this.enableDownloads = enableDownloads;
     }
 }
