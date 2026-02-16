@@ -70,6 +70,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     private ActivityResultLauncher<Intent> fileChooserLauncher;
 
+    private PluginCall openSecureWindowSavedCall;
+    private String openSecureWindowRedirectUri;
+
     @Override
     public void load() {
         super.load();
@@ -1094,6 +1097,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         if (!ok) {
             Log.e(getLogTag(), "Error binding to custom tabs service");
         }
+        // If we have a saved call and user returned without callback, reject
+        if (openSecureWindowSavedCall != null) {
+            openSecureWindowSavedCall.reject("OAuth cancelled or no callback received");
+            openSecureWindowSavedCall = null;
+        }
     }
 
     protected void handleOnPause() {
@@ -1137,6 +1145,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         currentPermissionRequest = null;
         customTabsClient = null;
         currentSession = null;
+        openSecureWindowSavedCall = null;
         super.handleOnDestroy();
     }
 
@@ -1183,5 +1192,70 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 }
             }
         );
+    }
+
+    @PluginMethod
+    public void openSecureWindow(PluginCall call) {
+        String authEndpoint = call.getString("authEndpoint");
+
+        if (authEndpoint == null || authEndpoint.isEmpty()) {
+            call.reject("Auth endpoint is required");
+            return;
+        }
+
+        String redirectUri = call.getString("redirectUri");
+        if (redirectUri == null || redirectUri.isEmpty()) {
+            call.reject("Redirect URI is required");
+            return;
+        }
+
+        openSecureWindowSavedCall = call;
+        openSecureWindowRedirectUri = redirectUri;
+
+        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
+        builder.enableUrlBarHiding();
+        builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
+        CustomTabsIntent customTabsIntent = builder.build();
+        customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        customTabsIntent.intent.putExtra(CustomTabsIntent.EXTRA_ENABLE_INSTANT_APPS, false);
+        customTabsIntent.intent.putExtra(CustomTabsIntent.EXTRA_DISABLE_BACKGROUND_INTERACTION, false);
+        customTabsIntent.launchUrl(getActivity(), Uri.parse(authEndpoint));
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) {
+            return;
+        }
+
+        Uri uri = intent.getData();
+        if (uri == null) {
+            return;
+        }
+
+        if (openSecureWindowRedirectUri == null) {
+            return;
+        }
+
+        if (uri.getHost() == null || !uri.toString().startsWith(openSecureWindowRedirectUri)) {
+            return;
+        }
+
+        try {
+            // Resolve the original call with the callback url
+            if (openSecureWindowSavedCall != null) {
+                final JSObject ret = new JSObject();
+                ret.put("redirectedUri", uri.toString());
+                openSecureWindowSavedCall.resolve(ret);
+                openSecureWindowSavedCall = null;
+            }
+        } catch (Exception e) {
+            if (openSecureWindowSavedCall != null) {
+                openSecureWindowSavedCall.reject("Failed to process OAuth callback", e);
+                openSecureWindowSavedCall = null;
+            }
+        }
     }
 }
