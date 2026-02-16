@@ -922,29 +922,34 @@ public class WebViewDialog extends Dialog {
         if (httpMethod != null && !httpMethod.equalsIgnoreCase("GET") && httpBody != null) {
             // For POST/PUT/etc requests with body and headers, use JavaScript fetch API
             // This allows us to set custom headers which WebView.postUrl doesn't support
-            String escapedUrl = this._options.getUrl().replace("'", "\\'");
-            String escapedBody = httpBody.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r");
+            try {
+                org.json.JSONObject fetchOptions = new org.json.JSONObject();
+                fetchOptions.put("method", httpMethod.toUpperCase());
 
-            StringBuilder headersJson = new StringBuilder("{");
-            if (!requestHeaders.isEmpty()) {
-                boolean first = true;
+                // Add headers as a proper JSON object
+                org.json.JSONObject headersObj = new org.json.JSONObject();
                 for (Map.Entry<String, String> entry : requestHeaders.entrySet()) {
-                    if (!first) headersJson.append(",");
-                    headersJson
-                        .append("'")
-                        .append(entry.getKey().replace("'", "\\'"))
-                        .append("':'")
-                        .append(entry.getValue().replace("'", "\\'"))
-                        .append("'");
-                    first = false;
+                    headersObj.put(entry.getKey(), entry.getValue());
                 }
-            }
-            headersJson.append("}");
+                fetchOptions.put("headers", headersObj);
 
-            // Load a blank page first, then use fetch to make the POST request
-            String html = String.format(
-                "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body><script>" +
-                    "fetch('%s', {method: '%s', headers: %s, body: '%s'})" +
+                // Add body
+                fetchOptions.put("body", httpBody);
+
+                // Create a safe HTML page that performs the fetch
+                String fetchOptionsJson = fetchOptions.toString().replace("\\", "\\\\").replace("'", "\\'").replace("</", "<\\/");
+                String targetUrl = this._options.getUrl().replace("\\", "\\\\").replace("'", "\\'");
+
+                String html =
+                    "<!DOCTYPE html>" +
+                    "<html><head><meta charset='UTF-8'></head>" +
+                    "<body><script>" +
+                    "const opts = " +
+                    fetchOptionsJson +
+                    ";" +
+                    "fetch('" +
+                    targetUrl +
+                    "', opts)" +
                     ".then(response => response.text())" +
                     ".then(html => {" +
                     "  document.open();" +
@@ -952,15 +957,16 @@ public class WebViewDialog extends Dialog {
                     "  document.close();" +
                     "})" +
                     ".catch(err => {" +
-                    "  document.body.innerHTML = '<h1>Error</h1><p>' + err.message + '</p>';" +
+                    "  document.body.innerHTML = '<h1>Error</h1><pre>' + err.message + '</pre>';" +
                     "});" +
-                    "</script></body></html>",
-                escapedUrl,
-                httpMethod.toUpperCase(),
-                headersJson.toString(),
-                escapedBody
-            );
-            _webView.loadDataWithBaseURL(this._options.getUrl(), html, "text/html", "UTF-8", null);
+                    "</script></body></html>";
+
+                _webView.loadDataWithBaseURL(this._options.getUrl(), html, "text/html", "UTF-8", null);
+            } catch (org.json.JSONException e) {
+                Log.e("InAppBrowser", "Failed to create fetch request: " + e.getMessage(), e);
+                // Fall back to standard loadUrl
+                _webView.loadUrl(this._options.getUrl(), requestHeaders);
+            }
         } else {
             // For GET and other methods without body, use loadUrl with headers
             _webView.loadUrl(this._options.getUrl(), requestHeaders);
