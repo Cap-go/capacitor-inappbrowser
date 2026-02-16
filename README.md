@@ -94,6 +94,46 @@ InAppBrowser.openWebView({
 
 Web platform is not supported. Use `window.open` instead.
 
+### Load HTML Content Directly with Data URLs
+
+You can load base64-encoded HTML content directly using data URLs, perfect for displaying dynamic content without a server:
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+// Your HTML content
+const htmlContent = `
+  <html>
+    <head>
+      <title>My Page</title>
+      <style>
+        body { font-family: Arial; padding: 20px; }
+        h1 { color: #333; }
+      </style>
+    </head>
+    <body>
+      <h1>Hello World</h1>
+      <p>This is dynamically generated content!</p>
+    </body>
+  </html>
+`;
+
+// Convert to base64
+// Note: btoa() only works with Latin1 characters. For Unicode content,
+// use TextEncoder or encodeURIComponent instead
+const base64Content = btoa(htmlContent);
+
+// Create data URL
+const dataUrl = `data:text/html;base64,${base64Content}`;
+
+// Open in InAppBrowser
+await InAppBrowser.openWebView({
+  url: dataUrl,
+  title: "My Custom Content"
+});
+```
+
+**Note**: Data URLs work with both `open()` and `openWebView()` methods on iOS and Android. Internal WebView schemes like `data:`, `blob:`, `about:`, and `javascript:` are always allowed to load, even when `preventDeeplink` is set to `true`.
 
 ### Test app and code:
 
