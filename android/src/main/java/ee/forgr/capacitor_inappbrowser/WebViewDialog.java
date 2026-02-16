@@ -49,6 +49,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
@@ -991,7 +992,7 @@ public class WebViewDialog extends Dialog {
                 window.setLayout(1, 1);
                 _webView.setAlpha(0f);
                 _webView.setVisibility(View.INVISIBLE);
-                _webView.setLayoutParams(new ViewGroup.LayoutParams(0, 0));
+                _webView.setLayoutParams(new RelativeLayout.LayoutParams(0, 0));
             } else {
                 _webView.setAlpha(0f);
                 _webView.setVisibility(View.INVISIBLE);
