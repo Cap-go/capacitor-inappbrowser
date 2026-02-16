@@ -773,6 +773,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
 
+        // Set HTTP method and body if provided
+        String httpMethod = call.getString("method");
+        String httpBody = call.getString("body");
+        if (httpMethod != null) {
+            options.setHttpMethod(httpMethod);
+        }
+        if (httpBody != null) {
+            options.setHttpBody(httpBody);
+        }
+
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override

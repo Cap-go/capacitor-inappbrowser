@@ -187,6 +187,8 @@ public class Options {
     private boolean hidden = false;
     private boolean allowWebViewJsVisibilityControl = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
+    private String httpMethod = null;
+    private String httpBody = null;
 
     public Integer getWidth() {
         return width;
@@ -535,5 +537,21 @@ public class Options {
 
     public void setInvisibilityMode(InvisibilityMode invisibilityMode) {
         this.invisibilityMode = invisibilityMode;
+    }
+
+    public String getHttpMethod() {
+        return httpMethod;
+    }
+
+    public void setHttpMethod(String httpMethod) {
+        this.httpMethod = httpMethod;
+    }
+
+    public String getHttpBody() {
+        return httpBody;
+    }
+
+    public void setHttpBody(String httpBody) {
+        this.httpBody = httpBody;
     }
 }
