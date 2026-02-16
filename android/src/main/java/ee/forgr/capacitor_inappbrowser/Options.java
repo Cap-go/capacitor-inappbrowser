@@ -176,6 +176,7 @@ public class Options {
     private boolean preventDeeplink = false;
     private List<String> authorizedAppLinks = new ArrayList<>();
     private boolean enabledSafeBottomMargin = false;
+    private boolean enabledSafeTopMargin = true;
     private boolean useTopInset = false;
     private boolean enableGooglePaySupport = false;
     private List<String> blockedHosts = new ArrayList<>();
@@ -187,6 +188,8 @@ public class Options {
     private boolean allowWebViewJsVisibilityControl = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private boolean enableDownloads = true;
+    private String httpMethod = null;
+    private String httpBody = null;
 
     public Integer getWidth() {
         return width;
@@ -242,6 +245,14 @@ public class Options {
 
     public void setEnabledSafeMargin(boolean enabledSafeBottomMargin) {
         this.enabledSafeBottomMargin = enabledSafeBottomMargin;
+    }
+
+    public boolean getEnabledSafeTopMargin() {
+        return enabledSafeTopMargin;
+    }
+
+    public void setEnabledSafeTopMargin(boolean enabledSafeTopMargin) {
+        this.enabledSafeTopMargin = enabledSafeTopMargin;
     }
 
     public boolean getUseTopInset() {
@@ -535,5 +546,21 @@ public class Options {
 
     public void setEnableDownloads(boolean enableDownloads) {
         this.enableDownloads = enableDownloads;
+    }
+
+    public String getHttpMethod() {
+        return httpMethod;
+    }
+
+    public void setHttpMethod(String httpMethod) {
+        this.httpMethod = httpMethod;
+    }
+
+    public String getHttpBody() {
+        return httpBody;
+    }
+
+    public void setHttpBody(String httpBody) {
+        this.httpBody = httpBody;
     }
 }

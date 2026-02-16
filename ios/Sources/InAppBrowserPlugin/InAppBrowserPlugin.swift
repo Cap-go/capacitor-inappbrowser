@@ -29,7 +29,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.1.18"
+    private let pluginVersion: String = "8.1.19"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -198,8 +198,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             ? webViewController.view.safeAreaLayoutGuide.bottomAnchor
             : webViewController.view.bottomAnchor
 
+        let topAnchor = webViewController.enabledSafeTopMargin
+            ? webViewController.view.safeAreaLayoutGuide.topAnchor
+            : webViewController.view.topAnchor
+
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: webViewController.view.safeAreaLayoutGuide.topAnchor),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: webViewController.view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: webViewController.view.trailingAnchor),
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
@@ -497,6 +501,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
+        let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
@@ -575,6 +580,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let credentials = self.readCredentials(call)
 
+        // Read HTTP method and body for custom requests
+        let httpMethod = call.getString("method")
+        let httpBody = call.getString("body")
+
         // Read dimension options
         let width = call.getFloat("width")
         let height = call.getFloat("height")
@@ -604,6 +613,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 preventDeeplink: preventDeeplink,
                 blankNavigationTab: toolbarType == "blank",
                 enabledSafeBottomMargin: enabledSafeBottomMargin,
+                enabledSafeTopMargin: enabledSafeTopMargin,
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
                 )
@@ -616,6 +626,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.instanceId = webViewId
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+
+            // Set HTTP method and body if provided
+            if let method = httpMethod {
+                webViewController.httpMethod = method
+            }
+            if let body = httpBody {
+                webViewController.httpBody = body
+            }
 
             // Set dimensions if provided
             if let width = width {
@@ -1160,7 +1178,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false)
+            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, enabledSafeTopMargin: true)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
