@@ -99,6 +99,44 @@ Web platform is not supported. Use `window.open` instead.
 
 https://github.com/Cap-go/demo-app/blob/main/src/views/plugins/Web.vue
 
+### File Downloads
+
+The plugin automatically handles file downloads from the webview. When a user clicks a download link or the server sends a file with the appropriate headers, the file is automatically downloaded and opened with the system viewer.
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+// Open webview with download handling enabled (default)
+const { id } = await InAppBrowser.openWebView({
+  url: "https://example.com",
+  enableDownloads: true // Default is true
+});
+
+// Listen for download events
+InAppBrowser.addListener('downloadEvent', (event) => {
+  console.log('Download status:', event.status);
+  console.log('Download URL:', event.url);
+  console.log('File name:', event.fileName);
+  console.log('MIME type:', event.mimeType);
+  
+  if (event.status === 'started') {
+    console.log('Download started');
+  } else if (event.status === 'completed') {
+    console.log('Download completed, file saved to:', event.filePath);
+  } else if (event.status === 'failed') {
+    console.error('Download failed:', event.error);
+  }
+});
+```
+
+**How it works:**
+- **iOS**: Uses `WKDownloadDelegate` (iOS 14.5+) to intercept downloads, saves files to the temporary directory, and opens them with `UIDocumentInteractionController`
+- **Android**: Uses `DownloadListener` to intercept downloads, saves files with `DownloadManager` to the Downloads folder, and opens them with an `Intent`
+
+**Permissions:**
+- **iOS**: No additional permissions required
+- **Android**: No additional permissions required for Android 10+ (API 29+). For older versions, may require `WRITE_EXTERNAL_STORAGE` permission
+
 ### Camera usage
 
 #### Android
