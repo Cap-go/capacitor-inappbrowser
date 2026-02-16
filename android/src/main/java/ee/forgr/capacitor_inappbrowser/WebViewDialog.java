@@ -919,12 +919,50 @@ public class WebViewDialog extends Dialog {
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
 
-        if (httpMethod != null && httpMethod.equalsIgnoreCase("POST") && httpBody != null) {
-            // For POST requests with body, use postUrl
-            byte[] postData = httpBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-            _webView.postUrl(this._options.getUrl(), postData);
+        if (httpMethod != null && !httpMethod.equalsIgnoreCase("GET") && httpBody != null) {
+            // For POST/PUT/etc requests with body and headers, use JavaScript fetch API
+            // This allows us to set custom headers which WebView.postUrl doesn't support
+            String escapedUrl = this._options.getUrl().replace("'", "\\'");
+            String escapedBody = httpBody.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r");
+
+            StringBuilder headersJson = new StringBuilder("{");
+            if (!requestHeaders.isEmpty()) {
+                boolean first = true;
+                for (Map.Entry<String, String> entry : requestHeaders.entrySet()) {
+                    if (!first) headersJson.append(",");
+                    headersJson
+                        .append("'")
+                        .append(entry.getKey().replace("'", "\\'"))
+                        .append("':'")
+                        .append(entry.getValue().replace("'", "\\'"))
+                        .append("'");
+                    first = false;
+                }
+            }
+            headersJson.append("}");
+
+            // Load a blank page first, then use fetch to make the POST request
+            String html = String.format(
+                "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body><script>" +
+                    "fetch('%s', {method: '%s', headers: %s, body: '%s'})" +
+                    ".then(response => response.text())" +
+                    ".then(html => {" +
+                    "  document.open();" +
+                    "  document.write(html);" +
+                    "  document.close();" +
+                    "})" +
+                    ".catch(err => {" +
+                    "  document.body.innerHTML = '<h1>Error</h1><p>' + err.message + '</p>';" +
+                    "});" +
+                    "</script></body></html>",
+                escapedUrl,
+                httpMethod.toUpperCase(),
+                headersJson.toString(),
+                escapedBody
+            );
+            _webView.loadDataWithBaseURL(this._options.getUrl(), html, "text/html", "UTF-8", null);
         } else {
-            // For GET and other methods, use loadUrl with headers
+            // For GET and other methods without body, use loadUrl with headers
             _webView.loadUrl(this._options.getUrl(), requestHeaders);
         }
 
