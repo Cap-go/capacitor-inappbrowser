@@ -731,22 +731,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Then set up constraints
         webView.translatesAutoresizingMaskIntoConstraints = false
-        var bottomPadding = self.view.bottomAnchor
-        var topPadding = self.view.safeAreaLayoutGuide.topAnchor
+        var bottomAnchor = self.view.bottomAnchor
+        var topAnchor = self.view.safeAreaLayoutGuide.topAnchor
 
         if self.enabledSafeBottomMargin {
-            bottomPadding = self.view.safeAreaLayoutGuide.bottomAnchor
+            bottomAnchor = self.view.safeAreaLayoutGuide.bottomAnchor
         }
 
         if self.blankNavigationTab {
-            topPadding = self.view.topAnchor
+            topAnchor = self.view.topAnchor
         }
 
         NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: topPadding),
+            webView.topAnchor.constraint(equalTo: topAnchor),
             webView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomPadding)
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
         webView.uiDelegate = self
