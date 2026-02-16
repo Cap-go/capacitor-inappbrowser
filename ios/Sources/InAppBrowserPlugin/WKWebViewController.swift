@@ -848,7 +848,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Ensure status bar appearance is correct when view appears
         // Make sure we have the latest tint color
-        if let tintColor = self.tintColor {
+        if self.tintColor != nil {
             // Update the status bar background if needed
             if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
                 setupStatusBarBackground(color: backgroundColor)
@@ -1632,15 +1632,8 @@ extension WKWebViewController: WKUIDelegate {
                 strongCompletionHandler()
             }))
 
-            // Try to present the alert
-            do {
-                self.present(alertController, animated: true, completion: nil)
-            } catch {
-                // This won't typically be triggered as present doesn't throw,
-                // but adding as a safeguard
-                print("[InAppBrowser] Error presenting alert: \(error)")
-                strongCompletionHandler()
-            }
+            // Present the alert
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
@@ -2129,9 +2122,8 @@ extension WKWebViewController: WKDownloadDelegate {
             print("[InAppBrowser] Presented file preview")
         } else {
             // Fallback to open-in menu
-            if let viewController = self.navigationController ?? self {
-                documentController.presentOpenInMenu(from: viewController.view.bounds, in: viewController.view, animated: true)
-            }
+            let viewController = self.navigationController ?? self
+            documentController.presentOpenInMenu(from: viewController.view.bounds, in: viewController.view, animated: true)
         }
     }
 }
