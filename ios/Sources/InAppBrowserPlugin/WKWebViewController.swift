@@ -946,7 +946,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 self.navigationItem.title = webView?.url?.host
             }
         case "URL":
-
+            // Guard against notifications during cleanup when webView is being torn down
+            guard self.webView != nil else { return }
             emit("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
             self.injectJavaScriptInterface()
         default:
@@ -1042,16 +1043,18 @@ public extension WKWebViewController {
     open func cleanupWebView() {
         guard let webView = self.webView else { return }
         webView.stopLoading()
-        // Break delegate callbacks early
-        webView.navigationDelegate = nil
-        webView.uiDelegate = nil
-        webView.loadHTMLString("", baseURL: nil)
 
+        // Remove KVO observers FIRST, before any operation that could trigger them
         webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
             webView.removeObserver(self, forKeyPath: titleKeyPath)
         }
         webView.removeObserver(self, forKeyPath: #keyPath(WKWebView.url))
+
+        // Now safe to tear down
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        webView.loadHTMLString("", baseURL: nil)
 
         webView.configuration.userContentController.removeAllUserScripts()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
