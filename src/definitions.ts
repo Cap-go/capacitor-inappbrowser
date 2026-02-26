@@ -25,9 +25,23 @@ export interface BtnEvent {
   url: string;
 }
 
+export interface ScreenshotEvent {
+  /**
+   * Webview instance id.
+   */
+  id?: string;
+  /**
+   * Base64 encoded screenshot data (PNG format)
+   *
+   * @since 8.1.0
+   */
+  base64: string;
+}
+
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: object) => void;
+export type ScreenshotCaptureListener = (state: ScreenshotEvent) => void;
 
 export enum BackgroundColor {
   WHITE = 'white',
@@ -363,6 +377,16 @@ export interface OpenWebViewOptions {
    * Test URL: https://capgo.app
    */
   showReloadButton?: boolean;
+  /**
+   * Shows a screenshot button that captures the current webpage.
+   * When clicked, the screenshot will be returned via the 'screenshotCapture' event listener.
+   * @since 8.1.0
+   * @default false
+   * @example
+   * showScreenshotButton: true
+   * Test URL: https://capgo.app
+   */
+  showScreenshotButton?: boolean;
   /**
    * CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.
    * @since 1.1.0
@@ -706,6 +730,24 @@ export interface DimensionOptions {
   y?: number;
 }
 
+export interface ScreenshotOptions {
+  /**
+   * Target webview id to capture. If omitted, captures the active webview.
+   */
+  id?: string;
+}
+
+export interface ScreenshotResult {
+  /**
+   * Base64 encoded image data (PNG format)
+   */
+  base64: string;
+  /**
+   * Webview instance id
+   */
+  id?: string;
+}
+
 export interface InAppBrowserPlugin {
   /**
    * Navigates back in the WebView's history if possible
@@ -808,6 +850,20 @@ export interface InAppBrowserPlugin {
   addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener): Promise<PluginListenerHandle>;
 
   /**
+   * Listen for screenshot capture events.
+   * Triggered when the user clicks the screenshot button in the toolbar.
+   * Returns the screenshot as base64-encoded PNG data.
+   *
+   * @since 8.1.0
+   * @example
+   * InAppBrowser.addListener('screenshotCapture', (event) => {
+   *   console.log('Screenshot captured:', event.base64);
+   *   // Use the screenshot data
+   * });
+   */
+  addListener(eventName: 'screenshotCapture', listenerFunc: ScreenshotCaptureListener): Promise<PluginListenerHandle>;
+
+  /**
    * Listen for close click only for openWebView
    *
    * @since 0.4.0
@@ -870,6 +926,20 @@ export interface InAppBrowserPlugin {
    * @returns Promise that resolves when dimensions are updated
    */
   updateDimensions(options: DimensionOptions & { id?: string }): Promise<void>;
+
+  /**
+   * Captures a screenshot of the webview content.
+   * Takes a snapshot of the currently displayed webpage and returns it as a base64-encoded PNG image.
+   * When `id` is omitted, captures the active webview.
+   *
+   * @param options Screenshot options (id)
+   * @returns Promise that resolves with the screenshot data
+   * @since 8.1.0
+   * @example
+   * const screenshot = await InAppBrowser.captureScreenshot();
+   * console.log('Screenshot captured:', screenshot.base64);
+   */
+  captureScreenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;
 
   /**
    * Opens a secured window for OAuth2 authentication.

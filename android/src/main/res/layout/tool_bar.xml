@@ -42,6 +42,16 @@
         android:src="@drawable/ic_refresh"
         android:visibility="gone" />
 
+    <ImageButton
+        android:id="@+id/screenshotButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:paddingRight="10dp"
+        android:contentDescription="@string/screenshot_button"
+        android:src="@drawable/ic_camera"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/titleText"
         android:layout_width="wrap_content"

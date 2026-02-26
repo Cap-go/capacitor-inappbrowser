@@ -380,6 +380,16 @@ public class Options {
         this.showReloadButton = showReloadButton;
     }
 
+    public boolean showScreenshotButton;
+
+    public boolean getShowScreenshotButton() {
+        return showScreenshotButton;
+    }
+
+    public void setShowScreenshotButton(boolean showScreenshotButton) {
+        this.showScreenshotButton = showScreenshotButton;
+    }
+
     public void setShareDisclaimer(JSObject shareDisclaimer) {
         this.shareDisclaimer = shareDisclaimer;
     }
