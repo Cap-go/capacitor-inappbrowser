@@ -141,6 +141,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var closeModalDescription = ""
     open var closeModalOk = ""
     open var closeModalCancel = ""
+    open var closeModalURLPattern = "" {
+        didSet {
+            closeModalURLRegex = closeModalURLPattern.isEmpty ? nil : (try? NSRegularExpression(pattern: closeModalURLPattern))
+        }
+    }
+    private var closeModalURLRegex: NSRegularExpression?
     open var ignoreUntrustedSSLError = false
     open var enableGooglePaySupport = false
     var viewWasPresented = false
@@ -1571,14 +1577,23 @@ fileprivate extension WKWebViewController {
         // check if closeModal is true, if true display alert before close
         if self.closeModal {
             let currentUrl = webView?.url?.absoluteString ?? ""
-            let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
-            alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
-                // Notify that confirm was clicked
-                self.emit("confirmBtnClicked", data: ["url": currentUrl])
+            var shouldShowModal = true
+            if let regex = self.closeModalURLRegex {
+                let matched = regex.firstMatch(in: currentUrl, range: NSRange(currentUrl.startIndex..., in: currentUrl)) != nil
+                shouldShowModal = matched
+            }
+            if shouldShowModal {
+                let alert = UIAlertController(title: self.closeModalTitle, message: self.closeModalDescription, preferredStyle: UIAlertController.Style.alert)
+                alert.addAction(UIAlertAction(title: self.closeModalOk, style: UIAlertAction.Style.default, handler: { _ in
+                    // Notify that confirm was clicked
+                    self.emit("confirmBtnClicked", data: ["url": currentUrl])
+                    self.closeView()
+                }))
+                alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))
+                self.present(alert, animated: true, completion: nil)
+            } else {
                 self.closeView()
-            }))
-            alert.addAction(UIAlertAction(title: self.closeModalCancel, style: UIAlertAction.Style.default, handler: nil))
-            self.present(alert, animated: true, completion: nil)
+            }
         } else {
             self.closeView()
         }

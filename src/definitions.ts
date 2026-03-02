@@ -401,6 +401,17 @@ export interface OpenWebViewOptions {
    */
   closeModalCancel?: string;
   /**
+   * closeModalURLPattern: a regex pattern to match against the current URL when the close button is pressed.
+   * When provided along with closeModal: true, the close confirmation modal is only shown if the current URL matches this pattern.
+   * If the current URL does not match, the browser closes immediately without showing the modal.
+   * Requires closeModal to be true.
+   * @since 7.2.0
+   * @example
+   * closeModal: true,
+   * closeModalURLPattern: ".*checkout.*"
+   */
+  closeModalURLPattern?: string;
+  /**
    * visibleTitle: if true the website title would be shown else shown empty
    * @since 1.2.5
    * @default true

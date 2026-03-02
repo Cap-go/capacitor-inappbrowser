@@ -152,6 +152,7 @@ public class Options {
     private String CloseModalCancel;
     private ButtonNearDone buttonNearDone;
     private String CloseModalOk;
+    private Pattern closeModalURLPattern;
     private String url;
     private JSObject headers;
     private JSObject credentials;
@@ -332,6 +333,14 @@ public class Options {
 
     public void setCloseModalOk(String CloseModalOk) {
         this.CloseModalOk = CloseModalOk;
+    }
+
+    public Pattern getCloseModalURLPattern() {
+        return closeModalURLPattern;
+    }
+
+    public void setCloseModalURLPattern(Pattern closeModalURLPattern) {
+        this.closeModalURLPattern = closeModalURLPattern;
     }
 
     public String getUrl() {
