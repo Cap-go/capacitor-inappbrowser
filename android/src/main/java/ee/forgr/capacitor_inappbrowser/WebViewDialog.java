@@ -447,23 +447,19 @@ public class WebViewDialog extends Dialog {
             _webView.getSettings().setSupportMultipleWindows(true);
         }
 
-        // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
+        // Enable Payment Request API by default (required for Google Pay and other payment methods)
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.PAYMENT_REQUEST)) {
+            WebSettingsCompat.setPaymentRequestEnabled(_webView.getSettings(), true);
+            Log.d("InAppBrowser", "Payment Request API enabled");
+        } else {
+            Log.w("InAppBrowser", "Payment Request API not supported on this WebView version (requires WebView 120+). Google Pay may not work.");
+        }
+
+        // Enhanced settings for Google Pay popup support (only when explicitly enabled)
         if (_options.getEnableGooglePaySupport()) {
             Log.d("InAppBrowser", "Enabling Google Pay support features");
-            _webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
             _webView.getSettings().setSupportMultipleWindows(true);
             _webView.getSettings().setGeolocationEnabled(true);
-
-            // Ensure secure context for Payment Request API
-            _webView.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-
-            // Enable Payment Request API only if feature is supported
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.PAYMENT_REQUEST)) {
-                WebSettingsCompat.setPaymentRequestEnabled(_webView.getSettings(), true);
-                Log.d("InAppBrowser", "Payment Request API enabled");
-            } else {
-                Log.d("InAppBrowser", "Payment Request API not supported on this device");
-            }
         }
 
         // Set web view background color
