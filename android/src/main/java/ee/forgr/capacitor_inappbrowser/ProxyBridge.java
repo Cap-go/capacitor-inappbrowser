@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ProxyBridge {
 
     public static class StoredRequest {
+
         public final String method;
         public final String headersJson;
         public final String base64Body;

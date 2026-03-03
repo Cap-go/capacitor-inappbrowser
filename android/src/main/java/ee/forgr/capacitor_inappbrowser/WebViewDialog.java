@@ -89,7 +89,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -2199,7 +2198,6 @@ public class WebViewDialog extends Dialog {
         buttonNearDoneView.setColorFilter(iconColor);
     }
 
-
     private void setWebViewClient() {
         _webView.setWebViewClient(
             new WebViewClient() {
@@ -3111,11 +3109,7 @@ public class WebViewDialog extends Dialog {
                 contentType = "application/octet-stream";
             }
 
-            WebResourceResponse webResourceResponse = new WebResourceResponse(
-                contentType,
-                "utf-8",
-                new ByteArrayInputStream(bodyBytes)
-            );
+            WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
             webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
             webResourceResponse.setResponseHeaders(responseHeaders);
 
@@ -3183,11 +3177,7 @@ public class WebViewDialog extends Dialog {
                 contentType = "application/octet-stream";
             }
 
-            WebResourceResponse webResourceResponse = new WebResourceResponse(
-                contentType,
-                "utf-8",
-                new ByteArrayInputStream(bodyBytes)
-            );
+            WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
             webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
             webResourceResponse.setResponseHeaders(responseHeaders);
             proxiedRequest.response = webResourceResponse;

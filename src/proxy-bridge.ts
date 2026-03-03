@@ -70,10 +70,7 @@
 
   // Patch fetch
   const originalFetch = window.fetch;
-  window.fetch = async function (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> {
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     const requestId = generateRequestId();
     let url: string;
     let method = 'GET';
@@ -119,8 +116,7 @@
     proxyBridge.storeRequest(requestId, method, JSON.stringify(headers), base64Body || '');
 
     // Rewrite URL to proxy interceptor
-    const proxyUrl =
-      '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
+    const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
 
     // Call original fetch with rewritten URL (GET, no body — body is stored natively)
     return originalFetch.call(window, proxyUrl, { method: 'GET' });
@@ -131,11 +127,7 @@
   const XHRSend = XMLHttpRequest.prototype.send;
   const XHRSetHeader = XMLHttpRequest.prototype.setRequestHeader;
 
-  XMLHttpRequest.prototype.open = function (
-    method: string,
-    url: string | URL,
-    ...rest: any[]
-  ) {
+  XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
     (this as any).__proxyMethod = method;
     (this as any).__proxyUrl = resolveUrl(url instanceof URL ? url.toString() : url);
     (this as any).__proxyHeaders = {};
@@ -149,9 +141,7 @@
     return XHRSetHeader.call(this, name, value);
   };
 
-  XMLHttpRequest.prototype.send = function (
-    body?: Document | XMLHttpRequestBodyInit | null,
-  ) {
+  XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
     const requestId = generateRequestId();
     const method = (this as any).__proxyMethod || 'GET';
     const url = (this as any).__proxyUrl || '';
@@ -173,8 +163,7 @@
     proxyBridge.storeRequest(requestId, method, JSON.stringify(headers), base64Body);
 
     // Rewrite URL
-    const proxyUrl =
-      '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
+    const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
 
     // Re-open with rewritten URL as GET
     XHROpen.call(this, 'GET', proxyUrl, true);

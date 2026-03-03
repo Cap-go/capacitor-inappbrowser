@@ -659,14 +659,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 }
 
                 @Override
-                public void proxyRequestEvent(
-                    String requestId,
-                    String url,
-                    String method,
-                    String headersJson,
-                    String body,
-                    String wvId
-                ) {
+                public void proxyRequestEvent(String requestId, String url, String method, String headersJson, String body, String wvId) {
                     JSObject data = new JSObject();
                     data.put("requestId", requestId);
                     data.put("url", url);

@@ -25,13 +25,7 @@ function headersToRecord(headers: Headers): Record<string, string> {
 }
 
 function isProxyResponse(obj: unknown): obj is ProxyResponse {
-  return (
-    obj !== null &&
-    typeof obj === 'object' &&
-    'status' in obj &&
-    'headers' in obj &&
-    !(obj instanceof Response)
-  );
+  return obj !== null && typeof obj === 'object' && 'status' in obj && 'headers' in obj && !(obj instanceof Response);
 }
 
 const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> => {

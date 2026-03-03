@@ -896,21 +896,14 @@ export interface InAppBrowserPlugin {
    * Use addProxyHandler() wrapper instead of calling this directly.
    * @since 9.0.0
    */
-  addListener(
-    eventName: 'proxyRequest',
-    listenerFunc: (event: ProxyRequest) => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
 
   /**
    * Internal method: sends a proxied response back to native.
    * Called by addProxyHandler() wrapper — not intended for direct use.
    * @since 9.0.0
    */
-  handleProxyRequest(options: {
-    requestId: string;
-    response: ProxyResponse | null;
-    webviewId?: string;
-  }): Promise<void>;
+  handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string }): Promise<void>;
 
   /**
    * Remove all listeners for this plugin.
