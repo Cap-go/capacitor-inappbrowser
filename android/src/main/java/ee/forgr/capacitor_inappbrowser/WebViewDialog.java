@@ -2536,6 +2536,11 @@ public class WebViewDialog extends Dialog {
                         base64Body = stored != null ? stored.base64Body : "";
                     } else {
                         // Direct resource load (img, link, script, etc.) — extract from WebResourceRequest
+                        // Note: WebResourceRequest does not expose the request body, so for non-GET/HEAD
+                        // methods (e.g. form POST) the base64Body will be empty. This is an Android
+                        // platform limitation — the proxy handler receives the URL/headers/method but
+                        // must re-fetch the body if needed. In practice, direct resource loads from HTML
+                        // (img, link, script, iframe) are always GET.
                         String scheme = request.getUrl().getScheme();
                         if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
                             return null;
