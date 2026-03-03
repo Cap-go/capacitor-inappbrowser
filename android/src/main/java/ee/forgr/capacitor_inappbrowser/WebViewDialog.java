@@ -127,6 +127,7 @@ public class WebViewDialog extends Dialog {
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
     private ProxyBridge proxyBridge;
     private String proxyBridgeScript;
+    private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
@@ -443,7 +444,8 @@ public class WebViewDialog extends Dialog {
         _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
 
         if (_options.getProxyRequests()) {
-            proxyBridge = new ProxyBridge();
+            proxyAccessToken = UUID.randomUUID().toString();
+            proxyBridge = new ProxyBridge(proxyAccessToken);
             _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
             proxyBridgeScript = loadProxyBridgeScript();
         }
@@ -2558,8 +2560,6 @@ public class WebViewDialog extends Dialog {
                         base64Body = "";
                     }
 
-                    Log.i("InAppBrowserProxy", String.format("Proxying request: %s %s", method, originalUrl));
-
                     // Create a new requestId for the semaphore wait
                     String proxyId = UUID.randomUUID().toString();
                     ProxiedRequest proxiedRequest = new ProxiedRequest();
@@ -2685,7 +2685,9 @@ public class WebViewDialog extends Dialog {
                     }
 
                     // Inject proxy bridge script early so fetch/XHR are patched before page JS runs
-                    if (_options.getProxyRequests() && proxyBridgeScript != null) {
+                    if (_options.getProxyRequests() && proxyBridgeScript != null && proxyAccessToken != null) {
+                        // Set the access token before the bridge script runs
+                        view.evaluateJavascript("window.__capgoProxyToken='" + proxyAccessToken + "';", null);
                         view.evaluateJavascript(proxyBridgeScript, null);
                     }
                 }

@@ -15,6 +15,12 @@
   const proxyBridge = (window as any).__capgoProxy;
   if (!proxyBridge) return;
 
+  // Access token set by native before this script runs — prevents page JS from
+  // calling storeRequest directly without knowing the per-webview secret.
+  const accessToken: string = (window as any).__capgoProxyToken || '';
+  // Clean up so page JS can't read it
+  delete (window as any).__capgoProxyToken;
+
   let requestCounter = 0;
 
   function generateRequestId(): string {
@@ -113,7 +119,7 @@
     const base64Body = await bodyToBase64(body);
 
     // Store request details via JavascriptInterface
-    proxyBridge.storeRequest(requestId, method, JSON.stringify(headers), base64Body || '');
+    proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body || '');
 
     // Rewrite URL to proxy interceptor
     const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
@@ -160,7 +166,7 @@
       // FormData, Blob etc — not easily synchronously encoded
     }
 
-    proxyBridge.storeRequest(requestId, method, JSON.stringify(headers), base64Body);
+    proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
 
     // Rewrite URL
     const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;

@@ -16,7 +16,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     public func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         let request = urlSchemeTask.request
-        print("[InAppBrowser][Proxy] >>> webView(_:start:) CALLED! url=\(request.url?.absoluteString ?? "nil")")
         guard let url = request.url else {
             urlSchemeTask.didFailWithError(NSError(
                 domain: "ProxySchemeHandler",
@@ -58,7 +57,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             "webviewId": webviewId,
         ]
 
-        print("[InAppBrowser][Proxy] Firing proxyRequest event: requestId=\(requestId), url=\(url.absoluteString), plugin=\(String(describing: plugin))")
         plugin?.notifyListeners("proxyRequest", data: eventData)
     }
 

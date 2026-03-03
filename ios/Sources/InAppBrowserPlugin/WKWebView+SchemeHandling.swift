@@ -28,7 +28,6 @@ extension WKWebView {
         }
 
         method_exchangeImplementations(original, swizzled)
-        print("[InAppBrowser][Proxy] Successfully swizzled handlesURLScheme")
     }()
 
     /// Swizzled replacement — returns false for overridden schemes, calls original for all others
@@ -50,11 +49,5 @@ extension WKWebView {
 
         // Trigger the one-time swizzle
         _ = _swizzleOnce
-
-        // Verify it worked
-        for scheme in schemes {
-            let handles = WKWebView.handlesURLScheme(scheme)
-            print("[InAppBrowser][Proxy] handlesURLScheme(\"\(scheme)\") = \(handles) (should be false)")
-        }
     }
 }

@@ -680,7 +680,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
             webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
             webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
-            print("[InAppBrowser][Proxy] Registered scheme handler for https and http via public API")
         }
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)

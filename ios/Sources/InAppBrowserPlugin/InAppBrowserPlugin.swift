@@ -617,7 +617,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if proxyRequests {
                 proxyHandler = ProxySchemeHandler(plugin: self, webviewId: webViewId)
                 self.proxySchemeHandlers[webViewId] = proxyHandler!
-                print("[InAppBrowser][Proxy] ProxySchemeHandler created for webViewId=\(webViewId)")
             }
 
             self.webViewController = WKWebViewController.init(
