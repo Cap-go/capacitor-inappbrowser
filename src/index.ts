@@ -28,6 +28,22 @@ function isProxyResponse(obj: unknown): obj is ProxyResponse {
   return obj !== null && typeof obj === 'object' && 'status' in obj && 'headers' in obj && !(obj instanceof Response);
 }
 
+/**
+ * Register a handler that intercepts all HTTP/HTTPS requests from the in-app browser webview.
+ *
+ * The callback receives a {@link ProxyRequest} for every request and must return one of:
+ * - A {@link ProxyResponse} object (recommended — use with CapacitorHttp for CORS-free fetching)
+ * - A fetch `Response` object
+ * - `null` to let the request pass through to its original destination
+ *
+ * **Platform note (Android):** Requests initiated directly by HTML elements (`<img>`,
+ * `<script>`, `<link>`, `<iframe>`, etc.) are intercepted via `shouldInterceptRequest`,
+ * which does not expose the request body. These requests will have an empty `body` field.
+ * In practice this only affects direct resource loads, which are always GET. Requests made
+ * via `fetch()` or `XMLHttpRequest` go through the JS bridge and include the full body.
+ *
+ * @since 9.0.0
+ */
 const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> => {
   return InAppBrowser.addListener('proxyRequest', async (event) => {
     try {

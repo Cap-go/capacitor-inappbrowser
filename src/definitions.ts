@@ -179,7 +179,13 @@ export interface ProxyRequest {
   method: string;
   /** Request headers as key-value pairs */
   headers: Record<string, string>;
-  /** Base64-encoded request body, or null if no body */
+  /**
+   * Base64-encoded request body, or null if no body.
+   *
+   * On Android, requests from HTML elements (img, script, link, iframe) are intercepted
+   * natively and do not have access to the request body — this field will be empty for those
+   * requests. Requests from fetch() and XMLHttpRequest include the full body.
+   */
   body: string | null;
   /** ID of the webview that made this request */
   webviewId: string;
