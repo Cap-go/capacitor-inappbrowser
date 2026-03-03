@@ -106,6 +106,70 @@ export interface OpenOptions {
    * @since 0.1.0
    */
   preventDeeplink?: boolean;
+
+  // --- Chrome Custom Tab customization (Android only, ignored on iOS) ---
+
+  /**
+   * Toolbar background color in hex format (e.g., "#1A1A2E").
+   * Applied to both light and dark color schemes.
+   * Also sets the navigation bar color to match.
+   * **Android only** — ignored on iOS.
+   * @since 8.2.0
+   */
+  toolbarColor?: string;
+
+  /**
+   * Whether the URL bar should auto-hide when the user scrolls down.
+   * The bar reappears on any upward scroll.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  urlBarHidingEnabled?: boolean;
+
+  /**
+   * Show the page's HTML <title> in the toolbar instead of the raw URL.
+   * The true URL is still visible when the user taps the title area.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  showTitle?: boolean;
+
+  /**
+   * Replace the default "X" close icon with a back arrow.
+   * Makes the Custom Tab feel like a native navigation push rather than a modal overlay.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  showArrow?: boolean;
+
+  /**
+   * Remove the share action from the overflow menu.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  disableShare?: boolean;
+
+  /**
+   * Hide the bookmark star icon in the overflow menu.
+   * Uses an undocumented Chromium intent extra — may stop working on future Chrome updates.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  disableBookmark?: boolean;
+
+  /**
+   * Hide the download icon in the overflow menu.
+   * Uses an undocumented Chromium intent extra — may stop working on future Chrome updates.
+   * **Android only** — ignored on iOS.
+   * @default false
+   * @since 8.2.0
+   */
+  disableDownload?: boolean;
 }
 
 export interface OpenSecureWindowOptions {

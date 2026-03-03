@@ -51,6 +51,27 @@ import { InAppBrowser } from '@capgo/inappbrowser'
 InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
+### Customize Chrome Custom Tab Appearance (Android)
+
+The `open()` method launches a Chrome Custom Tab on Android. You can customize its appearance to blend with your app:
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+InAppBrowser.open({
+  url: "https://example.com",
+  toolbarColor: "#1A1A2E",      // Match your app's theme
+  showTitle: true,               // Show page title instead of raw URL
+  showArrow: true,               // Back arrow instead of X close icon
+  urlBarHidingEnabled: true,     // Auto-hide URL bar on scroll
+  disableShare: true,            // Remove share from overflow menu
+  disableBookmark: true,         // Hide bookmark icon (undocumented, may break)
+  disableDownload: true,         // Hide download icon (undocumented, may break)
+});
+```
+
+All CCT options are Android-only and safely ignored on iOS. See [`OpenOptions`](#openoptions) for full documentation.
+
 ### Open WebView with Custom Dimensions
 
 By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
@@ -746,11 +767,18 @@ And in the AndroidManifest.xml file:
 
 #### OpenOptions
 
-| Prop                         | Type                 | Description                                                                                                           | Since |
-| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
-| **`url`**                    | <code>string</code>  | Target URL to load.                                                                                                   | 0.1.0 |
-| **`isPresentAfterPageLoad`** | <code>boolean</code> | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. | 0.1.0 |
-| **`preventDeeplink`**        | <code>boolean</code> | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                | 0.1.0 |
+| Prop                         | Type                 | Description                                                                                                                                                                             | Default            | Since |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ----- |
+| **`url`**                    | <code>string</code>  | Target URL to load.                                                                                                                                                                     |                    | 0.1.0 |
+| **`isPresentAfterPageLoad`** | <code>boolean</code> | if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.                                                                   |                    | 0.1.0 |
+| **`preventDeeplink`**        | <code>boolean</code> | if true the deeplink will not be opened, if false the deeplink will be opened when clicked on the link                                                                                  |                    | 0.1.0 |
+| **`toolbarColor`**           | <code>string</code>  | Toolbar background color in hex format (e.g., "#1A1A2E"). Applied to both light and dark color schemes. Also sets the navigation bar color to match. **Android only** — ignored on iOS. |                    | 8.2.0 |
+| **`urlBarHidingEnabled`**    | <code>boolean</code> | Whether the URL bar should auto-hide when the user scrolls down. The bar reappears on any upward scroll. **Android only** — ignored on iOS.                                             | <code>false</code> | 8.2.0 |
+| **`showTitle`**              | <code>boolean</code> | Show the page's HTML &lt;title&gt; in the toolbar instead of the raw URL. The true URL is still visible when the user taps the title area. **Android only** — ignored on iOS.           | <code>false</code> | 8.2.0 |
+| **`showArrow`**              | <code>boolean</code> | Replace the default "X" close icon with a back arrow. Makes the Custom Tab feel like a native navigation push rather than a modal overlay. **Android only** — ignored on iOS.           | <code>false</code> | 8.2.0 |
+| **`disableShare`**           | <code>boolean</code> | Remove the share action from the overflow menu. **Android only** — ignored on iOS.                                                                                                      | <code>false</code> | 8.2.0 |
+| **`disableBookmark`**        | <code>boolean</code> | Hide the bookmark star icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.            | <code>false</code> | 8.2.0 |
+| **`disableDownload`**        | <code>boolean</code> | Hide the download icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.                 | <code>false</code> | 8.2.0 |
 
 
 #### ClearCookieOptions

@@ -6,6 +6,11 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -16,6 +21,8 @@ import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsCallback;
 import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
@@ -337,7 +344,66 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
         currentUrl = url;
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
+
+        // --- Chrome Custom Tab UI customization ---
+
+        // Toolbar color (applied to both light and dark color schemes)
+        String toolbarColor = call.getString("toolbarColor");
+        if (toolbarColor != null) {
+            try {
+                int colorInt = Color.parseColor(toolbarColor);
+                CustomTabColorSchemeParams colorParams = new CustomTabColorSchemeParams.Builder()
+                    .setToolbarColor(colorInt)
+                    .setNavigationBarColor(colorInt)
+                    .build();
+                builder.setDefaultColorSchemeParams(colorParams);
+                builder.setColorSchemeParams(CustomTabsIntent.COLOR_SCHEME_DARK, colorParams);
+            } catch (IllegalArgumentException e) {
+                Log.w(getLogTag(), "Invalid toolbarColor value: " + toolbarColor, e);
+            }
+        }
+
+        // Auto-hide URL bar on scroll
+        if (call.getBoolean("urlBarHidingEnabled", false)) {
+            builder.setUrlBarHidingEnabled(true);
+        }
+
+        // Show page <title> instead of URL
+        if (call.getBoolean("showTitle", false)) {
+            builder.setShowTitle(true);
+        }
+
+        // Replace X close icon with a back arrow
+        if (call.getBoolean("showArrow", false)) {
+            Drawable arrowDrawable = AppCompatResources.getDrawable(getContext(), R.drawable.arrow_back_enabled);
+            if (arrowDrawable != null) {
+                Bitmap backArrow = Bitmap.createBitmap(
+                    arrowDrawable.getIntrinsicWidth(),
+                    arrowDrawable.getIntrinsicHeight(),
+                    Bitmap.Config.ARGB_8888
+                );
+                Canvas canvas = new Canvas(backArrow);
+                arrowDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+                arrowDrawable.draw(canvas);
+                builder.setCloseButtonIcon(backArrow);
+            }
+        }
+
+        // Remove share action from overflow menu
+        if (call.getBoolean("disableShare", false)) {
+            builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
+        }
+
         CustomTabsIntent tabsIntent = builder.build();
+
+        // Undocumented Chromium flags — these may stop working on future Chrome updates
+        if (call.getBoolean("disableBookmark", false)) {
+            tabsIntent.intent.putExtra("org.chromium.chrome.browser.customtabs.EXTRA_DISABLE_STAR_BUTTON", true);
+        }
+        if (call.getBoolean("disableDownload", false)) {
+            tabsIntent.intent.putExtra("org.chromium.chrome.browser.customtabs.EXTRA_DISABLE_DOWNLOAD_BUTTON", true);
+        }
+
         tabsIntent.intent.putExtra(Intent.EXTRA_REFERRER, Uri.parse(Intent.URI_ANDROID_APP_SCHEME + "//" + getContext().getPackageName()));
         tabsIntent.intent.putExtra(android.provider.Browser.EXTRA_HEADERS, this.getHeaders(call));
 
