@@ -41,7 +41,8 @@
     "prettier": "prettier-pretty-check \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api InAppBrowserPlugin --output-readme README.md --output-json dist/docs.json",
-    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
+    "build:proxy-bridge": "npx esbuild src/proxy-bridge.ts --bundle --outfile=android/src/main/assets/proxy-bridge.js --format=iife --target=es2015",
+    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs && npm run build:proxy-bridge",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
     "prepublishOnly": "npm run build"

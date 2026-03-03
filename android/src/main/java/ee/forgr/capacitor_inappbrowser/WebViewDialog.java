@@ -66,11 +66,14 @@ import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
@@ -85,8 +88,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -96,6 +99,12 @@ public class WebViewDialog extends Dialog {
 
         private WebResourceResponse response;
         private final Semaphore semaphore;
+        // Non-null when request came via JS proxy bridge (_capgo_proxy_ rewrite).
+        // Used by handleProxyResponse to do a native pass-through fetch when
+        // the handler returns null, since the rewritten URL is not loadable.
+        private String bridgedOriginalUrl;
+        private String bridgedMethod;
+        private Map<String, String> bridgedHeaders;
 
         public WebResourceResponse getResponse() {
             return response;
@@ -117,6 +126,8 @@ public class WebViewDialog extends Dialog {
     private final WebView capacitorWebView;
     private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
+    private ProxyBridge proxyBridge;
+    private String proxyBridgeScript;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
@@ -431,6 +442,12 @@ public class WebViewDialog extends Dialog {
         _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
         _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
         _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
+
+        if (_options.getProxyRequests()) {
+            proxyBridge = new ProxyBridge();
+            _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
+            proxyBridgeScript = loadProxyBridgeScript();
+        }
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         _webView.getSettings().setDatabaseEnabled(true);
@@ -2182,73 +2199,6 @@ public class WebViewDialog extends Dialog {
         buttonNearDoneView.setColorFilter(iconColor);
     }
 
-    public void handleProxyResultError(String result, String id) {
-        Log.i("InAppBrowserProxy", String.format("handleProxyResultError: %s, ok: %s id: %s", result, false, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-        proxiedRequest.semaphore.release();
-    }
-
-    public void handleProxyResultOk(JSONObject result, String id) {
-        Log.i("InAppBrowserProxy", String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-
-        if (result == null) {
-            proxiedRequest.semaphore.release();
-            return;
-        }
-
-        Map<String, String> responseHeaders = new HashMap<>();
-        String body;
-        int code;
-
-        try {
-            body = result.getString("body");
-            code = result.getInt("code");
-            JSONObject headers = result.getJSONObject("headers");
-            for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
-                String headerName = it.next();
-                String header = headers.getString(headerName);
-                responseHeaders.put(headerName, header);
-            }
-        } catch (JSONException e) {
-            Log.e("InAppBrowserProxy", "Cannot parse OK result", e);
-            return;
-        }
-
-        String contentType = responseHeaders.get("Content-Type");
-        if (contentType == null) {
-            contentType = responseHeaders.get("content-type");
-        }
-        if (contentType == null) {
-            Log.e("InAppBrowserProxy", "'Content-Type' header is required");
-            return;
-        }
-
-        if (!((100 <= code && code <= 299) || (400 <= code && code <= 599))) {
-            Log.e("InAppBrowserProxy", String.format("Status code %s outside of the allowed range", code));
-            return;
-        }
-
-        WebResourceResponse webResourceResponse = new WebResourceResponse(
-            contentType,
-            "utf-8",
-            new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
-        );
-
-        webResourceResponse.setStatusCodeAndReasonPhrase(code, getReasonPhrase(code));
-        proxiedRequest.response = webResourceResponse;
-        proxiedRequest.semaphore.release();
-    }
 
     private void setWebViewClient() {
         _webView.setWebViewClient(
@@ -2550,18 +2500,6 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
-                private String randomRequestId() {
-                    return UUID.randomUUID().toString();
-                }
-
-                private String toBase64(String raw) {
-                    String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
-                    if (s.endsWith("=")) {
-                        s = s.substring(0, s.length() - 2);
-                    }
-                    return s;
-                }
-
                 //
                 //        void handleRedirect(String currentUrl, Response response) {
                 //          String loc = response.header("Location");
@@ -2573,104 +2511,95 @@ public class WebViewDialog extends Dialog {
                     if (view == null || _webView == null) {
                         return null;
                     }
-                    Pattern pattern = _options.getProxyRequestsPattern();
-                    if (pattern == null) {
-                        return null;
-                    }
-                    Matcher matcher = pattern.matcher(request.getUrl().toString());
-                    if (!matcher.find()) {
+                    if (!_options.getProxyRequests()) {
                         return null;
                     }
 
-                    // Requests matches the regex
-                    if (Objects.equals(request.getMethod(), "POST")) {
-                        // Log.e("HTTP", String.format("returned null (ok) %s", request.getUrl().toString()));
-                        return null;
-                    }
+                    String requestUrl = request.getUrl().toString();
+                    String originalUrl;
+                    String method;
+                    String headersJson;
+                    String base64Body;
 
-                    Log.i("InAppBrowserProxy", String.format("Proxying request: %s", request.getUrl().toString()));
+                    if (requestUrl.contains("/_capgo_proxy_?")) {
+                        // JS-patched fetch/XHR: extract original URL and stored request data
+                        Uri uri = request.getUrl();
+                        originalUrl = uri.getQueryParameter("u");
+                        String requestId = uri.getQueryParameter("rid");
+                        if (originalUrl == null || requestId == null) {
+                            return null;
+                        }
 
-                    // We need to call a JS function
-                    String requestId = randomRequestId();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
-                    addProxiedRequest(requestId, proxiedRequest);
+                        ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
+                        method = stored != null ? stored.method : "GET";
+                        headersJson = stored != null ? stored.headersJson : "{}";
+                        base64Body = stored != null ? stored.base64Body : "";
+                    } else {
+                        // Direct resource load (img, link, script, etc.) — extract from WebResourceRequest
+                        String scheme = request.getUrl().getScheme();
+                        if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
+                            return null;
+                        }
 
-                    // lsuakdchgbbaHandleProxiedRequest
-                    activity.runOnUiThread(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                StringBuilder headers = new StringBuilder();
-                                Map<String, String> requestHeaders = request.getRequestHeaders();
-                                for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
-                                    headers.append(
-                                        String.format("h[atob('%s')]=atob('%s');", toBase64(header.getKey()), toBase64(header.getValue()))
-                                    );
+                        originalUrl = requestUrl;
+                        method = request.getMethod();
+
+                        // Convert request headers to JSON
+                        Map<String, String> reqHeaders = request.getRequestHeaders();
+                        JSONObject headersObj = new JSONObject();
+                        if (reqHeaders != null) {
+                            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
+                                try {
+                                    headersObj.put(entry.getKey(), entry.getValue());
+                                } catch (JSONException e) {
+                                    // skip malformed header
                                 }
-                                String jsTemplate = """
-                                    try {
-                                      function getHeaders() {
-                                        const h = {};
-                                        %s
-                                        return h;
-                                      }
-                                      window.InAppBrowserProxyRequest(new Request(atob('%s'), {
-                                        headers: getHeaders(),
-                                        method: '%s'
-                                      })).then(async (res) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: true,
-                                          result: (!!res ? {
-                                            headers: Object.fromEntries(res.headers.entries()),
-                                            code: res.status,
-                                            body: (await res.text())
-                                          } : null),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      }).catch((e) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: false,
-                                          result: e.toString(),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      });
-                                    } catch (e) {
-                                      Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                        ok: false,
-                                        result: e.toString(),
-                                        id: '%s',
-                                        webviewId: '%s'
-                                      });
-                                    }
-                                    """;
-                                String dialogId = instanceId != null ? instanceId : "";
-                                String s = String.format(
-                                    jsTemplate,
-                                    headers,
-                                    toBase64(request.getUrl().toString()),
-                                    request.getMethod(),
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId
-                                );
-                                // Log.i("HTTP", s);
-                                capacitorWebView.evaluateJavascript(s, null);
                             }
                         }
-                    );
+                        headersJson = headersObj.toString();
+                        base64Body = "";
+                    }
 
-                    // 10 seconds wait max
+                    Log.i("InAppBrowserProxy", String.format("Proxying request: %s %s", method, originalUrl));
+
+                    // Create a new requestId for the semaphore wait
+                    String proxyId = UUID.randomUUID().toString();
+                    ProxiedRequest proxiedRequest = new ProxiedRequest();
+
+                    // For bridged requests, store original URL so null response
+                    // can do a native pass-through instead of loading the /_capgo_proxy_ URL
+                    if (requestUrl.contains("/_capgo_proxy_?")) {
+                        proxiedRequest.bridgedOriginalUrl = originalUrl;
+                        proxiedRequest.bridgedMethod = method;
+                        try {
+                            JSONObject hdr = new JSONObject(headersJson);
+                            Map<String, String> hdrMap = new HashMap<>();
+                            Iterator<String> keys = hdr.keys();
+                            while (keys.hasNext()) {
+                                String k = keys.next();
+                                hdrMap.put(k, hdr.getString(k));
+                            }
+                            proxiedRequest.bridgedHeaders = hdrMap;
+                        } catch (JSONException e) {
+                            proxiedRequest.bridgedHeaders = new HashMap<>();
+                        }
+                    }
+
+                    addProxiedRequest(proxyId, proxiedRequest);
+
+                    // Fire proxyRequest event to the Capacitor plugin
+                    String dialogId = instanceId != null ? instanceId : "";
+                    _options
+                        .getCallbacks()
+                        .proxyRequestEvent(proxyId, originalUrl, method, headersJson, base64Body.isEmpty() ? null : base64Body, dialogId);
+
+                    // Wait for response (10 seconds max)
                     try {
                         if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
                             return proxiedRequest.response;
                         } else {
-                            Log.e("InAppBrowserProxy", "Semaphore timed out");
-                            removeProxiedRequest(requestId); // prevent mem leak
+                            Log.e("InAppBrowserProxy", "Semaphore timed out for: " + originalUrl);
+                            removeProxiedRequest(proxyId);
                         }
                     } catch (InterruptedException e) {
                         Log.e("InAppBrowserProxy", "Semaphore wait error", e);
@@ -2755,6 +2684,11 @@ public class WebViewDialog extends Dialog {
                         }
                     } catch (URISyntaxException e) {
                         // Do nothing
+                    }
+
+                    // Inject proxy bridge script early so fetch/XHR are patched before page JS runs
+                    if (_options.getProxyRequests() && proxyBridgeScript != null) {
+                        view.evaluateJavascript(proxyBridgeScript, null);
                     }
                 }
 
@@ -3111,6 +3045,156 @@ public class WebViewDialog extends Dialog {
     public void removeProxiedRequest(String key) {
         synchronized (proxiedRequestsHashmap) {
             proxiedRequestsHashmap.remove(key);
+        }
+    }
+
+    private String loadProxyBridgeScript() {
+        try {
+            InputStream is = _context.getAssets().open("proxy-bridge.js");
+            byte[] buffer = new byte[is.available()];
+            is.read(buffer);
+            is.close();
+            return new String(buffer, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            Log.e("InAppBrowserProxy", "Failed to load proxy-bridge.js", e);
+            return null;
+        }
+    }
+
+    public void handleProxyResponse(String requestId, JSObject response) {
+        ProxiedRequest proxiedRequest;
+        synchronized (proxiedRequestsHashmap) {
+            proxiedRequest = proxiedRequestsHashmap.get(requestId);
+        }
+        if (proxiedRequest == null) {
+            Log.e("InAppBrowserProxy", "No pending request for id: " + requestId);
+            return;
+        }
+
+        if (response == null) {
+            // null response = pass through
+            if (proxiedRequest.bridgedOriginalUrl != null) {
+                // Bridged fetch/XHR: URL was rewritten to /_capgo_proxy_, so WebView
+                // can't load it directly. Do a native pass-through fetch instead.
+                executeNativePassThrough(proxiedRequest);
+            }
+            // For direct resource loads the response stays null, which tells
+            // shouldInterceptRequest to return null and let WebView load normally.
+            synchronized (proxiedRequestsHashmap) {
+                proxiedRequestsHashmap.remove(requestId);
+            }
+            proxiedRequest.semaphore.release();
+            return;
+        }
+
+        try {
+            String base64Body = response.getString("body");
+            int status = response.getInteger("status", 200);
+            JSObject headers = response.getJSObject("headers");
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            if (headers != null) {
+                Iterator<String> keys = headers.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    responseHeaders.put(key, headers.getString(key));
+                }
+            }
+
+            byte[] bodyBytes = Base64.decode(base64Body, Base64.DEFAULT);
+
+            String contentType = responseHeaders.get("content-type");
+            if (contentType == null) {
+                contentType = responseHeaders.get("Content-Type");
+            }
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+
+            WebResourceResponse webResourceResponse = new WebResourceResponse(
+                contentType,
+                "utf-8",
+                new ByteArrayInputStream(bodyBytes)
+            );
+            webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
+            webResourceResponse.setResponseHeaders(responseHeaders);
+
+            proxiedRequest.response = webResourceResponse;
+        } catch (Exception e) {
+            Log.e("InAppBrowserProxy", "Error building proxy response", e);
+        }
+
+        synchronized (proxiedRequestsHashmap) {
+            proxiedRequestsHashmap.remove(requestId);
+        }
+        proxiedRequest.semaphore.release();
+    }
+
+    /**
+     * Performs a native HTTP request for bridged fetch/XHR pass-through.
+     * Called when proxy handler returns null for a request whose URL was
+     * rewritten to /_capgo_proxy_, so WebView can't load it directly.
+     */
+    private void executeNativePassThrough(ProxiedRequest proxiedRequest) {
+        try {
+            URL url = new URL(proxiedRequest.bridgedOriginalUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(proxiedRequest.bridgedMethod != null ? proxiedRequest.bridgedMethod : "GET");
+            conn.setInstanceFollowRedirects(true);
+
+            if (proxiedRequest.bridgedHeaders != null) {
+                for (Map.Entry<String, String> entry : proxiedRequest.bridgedHeaders.entrySet()) {
+                    conn.setRequestProperty(entry.getKey(), entry.getValue());
+                }
+            }
+
+            int status = conn.getResponseCode();
+            InputStream inputStream;
+            try {
+                inputStream = conn.getInputStream();
+            } catch (IOException e) {
+                inputStream = conn.getErrorStream();
+            }
+
+            byte[] bodyBytes = new byte[0];
+            if (inputStream != null) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = inputStream.read(buf)) != -1) {
+                    baos.write(buf, 0, n);
+                }
+                inputStream.close();
+                bodyBytes = baos.toByteArray();
+            }
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    responseHeaders.put(entry.getKey(), entry.getValue().get(0));
+                }
+            }
+
+            String contentType = responseHeaders.get("Content-Type");
+            if (contentType == null) {
+                contentType = responseHeaders.get("content-type");
+            }
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+
+            WebResourceResponse webResourceResponse = new WebResourceResponse(
+                contentType,
+                "utf-8",
+                new ByteArrayInputStream(bodyBytes)
+            );
+            webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
+            webResourceResponse.setResponseHeaders(responseHeaders);
+            proxiedRequest.response = webResourceResponse;
+
+            conn.disconnect();
+        } catch (Exception e) {
+            Log.e("InAppBrowserProxy", "Native pass-through failed for: " + proxiedRequest.bridgedOriginalUrl, e);
         }
     }
 

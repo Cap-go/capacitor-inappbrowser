@@ -251,6 +251,8 @@ window.mobileApp.close();
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`handleProxyRequest(...)`](#handleproxyrequest)
+* [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
@@ -635,6 +637,45 @@ Will be triggered when page load error
 --------------------
 
 
+### handleProxyRequest(...)
+
+```typescript
+handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string; }) => Promise<void>
+```
+
+Internal method: sends a proxied response back to native.
+Called by addProxyHandler() wrapper — not intended for direct use.
+
+| Param         | Type                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; response: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
+
+**Since:** 9.0.0
+
+--------------------
+
+
+### addListener('proxyRequest', ...)
+
+```typescript
+addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for proxied requests from the in-app browser webview.
+Use addProxyHandler() wrapper instead of calling this directly.
+
+| Param              | Type                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'proxyRequest'</code>                                               |
+| **`listenerFunc`** | <code>(event: <a href="#proxyrequest">ProxyRequest</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 9.0.0
+
+--------------------
+
+
 ### removeAllListeners()
 
 ```typescript
@@ -820,7 +861,7 @@ And in the AndroidManifest.xml file:
 | **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 6.1.0  |
 | **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
-| **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 6.9.0  |
+| **`proxyRequests`**                    | <code>boolean</code>                                                                                                                                                   | When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler registered via addProxyHandler(). The handler can return a custom Response or null for pass-through.                                                                                                                                                                                                                                                                                                                                                                     |                                                               | 9.0.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                             | <code>false</code>                                            | 0.1.0  |
@@ -881,6 +922,31 @@ And in the AndroidManifest.xml file:
 | --------- | ------------------- | ------------------------------ | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
+
+#### ProxyResponse
+
+Response to send back for a proxied request.
+
+| Prop          | Type                                                            | Description                         |
+| ------------- | --------------------------------------------------------------- | ----------------------------------- |
+| **`body`**    | <code>string</code>                                             | Base64-encoded response body        |
+| **`status`**  | <code>number</code>                                             | HTTP status code                    |
+| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Response headers as key-value pairs |
+
+
+#### ProxyRequest
+
+Represents an intercepted HTTP request from the in-app browser webview.
+
+| Prop            | Type                                                            | Description                                                 |
+| --------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| **`requestId`** | <code>string</code>                                             | Unique identifier for this request, used to match responses |
+| **`url`**       | <code>string</code>                                             | The full URL being requested                                |
+| **`method`**    | <code>string</code>                                             | HTTP method (GET, POST, PUT, DELETE, etc.)                  |
+| **`headers`**   | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Request headers as key-value pairs                          |
+| **`body`**      | <code>string \| null</code>                                     | Base64-encoded request body, or null if no body             |
+| **`webviewId`** | <code>string</code>                                             | ID of the webview that made this request                    |
 
 
 #### DimensionOptions
