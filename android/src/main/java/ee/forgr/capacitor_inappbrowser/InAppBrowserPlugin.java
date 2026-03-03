@@ -1016,10 +1016,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
         String webviewId = call.getString("webviewId");
         WebViewDialog webViewDialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
-        if (webViewDialog != null) {
-            JSObject response = call.getObject("response");
-            webViewDialog.handleProxyResponse(requestId, response);
+        if (webViewDialog == null) {
+            call.reject("Target WebView not found for proxy request");
+            return;
         }
+        JSObject response = call.getObject("response");
+        webViewDialog.handleProxyResponse(requestId, response);
         call.resolve();
     }
 
