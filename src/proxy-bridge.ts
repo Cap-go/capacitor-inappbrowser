@@ -63,11 +63,9 @@
       return arrayBufferToBase64(ab);
     }
     if (body instanceof FormData) {
-      const parts: string[] = [];
-      body.forEach((value, key) => {
-        parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(value.toString()));
-      });
-      return stringToBase64(parts.join('&'));
+      // Use Response to get proper multipart encoding with boundaries and file contents
+      const ab = await new Response(body).arrayBuffer();
+      return arrayBufferToBase64(ab);
     }
     if (body instanceof URLSearchParams) {
       return stringToBase64(body.toString());
@@ -117,6 +115,21 @@
       if (init.body !== undefined) body = init.body;
     }
 
+    // FormData needs special handling: serialize via Response to get proper multipart
+    // encoding with boundaries, and extract the generated Content-Type header
+    if (body instanceof FormData) {
+      const encoded = new Response(body);
+      const ct = encoded.headers.get('content-type');
+      if (ct) {
+        // Remove any existing Content-Type — the boundary must match the encoded body
+        Object.keys(headers).forEach((k) => {
+          if (k.toLowerCase() === 'content-type') delete headers[k];
+        });
+        headers['content-type'] = ct;
+      }
+      body = await encoded.arrayBuffer();
+    }
+
     const base64Body = await bodyToBase64(body);
 
     // Store request details via JavascriptInterface
@@ -149,31 +162,60 @@
   };
 
   XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+    const xhr = this;
     const requestId = generateRequestId();
-    const method = (this as any).__proxyMethod || 'GET';
-    const url = (this as any).__proxyUrl || '';
-    const headers = (this as any).__proxyHeaders || {};
+    const method = (xhr as any).__proxyMethod || 'GET';
+    const url = (xhr as any).__proxyUrl || '';
+    const headers = (xhr as any).__proxyHeaders || {};
 
-    // Store body synchronously
-    let base64Body = '';
-    if (body !== null && body !== undefined) {
-      if (typeof body === 'string') {
-        base64Body = stringToBase64(body);
-      } else if (body instanceof ArrayBuffer) {
-        base64Body = arrayBufferToBase64(body);
-      } else if (body instanceof Uint8Array) {
-        base64Body = arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
-      }
-      // FormData, Blob etc — not easily synchronously encoded
+    function completeSend(base64Body: string) {
+      proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
+      const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
+      XHROpen.call(xhr, 'GET', proxyUrl, true);
+      XHRSend.call(xhr, null);
     }
 
-    proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
+    // Synchronous fast path for simple types
+    if (body === null || body === undefined) {
+      completeSend('');
+      return;
+    }
+    if (typeof body === 'string') {
+      completeSend(stringToBase64(body));
+      return;
+    }
+    if (body instanceof ArrayBuffer) {
+      completeSend(arrayBufferToBase64(body));
+      return;
+    }
+    if (body instanceof Uint8Array) {
+      completeSend(arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength)));
+      return;
+    }
+    if (body instanceof URLSearchParams) {
+      completeSend(stringToBase64(body.toString()));
+      return;
+    }
 
-    // Rewrite URL
-    const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
+    // Async path for FormData and Blob — deferred to microtask
+    if (body instanceof Blob || body instanceof FormData) {
+      const encoded = new Response(body);
+      if (body instanceof FormData) {
+        const ct = encoded.headers.get('content-type');
+        if (ct) {
+          Object.keys(headers).forEach((k) => {
+            if (k.toLowerCase() === 'content-type') delete headers[k];
+          });
+          headers['content-type'] = ct;
+        }
+      }
+      encoded.arrayBuffer().then((ab) => {
+        completeSend(arrayBufferToBase64(ab));
+      });
+      return;
+    }
 
-    // Re-open with rewritten URL as GET
-    XHROpen.call(this, 'GET', proxyUrl, true);
-    return XHRSend.call(this, null);
+    // Unknown type (e.g. Document) — send without body
+    completeSend('');
   };
 })();

@@ -42,11 +42,8 @@
         return arrayBufferToBase64(ab);
       }
       if (body instanceof FormData) {
-        const parts = [];
-        body.forEach((value, key) => {
-          parts.push(encodeURIComponent(key) + "=" + encodeURIComponent(value.toString()));
-        });
-        return stringToBase64(parts.join("&"));
+        const ab = await new Response(body).arrayBuffer();
+        return arrayBufferToBase64(ab);
       }
       if (body instanceof URLSearchParams) {
         return stringToBase64(body.toString());
@@ -88,6 +85,17 @@
         }
         if (init.body !== void 0) body = init.body;
       }
+      if (body instanceof FormData) {
+        const encoded = new Response(body);
+        const ct = encoded.headers.get("content-type");
+        if (ct) {
+          Object.keys(headers).forEach((k) => {
+            if (k.toLowerCase() === "content-type") delete headers[k];
+          });
+          headers["content-type"] = ct;
+        }
+        body = await encoded.arrayBuffer();
+      }
       const base64Body = await bodyToBase64(body);
       proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body || "");
       const proxyUrl = "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
@@ -109,24 +117,54 @@
       return XHRSetHeader.call(this, name, value);
     };
     XMLHttpRequest.prototype.send = function(body) {
+      const xhr = this;
       const requestId = generateRequestId();
-      const method = this.__proxyMethod || "GET";
-      const url = this.__proxyUrl || "";
-      const headers = this.__proxyHeaders || {};
-      let base64Body = "";
-      if (body !== null && body !== void 0) {
-        if (typeof body === "string") {
-          base64Body = stringToBase64(body);
-        } else if (body instanceof ArrayBuffer) {
-          base64Body = arrayBufferToBase64(body);
-        } else if (body instanceof Uint8Array) {
-          base64Body = arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
-        }
+      const method = xhr.__proxyMethod || "GET";
+      const url = xhr.__proxyUrl || "";
+      const headers = xhr.__proxyHeaders || {};
+      function completeSend(base64Body) {
+        proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
+        const proxyUrl = "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
+        XHROpen.call(xhr, "GET", proxyUrl, true);
+        XHRSend.call(xhr, null);
       }
-      proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
-      const proxyUrl = "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
-      XHROpen.call(this, "GET", proxyUrl, true);
-      return XHRSend.call(this, null);
+      if (body === null || body === void 0) {
+        completeSend("");
+        return;
+      }
+      if (typeof body === "string") {
+        completeSend(stringToBase64(body));
+        return;
+      }
+      if (body instanceof ArrayBuffer) {
+        completeSend(arrayBufferToBase64(body));
+        return;
+      }
+      if (body instanceof Uint8Array) {
+        completeSend(arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength)));
+        return;
+      }
+      if (body instanceof URLSearchParams) {
+        completeSend(stringToBase64(body.toString()));
+        return;
+      }
+      if (body instanceof Blob || body instanceof FormData) {
+        const encoded = new Response(body);
+        if (body instanceof FormData) {
+          const ct = encoded.headers.get("content-type");
+          if (ct) {
+            Object.keys(headers).forEach((k) => {
+              if (k.toLowerCase() === "content-type") delete headers[k];
+            });
+            headers["content-type"] = ct;
+          }
+        }
+        encoded.arrayBuffer().then((ab) => {
+          completeSend(arrayBufferToBase64(ab));
+        });
+        return;
+      }
+      completeSend("");
     };
   })();
 })();
