@@ -35,7 +35,8 @@
       if (body === null || body === void 0) return null;
       if (typeof body === "string") return stringToBase64(body);
       if (body instanceof ArrayBuffer) return arrayBufferToBase64(body);
-      if (body instanceof Uint8Array) return arrayBufferToBase64(body.buffer);
+      if (body instanceof Uint8Array)
+        return arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
       if (body instanceof Blob) {
         const ab = await body.arrayBuffer();
         return arrayBufferToBase64(ab);
@@ -119,7 +120,7 @@
         } else if (body instanceof ArrayBuffer) {
           base64Body = arrayBufferToBase64(body);
         } else if (body instanceof Uint8Array) {
-          base64Body = arrayBufferToBase64(body.buffer);
+          base64Body = arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
         }
       }
       proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
