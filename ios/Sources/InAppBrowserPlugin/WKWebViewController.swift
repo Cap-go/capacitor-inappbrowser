@@ -678,8 +678,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         // This is the industry-standard approach used by DuckDuckGo Browser and others
         if proxyRequests, let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
-            webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
-            webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
+            if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
+            } else {
+                print("[InAppBrowser][Proxy] WARNING: handlesURLScheme swizzle failed; proxy scheme handler not registered")
+            }
         }
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
