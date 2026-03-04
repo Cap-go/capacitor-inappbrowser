@@ -306,14 +306,28 @@ extension ProxySchemeHandler: URLSessionDataDelegate {
 
                 let matchingCookies = allCookies.filter { cookie in
                     guard let host = redirectURL.host else { return false }
+                    // Domain matching
                     let domain = cookie.domain
-                    if host == domain { return true }
-                    if domain.hasPrefix(".") {
-                        return host.hasSuffix(domain) || host == String(domain.dropFirst())
+                    let domainMatch: Bool
+                    if host == domain {
+                        domainMatch = true
+                    } else if domain.hasPrefix(".") {
+                        domainMatch = host.hasSuffix(domain) || host == String(domain.dropFirst())
+                    } else {
+                        domainMatch = false
                     }
-                    return false
+                    guard domainMatch else { return false }
+                    // Path matching
+                    guard redirectURL.path.hasPrefix(cookie.path) else { return false }
+                    // Secure cookies only over HTTPS
+                    if cookie.isSecure && redirectURL.scheme != "https" { return false }
+                    return true
                 }
-                if !matchingCookies.isEmpty {
+                // Always set Cookie header explicitly — clear it when no cookies match
+                // to prevent leaking source-domain cookies to the redirect target
+                if matchingCookies.isEmpty {
+                    modifiedRequest.setValue("", forHTTPHeaderField: "Cookie")
+                } else {
                     let headers = HTTPCookie.requestHeaderFields(with: matchingCookies)
                     for (key, value) in headers {
                         modifiedRequest.setValue(value, forHTTPHeaderField: key)
