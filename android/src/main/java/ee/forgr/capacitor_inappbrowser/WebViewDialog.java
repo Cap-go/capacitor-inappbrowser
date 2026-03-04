@@ -3054,12 +3054,14 @@ public class WebViewDialog extends Dialog {
     }
 
     private String loadProxyBridgeScript() {
-        try {
-            InputStream is = _context.getAssets().open("proxy-bridge.js");
-            byte[] buffer = new byte[is.available()];
-            is.read(buffer);
-            is.close();
-            return new String(buffer, StandardCharsets.UTF_8);
+        try (InputStream is = _context.getAssets().open("proxy-bridge.js")) {
+            ByteArrayOutputStream result = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                result.write(buffer, 0, bytesRead);
+            }
+            return result.toString(StandardCharsets.UTF_8.name());
         } catch (IOException e) {
             Log.e("InAppBrowserProxy", "Failed to load proxy-bridge.js", e);
             return null;
