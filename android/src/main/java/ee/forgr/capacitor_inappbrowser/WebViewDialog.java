@@ -1848,26 +1848,35 @@ public class WebViewDialog extends Dialog {
                 public void onClick(View view) {
                     // if closeModal true then display a native modal to check if the user is sure to close the browser
                     if (_options.getCloseModal()) {
-                        new AlertDialog.Builder(_context)
-                            .setTitle(_options.getCloseModalTitle())
-                            .setMessage(_options.getCloseModalDescription())
-                            .setPositiveButton(
-                                _options.getCloseModalOk(),
-                                new OnClickListener() {
-                                    public void onClick(DialogInterface dialog, int which) {
-                                        // Close button clicked, do something
-                                        String currentUrl = getUrl();
-                                        dismiss();
-                                        if (_options != null && _options.getCallbacks() != null) {
-                                            // Notify that confirm was clicked
-                                            _options.getCallbacks().confirmBtnClicked(currentUrl);
-                                            _options.getCallbacks().closeEvent(currentUrl);
+                        Pattern urlPattern = _options.getCloseModalURLPattern();
+                        final String currentUrl = getUrl();
+                        boolean shouldShowModal = urlPattern == null || urlPattern.matcher(currentUrl).find();
+                        if (shouldShowModal) {
+                            new AlertDialog.Builder(_context)
+                                .setTitle(_options.getCloseModalTitle())
+                                .setMessage(_options.getCloseModalDescription())
+                                .setPositiveButton(
+                                    _options.getCloseModalOk(),
+                                    new OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            // Close button clicked, do something
+                                            dismiss();
+                                            if (_options != null && _options.getCallbacks() != null) {
+                                                // Notify that confirm was clicked
+                                                _options.getCallbacks().confirmBtnClicked(currentUrl);
+                                                _options.getCallbacks().closeEvent(currentUrl);
+                                            }
                                         }
                                     }
-                                }
-                            )
-                            .setNegativeButton(_options.getCloseModalCancel(), null)
-                            .show();
+                                )
+                                .setNegativeButton(_options.getCloseModalCancel(), null)
+                                .show();
+                        } else {
+                            dismiss();
+                            if (_options != null && _options.getCallbacks() != null) {
+                                _options.getCallbacks().closeEvent(currentUrl);
+                            }
+                        }
                     } else {
                         String currentUrl = getUrl();
                         dismiss();

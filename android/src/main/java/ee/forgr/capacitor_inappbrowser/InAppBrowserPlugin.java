@@ -646,13 +646,23 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             options.setCloseModalDescription(call.getString("closeModalDescription", "Are you sure ?"));
             options.setCloseModalOk(call.getString("closeModalOk", "Ok"));
             options.setCloseModalCancel(call.getString("closeModalCancel", "Cancel"));
+            String closeModalURLPatternStr = call.getString("closeModalURLPattern");
+            if (closeModalURLPatternStr != null) {
+                try {
+                    options.setCloseModalURLPattern(Pattern.compile(closeModalURLPatternStr));
+                } catch (PatternSyntaxException e) {
+                    call.reject("Invalid closeModalURLPattern regex: " + e.getMessage());
+                    return;
+                }
+            }
         } else {
             // Reject if closeModal is false but closeModal options are provided
             if (
                 call.getData().has("closeModalTitle") ||
                 call.getData().has("closeModalDescription") ||
                 call.getData().has("closeModalOk") ||
-                call.getData().has("closeModalCancel")
+                call.getData().has("closeModalCancel") ||
+                call.getData().has("closeModalURLPattern")
             ) {
                 call.reject("closeModal options require closeModal to be true");
                 return;
