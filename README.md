@@ -633,6 +633,50 @@ Will be triggered when page load error
 
 ---
 
+### addProxyHandler(callback)
+
+```typescript
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
+```
+
+Register a handler that intercepts all HTTP/HTTPS requests from the in-app browser webview.
+The handler is automatically wired to the `proxyRequest` listener and `handleProxyRequest` method — you do not need to call those directly.
+
+**Callback return values:**
+
+| Return type     | Effect                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `ProxyResponse` | Sends a custom response back to the webview (recommended when using `CapacitorHttp`)            |
+| `Response`      | A standard fetch `Response`; the wrapper converts it to base64 automatically                    |
+| `null`          | Pass-through — the request is forwarded to its original destination by native code              |
+
+If the callback throws, the request is automatically passed through (`null`).
+
+**Usage:**
+
+```typescript
+const handler = addProxyHandler(async (request) => {
+  console.log('Intercepted:', request.method, request.url);
+
+  // Return null to pass through
+  return null;
+
+  // Or return a custom response
+  // return { status: 200, headers: { 'Content-Type': 'text/html' }, body: btoa('<h1>Hello</h1>') };
+});
+
+await InAppBrowser.openWebView({ url: 'https://example.com', proxyRequests: true });
+
+// Clean up when the webview closes
+InAppBrowser.addListener('closeEvent', () => {
+  handler.then((h) => h.remove());
+});
+```
+
+**Since:** 9.0.0
+
+---
+
 ### addListener('proxyRequest', ...)
 
 ```typescript

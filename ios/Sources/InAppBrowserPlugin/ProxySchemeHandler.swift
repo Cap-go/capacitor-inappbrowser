@@ -5,8 +5,12 @@ import Capacitor
 public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: WKURLSchemeTask] = [:]
+    private var pendingBodies: [String: Data] = [:]
+    private var pendingNetworkTasks: [String: URLSessionDataTask] = [:]
+    private var stoppedRequests: Set<String> = []
     private let taskLock = NSLock()
     private let webviewId: String
+    private let proxyTimeoutSeconds: TimeInterval = 10
 
     init(plugin: InAppBrowserPlugin, webviewId: String) {
         self.plugin = plugin
@@ -31,7 +35,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         pendingTasks[requestId] = urlSchemeTask
         taskLock.unlock()
 
-        // Encode body to base64
+        // Encode body to base64, buffering stream data for later pass-through
         var base64Body: String? = nil
         if let bodyData = request.httpBody {
             base64Body = bodyData.base64EncodedString()
@@ -39,6 +43,9 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             let data = Data(reading: bodyStream)
             if !data.isEmpty {
                 base64Body = data.base64EncodedString()
+                taskLock.lock()
+                pendingBodies[requestId] = data
+                taskLock.unlock()
             }
         }
 
@@ -58,24 +65,64 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         ]
 
         plugin?.notifyListeners("proxyRequest", data: eventData)
+
+        // Timeout: if JS never responds, fail the request after proxyTimeoutSeconds
+        DispatchQueue.global().asyncAfter(deadline: .now() + proxyTimeoutSeconds) { [weak self] in
+            guard let self = self else { return }
+            self.taskLock.lock()
+            guard let task = self.pendingTasks.removeValue(forKey: requestId) else {
+                self.taskLock.unlock()
+                return
+            }
+            self.pendingBodies.removeValue(forKey: requestId)
+            self.taskLock.unlock()
+
+            print("[InAppBrowser] Proxy request timed out after \(Int(self.proxyTimeoutSeconds))s: \(requestId)")
+            task.didFailWithError(NSError(
+                domain: "ProxySchemeHandler",
+                code: NSURLErrorTimedOut,
+                userInfo: [NSLocalizedDescriptionKey: "Proxy handler did not respond within \(Int(self.proxyTimeoutSeconds)) seconds"]
+            ))
+        }
     }
 
     public func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
         taskLock.lock()
         let requestIdToRemove = pendingTasks.first(where: { $0.value === urlSchemeTask })?.key
+        var networkTask: URLSessionDataTask?
         if let key = requestIdToRemove {
             pendingTasks.removeValue(forKey: key)
+            pendingBodies.removeValue(forKey: key)
+            networkTask = pendingNetworkTasks.removeValue(forKey: key)
+            stoppedRequests.insert(key)
         }
         taskLock.unlock()
+        networkTask?.cancel()
     }
 
     /// Called from handleProxyRequest plugin method with the JS response
     func handleResponse(requestId: String, responseData: [String: Any]?) {
         taskLock.lock()
-        guard let urlSchemeTask = pendingTasks.removeValue(forKey: requestId) else {
+        let isStopped = stoppedRequests.remove(requestId) != nil
+        guard let urlSchemeTask = pendingTasks[requestId] else {
+            pendingTasks.removeValue(forKey: requestId)
+            pendingBodies.removeValue(forKey: requestId)
             taskLock.unlock()
             return
         }
+        let bufferedBody = pendingBodies.removeValue(forKey: requestId)
+
+        if isStopped {
+            pendingTasks.removeValue(forKey: requestId)
+            taskLock.unlock()
+            return
+        }
+
+        if responseData != nil {
+            // JS provided a response — remove from pending now
+            pendingTasks.removeValue(forKey: requestId)
+        }
+        // For pass-through (nil), keep pendingTasks entry so stop can find it
         taskLock.unlock()
 
         if let responseData = responseData {
@@ -113,15 +160,35 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             urlSchemeTask.didFinish()
         } else {
             // Null response = pass-through via URLSession
-            executePassThrough(urlSchemeTask: urlSchemeTask)
+            executePassThrough(requestId: requestId, urlSchemeTask: urlSchemeTask, bufferedBody: bufferedBody)
         }
     }
 
-    private func executePassThrough(urlSchemeTask: WKURLSchemeTask) {
-        let request = urlSchemeTask.request
+    private func executePassThrough(requestId: String, urlSchemeTask: WKURLSchemeTask, bufferedBody: Data?) {
+        var request = urlSchemeTask.request
+        // Restore body if it was consumed from httpBodyStream during interception
+        if request.httpBody == nil, let body = bufferedBody {
+            request.httpBody = body
+        }
         let session = URLSession.shared
-        let task = session.dataTask(with: request) { data, response, error in
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+
+            // Clean up and check if this request was stopped while in-flight
+            self.taskLock.lock()
+            self.pendingTasks.removeValue(forKey: requestId)
+            self.pendingNetworkTasks.removeValue(forKey: requestId)
+            let wasStopped = self.stoppedRequests.remove(requestId) != nil
+            self.taskLock.unlock()
+
+            if wasStopped {
+                return
+            }
+
             if let error = error {
+                if (error as NSError).code == NSURLErrorCancelled {
+                    return
+                }
                 urlSchemeTask.didFailWithError(error)
                 return
             }
@@ -141,15 +208,26 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             }
             urlSchemeTask.didFinish()
         }
+
+        taskLock.lock()
+        pendingNetworkTasks[requestId] = task
+        taskLock.unlock()
         task.resume()
     }
 
     func cancelAllPendingTasks() {
         taskLock.lock()
         let tasks = pendingTasks
+        let networkTasks = pendingNetworkTasks
         pendingTasks.removeAll()
+        pendingBodies.removeAll()
+        pendingNetworkTasks.removeAll()
+        stoppedRequests.removeAll()
         taskLock.unlock()
 
+        for (_, networkTask) in networkTasks {
+            networkTask.cancel()
+        }
         for (_, task) in tasks {
             task.didFailWithError(NSError(
                 domain: "ProxySchemeHandler",

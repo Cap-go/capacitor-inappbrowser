@@ -42,9 +42,11 @@ public class ProxyBridge {
             return;
         }
         if (storedRequests.size() >= MAX_STORED_REQUESTS) {
-            // Evict oldest entry to prevent unbounded growth
-            String oldest = storedRequests.keys().nextElement();
-            storedRequests.remove(oldest);
+            // Remove an arbitrary entry to prevent unbounded growth
+            var it = storedRequests.keys().asIterator();
+            if (it.hasNext()) {
+                storedRequests.remove(it.next());
+            }
         }
         storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body));
     }

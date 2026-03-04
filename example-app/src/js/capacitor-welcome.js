@@ -542,16 +542,21 @@ window.customElements.define(
               return null; // pass-through
             });
 
-            await InAppBrowser.openWebView({
-              url: "https://example.com",
-              proxyRequests: true,
-              toolbarType: ToolBarType.NAVIGATION,
-              title: "Proxy Pass-through Test",
-            });
+            try {
+              await InAppBrowser.openWebView({
+                url: "https://example.com",
+                proxyRequests: true,
+                toolbarType: ToolBarType.NAVIGATION,
+                title: "Proxy Pass-through Test",
+              });
 
-            InAppBrowser.addListener("closeEvent", () => {
+              InAppBrowser.addListener("closeEvent", () => {
+                handler.then((h) => h.remove());
+              });
+            } catch (e) {
               handler.then((h) => h.remove());
-            });
+              throw e;
+            }
           } catch (e) {
             console.error("Error opening proxy pass-through:", e);
           }
@@ -576,16 +581,21 @@ window.customElements.define(
               return null; // pass-through for everything else
             });
 
-            await InAppBrowser.openWebView({
-              url: "https://example.com",
-              proxyRequests: true,
-              toolbarType: ToolBarType.NAVIGATION,
-              title: "Proxy Intercept Test",
-            });
+            try {
+              await InAppBrowser.openWebView({
+                url: "https://example.com",
+                proxyRequests: true,
+                toolbarType: ToolBarType.NAVIGATION,
+                title: "Proxy Intercept Test",
+              });
 
-            InAppBrowser.addListener("closeEvent", () => {
+              InAppBrowser.addListener("closeEvent", () => {
+                handler.then((h) => h.remove());
+              });
+            } catch (e) {
               handler.then((h) => h.remove());
-            });
+              throw e;
+            }
           } catch (e) {
             console.error("Error opening proxy intercept:", e);
           }
@@ -643,19 +653,24 @@ window.customElements.define(
               }
             });
 
-            await InAppBrowser.openWebView({
-              url: serverUrl,
-              proxyRequests: true,
-              toolbarType: ToolBarType.NAVIGATION,
-              title: "Proxy Test Server",
-              toolbarColor: "#28a745",
-              showReloadButton: true,
-              visibleTitle: true,
-            });
+            try {
+              await InAppBrowser.openWebView({
+                url: serverUrl,
+                proxyRequests: true,
+                toolbarType: ToolBarType.NAVIGATION,
+                title: "Proxy Test Server",
+                toolbarColor: "#28a745",
+                showReloadButton: true,
+                visibleTitle: true,
+              });
 
-            InAppBrowser.addListener("closeEvent", () => {
+              InAppBrowser.addListener("closeEvent", () => {
+                handler.then((h) => h.remove());
+              });
+            } catch (e) {
               handler.then((h) => h.remove());
-            });
+              throw e;
+            }
           } catch (e) {
             console.error("Error opening proxy test server:", e);
           }

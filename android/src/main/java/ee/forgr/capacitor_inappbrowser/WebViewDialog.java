@@ -3106,7 +3106,9 @@ public class WebViewDialog extends Dialog {
                 }
             }
 
-            byte[] bodyBytes = Base64.decode(base64Body, Base64.DEFAULT);
+            byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty())
+                    ? Base64.decode(base64Body, Base64.DEFAULT)
+                    : new byte[0];
 
             String contentType = responseHeaders.get("content-type");
             if (contentType == null) {
@@ -3116,8 +3118,17 @@ public class WebViewDialog extends Dialog {
                 contentType = "application/octet-stream";
             }
 
+            if (status < 100 || status > 599) {
+                Log.w("InAppBrowserProxy", "Invalid HTTP status " + status + ", defaulting to 200");
+                status = 200;
+            }
+            String reasonPhrase = getReasonPhrase(status);
+            if (reasonPhrase.isEmpty()) {
+                reasonPhrase = "Unknown";
+            }
+
             WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
-            webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
+            webResourceResponse.setStatusCodeAndReasonPhrase(status, reasonPhrase);
             webResourceResponse.setResponseHeaders(responseHeaders);
 
             proxiedRequest.response = webResourceResponse;
@@ -3184,8 +3195,13 @@ public class WebViewDialog extends Dialog {
                 contentType = "application/octet-stream";
             }
 
+            String reasonPhrase = getReasonPhrase(status);
+            if (reasonPhrase.isEmpty()) {
+                reasonPhrase = "Unknown";
+            }
+
             WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
-            webResourceResponse.setStatusCodeAndReasonPhrase(status, getReasonPhrase(status));
+            webResourceResponse.setStatusCodeAndReasonPhrase(status, reasonPhrase);
             webResourceResponse.setResponseHeaders(responseHeaders);
             proxiedRequest.response = webResourceResponse;
 

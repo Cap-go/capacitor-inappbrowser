@@ -1260,8 +1260,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         var handler: ProxySchemeHandler?
         if let webviewId = webviewId {
             handler = proxySchemeHandlers[webviewId]
-        } else {
+        } else if proxySchemeHandlers.count == 1 {
             handler = proxySchemeHandlers.values.first
+        } else if proxySchemeHandlers.count > 1 {
+            print("[InAppBrowser] handleProxyRequest: webviewId is nil but \(proxySchemeHandlers.count) webviews are active — cannot determine target, aborting")
+            call.reject("webviewId is required when multiple webviews are open")
+            return
         }
 
         guard let proxyHandler = handler else {
