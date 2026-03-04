@@ -207,12 +207,15 @@
           headers['content-type'] = ct;
         }
       }
-      encoded.arrayBuffer().then((ab) => {
-        completeSend(arrayBufferToBase64(ab));
-      }).catch((_e) => {
-        console.error('[proxy-bridge] Failed to encode Blob/FormData body:', _e);
-        completeSend('');
-      });
+      encoded
+        .arrayBuffer()
+        .then((ab) => {
+          completeSend(arrayBufferToBase64(ab));
+        })
+        .catch((_e) => {
+          console.error('[proxy-bridge] Failed to encode Blob/FormData body:', _e);
+          completeSend('');
+        });
       return;
     }
 

@@ -3108,9 +3108,7 @@ public class WebViewDialog extends Dialog {
                 }
             }
 
-            byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty())
-                    ? Base64.decode(base64Body, Base64.DEFAULT)
-                    : new byte[0];
+            byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty()) ? Base64.decode(base64Body, Base64.DEFAULT) : new byte[0];
 
             String contentType = responseHeaders.get("content-type");
             if (contentType == null) {
