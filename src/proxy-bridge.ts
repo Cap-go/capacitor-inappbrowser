@@ -15,11 +15,9 @@
   const proxyBridge = (window as any).__capgoProxy;
   if (!proxyBridge) return;
 
-  // Access token set by native before this script runs — prevents page JS from
-  // calling storeRequest directly without knowing the per-webview secret.
-  const accessToken: string = (window as any).__capgoProxyToken || '';
-  // Clean up so page JS can't read it
-  delete (window as any).__capgoProxyToken;
+  // Access token — embedded directly in the script by native before injection.
+  // Using a placeholder that native replaces avoids exposing the token on `window`.
+  const accessToken: string = '___CAPGO_PROXY_TOKEN___';
 
   let requestCounter = 0;
 

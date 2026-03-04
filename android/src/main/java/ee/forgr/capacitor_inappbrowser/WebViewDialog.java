@@ -2691,9 +2691,9 @@ public class WebViewDialog extends Dialog {
 
                     // Inject proxy bridge script early so fetch/XHR are patched before page JS runs
                     if (_options.getProxyRequests() && proxyBridgeScript != null && proxyAccessToken != null) {
-                        // Set the access token before the bridge script runs
-                        view.evaluateJavascript("window.__capgoProxyToken='" + proxyAccessToken + "';", null);
-                        view.evaluateJavascript(proxyBridgeScript, null);
+                        // Embed the access token directly in the script to avoid exposing it on window
+                        String scriptWithToken = proxyBridgeScript.replace("___CAPGO_PROXY_TOKEN___", proxyAccessToken);
+                        view.evaluateJavascript(scriptWithToken, null);
                     }
                 }
 
