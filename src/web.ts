@@ -83,6 +83,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return { version: 'web' };
   }
 
+  async handleProxyRequest(): Promise<void> {
+    // No-op on web
+    return;
+  }
+
   async updateDimensions(options: DimensionOptions): Promise<void> {
     console.log('updateDimensions', options);
     // Web platform doesn't support dimension control

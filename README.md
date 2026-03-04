@@ -1,9 +1,22 @@
 # @capgo/inappbrowser
- <a href="https://capgo.app/"><img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/></a>
+
+<a href="https://capgo.app/">
+  <img
+    src="https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png"
+    alt="Capgo - Instant updates for capacitor"
+  />
+</a>
 
 <div align="center">
-  <h2><a href="https://capgo.app/?ref=plugin_inappbrowser"> ➡️ Get Instant updates for your App with Capgo</a></h2>
-  <h2><a href="https://capgo.app/consulting/?ref=plugin_inappbrowser"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
+  <h2>
+    <a href="https://capgo.app/?ref=plugin_inappbrowser"> ➡️ Get Instant updates for your App with Capgo</a>
+  </h2>
+  <h2>
+    <a href="https://capgo.app/consulting/?ref=plugin_inappbrowser">
+      {' '}
+      Missing a feature? We’ll build the plugin for you 💪
+    </a>
+  </h2>
 </div>
 
 Capacitor plugin in app browser with urlChangeEvent, two way communication, camera and microphone usage, etc.
@@ -30,10 +43,10 @@ The most complete doc is available here: https://capgo.app/docs/plugins/inappbro
 
 | Plugin version | Capacitor compatibility | Maintained |
 | -------------- | ----------------------- | ---------- |
-| v8.\*.\*       | v8.\*.\*                | ✅          |
-| v7.\*.\*       | v7.\*.\*                | On demand   |
-| v6.\*.\*       | v6.\*.\*                | ❌          |
-| v5.\*.\*       | v5.\*.\*                | ❌          |
+| v8.\*.\*       | v8.\*.\*                | ✅         |
+| v7.\*.\*       | v7.\*.\*                | On demand  |
+| v6.\*.\*       | v6.\*.\*                | ❌         |
+| v5.\*.\*       | v5.\*.\*                | ❌         |
 
 > **Note:** The major version of this plugin follows the major version of Capacitor. Use the version that matches your Capacitor installation (e.g., plugin v8 for Capacitor 8). Only the latest major version is actively maintained.
 
@@ -43,12 +56,13 @@ The most complete doc is available here: https://capgo.app/docs/plugins/inappbro
 npm install @capgo/inappbrowser
 npx cap sync
 ```
+
 ## Usage
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
-InAppBrowser.open({ url: "YOUR_URL" });
+InAppBrowser.open({ url: 'YOUR_URL' });
 ```
 
 ### Customize Chrome Custom Tab Appearance (Android)
@@ -77,15 +91,15 @@ All CCT options are Android-only and safely ignored on iOS. See [`OpenOptions`](
 By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 // Open with custom dimensions (400x600 at position 50,100)
 const { id } = await InAppBrowser.openWebView({
-  url: "YOUR_URL",
+  url: 'YOUR_URL',
   width: 400,
   height: 600,
   x: 50,
-  y: 100
+  y: 100,
 });
 
 // Update dimensions at runtime
@@ -94,7 +108,7 @@ InAppBrowser.updateDimensions({
   width: 500,
   height: 700,
   x: 100,
-  y: 150
+  y: 150,
 });
 ```
 
@@ -105,11 +119,11 @@ InAppBrowser.updateDimensions({
 To create a webView with a 20px bottom margin (safe margin area outside the browser):
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 InAppBrowser.openWebView({
-  url: "YOUR_URL",
-  enabledSafeBottomMargin: true
+  url: 'YOUR_URL',
+  enabledSafeBottomMargin: true,
 });
 ```
 
@@ -120,15 +134,16 @@ Web platform is not supported. Use `window.open` instead.
 To open the webview in true full screen mode (content extends behind the status bar), set `enabledSafeTopMargin` to `false`:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 InAppBrowser.openWebView({
-  url: "YOUR_URL",
-  enabledSafeTopMargin: false  // Disables safe area at top, allows full screen
+  url: 'YOUR_URL',
+  enabledSafeTopMargin: false, // Disables safe area at top, allows full screen
 });
 ```
 
 This option works independently of the toolbar type:
+
 - **iOS**: The webview extends behind the status bar, providing true edge-to-edge content
 - **Android**: The top margin is disabled, allowing content to fill the entire screen
 
@@ -214,16 +229,16 @@ With this plugin you can send events from the main app to the inappbrowser and v
 #### Main app to inappbrowser, detail object is mendatory
 
 ```js
-const { id } = await InAppBrowser.openWebView({ url: "YOUR_URL" });
-InAppBrowser.postMessage({ id, detail: { message: "myMessage" } });
+const { id } = await InAppBrowser.openWebView({ url: 'YOUR_URL' });
+InAppBrowser.postMessage({ id, detail: { message: 'myMessage' } });
 // Or broadcast to all open webviews
-InAppBrowser.postMessage({ detail: { message: "broadcast" } });
+InAppBrowser.postMessage({ detail: { message: 'broadcast' } });
 ```
 
 #### Receive event from native in the inappbrowser
 
 ```js
-window.addEventListener("messageFromNative", (event) => {
+window.addEventListener('messageFromNative', (event) => {
   console.log(event);
 });
 ```
@@ -231,13 +246,13 @@ window.addEventListener("messageFromNative", (event) => {
 #### Send event from inappbrowser to main app, detail object is mendatory
 
 ```js
-window.mobileApp.postMessage({ detail: { message: "myMessage" } });
+window.mobileApp.postMessage({ detail: { message: 'myMessage' } });
 ```
 
 #### Receive event from inappbrowser in the main app
 
 ```js
-InAppBrowser.addListener("messageFromWebview", (event) => {
+InAppBrowser.addListener('messageFromWebview', (event) => {
   console.log(event.id, event.detail);
 });
 ```
@@ -252,33 +267,35 @@ window.mobileApp.close();
 
 <docgen-index>
 
-* [`goBack(...)`](#goback)
-* [`open(...)`](#open)
-* [`clearCookies(...)`](#clearcookies)
-* [`clearAllCookies(...)`](#clearallcookies)
-* [`clearCache(...)`](#clearcache)
-* [`getCookies(...)`](#getcookies)
-* [`close(...)`](#close)
-* [`hide()`](#hide)
-* [`show()`](#show)
-* [`openWebView(...)`](#openwebview)
-* [`executeScript(...)`](#executescript)
-* [`postMessage(...)`](#postmessage)
-* [`setUrl(...)`](#seturl)
-* [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
-* [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
-* [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
-* [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
-* [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
-* [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
-* [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
-* [`removeAllListeners()`](#removealllisteners)
-* [`reload(...)`](#reload)
-* [`updateDimensions(...)`](#updatedimensions)
-* [`openSecureWindow(...)`](#opensecurewindow)
-* [Interfaces](#interfaces)
-* [Type Aliases](#type-aliases)
-* [Enums](#enums)
+- [`goBack(...)`](#goback)
+- [`open(...)`](#open)
+- [`clearCookies(...)`](#clearcookies)
+- [`clearAllCookies(...)`](#clearallcookies)
+- [`clearCache(...)`](#clearcache)
+- [`getCookies(...)`](#getcookies)
+- [`close(...)`](#close)
+- [`hide()`](#hide)
+- [`show()`](#show)
+- [`openWebView(...)`](#openwebview)
+- [`executeScript(...)`](#executescript)
+- [`postMessage(...)`](#postmessage)
+- [`setUrl(...)`](#seturl)
+- [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
+- [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
+- [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
+- [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
+- [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
+- [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
+- [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+- [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
+- [`handleProxyRequest(...)`](#handleproxyrequest)
+- [`removeAllListeners()`](#removealllisteners)
+- [`reload(...)`](#reload)
+- [`updateDimensions(...)`](#updatedimensions)
+- [`openSecureWindow(...)`](#opensecurewindow)
+- [Interfaces](#interfaces)
+- [Type Aliases](#type-aliases)
+- [Enums](#enums)
 
 </docgen-index>
 
@@ -301,8 +318,7 @@ Navigates back in the WebView's history if possible
 
 **Since:** 7.21.0
 
---------------------
-
+---
 
 ### open(...)
 
@@ -320,8 +336,7 @@ Open url in a new window fullscreen, on android it use chrome custom tabs, on io
 
 **Since:** 0.1.0
 
---------------------
-
+---
 
 ### clearCookies(...)
 
@@ -340,8 +355,7 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 0.5.0
 
---------------------
-
+---
 
 ### clearAllCookies(...)
 
@@ -360,8 +374,7 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 6.5.0
 
---------------------
-
+---
 
 ### clearCache(...)
 
@@ -380,8 +393,7 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 6.5.0
 
---------------------
-
+---
 
 ### getCookies(...)
 
@@ -397,8 +409,7 @@ Get cookies for a specific URL.
 
 **Returns:** <code>Promise&lt;<a href="#record">Record</a>&lt;string, string&gt;&gt;</code>
 
---------------------
-
+---
 
 ### close(...)
 
@@ -415,8 +426,7 @@ When `id` is omitted, closes the active webview.
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
---------------------
-
+---
 
 ### hide()
 
@@ -429,8 +439,7 @@ Use show() to bring it back.
 
 **Since:** 8.0.8
 
---------------------
-
+---
 
 ### show()
 
@@ -442,8 +451,7 @@ Show a previously hidden webview.
 
 **Since:** 8.0.8
 
---------------------
-
+---
 
 ### openWebView(...)
 
@@ -455,6 +463,7 @@ Open url in a new webview with toolbars, and enhanced capabilities, like camera 
 
 JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
+
 - `window.mobileApp.close()`: Closes the webview from JavaScript
 - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
 
@@ -466,8 +475,7 @@ When you open a webview with this method, a JavaScript interface is automaticall
 
 **Since:** 0.1.0
 
---------------------
-
+---
 
 ### executeScript(...)
 
@@ -482,8 +490,7 @@ When `id` is omitted, executes in all open webviews.
 | ------------- | ------------------------------------------- |
 | **`options`** | <code>{ code: string; id?: string; }</code> |
 
---------------------
-
+---
 
 ### postMessage(...)
 
@@ -500,8 +507,7 @@ When `id` is omitted, broadcasts to all open webviews.
 | ------------- | -------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; id?: string; }</code> |
 
---------------------
-
+---
 
 ### setUrl(...)
 
@@ -518,8 +524,7 @@ When `id` is omitted, targets the active webview.
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
---------------------
-
+---
 
 ### addListener('urlChangeEvent', ...)
 
@@ -538,8 +543,7 @@ Listen for url change, only for openWebView
 
 **Since:** 0.0.1
 
---------------------
-
+---
 
 ### addListener('buttonNearDoneClick', ...)
 
@@ -554,8 +558,7 @@ addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) 
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
---------------------
-
+---
 
 ### addListener('closeEvent', ...)
 
@@ -574,8 +577,7 @@ Listen for close click only for openWebView
 
 **Since:** 0.4.0
 
---------------------
-
+---
 
 ### addListener('confirmBtnClicked', ...)
 
@@ -595,8 +597,7 @@ works with openWebView shareDisclaimer and closeModal
 
 **Since:** 0.0.1
 
---------------------
-
+---
 
 ### addListener('messageFromWebview', ...)
 
@@ -617,8 +618,7 @@ This method is inject at runtime in the webview
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
---------------------
-
+---
 
 ### addListener('browserPageLoaded', ...)
 
@@ -635,8 +635,7 @@ Will be triggered when page is loaded
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
---------------------
-
+---
 
 ### addListener('pageLoadError', ...)
 
@@ -653,8 +652,88 @@ Will be triggered when page load error
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
---------------------
+---
 
+### addProxyHandler(callback)
+
+```typescript
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
+```
+
+Register a handler that intercepts all HTTP/HTTPS requests from the in-app browser webview.
+The handler is automatically wired to the `proxyRequest` listener and `handleProxyRequest` method — you do not need to call those directly.
+
+**Callback return values:**
+
+| Return type     | Effect                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| `ProxyResponse` | Sends a custom response back to the webview (recommended when using `CapacitorHttp`)            |
+| `Response`      | A standard fetch `Response`; the wrapper converts it to base64 automatically                    |
+| `null`          | Pass-through — the request is forwarded to its original destination by native code              |
+
+If the callback throws, the request is automatically passed through (`null`).
+
+**Usage:**
+
+```typescript
+const handler = addProxyHandler(async (request) => {
+  console.log('Intercepted:', request.method, request.url);
+
+  // Return null to pass through
+  return null;
+
+  // Or return a custom response
+  // return { status: 200, headers: { 'Content-Type': 'text/html' }, body: btoa('<h1>Hello</h1>') };
+});
+
+await InAppBrowser.openWebView({ url: 'https://example.com', proxyRequests: true });
+
+// Clean up when the webview closes
+InAppBrowser.addListener('closeEvent', () => {
+  handler.then((h) => h.remove());
+});
+```
+
+**Since:** 9.0.0
+
+---
+
+### addListener('proxyRequest', ...)
+
+```typescript
+addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for proxied requests from the in-app browser webview.
+Use addProxyHandler() wrapper instead of calling this directly.
+
+| Param              | Type                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'proxyRequest'</code>                                               |
+| **`listenerFunc`** | <code>(event: <a href="#proxyrequest">ProxyRequest</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 9.0.0
+
+---
+
+### handleProxyRequest(...)
+
+```typescript
+handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string; }) => Promise<void>
+```
+
+Internal method: sends a proxied response back to native.
+Called by addProxyHandler() wrapper — not intended for direct use.
+
+| Param         | Type                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; response: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
+
+**Since:** 9.0.0
+
+---
 
 ### removeAllListeners()
 
@@ -666,8 +745,7 @@ Remove all listeners for this plugin.
 
 **Since:** 1.0.0
 
---------------------
-
+---
 
 ### reload(...)
 
@@ -685,8 +763,7 @@ Reload the current web page.
 
 **Since:** 1.0.0
 
---------------------
-
+---
 
 ### updateDimensions(...)
 
@@ -702,8 +779,7 @@ When `id` is omitted, targets the active webview.
 | ------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
 | **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a> & { id?: string; }</code> | Dimension options (width, height, x, y) |
 
---------------------
-
+---
 
 ### openSecureWindow(...)
 
@@ -714,22 +790,17 @@ openSecureWindow(options: OpenSecureWindowOptions) => Promise<OpenSecureWindowRe
 Opens a secured window for OAuth2 authentication.
 For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
 Something like:
+
 ```html
-&lt;html&gt;
-&lt;head&gt;&lt;/head&gt;
-&lt;body&gt;
-&lt;script&gt;
-  const searchParams = new URLSearchParams(location.search)
-  if (searchParams.has("code")) {
-    new BroadcastChannel("my-channel-name").postMessage(location.href);
-    window.close();
-  }
-&lt;/script&gt;
-&lt;/body&gt;
+&lt;html&gt; &lt;head&gt;&lt;/head&gt; &lt;body&gt; &lt;script&gt; const searchParams = new
+URLSearchParams(location.search) if (searchParams.has("code")) { new
+BroadcastChannel("my-channel-name").postMessage(location.href); window.close(); } &lt;/script&gt; &lt;/body&gt;
 &lt;/html&gt;
 ```
+
 For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
 And make sure to register it in the app's info.plist:
+
 ```xml
 &lt;key&gt;CFBundleURLTypes&lt;/key&gt;
 &lt;array&gt;
@@ -741,7 +812,9 @@ And make sure to register it in the app's info.plist:
    &lt;/dict&gt;
 &lt;/array&gt;
 ```
+
 And in the AndroidManifest.xml file:
+
 ```xml
 &lt;activity&gt;
    &lt;intent-filter&gt;
@@ -759,11 +832,9 @@ And in the AndroidManifest.xml file:
 
 **Returns:** <code>Promise&lt;<a href="#opensecurewindowresponse">OpenSecureWindowResponse</a>&gt;</code>
 
---------------------
-
+---
 
 ### Interfaces
-
 
 #### OpenOptions
 
@@ -780,14 +851,12 @@ And in the AndroidManifest.xml file:
 | **`disableBookmark`**        | <code>boolean</code> | Hide the bookmark star icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.            | <code>false</code> | 8.2.0 |
 | **`disableDownload`**        | <code>boolean</code> | Hide the download icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.                 | <code>false</code> | 8.2.0 |
 
-
 #### ClearCookieOptions
 
 | Prop      | Type                | Description                                                    |
 | --------- | ------------------- | -------------------------------------------------------------- |
 | **`id`**  | <code>string</code> | Target webview id. When omitted, applies to all open webviews. |
 | **`url`** | <code>string</code> |                                                                |
-
 
 #### HttpCookie
 
@@ -797,7 +866,6 @@ And in the AndroidManifest.xml file:
 | **`key`**   | <code>string</code> | The key of the cookie.   |
 | **`value`** | <code>string</code> | The value of the cookie. |
 
-
 #### GetCookieOptions
 
 | Prop                  | Type                 |
@@ -805,14 +873,12 @@ And in the AndroidManifest.xml file:
 | **`url`**             | <code>string</code>  |
 | **`includeHttpOnly`** | <code>boolean</code> |
 
-
 #### CloseWebviewOptions
 
 | Prop             | Type                 | Description                                                        | Default           |
 | ---------------- | -------------------- | ------------------------------------------------------------------ | ----------------- |
 | **`id`**         | <code>string</code>  | Target webview id to close. If omitted, closes the active webview. |                   |
 | **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only           | <code>true</code> |
-
 
 #### OpenWebViewOptions
 
@@ -848,7 +914,7 @@ And in the AndroidManifest.xml file:
 | **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 6.1.0  |
 | **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
-| **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 6.9.0  |
+| **`proxyRequests`**                    | <code>boolean</code>                                                                                                                                                   | When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler registered via addProxyHandler(). The handler can return a custom Response or null for pass-through.                                                                                                                                                                                                                                                                                                                                                                     |                                                               | 9.0.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                             | <code>false</code>                                            | 0.1.0  |
@@ -866,9 +932,7 @@ And in the AndroidManifest.xml file:
 | **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
 | **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
 
-
 #### Headers
-
 
 #### Credentials
 
@@ -876,7 +940,6 @@ And in the AndroidManifest.xml file:
 | -------------- | ------------------- |
 | **`username`** | <code>string</code> |
 | **`password`** | <code>string</code> |
-
 
 #### DisclaimerOptions
 
@@ -887,13 +950,11 @@ And in the AndroidManifest.xml file:
 | **`confirmBtn`** | <code>string</code> | Text for the confirm button            | <code>"Confirm"</code> |
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
 
-
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
 | ------------ | ----------------------------------------- |
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
-
 
 #### UrlEvent
 
@@ -902,7 +963,6 @@ And in the AndroidManifest.xml file:
 | **`id`**  | <code>string</code> | Webview instance id.      |       |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
 
-
 #### BtnEvent
 
 | Prop      | Type                | Description                    | Since |
@@ -910,6 +970,28 @@ And in the AndroidManifest.xml file:
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
 
+#### ProxyRequest
+
+Represents an intercepted HTTP request from the in-app browser webview.
+
+| Prop            | Type                                                            | Description                                                 |
+| --------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| **`requestId`** | <code>string</code>                                             | Unique identifier for this request, used to match responses |
+| **`url`**       | <code>string</code>                                             | The full URL being requested                                |
+| **`method`**    | <code>string</code>                                             | HTTP method (GET, POST, PUT, DELETE, etc.)                  |
+| **`headers`**   | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Request headers as key-value pairs                          |
+| **`body`**      | <code>string \| null</code>                                     | Base64-encoded request body, or null if no body             |
+| **`webviewId`** | <code>string</code>                                             | ID of the webview that made this request                    |
+
+#### ProxyResponse
+
+Response to send back for a proxied request.
+
+| Prop          | Type                                                            | Description                         |
+| ------------- | --------------------------------------------------------------- | ----------------------------------- |
+| **`body`**    | <code>string</code>                                             | Base64-encoded response body        |
+| **`status`**  | <code>number</code>                                             | HTTP status code                    |
+| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Response headers as key-value pairs |
 
 #### DimensionOptions
 
@@ -920,13 +1002,11 @@ And in the AndroidManifest.xml file:
 | **`x`**      | <code>number</code> | X position from the left edge in pixels |
 | **`y`**      | <code>number</code> | Y position from the top edge in pixels  |
 
-
 #### OpenSecureWindowResponse
 
 | Prop                | Type                | Description                             |
 | ------------------- | ------------------- | --------------------------------------- |
 | **`redirectedUri`** | <code>string</code> | The result of the openSecureWindow call |
-
 
 #### OpenSecureWindowOptions
 
@@ -936,28 +1016,29 @@ And in the AndroidManifest.xml file:
 | **`redirectUri`**          | <code>string</code> | The redirect URI to use for the openSecureWindow call. This will be checked to make sure it matches the redirect URI after the window finishes the redirection. |
 | **`broadcastChannelName`** | <code>string</code> | The name of the broadcast channel to listen to, relevant only for web                                                                                           |
 
-
 ### Type Aliases
-
 
 #### ClearCookieOptions
 
-<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
-
+<code>
+  <a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;
+</code>
 
 #### Omit
 
 Construct a type with the properties of T except for those in type K.
 
-<code><a href="#pick">Pick</a>&lt;T, <a href="#exclude">Exclude</a>&lt;keyof T, K&gt;&gt;</code>
-
+<code>
+  <a href="#pick">Pick</a>&lt;T, <a href="#exclude">Exclude</a>&lt;keyof T, K&gt;&gt;
+</code>
 
 #### Pick
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
-
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 #### Exclude
 
@@ -965,36 +1046,37 @@ From T, pick a set of properties whose keys are in the union K
 
 <code>T extends U ? never : T</code>
 
-
 #### Record
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
-
+<code>{
+ [P in K]: T;
+ }</code>
 
 #### GetCookieOptions
 
-<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
-
+<code>
+  <a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;
+</code>
 
 #### UrlChangeListener
 
-<code>(state: <a href="#urlevent">UrlEvent</a>): void</code>
-
+<code>
+  (state: <a href="#urlevent">UrlEvent</a>): void
+</code>
 
 #### ButtonNearListener
 
 <code>(state: object): void</code>
 
-
 #### ConfirmBtnListener
 
-<code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
-
+<code>
+  (state: <a href="#btnevent">BtnEvent</a>): void
+</code>
 
 ### Enums
-
 
 #### ToolBarType
 
@@ -1005,14 +1087,12 @@ Construct a type with a set of properties K of type T
 | **`NAVIGATION`** | <code>'navigation'</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
 | **`BLANK`**      | <code>'blank'</code>      | Shows no toolbar                                                 | 0.1.0 |
 
-
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
 | **`WHITE`** | <code>'white'</code> |
 | **`BLACK`** | <code>'black'</code> |
-
 
 #### InvisibilityMode
 
@@ -1024,5 +1104,6 @@ Construct a type with a set of properties K of type T
 </docgen-api>
 
 **Credits**
- - [WKWebViewController](https://github.com/Meniny/WKWebViewController) - for iOS
- - [CapBrowser](https://github.com/gadapa-rakesh/CapBrowser) - For the base in capacitor v2
+
+- [WKWebViewController](https://github.com/Meniny/WKWebViewController) - for iOS
+- [CapBrowser](https://github.com/gadapa-rakesh/CapBrowser) - For the base in capacitor v2

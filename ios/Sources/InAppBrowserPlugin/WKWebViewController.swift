@@ -101,11 +101,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
         self.enabledSafeTopMargin = enabledSafeTopMargin
+        self.proxyRequests = proxyRequests
+        self.proxySchemeHandler = proxySchemeHandler
         self.source = .remote(url)
         self.credentials = credentials
         self.setHeaders(headers: headers)
@@ -153,6 +155,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var disableOverscroll: Bool = false
+    var proxyRequests: Bool = false
+    var proxySchemeHandler: ProxySchemeHandler?
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -668,6 +672,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Enable background task processing
         webConfiguration.processPool = WKProcessPool()
+
+        // Register proxy scheme handler if enabled
+        // Swizzles WKWebView.handlesURLScheme to allow registering for http/https via the public API
+        // This is the industry-standard approach used by DuckDuckGo Browser and others
+        if proxyRequests, let handler = proxySchemeHandler {
+            WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
+            if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
+            } else {
+                print("[InAppBrowser][Proxy] WARNING: handlesURLScheme swizzle failed; proxy scheme handler not registered")
+            }
+        }
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true

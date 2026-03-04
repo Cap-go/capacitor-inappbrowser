@@ -230,6 +230,52 @@ export interface CloseWebviewOptions {
   isAnimated?: boolean;
 }
 
+/**
+ * Represents an intercepted HTTP request from the in-app browser webview.
+ * @since 9.0.0
+ */
+export interface ProxyRequest {
+  /** Unique identifier for this request, used to match responses */
+  requestId: string;
+  /** The full URL being requested */
+  url: string;
+  /** HTTP method (GET, POST, PUT, DELETE, etc.) */
+  method: string;
+  /** Request headers as key-value pairs */
+  headers: Record<string, string>;
+  /**
+   * Base64-encoded request body, or null if no body.
+   *
+   * On Android, requests from HTML elements (img, script, link, iframe) are intercepted
+   * natively and do not have access to the request body — this field will be empty for those
+   * requests. Requests from fetch() and XMLHttpRequest include the full body.
+   */
+  body: string | null;
+  /** ID of the webview that made this request */
+  webviewId: string;
+}
+
+/**
+ * Response to send back for a proxied request.
+ * @since 9.0.0
+ */
+export interface ProxyResponse {
+  /** Base64-encoded response body */
+  body: string;
+  /** HTTP status code */
+  status: number;
+  /** Response headers as key-value pairs */
+  headers: Record<string, string>;
+}
+
+/**
+ * Callback function that handles proxied requests.
+ * Return a ProxyResponse to provide a custom response (recommended with CapacitorHttp),
+ * a fetch Response object, or null to let the request pass through normally.
+ * @since 9.0.0
+ */
+export type ProxyHandler = (request: ProxyRequest) => Promise<Response | ProxyResponse | null>;
+
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
@@ -524,10 +570,13 @@ export interface OpenWebViewOptions {
    */
   preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
   /**
-   * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
-   * @since 6.9.0
+   * When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler
+   * registered via addProxyHandler(). The handler can return a custom Response or null
+   * for pass-through.
+   *
+   * @since 9.0.0
    */
-  proxyRequests?: string;
+  proxyRequests?: boolean;
   /**
    * buttonNearDone allows for a creation of a custom button near the done/close button.
    * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
@@ -911,6 +960,21 @@ export interface InAppBrowserPlugin {
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
+
+  /**
+   * Listen for proxied requests from the in-app browser webview.
+   * Use addProxyHandler() wrapper instead of calling this directly.
+   * @since 9.0.0
+   */
+  addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
+
+  /**
+   * Internal method: sends a proxied response back to native.
+   * Called by addProxyHandler() wrapper — not intended for direct use.
+   * @since 9.0.0
+   */
+  handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string }): Promise<void>;
+
   /**
    * Remove all listeners for this plugin.
    *

@@ -9,8 +9,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Objects;
-import java.util.regex.Pattern;
 
 public class Options {
 
@@ -170,7 +168,7 @@ public class Options {
     private boolean ignoreUntrustedSSLError;
     private String preShowScript;
     private String toolbarTextColor;
-    private Pattern proxyRequestsPattern = null;
+    private boolean proxyRequests = false;
     private boolean materialPicker = false;
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
@@ -262,12 +260,12 @@ public class Options {
         this.useTopInset = useTopInset;
     }
 
-    public Pattern getProxyRequestsPattern() {
-        return proxyRequestsPattern;
+    public boolean getProxyRequests() {
+        return proxyRequests;
     }
 
-    public void setProxyRequestsPattern(Pattern proxyRequestsPattern) {
-        this.proxyRequestsPattern = proxyRequestsPattern;
+    public void setProxyRequests(boolean proxyRequests) {
+        this.proxyRequests = proxyRequests;
     }
 
     public PluginCall getPluginCall() {
