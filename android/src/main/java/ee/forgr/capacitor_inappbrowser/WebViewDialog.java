@@ -3314,6 +3314,22 @@ public class WebViewDialog extends Dialog {
         applyDimensions();
     }
 
+    public void setEnabledSafeTopMargin(boolean enabled) {
+        if (_options.getEnabledSafeTopMargin() == enabled) return;
+        _options.setEnabledSafeTopMargin(enabled);
+        if (_webView != null) {
+            ViewCompat.requestApplyInsets(_webView);
+        }
+    }
+
+    public void setEnabledSafeBottomMargin(boolean enabled) {
+        if (_options.getEnabledSafeMargin() == enabled) return;
+        _options.setEnabledSafeMargin(enabled);
+        if (_webView != null) {
+            ViewCompat.requestApplyInsets(_webView);
+        }
+    }
+
     /**
      * Convert density-independent pixels (dp) to actual pixels
      */

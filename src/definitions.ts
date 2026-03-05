@@ -936,6 +936,24 @@ export interface InAppBrowserPlugin {
   updateDimensions(options: DimensionOptions & { id?: string }): Promise<void>;
 
   /**
+   * Sets the enabled safe top margin of the webview at runtime.
+   * When `id` is omitted, targets the active webview.
+   */
+  setEnabledSafeTopMargin(options: {
+    enabled: boolean;
+    id?: string;
+  }): Promise<void>;
+
+  /**
+   * Sets the enabled safe bottom margin of the webview at runtime.
+   * When `id` is omitted, targets the active webview.
+   */
+  setEnabledSafeBottomMargin(options: {
+    enabled: boolean;
+    id?: string;
+  }): Promise<void>;
+
+  /**
    * Opens a secured window for OAuth2 authentication.
    * For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
    * Something like:
