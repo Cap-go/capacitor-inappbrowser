@@ -938,20 +938,16 @@ export interface InAppBrowserPlugin {
   /**
    * Sets the enabled safe top margin of the webview at runtime.
    * When `id` is omitted, targets the active webview.
+   * On Web, this method is a no-op and resolves without changing layout.
    */
-  setEnabledSafeTopMargin(options: {
-    enabled: boolean;
-    id?: string;
-  }): Promise<void>;
+  setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void>;
 
   /**
    * Sets the enabled safe bottom margin of the webview at runtime.
    * When `id` is omitted, targets the active webview.
+   * On Web, this method is a no-op and resolves without changing layout.
    */
-  setEnabledSafeBottomMargin(options: {
-    enabled: boolean;
-    id?: string;
-  }): Promise<void>;
+  setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void>;
 
   /**
    * Opens a secured window for OAuth2 authentication.

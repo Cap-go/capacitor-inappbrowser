@@ -1278,10 +1278,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void setEnabledSafeTopMargin(PluginCall call) {
-        if (!call.getData().has("enabled")) {
-            Log.w("InAppBrowser", "setEnabledSafeTopMargin called without 'enabled'; defaulting to true");
+        Boolean enabledValue = call.getBoolean("enabled");
+        if (enabledValue == null) {
+            call.reject("'enabled' (boolean) is required");
+            return;
         }
-        boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", true));
+        boolean enabled = enabledValue;
         String targetId = resolveTargetId(call);
         WebViewDialog dialog = resolveDialog(targetId);
         if (dialog == null) {
@@ -1301,10 +1303,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void setEnabledSafeBottomMargin(PluginCall call) {
-        if (!call.getData().has("enabled")) {
-            Log.w("InAppBrowser", "setEnabledSafeBottomMargin called without 'enabled'; defaulting to false");
+        Boolean enabledValue = call.getBoolean("enabled");
+        if (enabledValue == null) {
+            call.reject("'enabled' (boolean) is required");
+            return;
         }
-        boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled", false));
+        boolean enabled = enabledValue;
         String targetId = resolveTargetId(call);
         WebViewDialog dialog = resolveDialog(targetId);
         if (dialog == null) {

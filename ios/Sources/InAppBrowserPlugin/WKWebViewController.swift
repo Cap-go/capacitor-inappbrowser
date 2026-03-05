@@ -2036,6 +2036,7 @@ extension WKWebViewController: WKNavigationDelegate {
         guard enabled != self.enabledSafeTopMargin else { return }
         self.enabledSafeTopMargin = enabled
         guard let webView = self.webView else { return }
+        guard webView.superview === self.view else { return }
 
         // Find and deactivate the existing top constraint
         let existingTopConstraints = self.view.constraints.filter {
@@ -2055,6 +2056,7 @@ extension WKWebViewController: WKNavigationDelegate {
         guard enabled != self.enabledSafeBottomMargin else { return }
         self.enabledSafeBottomMargin = enabled
         guard let webView = self.webView else { return }
+        guard webView.superview === self.view else { return }
 
         // Find and deactivate the existing bottom constraint
         let existingBottomConstraints = self.view.constraints.filter {

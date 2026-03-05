@@ -715,6 +715,7 @@ setEnabledSafeTopMargin(options: { enabled: boolean; id?: string; }) => Promise<
 
 Sets the enabled safe top margin of the webview at runtime.
 When `id` is omitted, targets the active webview.
+On Web, this method is a no-op and resolves without changing layout.
 
 | Param         | Type                                            |
 | ------------- | ----------------------------------------------- |
@@ -731,6 +732,7 @@ setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string; }) => Promi
 
 Sets the enabled safe bottom margin of the webview at runtime.
 When `id` is omitted, targets the active webview.
+On Web, this method is a no-op and resolves without changing layout.
 
 | Param         | Type                                            |
 | ------------- | ----------------------------------------------- |
