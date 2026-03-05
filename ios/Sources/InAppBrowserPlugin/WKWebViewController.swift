@@ -2031,6 +2031,46 @@ extension WKWebViewController: WKNavigationDelegate {
         // Apply the new dimensions
         applyCustomDimensions()
     }
+
+    open func updateSafeTopMargin(_ enabled: Bool) {
+        guard enabled != self.enabledSafeTopMargin else { return }
+        self.enabledSafeTopMargin = enabled
+        guard let webView = self.webView else { return }
+        guard webView.superview === self.view else { return }
+
+        // Find and deactivate the existing top constraint
+        let existingTopConstraints = self.view.constraints.filter {
+            ($0.firstItem as? WKWebView) == webView && $0.firstAttribute == .top
+        }
+        NSLayoutConstraint.deactivate(existingTopConstraints)
+
+        // Create new top constraint based on enabled value
+        let topAnchor = enabled ? self.view.safeAreaLayoutGuide.topAnchor : self.view.topAnchor
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: topAnchor)
+        ])
+        self.view.layoutIfNeeded()
+    }
+
+    open func updateSafeBottomMargin(_ enabled: Bool) {
+        guard enabled != self.enabledSafeBottomMargin else { return }
+        self.enabledSafeBottomMargin = enabled
+        guard let webView = self.webView else { return }
+        guard webView.superview === self.view else { return }
+
+        // Find and deactivate the existing bottom constraint
+        let existingBottomConstraints = self.view.constraints.filter {
+            ($0.firstItem as? WKWebView) == webView && $0.firstAttribute == .bottom
+        }
+        NSLayoutConstraint.deactivate(existingBottomConstraints)
+
+        // Create new bottom constraint based on enabled value
+        let bottomAnchor = enabled ? self.view.safeAreaLayoutGuide.bottomAnchor : self.view.bottomAnchor
+        NSLayoutConstraint.activate([
+            webView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        self.view.layoutIfNeeded()
+    }
 }
 
 class BlockBarButtonItem: UIBarButtonItem {

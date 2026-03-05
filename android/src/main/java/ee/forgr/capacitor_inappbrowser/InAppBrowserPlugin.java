@@ -1277,6 +1277,56 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     @PluginMethod
+    public void setEnabledSafeTopMargin(PluginCall call) {
+        Boolean enabledValue = call.getBoolean("enabled");
+        if (enabledValue == null) {
+            call.reject("'enabled' (boolean) is required");
+            return;
+        }
+        boolean enabled = enabledValue;
+        String targetId = resolveTargetId(call);
+        WebViewDialog dialog = resolveDialog(targetId);
+        if (dialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+        this.getActivity().runOnUiThread(() -> {
+            try {
+                dialog.setEnabledSafeTopMargin(enabled);
+                call.resolve();
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error setting safe top margin: " + e.getMessage());
+                call.reject("Failed to set safe top margin: " + e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void setEnabledSafeBottomMargin(PluginCall call) {
+        Boolean enabledValue = call.getBoolean("enabled");
+        if (enabledValue == null) {
+            call.reject("'enabled' (boolean) is required");
+            return;
+        }
+        boolean enabled = enabledValue;
+        String targetId = resolveTargetId(call);
+        WebViewDialog dialog = resolveDialog(targetId);
+        if (dialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+        this.getActivity().runOnUiThread(() -> {
+            try {
+                dialog.setEnabledSafeBottomMargin(enabled);
+                call.resolve();
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error setting safe bottom margin: " + e.getMessage());
+                call.reject("Failed to set safe bottom margin: " + e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
     public void openSecureWindow(PluginCall call) {
         String authEndpoint = call.getString("authEndpoint");
 
