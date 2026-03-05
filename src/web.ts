@@ -9,6 +9,8 @@ import type {
   DimensionOptions,
   OpenSecureWindowOptions,
   OpenSecureWindowResponse,
+  ScreenshotOptions,
+  ScreenshotResult,
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
@@ -87,6 +89,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log('updateDimensions', options);
     // Web platform doesn't support dimension control
     return;
+  }
+
+  async captureScreenshot(options?: ScreenshotOptions): Promise<ScreenshotResult> {
+    console.log('captureScreenshot', options);
+    // Web platform doesn't support native screenshot capture
+    throw new Error('Screenshot capture is not supported on web platform');
   }
 
   async openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse> {

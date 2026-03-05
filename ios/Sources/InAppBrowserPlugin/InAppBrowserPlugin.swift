@@ -48,6 +48,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "captureScreenshot", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
     ]
@@ -571,6 +572,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
         let showReloadButton = call.getBool("showReloadButton", false)
+        let showScreenshotButton = call.getBool("showScreenshotButton", false)
 
         let blockedHostsRaw = call.getArray("blockedHosts", [])
         let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
@@ -716,6 +718,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if showReloadButton {
                     webViewController.leftNavigationBarItemTypes.append(.reload)
                 }
+                if showScreenshotButton {
+                    webViewController.leftNavigationBarItemTypes.append(.screenshot)
+                }
 
                 // Only add share button if subject is provided
                 if call.getString("shareSubject") != nil {
@@ -726,6 +731,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 // Other modes may have reload button
                 if showReloadButton {
                     webViewController.leftNavigationBarItemTypes.append(.reload)
+                }
+                if showScreenshotButton {
+                    webViewController.leftNavigationBarItemTypes.append(.screenshot)
                 }
 
                 // Only add share button if subject is provided
@@ -967,6 +975,34 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.reload()
             call.resolve()
+        }
+    }
+
+    @objc func captureScreenshot(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let explicitId = call.getString("id")
+            let targetId = explicitId ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.captureScreenshot { base64, error in
+                if let error = error {
+                    call.reject("Failed to capture screenshot: \(error.localizedDescription)")
+                    return
+                }
+
+                if let base64 = base64 {
+                    var result: [String: Any] = ["base64": base64]
+                    if let explicitId = explicitId {
+                        result["id"] = explicitId
+                    }
+                    call.resolve(result)
+                } else {
+                    call.reject("Failed to capture screenshot")
+                }
+            }
         }
     }
 

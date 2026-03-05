@@ -6,6 +6,7 @@
     <string name="close_button">Close Button</string>
     <string name="button_near_done">Button near "done"</string>
     <string name="reload_button">Reload Button</string>
+    <string name="screenshot_button">Screenshot Button</string>
     <string name="back_button">Back Button</string>
     <string name="title">Title</string>
     <string name="forward_button">Forward Button</string>

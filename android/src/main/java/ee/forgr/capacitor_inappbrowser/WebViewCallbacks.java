@@ -14,4 +14,6 @@ public interface WebViewCallbacks {
     public void buttonNearDoneClicked();
 
     public void confirmBtnClicked(String url);
+
+    public void screenshotCaptured(String base64);
 }
