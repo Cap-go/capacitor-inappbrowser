@@ -575,9 +575,7 @@ window.customElements.define(
           try {
             const handler = addProxyHandler(async (request) => {
               console.log("[Proxy Google] Intercept:", request.method, request.url);
-              const headers = Object.assign({}, request.headers || {}, {
-                "X-Custom-Header": "capgo-proxy-test",
-              });
+              const headers = { ...(request.headers || {}), "X-Custom-Header": "capgo-proxy-test" };
               try {
                 const res = await CapacitorHttp.request({
                   url: request.url,
@@ -593,7 +591,7 @@ window.customElements.define(
                     base64Body = res.data;
                   } else {
                     const str = JSON.stringify(res.data);
-                    base64Body = btoa(unescape(encodeURIComponent(str)));
+                    base64Body = btoa(decodeURIComponent(encodeURIComponent(str)));
                   }
                 }
                 return {
@@ -666,9 +664,7 @@ window.customElements.define(
           try {
             const handler = addProxyHandler(async (request) => {
               console.log("[Proxy cal.com Firefox] Intercept:", request.method, request.url);
-              const headers = Object.assign({}, request.headers || {}, {
-                "User-Agent": firefoxUA,
-              });
+              const headers = { ...(request.headers || {}), "User-Agent": firefoxUA };
               try {
                 const res = await CapacitorHttp.request({
                   url: request.url,
@@ -684,7 +680,7 @@ window.customElements.define(
                     base64Body = res.data;
                   } else {
                     const str = JSON.stringify(res.data);
-                    base64Body = btoa(unescape(encodeURIComponent(str)));
+                    base64Body = btoa(decodeURIComponent(encodeURIComponent(str)));
                   }
                 }
                 return {
@@ -743,9 +739,7 @@ window.customElements.define(
               // Only intercept facebook.com requests
               if (url.hostname.includes("facebook.com")) {
                 console.log("[Proxy Facebook] Intercept:", request.method, request.url);
-                const headers = Object.assign({}, request.headers || {}, {
-                  "User-Agent": facebookUA,
-                });
+                const headers = { ...(request.headers || {}), "User-Agent": facebookUA };
                 try {
                   const res = await CapacitorHttp.request({
                     url: request.url,
@@ -761,11 +755,11 @@ window.customElements.define(
                       base64Body = res.data;
                     } else {
                       const str = JSON.stringify(res.data);
-                      base64Body = btoa(unescape(encodeURIComponent(str)));
+                      base64Body = btoa(decodeURIComponent(encodeURIComponent(str)));
                     }
                   }
                   // Strip all security policy headers entirely
-                  const responseHeaders = Object.assign({}, res.headers || {});
+                  const responseHeaders = { ...(res.headers || {}) };
                   delete responseHeaders["Content-Security-Policy"];
                   delete responseHeaders["content-security-policy"];
                   delete responseHeaders["Content-Security-Policy-Report-Only"];
