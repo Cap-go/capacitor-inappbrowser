@@ -6,11 +6,15 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: WKURLSchemeTask] = [:]
     private var pendingBodies: [String: Data] = [:]
-    private var pendingNetworkTasks: [String: URLSessionDataTask] = [:]
+    private var activeTasks: [Int: (requestId: String, schemeTask: WKURLSchemeTask, dataTask: URLSessionDataTask)] = [:]
     private var stoppedRequests: Set<String> = []
     private let taskLock = NSLock()
     private let webviewId: String
     private let proxyTimeoutSeconds: TimeInterval = 10
+
+    private static var session: URLSession = {
+        return URLSession(configuration: .default)
+    }()
 
     init(plugin: InAppBrowserPlugin, webviewId: String) {
         self.plugin = plugin
@@ -35,7 +39,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         pendingTasks[requestId] = urlSchemeTask
         taskLock.unlock()
 
-        // Encode body to base64, buffering stream data for later pass-through
+        // Buffer body from stream if needed (stream can only be read once)
         var base64Body: String? = nil
         if let bodyData = request.httpBody {
             base64Body = bodyData.base64EncodedString()
@@ -66,7 +70,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
         plugin?.notifyListeners("proxyRequest", data: eventData)
 
-        // Timeout: if JS never responds, fail the request after proxyTimeoutSeconds
+        // Timeout: if JS never responds, fail the request
         DispatchQueue.global().asyncAfter(deadline: .now() + proxyTimeoutSeconds) { [weak self] in
             guard let self = self else { return }
             self.taskLock.lock()
@@ -77,7 +81,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             self.pendingBodies.removeValue(forKey: requestId)
             self.taskLock.unlock()
 
-            print("[InAppBrowser] Proxy request timed out after \(Int(self.proxyTimeoutSeconds))s: \(requestId)")
             task.didFailWithError(NSError(
                 domain: "ProxySchemeHandler",
                 code: NSURLErrorTimedOut,
@@ -88,68 +91,50 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     public func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
         taskLock.lock()
-        let requestIdToRemove = pendingTasks.first(where: { $0.value === urlSchemeTask })?.key
-        var networkTask: URLSessionDataTask?
-        if let key = requestIdToRemove {
+        // Check pending (waiting for JS)
+        if let key = pendingTasks.first(where: { $0.value === urlSchemeTask })?.key {
             pendingTasks.removeValue(forKey: key)
             pendingBodies.removeValue(forKey: key)
-            networkTask = pendingNetworkTasks.removeValue(forKey: key)
             stoppedRequests.insert(key)
         }
+        // Check active network tasks (pass-through) — cancel the URLSessionDataTask
+        var networkTaskToCancel: URLSessionDataTask?
+        if let entry = activeTasks.first(where: { $0.value.schemeTask === urlSchemeTask }) {
+            networkTaskToCancel = entry.value.dataTask
+            activeTasks.removeValue(forKey: entry.key)
+            stoppedRequests.insert(entry.value.requestId)
+        }
         taskLock.unlock()
-        networkTask?.cancel()
+        networkTaskToCancel?.cancel()
     }
 
     /// Called from handleProxyRequest plugin method with the JS response
     func handleResponse(requestId: String, responseData: [String: Any]?) {
         taskLock.lock()
         let isStopped = stoppedRequests.remove(requestId) != nil
-        guard let urlSchemeTask = pendingTasks[requestId] else {
-            pendingTasks.removeValue(forKey: requestId)
-            pendingBodies.removeValue(forKey: requestId)
+        guard let urlSchemeTask = pendingTasks.removeValue(forKey: requestId) else {
             taskLock.unlock()
             return
         }
         let bufferedBody = pendingBodies.removeValue(forKey: requestId)
-
-        if isStopped {
-            pendingTasks.removeValue(forKey: requestId)
-            taskLock.unlock()
-            return
-        }
-
-        if responseData != nil {
-            // JS provided a response — remove from pending now
-            pendingTasks.removeValue(forKey: requestId)
-        }
-        // For pass-through (nil), keep pendingTasks entry so stop can find it
         taskLock.unlock()
 
+        if isStopped { return }
+
         if let responseData = responseData {
+            // JS provided a response — return it directly
             let statusCode = responseData["status"] as? Int ?? 200
             let headersDict = responseData["headers"] as? [String: String] ?? [:]
             let base64Body = responseData["body"] as? String ?? ""
-
             let bodyData = Data(base64Encoded: base64Body) ?? Data()
 
-            guard let url = urlSchemeTask.request.url else {
+            guard let url = urlSchemeTask.request.url,
+                  let httpResponse = HTTPURLResponse(
+                      url: url, statusCode: statusCode,
+                      httpVersion: "HTTP/1.1", headerFields: headersDict
+                  ) else {
                 urlSchemeTask.didFailWithError(NSError(
-                    domain: "ProxySchemeHandler",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "No URL"]
-                ))
-                return
-            }
-
-            guard let httpResponse = HTTPURLResponse(
-                url: url,
-                statusCode: statusCode,
-                httpVersion: "HTTP/1.1",
-                headerFields: headersDict
-            ) else {
-                urlSchemeTask.didFailWithError(NSError(
-                    domain: "ProxySchemeHandler",
-                    code: -2,
+                    domain: "ProxySchemeHandler", code: -2,
                     userInfo: [NSLocalizedDescriptionKey: "Failed to create response"]
                 ))
                 return
@@ -166,69 +151,60 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func executePassThrough(requestId: String, urlSchemeTask: WKURLSchemeTask, bufferedBody: Data?) {
         var request = urlSchemeTask.request
-        // Restore body if it was consumed from httpBodyStream during interception
         if request.httpBody == nil, let body = bufferedBody {
             request.httpBody = body
         }
-        let session = URLSession.shared
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
+
+        let task = Self.session.dataTask(with: request) { [weak self, weak urlSchemeTask] data, response, error in
+            guard let urlSchemeTask = urlSchemeTask else { return }
             guard let self = self else { return }
 
-            // Clean up and check if this request was stopped while in-flight
+            // Clean up active entry and check not stopped
             self.taskLock.lock()
-            self.pendingTasks.removeValue(forKey: requestId)
-            self.pendingNetworkTasks.removeValue(forKey: requestId)
+            if let entry = self.activeTasks.first(where: { $0.value.requestId == requestId }) {
+                self.activeTasks.removeValue(forKey: entry.key)
+            }
             let wasStopped = self.stoppedRequests.remove(requestId) != nil
             self.taskLock.unlock()
-
-            if wasStopped {
-                return
-            }
+            if wasStopped { return }
 
             if let error = error {
-                if (error as NSError).code == NSURLErrorCancelled {
-                    return
+                if (error as NSError).code != NSURLErrorCancelled {
+                    urlSchemeTask.didFailWithError(error)
                 }
-                urlSchemeTask.didFailWithError(error)
-                return
+            } else {
+                if let response = response {
+                    urlSchemeTask.didReceive(response)
+                }
+                if let data = data {
+                    urlSchemeTask.didReceive(data)
+                }
+                urlSchemeTask.didFinish()
             }
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                urlSchemeTask.didFailWithError(NSError(
-                    domain: "ProxySchemeHandler",
-                    code: -3,
-                    userInfo: [NSLocalizedDescriptionKey: "Non-HTTP response"]
-                ))
-                return
-            }
-
-            urlSchemeTask.didReceive(httpResponse)
-            if let data = data {
-                urlSchemeTask.didReceive(data)
-            }
-            urlSchemeTask.didFinish()
         }
 
         taskLock.lock()
-        pendingNetworkTasks[requestId] = task
+        activeTasks[task.taskIdentifier] = (requestId: requestId, schemeTask: urlSchemeTask, dataTask: task)
         taskLock.unlock()
+
         task.resume()
     }
 
     func cancelAllPendingTasks() {
         taskLock.lock()
-        let tasks = pendingTasks
-        let networkTasks = pendingNetworkTasks
+        let pending = pendingTasks
+        let active = activeTasks
         pendingTasks.removeAll()
         pendingBodies.removeAll()
-        pendingNetworkTasks.removeAll()
+        activeTasks.removeAll()
         stoppedRequests.removeAll()
         taskLock.unlock()
 
-        for (_, networkTask) in networkTasks {
-            networkTask.cancel()
+        for (_, entry) in active {
+            entry.dataTask.cancel()
         }
-        for (_, task) in tasks {
+
+        for (_, task) in pending {
             task.didFailWithError(NSError(
                 domain: "ProxySchemeHandler",
                 code: NSURLErrorCancelled,
