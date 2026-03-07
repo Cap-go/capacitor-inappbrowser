@@ -6,7 +6,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: WKURLSchemeTask] = [:]
     private var pendingBodies: [String: Data] = [:]
-    private var activeTasks: [Int: (requestId: String, schemeTask: WKURLSchemeTask)] = [:]
+    private var activeTasks: [Int: (requestId: String, schemeTask: WKURLSchemeTask, dataTask: URLSessionDataTask)] = [:]
     private var stoppedRequests: Set<String> = []
     private let taskLock = NSLock()
     private let webviewId: String
@@ -97,12 +97,15 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             pendingBodies.removeValue(forKey: key)
             stoppedRequests.insert(key)
         }
-        // Check active network tasks (pass-through)
+        // Check active network tasks (pass-through) — cancel the URLSessionDataTask
+        var networkTaskToCancel: URLSessionDataTask?
         if let entry = activeTasks.first(where: { $0.value.schemeTask === urlSchemeTask }) {
+            networkTaskToCancel = entry.value.dataTask
             activeTasks.removeValue(forKey: entry.key)
             stoppedRequests.insert(entry.value.requestId)
         }
         taskLock.unlock()
+        networkTaskToCancel?.cancel()
     }
 
     /// Called from handleProxyRequest plugin method with the JS response
@@ -156,8 +159,11 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             guard let urlSchemeTask = urlSchemeTask else { return }
             guard let self = self else { return }
 
-            // Check not stopped
+            // Clean up active entry and check not stopped
             self.taskLock.lock()
+            if let entry = self.activeTasks.first(where: { $0.value.requestId == requestId }) {
+                self.activeTasks.removeValue(forKey: entry.key)
+            }
             let wasStopped = self.stoppedRequests.remove(requestId) != nil
             self.taskLock.unlock()
             if wasStopped { return }
@@ -178,7 +184,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
 
         taskLock.lock()
-        activeTasks[task.taskIdentifier] = (requestId: requestId, schemeTask: urlSchemeTask)
+        activeTasks[task.taskIdentifier] = (requestId: requestId, schemeTask: urlSchemeTask, dataTask: task)
         taskLock.unlock()
 
         task.resume()
@@ -187,11 +193,16 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     func cancelAllPendingTasks() {
         taskLock.lock()
         let pending = pendingTasks
+        let active = activeTasks
         pendingTasks.removeAll()
         pendingBodies.removeAll()
         activeTasks.removeAll()
         stoppedRequests.removeAll()
         taskLock.unlock()
+
+        for (_, entry) in active {
+            entry.dataTask.cancel()
+        }
 
         for (_, task) in pending {
             task.didFailWithError(NSError(
