@@ -687,6 +687,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         // Set Material Design picker option
         options.setMaterialPicker(Boolean.TRUE.equals(call.getBoolean("materialPicker", false)));
 
+        // Set hideNavigationBar option (immersive mode - hides Android system nav bar)
+        options.setHideNavigationBar(Boolean.TRUE.equals(call.getBoolean("hideNavigationBar", false)));
+
         // Set enabledSafeBottomMargin option
         options.setEnabledSafeMargin(Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false)));
 
