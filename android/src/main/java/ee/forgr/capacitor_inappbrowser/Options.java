@@ -175,6 +175,7 @@ public class Options {
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
     private List<String> authorizedAppLinks = new ArrayList<>();
+    private boolean hideNavigationBar = false;
     private boolean enabledSafeBottomMargin = false;
     private boolean enabledSafeTopMargin = true;
     private boolean useTopInset = false;
@@ -236,6 +237,14 @@ public class Options {
 
     public void setMaterialPicker(boolean materialPicker) {
         this.materialPicker = materialPicker;
+    }
+
+    public boolean getHideNavigationBar() {
+        return hideNavigationBar;
+    }
+
+    public void setHideNavigationBar(boolean hideNavigationBar) {
+        this.hideNavigationBar = hideNavigationBar;
     }
 
     public boolean getEnabledSafeMargin() {

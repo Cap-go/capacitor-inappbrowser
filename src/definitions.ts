@@ -611,6 +611,18 @@ export interface OpenWebViewOptions {
   authorizedAppLinks?: string[];
 
   /**
+   * If true, hides the Android system navigation bar using sticky immersive mode.
+   * The navigation bar reappears temporarily when the user swipes from the bottom edge,
+   * then auto-hides again. Useful for apps that use immersive mode in their main activity
+   * and want the WebView dialog to match.
+   * @since 8.2.1
+   * @default false
+   * @example
+   * hideNavigationBar: true
+   */
+  hideNavigationBar?: boolean;
+
+  /**
    * If true, the webView will not take the full height and will have a 20px margin at the bottom.
    * This creates a safe margin area outside the browser view.
    * @since 7.13.0

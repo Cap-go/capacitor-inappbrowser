@@ -373,6 +373,16 @@ public class WebViewDialog extends Dialog {
             getWindow() != null ? getWindow().getDecorView() : null
         );
 
+        // Hide the Android system navigation bar if the option is enabled.
+        // Uses sticky immersive mode: the bar reappears on edge swipe,
+        // then auto-hides again after a short delay.
+        if (_options != null && _options.getHideNavigationBar()) {
+            insetsController.setSystemBarsBehavior(
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            );
+            insetsController.hide(WindowInsetsCompat.Type.navigationBars());
+        }
+
         if (getWindow() != null) {
             getWindow()
                 .getDecorView()
