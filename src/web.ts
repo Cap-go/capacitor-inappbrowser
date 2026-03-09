@@ -89,6 +89,16 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
+  async setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeTopMargin not supported on web');
+    return;
+  }
+
+  async setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeBottomMargin not supported on web');
+    return;
+  }
+
   async openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse> {
     const w = 600;
     const h = 550;
