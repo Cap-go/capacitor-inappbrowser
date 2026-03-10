@@ -590,7 +590,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    func injectJavaScriptInterface() {
+    /// Builds the JS source that defines `window.mobileApp`.
+    private func mobileAppScriptSource() -> String {
         let extraControls = allowWebViewJsVisibilityControl ? """
                                 ,
                                 hide: function() {
@@ -600,7 +601,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         window.webkit.messageHandlers.show.postMessage(null);
                                 }
                 """ : ""
-        let script = """
+        return """
                 if (!window.mobileApp) {
                         window.mobileApp = {
                                 postMessage: function(message) {
@@ -614,6 +615,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         };
                 }
                 """
+    }
+
+    /// Registers `window.mobileApp` as a WKUserScript so it is injected at
+    /// document-start for every page navigation — before any page JS executes.
+    /// Call this after `allowWebViewJsVisibilityControl` has been set.
+    public func addMobileAppUserScript() {
+        let userScript = WKUserScript(
+            source: mobileAppScriptSource(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        webView?.configuration.userContentController.addUserScript(userScript)
+    }
+
+    func injectJavaScriptInterface() {
+        let script = mobileAppScriptSource()
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
                 if let error = error {

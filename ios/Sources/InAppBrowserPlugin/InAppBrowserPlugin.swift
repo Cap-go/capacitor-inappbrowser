@@ -625,7 +625,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.instanceId = webViewId
-            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+            // Register window.mobileApp at document-start so it is available before
+            // any page JS runs (fixes injection race on iOS first load).
+            webViewController.addMobileAppUserScript()
 
             // Set HTTP method and body if provided
             if let method = httpMethod {
