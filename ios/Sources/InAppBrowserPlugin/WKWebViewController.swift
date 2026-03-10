@@ -661,8 +661,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         )
         userContentController.addUserScript(printScript)
 
-        // Inject window.mobileApp bridge at document start so it is available
-        // before any page scripts run (mirrors Android's addJavascriptInterface behaviour)
+        // Inject window.mobileApp bridge at document start
         let extraControls = allowWebViewJsVisibilityControl ? """
                         ,
                         hide: function() {
