@@ -650,7 +650,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
-        let script = WKUserScript(
+        let printScript = WKUserScript(
             source: """
             window.print = function() {
                 window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
@@ -659,7 +659,37 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         )
-        userContentController.addUserScript(script)
+        userContentController.addUserScript(printScript)
+
+        // Inject window.mobileApp bridge at document start
+        let extraControls = allowWebViewJsVisibilityControl ? """
+                        ,
+                        hide: function() {
+                                window.webkit.messageHandlers.hide.postMessage(null);
+                        },
+                        show: function() {
+                                window.webkit.messageHandlers.show.postMessage(null);
+                        }
+            """ : ""
+        let mobileAppScript = WKUserScript(
+            source: """
+            if (!window.mobileApp) {
+                    window.mobileApp = {
+                            postMessage: function(message) {
+                                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                                            window.webkit.messageHandlers.messageHandler.postMessage(message);
+                                    }
+                            },
+                            close: function() {
+                                    window.webkit.messageHandlers.close.postMessage(null);
+                            }\(extraControls)
+                    };
+            }
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(mobileAppScript)
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
