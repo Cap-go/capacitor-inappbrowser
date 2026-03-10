@@ -641,15 +641,14 @@ export interface OpenWebViewOptions {
   useTopInset?: boolean;
 
   /**
-   * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
-   * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.
-   * Only enable this if you need Google Pay functionality as it allows popup windows.
+   * enableGooglePaySupport: if true, enables additional support for Google Pay popups.
+   * Note: The Payment Request API (required for Google Pay) is always enabled by default
+   * on devices with WebView 120+ (Android WebView version 120.0.6099.56 or later),
+   * regardless of this setting.
    *
-   * When enabled:
+   * When enabled, this additionally:
    * - Allows popup windows for Google Pay authentication
-   * - Sets proper CORS headers for Payment Request API
    * - Enables multiple window support in WebView
-   * - Configures secure context for payment processing
    *
    * @since 7.13.0
    * @default false
