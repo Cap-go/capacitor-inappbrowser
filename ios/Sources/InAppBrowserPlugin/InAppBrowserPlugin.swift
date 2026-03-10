@@ -497,6 +497,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let closeModalDescription = call.getString("closeModalDescription", "Are you sure you want to close this window?")
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
+        let closeModalURLPattern = call.getString("closeModalURLPattern")
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let isAnimated = call.getBool("isAnimated", true)
@@ -526,12 +527,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.closeModalOk = closeModalOk
                 self.closeModalCancel = closeModalCancel
             }
+            if let pattern = closeModalURLPattern {
+                if (try? NSRegularExpression(pattern: pattern)) == nil {
+                    call.reject("Invalid closeModalURLPattern regex")
+                    return
+                }
+            }
         } else {
             // Reject if closeModal is false but closeModal options are provided
             if call.getString("closeModalTitle") != nil ||
                 call.getString("closeModalDescription") != nil ||
                 call.getString("closeModalOk") != nil ||
-                call.getString("closeModalCancel") != nil {
+                call.getString("closeModalCancel") != nil ||
+                call.getString("closeModalURLPattern") != nil {
                 call.reject("closeModal options require closeModal to be true")
                 return
             }
@@ -782,6 +790,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 webViewController.closeModalDescription = self.closeModalDescription ?? closeModalDescription
                 webViewController.closeModalOk = self.closeModalOk ?? closeModalOk
                 webViewController.closeModalCancel = self.closeModalCancel ?? closeModalCancel
+                if let pattern = closeModalURLPattern {
+                    webViewController.closeModalURLPattern = pattern
+                }
             }
 
             self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
