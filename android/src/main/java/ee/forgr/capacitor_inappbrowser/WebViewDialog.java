@@ -972,16 +972,17 @@ public class WebViewDialog extends Dialog {
 
         setupToolbar();
         setWebViewClient();
-
+        JSObject result = new JSObject();
+        result.put("id", webViewId);
         if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
                 show();
                 applyHiddenMode();
             }
-            _options.getPluginCall().resolve();
+            _options.getPluginCall().resolve(result);
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
-            _options.getPluginCall().resolve();
+            _options.getPluginCall().resolve(result);
         }
     }
 
@@ -2780,6 +2781,8 @@ public class WebViewDialog extends Dialog {
                     if (view == null || _webView == null) {
                         return;
                     }
+                    JSObject result = new JSObject();
+                    result.put("id", webViewId);
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
@@ -2787,7 +2790,7 @@ public class WebViewDialog extends Dialog {
                             boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
                             if (!usePreShowScript) {
                                 show();
-                                _options.getPluginCall().resolve();
+                                _options.getPluginCall().resolve(result);
                             } else {
                                 executorService.execute(
                                     new Runnable() {
@@ -2802,7 +2805,7 @@ public class WebViewDialog extends Dialog {
                                                     @Override
                                                     public void run() {
                                                         show();
-                                                        _options.getPluginCall().resolve();
+                                                        _options.getPluginCall().resolve(result);
                                                     }
                                                 }
                                             );
