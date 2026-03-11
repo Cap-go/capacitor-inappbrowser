@@ -973,7 +973,7 @@ public class WebViewDialog extends Dialog {
         setupToolbar();
         setWebViewClient();
         JSObject result = new JSObject();
-        result.put("id", webViewId);
+        result.put("id", instanceId);
         if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
                 show();
@@ -2782,7 +2782,7 @@ public class WebViewDialog extends Dialog {
                         return;
                     }
                     JSObject result = new JSObject();
-                    result.put("id", webViewId);
+                    result.put("id", instanceId);
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
