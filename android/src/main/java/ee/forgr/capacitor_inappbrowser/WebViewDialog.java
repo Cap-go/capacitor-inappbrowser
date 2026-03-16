@@ -165,6 +165,15 @@ public class WebViewDialog extends Dialog {
         return instanceId;
     }
 
+    private void resolvePluginCallWithId() {
+        if (_options == null || _options.getPluginCall() == null) {
+            return;
+        }
+        JSObject result = new JSObject();
+        result.put("id", instanceId != null ? instanceId : "");
+        _options.getPluginCall().resolve(result);
+    }
+
     // Add this class to provide safer JavaScript interface
     private class JavaScriptInterface {
 
@@ -978,10 +987,10 @@ public class WebViewDialog extends Dialog {
                 show();
                 applyHiddenMode();
             }
-            _options.getPluginCall().resolve();
+            resolvePluginCallWithId();
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
-            _options.getPluginCall().resolve();
+            resolvePluginCallWithId();
         }
     }
 
@@ -2787,7 +2796,7 @@ public class WebViewDialog extends Dialog {
                             boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
                             if (!usePreShowScript) {
                                 show();
-                                _options.getPluginCall().resolve();
+                                resolvePluginCallWithId();
                             } else {
                                 executorService.execute(
                                     new Runnable() {
@@ -2802,7 +2811,7 @@ public class WebViewDialog extends Dialog {
                                                     @Override
                                                     public void run() {
                                                         show();
-                                                        _options.getPluginCall().resolve();
+                                                        resolvePluginCallWithId();
                                                     }
                                                 }
                                             );
