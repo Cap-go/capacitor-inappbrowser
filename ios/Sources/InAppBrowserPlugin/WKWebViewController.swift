@@ -590,7 +590,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    func injectJavaScriptInterface() {
+    private func javaScriptInterfaceSource() -> String {
         let extraControls = allowWebViewJsVisibilityControl ? """
                                 ,
                                 hide: function() {
@@ -614,6 +614,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         };
                 }
                 """
+    }
+
+    func injectJavaScriptInterface() {
+        let script = javaScriptInterfaceSource()
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
                 if let error = error {
@@ -660,6 +664,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             forMainFrameOnly: false
         )
         userContentController.addUserScript(script)
+
+        // Inject the Capacitor bridge interface before page scripts run so
+        // window.mobileApp is available on first load.
+        let jsBridgeScript = WKUserScript(
+            source: javaScriptInterfaceSource(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(jsBridgeScript)
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
