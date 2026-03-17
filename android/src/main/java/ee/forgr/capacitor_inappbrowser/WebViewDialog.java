@@ -65,6 +65,7 @@ import androidx.webkit.WebViewFeature;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PluginCall;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -168,13 +169,38 @@ public class WebViewDialog extends Dialog {
     }
 
     private void resolveOpenWebViewIfNeeded() {
-        if (openWebViewResolved || _options == null || _options.getPluginCall() == null) {
+        if (openWebViewResolved || _options == null) {
             return;
         }
-        openWebViewResolved = true;
+        PluginCall call = _options.getPluginCall();
+        if (call == null) {
+            Log.e("InAppBrowser", "Cannot resolve openWebView: plugin call is null");
+            openWebViewResolved = true;
+            return;
+        }
+        if (instanceId == null || instanceId.isEmpty()) {
+            call.reject("Cannot resolve openWebView: missing webview id");
+            openWebViewResolved = true;
+            return;
+        }
         JSObject result = new JSObject();
         result.put("id", instanceId);
-        _options.getPluginCall().resolve(result);
+        call.resolve(result);
+        openWebViewResolved = true;
+    }
+
+    private void rejectOpenWebViewIfNeeded(String message) {
+        if (openWebViewResolved || _options == null) {
+            return;
+        }
+        PluginCall call = _options.getPluginCall();
+        if (call == null) {
+            Log.e("InAppBrowser", "Cannot reject openWebView: plugin call is null");
+            openWebViewResolved = true;
+            return;
+        }
+        call.reject(message);
+        openWebViewResolved = true;
     }
 
     // Add this class to provide safer JavaScript interface
@@ -2479,6 +2505,7 @@ public class WebViewDialog extends Dialog {
                             // Notify that a page load error occurred
                             if (_options.getCallbacks() != null && request.isForMainFrame()) {
                                 _options.getCallbacks().pageLoadError();
+                                rejectOpenWebViewIfNeeded("No handler available for external URL: " + url);
                             }
                             return true; // prevent WebView from attempting to load the custom scheme
                         }
@@ -2901,6 +2928,11 @@ public class WebViewDialog extends Dialog {
                         return;
                     }
                     _options.getCallbacks().pageLoadError();
+                    if (request != null && request.isForMainFrame() && !isInitialized) {
+                        CharSequence description = error != null ? error.getDescription() : null;
+                        String message = description != null ? "Initial page load failed: " + description : "Initial page load failed";
+                        rejectOpenWebViewIfNeeded(message);
+                    }
                 }
 
                 @SuppressLint("WebViewClientOnReceivedSslError")
