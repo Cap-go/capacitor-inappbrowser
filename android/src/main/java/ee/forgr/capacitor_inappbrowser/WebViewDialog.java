@@ -452,7 +452,10 @@ public class WebViewDialog extends Dialog {
             WebSettingsCompat.setPaymentRequestEnabled(_webView.getSettings(), true);
             Log.d("InAppBrowser", "Payment Request API enabled");
         } else {
-            Log.w("InAppBrowser", "Payment Request API not supported on this WebView version (requires WebView 120+). Google Pay may not work.");
+            Log.w(
+                "InAppBrowser",
+                "Payment Request API not supported on this WebView version (requires WebView 120+). Google Pay may not work."
+            );
         }
 
         // Enhanced settings for Google Pay popup support (only when explicitly enabled)
