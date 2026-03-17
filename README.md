@@ -227,6 +227,46 @@ InAppBrowser.addListener("messageFromWebview", (event) => {
 window.mobileApp.close();
 ```
 
+### Google Pay (Android)
+
+To enable Google Pay inside the in-app browser on Android you must do **all three** of the following:
+
+#### 1. Enable the option when opening the browser
+
+Pass `enableGooglePaySupport: true` in your `openWebView` call:
+
+```ts
+InAppBrowser.openWebView({
+  url: 'https://your-checkout-page.example.com',
+  enableGooglePaySupport: true,
+});
+```
+
+#### 2. Add Payment Request intent queries to your `AndroidManifest.xml`
+
+Android 11+ enforces [Package Visibility](https://developer.android.com/training/package-visibility). Without these entries the WebView cannot discover Google Pay and the payment sheet will never appear.
+
+Add the following inside the `<manifest>` tag of your app's `AndroidManifest.xml` (typically `android/app/src/main/AndroidManifest.xml`):
+
+```xml
+<queries>
+  <!-- Required for Google Pay / Payment Request API in WebView -->
+  <intent>
+    <action android:name="org.chromium.intent.action.PAY" />
+  </intent>
+  <intent>
+    <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
+  </intent>
+  <intent>
+    <action android:name="org.chromium.intent.action.UPDATE_PAYMENT_DETAILS" />
+  </intent>
+</queries>
+```
+
+#### 3. Require WebView 120 or later
+
+The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. Devices running an older WebView version will not be able to complete Google Pay transactions. Most modern Android devices already meet this requirement.
+
 ## API
 
 <docgen-index>
@@ -828,7 +868,7 @@ And in the AndroidManifest.xml file:
 | **`enabledSafeBottomMargin`**          | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                                    | <code>false</code>                                            | 7.13.0 |
 | **`enabledSafeTopMargin`**             | <code>boolean</code>                                                                                                                                                   | If false, the webView will extend behind the status bar for true full-screen immersive content. When true (default), respects the safe area at the top of the screen. Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.                                                                                                                                                                                                                                                                                | <code>true</code>                                             | 8.2.0  |
 | **`useTopInset`**                      | <code>boolean</code>                                                                                                                                                   | When true, applies the system status bar inset as the WebView top margin on Android. Keeps the legacy 0px margin by default for apps that handle padding themselves.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            |        |
-| **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables additional support for Google Pay popups. Note: The Payment Request API (required for Google Pay) is always enabled by default on devices with WebView 120+ (Android WebView version 120.0.6099.56 or later), regardless of this setting. When enabled, this additionally: - Allows popup windows for Google Pay authentication - Enables multiple window support in WebView                                                                                                                                      | <code>false</code>                                            | 7.13.0 |
+| **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                                | <code>false</code>                                            | 7.13.0 |
 | **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "*.example.com" to block all subdomains - "www.example.*" to block wildcard domain extensions                                                                                                                                                                                                       | <code>[]</code>                                               | 7.17.0 |
 | **`width`**                            | <code>number</code>                                                                                                                                                    | Width of the webview in pixels. If not set, webview will be fullscreen width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>undefined (fullscreen)</code>                           |        |
 | **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |

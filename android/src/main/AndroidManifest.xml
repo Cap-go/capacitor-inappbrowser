@@ -5,16 +5,6 @@
         <category android:name="android.intent.category.BROWSABLE" />
         <data android:scheme="http" />
       </intent>
-      <!-- Required for Payment Request API (Google Pay) in WebView on Android 11+ -->
-      <intent>
-        <action android:name="org.chromium.intent.action.PAY" />
-      </intent>
-      <intent>
-        <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
-      </intent>
-      <intent>
-        <action android:name="org.chromium.intent.action.UPDATE_PAYMENT_DETAILS" />
-      </intent>
     </queries>
   <uses-permission android:name="android.permission.CAMERA"/>
   
