@@ -48,6 +48,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
     ]
@@ -1364,6 +1366,38 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 yPos: yPos.map { CGFloat($0) }
             )
 
+            call.resolve()
+        }
+    }
+
+    @objc func setEnabledSafeTopMargin(_ call: CAPPluginCall) {
+        if call.options["enabled"] == nil {
+            print("[InAppBrowser][Warning] setEnabledSafeTopMargin called without 'enabled'; defaulting to true")
+        }
+        let enabled = call.getBool("enabled", true)
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+            webViewController.updateSafeTopMargin(enabled)
+            call.resolve()
+        }
+    }
+
+    @objc func setEnabledSafeBottomMargin(_ call: CAPPluginCall) {
+        if call.options["enabled"] == nil {
+            print("[InAppBrowser][Warning] setEnabledSafeBottomMargin called without 'enabled'; defaulting to false")
+        }
+        let enabled = call.getBool("enabled", false)
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+            webViewController.updateSafeBottomMargin(enabled)
             call.resolve()
         }
     }

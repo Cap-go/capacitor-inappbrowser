@@ -275,6 +275,8 @@ window.mobileApp.close();
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
+* [`setEnabledSafeTopMargin(...)`](#setenabledsafetopmargin)
+* [`setEnabledSafeBottomMargin(...)`](#setenabledsafebottommargin)
 * [`openSecureWindow(...)`](#opensecurewindow)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -701,6 +703,40 @@ When `id` is omitted, targets the active webview.
 | Param         | Type                                                                             | Description                             |
 | ------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
 | **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a> & { id?: string; }</code> | Dimension options (width, height, x, y) |
+
+--------------------
+
+
+### setEnabledSafeTopMargin(...)
+
+```typescript
+setEnabledSafeTopMargin(options: { enabled: boolean; id?: string; }) => Promise<void>
+```
+
+Sets the enabled safe top margin of the webview at runtime.
+When `id` is omitted, targets the active webview.
+On Web, this method is a no-op and resolves without changing layout.
+
+| Param         | Type                                            |
+| ------------- | ----------------------------------------------- |
+| **`options`** | <code>{ enabled: boolean; id?: string; }</code> |
+
+--------------------
+
+
+### setEnabledSafeBottomMargin(...)
+
+```typescript
+setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string; }) => Promise<void>
+```
+
+Sets the enabled safe bottom margin of the webview at runtime.
+When `id` is omitted, targets the active webview.
+On Web, this method is a no-op and resolves without changing layout.
+
+| Param         | Type                                            |
+| ------------- | ----------------------------------------------- |
+| **`options`** | <code>{ enabled: boolean; id?: string; }</code> |
 
 --------------------
 
