@@ -679,7 +679,7 @@ Will be triggered when page load error
 addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
 ```
 
-Listen for proxied requests from the in-app browser webview.
+Listen for proxy events delegated by native rules from the in-app browser webview.
 Use addProxyHandler() wrapper instead of calling this directly.
 
 | Param              | Type                                                                      |
@@ -697,15 +697,15 @@ Use addProxyHandler() wrapper instead of calling this directly.
 ### handleProxyRequest(...)
 
 ```typescript
-handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string; }) => Promise<void>
+handleProxyRequest(options: { requestId: string; decision?: ProxyDecision | null; response?: ProxyResponse | null; webviewId?: string; }) => Promise<void>
 ```
 
-Internal method: sends a proxied response back to native.
+Internal method: sends a proxied decision back to native.
 Called by addProxyHandler() wrapper — not intended for direct use.
 
-| Param         | Type                                                                                                                  |
-| ------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ requestId: string; response: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
+| Param         | Type                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; decision?: <a href="#proxydecision">ProxyDecision</a> \| null; response?: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
 
 **Since:** 9.0.0
 
@@ -904,7 +904,9 @@ And in the AndroidManifest.xml file:
 | **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 6.1.0  |
 | **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
-| **`proxyRequests`**                    | <code>boolean</code>                                                                                                                                                   | When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler registered via addProxyHandler(). The handler can return a custom Response or null for pass-through.                                                                                                                                                                                                                                                                                                                                                                     |                                                               | 9.0.0  |
+| **`proxyRequests`**                    | <code>boolean</code>                                                                                                                                                   | Legacy blanket proxy mode. When true, all HTTP/HTTPS requests are delegated to JavaScript. Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.                                                                                                                                                                                                                                                                                                                                                                                  |                                                               | 9.0.0  |
+| **`outboundProxyRules`**               | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first outbound proxy rules. Native evaluates these before a request leaves the device. Only rules with `action: "delegateToJs"` cross the Capacitor bridge.                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 9.1.0  |
+| **`inboundProxyRules`**                | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first inbound proxy rules. Native evaluates these after the response is fetched and before it reaches the webview. Only rules with `action: "delegateToJs"` cross the Capacitor bridge.                                                                                                                                                                                                                                                                                                                                                             |                                                               | 9.1.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                             | <code>false</code>                                            | 0.1.0  |
@@ -944,6 +946,25 @@ And in the AndroidManifest.xml file:
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
 
 
+#### NativeProxyRule
+
+Native-first proxy rule used on both Android and iOS.
+Regexes are applied only to the fields that are provided.
+
+| Prop                      | Type                                                  | Description                                                                           |
+| ------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **`id`**                  | <code>string</code>                                   | Stable identifier to help debug which rule matched.                                   |
+| **`urlRegex`**            | <code>string</code>                                   | Regex applied to the request URL.                                                     |
+| **`methodRegex`**         | <code>string</code>                                   | Regex applied to the HTTP method.                                                     |
+| **`headerRegex`**         | <code>string</code>                                   | Regex applied to serialized request headers.                                          |
+| **`bodyRegex`**           | <code>string</code>                                   | Regex applied to the base64-decoded request body when available.                      |
+| **`statusRegex`**         | <code>string</code>                                   | Regex applied to the HTTP status code string for inbound rules.                       |
+| **`responseHeaderRegex`** | <code>string</code>                                   | Regex applied to serialized response headers for inbound rules.                       |
+| **`responseBodyRegex`**   | <code>string</code>                                   | Regex applied to the base64-decoded response body for inbound rules.                  |
+| **`mainFrameOnly`**       | <code>boolean</code>                                  | If true, only matches main-frame requests when the platform exposes that information. |
+| **`action`**              | <code>'continue' \| 'cancel' \| 'delegateToJs'</code> | Native action to take when the rule matches.                                          |
+
+
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
@@ -971,14 +992,42 @@ And in the AndroidManifest.xml file:
 
 Represents an intercepted HTTP request from the in-app browser webview.
 
-| Prop            | Type                                                            | Description                                                                                                                                                                                                                                                                                             |
-| --------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`requestId`** | <code>string</code>                                             | Unique identifier for this request, used to match responses                                                                                                                                                                                                                                             |
-| **`url`**       | <code>string</code>                                             | The full URL being requested                                                                                                                                                                                                                                                                            |
-| **`method`**    | <code>string</code>                                             | HTTP method (GET, POST, PUT, DELETE, etc.)                                                                                                                                                                                                                                                              |
-| **`headers`**   | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Request headers as key-value pairs                                                                                                                                                                                                                                                                      |
-| **`body`**      | <code>string \| null</code>                                     | Base64-encoded request body, or null if no body. On Android, requests from HTML elements (img, script, link, iframe) are intercepted natively and do not have access to the request body — this field will be empty for those requests. Requests from fetch() and XMLHttpRequest include the full body. |
-| **`webviewId`** | <code>string</code>                                             | ID of the webview that made this request                                                                                                                                                                                                                                                                |
+| Prop                  | Type                                                            | Description                                                                                                                                                                                                                                                                                             |
+| --------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`requestId`**       | <code>string</code>                                             | Unique identifier for this request, used to match responses                                                                                                                                                                                                                                             |
+| **`phase`**           | <code>'outbound' \| 'inbound'</code>                            | Whether this callback is happening before the native request is sent or after the native response is received.                                                                                                                                                                                          |
+| **`url`**             | <code>string</code>                                             | The full URL being requested                                                                                                                                                                                                                                                                            |
+| **`method`**          | <code>string</code>                                             | HTTP method (GET, POST, PUT, DELETE, etc.)                                                                                                                                                                                                                                                              |
+| **`headers`**         | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Request headers as key-value pairs                                                                                                                                                                                                                                                                      |
+| **`body`**            | <code>string \| null</code>                                     | Base64-encoded request body, or null if no body. On Android, requests from HTML elements (img, script, link, iframe) are intercepted natively and do not have access to the request body — this field will be empty for those requests. Requests from fetch() and XMLHttpRequest include the full body. |
+| **`status`**          | <code>number</code>                                             | HTTP status code for inbound interceptions.                                                                                                                                                                                                                                                             |
+| **`responseHeaders`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Response headers for inbound interceptions.                                                                                                                                                                                                                                                             |
+| **`responseBody`**    | <code>string \| null</code>                                     | Base64-encoded response body for inbound interceptions.                                                                                                                                                                                                                                                 |
+| **`webviewId`**       | <code>string</code>                                             | ID of the webview that made this request                                                                                                                                                                                                                                                                |
+
+
+#### ProxyDecision
+
+Decision returned to native for a delegated proxy event.
+
+| Prop           | Type                                                                          | Description                                                                     |
+| -------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **`request`**  | <code><a href="#proxyrequestoverride">ProxyRequestOverride</a> \| null</code> | For outbound events, override the native request before it is executed.         |
+| **`response`** | <code><a href="#proxyresponse">ProxyResponse</a> \| null</code>               | For inbound events, override the native response before it reaches the WebView. |
+| **`cancel`**   | <code>boolean</code>                                                          | Cancels the request entirely.                                                   |
+
+
+#### ProxyRequestOverride
+
+Request override returned to native when an outbound proxy rule delegates to JS.
+All body values must be base64-encoded.
+
+| Prop          | Type                                                            | Description                         |
+| ------------- | --------------------------------------------------------------- | ----------------------------------- |
+| **`url`**     | <code>string</code>                                             | Absolute URL to request.            |
+| **`method`**  | <code>string</code>                                             | HTTP method to use.                 |
+| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Request headers as key-value pairs. |
+| **`body`**    | <code>string \| null</code>                                     | Base64-encoded request body.        |
 
 
 #### ProxyResponse

@@ -146,6 +146,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         return stores
     }
 
+    private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
+        try rawRules.compactMap { item in
+            guard let dictionary = item as? [String: Any] else { return nil }
+            return try NativeProxyRule.from(dictionary: dictionary)
+        }
+    }
+
     func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
         let resolvedId = webViewId ?? activeWebViewId
         let navigationController = resolvedId.flatMap { navigationControllers[$0] } ?? self.navigationWebViewController
@@ -599,6 +606,17 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         // Read proxy option
         let proxyRequests = call.getBool("proxyRequests") ?? false
+        let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
+        let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
+        let outboundProxyRules: [NativeProxyRule]
+        let inboundProxyRules: [NativeProxyRule]
+        do {
+            outboundProxyRules = try parseProxyRules(outboundProxyRulesRaw)
+            inboundProxyRules = try parseProxyRules(inboundProxyRulesRaw)
+        } catch {
+            call.reject("Invalid proxy rules: \(error.localizedDescription)")
+            return
+        }
 
         // Validate dimension parameters
         if width != nil && height == nil {
@@ -614,8 +632,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             // Create proxy handler before init so it's available during initWebview()
             var proxyHandler: ProxySchemeHandler? = nil
-            if proxyRequests {
-                proxyHandler = ProxySchemeHandler(plugin: self, webviewId: webViewId)
+            if proxyRequests || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+                proxyHandler = ProxySchemeHandler(
+                    plugin: self,
+                    webviewId: webViewId,
+                    legacyProxyRequests: proxyRequests,
+                    outboundRules: outboundProxyRules,
+                    inboundRules: inboundProxyRules
+                )
                 self.proxySchemeHandlers[webViewId] = proxyHandler!
             }
 
@@ -1254,7 +1278,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let webviewId = call.getString("webviewId")
-        let responseObj = call.getObject("response")
+        let decisionObj = call.getObject("decision") ?? call.getObject("response")
 
         // Find the handler
         var handler: ProxySchemeHandler?
@@ -1274,18 +1298,47 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         var responseDict: [String: Any]? = nil
-        if let responseObj = responseObj {
+        if let decisionObj = decisionObj {
             var dict: [String: Any] = [:]
-            dict["status"] = responseObj["status"]
-            dict["body"] = responseObj["body"]
-            if let headers = responseObj["headers"] as? JSObject {
-                var headersDict: [String: String] = [:]
-                for (key, value) in headers {
-                    if let strValue = value as? String {
-                        headersDict[key] = strValue
+            if let cancel = decisionObj["cancel"] as? Bool {
+                dict["cancel"] = cancel
+            }
+            if let request = decisionObj["request"] as? JSObject {
+                var requestDict: [String: Any] = [:]
+                requestDict["url"] = request["url"]
+                requestDict["method"] = request["method"]
+                requestDict["body"] = request["body"]
+                if let headers = request["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
                     }
+                    requestDict["headers"] = headersDict
                 }
-                dict["headers"] = headersDict
+                dict["request"] = requestDict
+            }
+
+            let responsePayload = (decisionObj["response"] as? JSObject) ?? decisionObj
+            if responsePayload["status"] != nil {
+                var responsePayloadDict: [String: Any] = [:]
+                responsePayloadDict["status"] = responsePayload["status"]
+                responsePayloadDict["body"] = responsePayload["body"]
+                if let headers = responsePayload["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
+                    }
+                    responsePayloadDict["headers"] = headersDict
+                }
+                if decisionObj["response"] != nil {
+                    dict["response"] = responsePayloadDict
+                } else {
+                    dict.merge(responsePayloadDict) { _, new in new }
+                }
             }
             responseDict = dict
         }

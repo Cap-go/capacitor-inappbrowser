@@ -15,5 +15,16 @@ public interface WebViewCallbacks {
 
     public void confirmBtnClicked(String url);
 
-    public void proxyRequestEvent(String requestId, String url, String method, String headersJson, String body, String webviewId);
+    public void proxyRequestEvent(
+        String requestId,
+        String phase,
+        String url,
+        String method,
+        String headersJson,
+        String body,
+        Integer status,
+        String responseHeadersJson,
+        String responseBody,
+        String webviewId
+    );
 }

@@ -98,12 +98,10 @@ public class WebViewDialog extends Dialog {
 
         private WebResourceResponse response;
         private final Semaphore semaphore;
-        // Non-null when request came via JS proxy bridge (_capgo_proxy_ rewrite).
-        // Used by handleProxyResponse to do a native pass-through fetch when
-        // the handler returns null, since the rewritten URL is not loadable.
-        private String bridgedOriginalUrl;
-        private String bridgedMethod;
-        private Map<String, String> bridgedHeaders;
+        private NativeRequestContext requestContext;
+        private NativeResponseData nativeResponse;
+        private String phase = "outbound";
+        private boolean canceled;
 
         public WebResourceResponse getResponse() {
             return response;
@@ -112,6 +110,38 @@ public class WebViewDialog extends Dialog {
         public ProxiedRequest() {
             this.semaphore = new Semaphore(0);
             this.response = null;
+        }
+    }
+
+    private static class NativeRequestContext {
+
+        private String url;
+        private String method;
+        private Map<String, String> headers;
+        private String base64Body;
+        private boolean mainFrame;
+
+        NativeRequestContext(String url, String method, Map<String, String> headers, String base64Body, boolean mainFrame) {
+            this.url = url;
+            this.method = method;
+            this.headers = headers != null ? new HashMap<>(headers) : new HashMap<>();
+            this.base64Body = base64Body != null ? base64Body : "";
+            this.mainFrame = mainFrame;
+        }
+    }
+
+    private static class NativeResponseData {
+
+        private int statusCode;
+        private String contentType;
+        private Map<String, String> headers;
+        private byte[] bodyBytes;
+
+        NativeResponseData(int statusCode, String contentType, Map<String, String> headers, byte[] bodyBytes) {
+            this.statusCode = statusCode;
+            this.contentType = contentType != null ? contentType : "application/octet-stream";
+            this.headers = headers != null ? new HashMap<>(headers) : new HashMap<>();
+            this.bodyBytes = bodyBytes != null ? bodyBytes : new byte[0];
         }
     }
 
@@ -2511,18 +2541,17 @@ public class WebViewDialog extends Dialog {
                     if (view == null || _webView == null) {
                         return null;
                     }
-                    if (!_options.getProxyRequests()) {
+                    if (!shouldUseNativeProxy()) {
                         return null;
                     }
 
                     String requestUrl = request.getUrl().toString();
                     String originalUrl;
                     String method;
-                    String headersJson;
+                    Map<String, String> requestHeaders = new HashMap<>();
                     String base64Body;
 
                     if (requestUrl.contains("/_capgo_proxy_?")) {
-                        // JS-patched fetch/XHR: extract original URL and stored request data
                         Uri uri = request.getUrl();
                         originalUrl = uri.getQueryParameter("u");
                         String requestId = uri.getQueryParameter("rid");
@@ -2532,82 +2561,150 @@ public class WebViewDialog extends Dialog {
 
                         ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
                         method = stored != null ? stored.method : "GET";
-                        headersJson = stored != null ? stored.headersJson : "{}";
                         base64Body = stored != null ? stored.base64Body : "";
+                        if (stored != null) {
+                            try {
+                                JSONObject headersObj = new JSONObject(stored.headersJson);
+                                Iterator<String> keys = headersObj.keys();
+                                while (keys.hasNext()) {
+                                    String key = keys.next();
+                                    requestHeaders.put(key, headersObj.getString(key));
+                                }
+                            } catch (JSONException ignored) {}
+                        }
                     } else {
-                        // Direct resource load (img, link, script, etc.) — extract from WebResourceRequest
-                        // Note: WebResourceRequest does not expose the request body, so for non-GET/HEAD
-                        // methods (e.g. form POST) the base64Body will be empty. This is an Android
-                        // platform limitation — the proxy handler receives the URL/headers/method but
-                        // must re-fetch the body if needed. In practice, direct resource loads from HTML
-                        // (img, link, script, iframe) are always GET.
                         String scheme = request.getUrl().getScheme();
                         if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
                             return null;
                         }
-
                         originalUrl = requestUrl;
                         method = request.getMethod();
-
-                        // Convert request headers to JSON
-                        Map<String, String> reqHeaders = request.getRequestHeaders();
-                        JSONObject headersObj = new JSONObject();
-                        if (reqHeaders != null) {
-                            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
-                                try {
-                                    headersObj.put(entry.getKey(), entry.getValue());
-                                } catch (JSONException e) {
-                                    // skip malformed header
-                                }
-                            }
+                        if (request.getRequestHeaders() != null) {
+                            requestHeaders.putAll(request.getRequestHeaders());
                         }
-                        headersJson = headersObj.toString();
                         base64Body = "";
                     }
 
-                    // Create a new requestId for the semaphore wait
-                    String proxyId = UUID.randomUUID().toString();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
+                    NativeRequestContext requestContext = new NativeRequestContext(
+                        originalUrl,
+                        method,
+                        requestHeaders,
+                        base64Body,
+                        request.isForMainFrame()
+                    );
 
-                    // For bridged requests, store original URL so null response
-                    // can do a native pass-through instead of loading the /_capgo_proxy_ URL
-                    if (requestUrl.contains("/_capgo_proxy_?")) {
-                        proxiedRequest.bridgedOriginalUrl = originalUrl;
-                        proxiedRequest.bridgedMethod = method;
+                    boolean legacyProxyMode =
+                        _options.getProxyRequests() &&
+                        _options.getOutboundProxyRules().isEmpty() &&
+                        _options.getInboundProxyRules().isEmpty();
+
+                    NativeProxyRule outboundRule = legacyProxyMode
+                        ? new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.DELEGATE_TO_JS)
+                        : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
+
+                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                        return createCanceledResponse();
+                    }
+
+                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS) {
+                        String proxyId = UUID.randomUUID().toString();
+                        ProxiedRequest proxiedRequest = new ProxiedRequest();
+                        proxiedRequest.phase = "outbound";
+                        proxiedRequest.requestContext = requestContext;
+                        addProxiedRequest(proxyId, proxiedRequest);
+
+                        String dialogId = instanceId != null ? instanceId : "";
+                        _options
+                            .getCallbacks()
+                            .proxyRequestEvent(
+                                proxyId,
+                                "outbound",
+                                requestContext.url,
+                                requestContext.method,
+                                serializeHeaders(requestContext.headers),
+                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                null,
+                                null,
+                                null,
+                                dialogId
+                            );
+
                         try {
-                            JSONObject hdr = new JSONObject(headersJson);
-                            Map<String, String> hdrMap = new HashMap<>();
-                            Iterator<String> keys = hdr.keys();
-                            while (keys.hasNext()) {
-                                String k = keys.next();
-                                hdrMap.put(k, hdr.getString(k));
+                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                if (proxiedRequest.canceled) {
+                                    return createCanceledResponse();
+                                }
+                                if (proxiedRequest.response != null) {
+                                    return proxiedRequest.response;
+                                }
+                                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                            } else {
+                                removeProxiedRequest(proxyId);
+                                return null;
                             }
-                            proxiedRequest.bridgedHeaders = hdrMap;
-                        } catch (JSONException e) {
-                            proxiedRequest.bridgedHeaders = new HashMap<>();
+                        } catch (InterruptedException e) {
+                            Log.e("InAppBrowserProxy", "Semaphore wait error", e);
+                            return null;
                         }
                     }
 
+                    NativeResponseData nativeResponse;
+                    try {
+                        nativeResponse = performNativeRequest(requestContext);
+                    } catch (IOException e) {
+                        Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, e);
+                        return null;
+                    }
+
+                    NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
+                    if (inboundRule == null) {
+                        return buildWebResourceResponse(nativeResponse);
+                    }
+                    if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                        return createCanceledResponse();
+                    }
+                    if (inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
+                        return buildWebResourceResponse(nativeResponse);
+                    }
+
+                    String proxyId = UUID.randomUUID().toString();
+                    ProxiedRequest proxiedRequest = new ProxiedRequest();
+                    proxiedRequest.phase = "inbound";
+                    proxiedRequest.requestContext = requestContext;
+                    proxiedRequest.nativeResponse = nativeResponse;
                     addProxiedRequest(proxyId, proxiedRequest);
 
-                    // Fire proxyRequest event to the Capacitor plugin
                     String dialogId = instanceId != null ? instanceId : "";
                     _options
                         .getCallbacks()
-                        .proxyRequestEvent(proxyId, originalUrl, method, headersJson, base64Body.isEmpty() ? null : base64Body, dialogId);
+                        .proxyRequestEvent(
+                            proxyId,
+                            "inbound",
+                            requestContext.url,
+                            requestContext.method,
+                            serializeHeaders(requestContext.headers),
+                            requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                            nativeResponse.statusCode,
+                            serializeHeaders(nativeResponse.headers),
+                            Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
+                            dialogId
+                        );
 
-                    // Wait for response (10 seconds max)
                     try {
                         if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                            return proxiedRequest.response;
-                        } else {
-                            Log.e("InAppBrowserProxy", "Semaphore timed out for: " + originalUrl);
-                            removeProxiedRequest(proxyId);
+                            if (proxiedRequest.canceled) {
+                                return createCanceledResponse();
+                            }
+                            if (proxiedRequest.response != null) {
+                                return proxiedRequest.response;
+                            }
+                            return buildWebResourceResponse(nativeResponse);
                         }
+                        removeProxiedRequest(proxyId);
                     } catch (InterruptedException e) {
                         Log.e("InAppBrowserProxy", "Semaphore wait error", e);
                     }
-                    return null;
+                    return buildWebResourceResponse(nativeResponse);
                 }
 
                 @Override
@@ -3068,6 +3165,139 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private boolean shouldUseNativeProxy() {
+        return _options != null && _options.shouldEnableNativeProxy();
+    }
+
+    private String decodeBase64Body(String base64Body) {
+        if (base64Body == null || base64Body.isEmpty()) {
+            return null;
+        }
+        try {
+            return new String(Base64.decode(base64Body, Base64.DEFAULT), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String serializeHeaders(Map<String, String> headers) {
+        JSONObject jsonObject = new JSONObject();
+        if (headers != null) {
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                try {
+                    jsonObject.put(entry.getKey(), entry.getValue());
+                } catch (JSONException ignored) {}
+            }
+        }
+        return jsonObject.toString();
+    }
+
+    private NativeProxyRule findMatchingRule(List<NativeProxyRule> rules, NativeRequestContext requestContext, NativeResponseData responseData) {
+        if (rules == null) {
+            return null;
+        }
+        String decodedRequestBody = decodeBase64Body(requestContext.base64Body);
+        String serializedRequestHeaders = serializeHeaders(requestContext.headers);
+        String serializedResponseHeaders = responseData != null ? serializeHeaders(responseData.headers) : null;
+        String decodedResponseBody = responseData != null ? new String(responseData.bodyBytes, StandardCharsets.UTF_8) : null;
+        Integer statusCode = responseData != null ? responseData.statusCode : null;
+
+        for (NativeProxyRule rule : rules) {
+            if (
+                rule.matches(
+                    requestContext.url,
+                    requestContext.method,
+                    serializedRequestHeaders,
+                    decodedRequestBody,
+                    requestContext.mainFrame,
+                    statusCode,
+                    serializedResponseHeaders,
+                    decodedResponseBody
+                )
+            ) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    private WebResourceResponse createCanceledResponse() {
+        WebResourceResponse response = new WebResourceResponse("text/plain", "utf-8", new ByteArrayInputStream(new byte[0]));
+        response.setStatusCodeAndReasonPhrase(204, "No Content");
+        response.setResponseHeaders(new HashMap<>());
+        return response;
+    }
+
+    private WebResourceResponse buildWebResourceResponse(NativeResponseData responseData) {
+        WebResourceResponse webResourceResponse = new WebResourceResponse(
+            responseData.contentType,
+            "utf-8",
+            new ByteArrayInputStream(responseData.bodyBytes)
+        );
+        String reasonPhrase = getReasonPhrase(responseData.statusCode);
+        if (reasonPhrase.isEmpty()) {
+            reasonPhrase = "Unknown";
+        }
+        webResourceResponse.setStatusCodeAndReasonPhrase(responseData.statusCode, reasonPhrase);
+        webResourceResponse.setResponseHeaders(responseData.headers);
+        return webResourceResponse;
+    }
+
+    private NativeResponseData performNativeRequest(NativeRequestContext requestContext) throws IOException {
+        URL url = new URL(requestContext.url);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
+        conn.setInstanceFollowRedirects(true);
+
+        for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
+            conn.setRequestProperty(entry.getKey(), entry.getValue());
+        }
+
+        if (requestContext.base64Body != null && !requestContext.base64Body.isEmpty()) {
+            byte[] bodyBytes = Base64.decode(requestContext.base64Body, Base64.DEFAULT);
+            conn.setDoOutput(true);
+            conn.getOutputStream().write(bodyBytes);
+        }
+
+        int status = conn.getResponseCode();
+        InputStream inputStream;
+        try {
+            inputStream = conn.getInputStream();
+        } catch (IOException e) {
+            inputStream = conn.getErrorStream();
+        }
+
+        byte[] bodyBytes = new byte[0];
+        if (inputStream != null) {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = inputStream.read(buf)) != -1) {
+                baos.write(buf, 0, n);
+            }
+            inputStream.close();
+            bodyBytes = baos.toByteArray();
+        }
+
+        Map<String, String> responseHeaders = new HashMap<>();
+        for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                responseHeaders.put(entry.getKey(), entry.getValue().get(0));
+            }
+        }
+
+        String contentType = responseHeaders.get("Content-Type");
+        if (contentType == null) {
+            contentType = responseHeaders.get("content-type");
+        }
+        if (contentType == null) {
+            contentType = conn.getContentType();
+        }
+
+        conn.disconnect();
+        return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+    }
+
     public void handleProxyResponse(String requestId, JSObject response) {
         ProxiedRequest proxiedRequest;
         synchronized (proxiedRequestsHashmap) {
@@ -3079,14 +3309,6 @@ public class WebViewDialog extends Dialog {
         }
 
         if (response == null) {
-            // null response = pass through
-            if (proxiedRequest.bridgedOriginalUrl != null) {
-                // Bridged fetch/XHR: URL was rewritten to /_capgo_proxy_, so WebView
-                // can't load it directly. Do a native pass-through fetch instead.
-                executeNativePassThrough(proxiedRequest);
-            }
-            // For direct resource loads the response stays null, which tells
-            // shouldInterceptRequest to return null and let WebView load normally.
             synchronized (proxiedRequestsHashmap) {
                 proxiedRequestsHashmap.remove(requestId);
             }
@@ -3095,43 +3317,70 @@ public class WebViewDialog extends Dialog {
         }
 
         try {
-            String base64Body = response.getString("body");
-            int status = response.getInteger("status", 200);
-            JSObject headers = response.getJSObject("headers");
+            Boolean canceled = response.getBool("cancel");
+            proxiedRequest.canceled = Boolean.TRUE.equals(canceled);
 
-            Map<String, String> responseHeaders = new HashMap<>();
-            if (headers != null) {
-                Iterator<String> keys = headers.keys();
-                while (keys.hasNext()) {
-                    String key = keys.next();
-                    responseHeaders.put(key, headers.getString(key));
+            JSObject requestOverride = response.getJSObject("request");
+            if (requestOverride != null && proxiedRequest.requestContext != null) {
+                String url = requestOverride.getString("url", proxiedRequest.requestContext.url);
+                String method = requestOverride.getString("method", proxiedRequest.requestContext.method);
+                JSObject headersObject = requestOverride.getJSObject("headers");
+                Map<String, String> headers = proxiedRequest.requestContext.headers;
+                if (headersObject != null) {
+                    headers = new HashMap<>();
+                    Iterator<String> keys = headersObject.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        headers.put(key, headersObject.getString(key));
+                    }
                 }
+                String body = requestOverride.getString("body", proxiedRequest.requestContext.base64Body);
+                proxiedRequest.requestContext = new NativeRequestContext(
+                    url,
+                    method,
+                    headers,
+                    body,
+                    proxiedRequest.requestContext.mainFrame
+                );
             }
 
-            byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty()) ? Base64.decode(base64Body, Base64.DEFAULT) : new byte[0];
-
-            String contentType = responseHeaders.get("content-type");
-            if (contentType == null) {
-                contentType = responseHeaders.get("Content-Type");
-            }
-            if (contentType == null) {
-                contentType = "application/octet-stream";
+            JSObject responseOverride = response.getJSObject("response");
+            if (responseOverride == null && response.get("status") != null) {
+                responseOverride = response;
             }
 
-            if (status < 100 || status > 599) {
-                Log.w("InAppBrowserProxy", "Invalid HTTP status " + status + ", defaulting to 200");
-                status = 200;
-            }
-            String reasonPhrase = getReasonPhrase(status);
-            if (reasonPhrase.isEmpty()) {
-                reasonPhrase = "Unknown";
-            }
+            if (responseOverride != null) {
+                String base64Body = responseOverride.getString("body");
+                int status = responseOverride.getInteger("status", 200);
+                JSObject headers = responseOverride.getJSObject("headers");
 
-            WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
-            webResourceResponse.setStatusCodeAndReasonPhrase(status, reasonPhrase);
-            webResourceResponse.setResponseHeaders(responseHeaders);
+                Map<String, String> responseHeaders = new HashMap<>();
+                if (headers != null) {
+                    Iterator<String> keys = headers.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        responseHeaders.put(key, headers.getString(key));
+                    }
+                }
 
-            proxiedRequest.response = webResourceResponse;
+                byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty())
+                    ? Base64.decode(base64Body, Base64.DEFAULT)
+                    : new byte[0];
+
+                String contentType = responseHeaders.get("content-type");
+                if (contentType == null) {
+                    contentType = responseHeaders.get("Content-Type");
+                }
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+
+                if (status < 100 || status > 599) {
+                    status = 200;
+                }
+                proxiedRequest.nativeResponse = new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+                proxiedRequest.response = buildWebResourceResponse(proxiedRequest.nativeResponse);
+            }
         } catch (Exception e) {
             Log.e("InAppBrowserProxy", "Error building proxy response", e);
         }
@@ -3140,75 +3389,6 @@ public class WebViewDialog extends Dialog {
             proxiedRequestsHashmap.remove(requestId);
         }
         proxiedRequest.semaphore.release();
-    }
-
-    /**
-     * Performs a native HTTP request for bridged fetch/XHR pass-through.
-     * Called when proxy handler returns null for a request whose URL was
-     * rewritten to /_capgo_proxy_, so WebView can't load it directly.
-     */
-    private void executeNativePassThrough(ProxiedRequest proxiedRequest) {
-        try {
-            URL url = new URL(proxiedRequest.bridgedOriginalUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod(proxiedRequest.bridgedMethod != null ? proxiedRequest.bridgedMethod : "GET");
-            conn.setInstanceFollowRedirects(true);
-
-            if (proxiedRequest.bridgedHeaders != null) {
-                for (Map.Entry<String, String> entry : proxiedRequest.bridgedHeaders.entrySet()) {
-                    conn.setRequestProperty(entry.getKey(), entry.getValue());
-                }
-            }
-
-            int status = conn.getResponseCode();
-            InputStream inputStream;
-            try {
-                inputStream = conn.getInputStream();
-            } catch (IOException e) {
-                inputStream = conn.getErrorStream();
-            }
-
-            byte[] bodyBytes = new byte[0];
-            if (inputStream != null) {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                int n;
-                while ((n = inputStream.read(buf)) != -1) {
-                    baos.write(buf, 0, n);
-                }
-                inputStream.close();
-                bodyBytes = baos.toByteArray();
-            }
-
-            Map<String, String> responseHeaders = new HashMap<>();
-            for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
-                if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
-                    responseHeaders.put(entry.getKey(), entry.getValue().get(0));
-                }
-            }
-
-            String contentType = responseHeaders.get("Content-Type");
-            if (contentType == null) {
-                contentType = responseHeaders.get("content-type");
-            }
-            if (contentType == null) {
-                contentType = "application/octet-stream";
-            }
-
-            String reasonPhrase = getReasonPhrase(status);
-            if (reasonPhrase.isEmpty()) {
-                reasonPhrase = "Unknown";
-            }
-
-            WebResourceResponse webResourceResponse = new WebResourceResponse(contentType, "utf-8", new ByteArrayInputStream(bodyBytes));
-            webResourceResponse.setStatusCodeAndReasonPhrase(status, reasonPhrase);
-            webResourceResponse.setResponseHeaders(responseHeaders);
-            proxiedRequest.response = webResourceResponse;
-
-            conn.disconnect();
-        } catch (Exception e) {
-            Log.e("InAppBrowserProxy", "Native pass-through failed for: " + proxiedRequest.bridgedOriginalUrl, e);
-        }
     }
 
     private void shareUrl() {

@@ -237,6 +237,8 @@ export interface CloseWebviewOptions {
 export interface ProxyRequest {
   /** Unique identifier for this request, used to match responses */
   requestId: string;
+  /** Whether this callback is happening before the native request is sent or after the native response is received. */
+  phase: 'outbound' | 'inbound';
   /** The full URL being requested */
   url: string;
   /** HTTP method (GET, POST, PUT, DELETE, etc.) */
@@ -251,6 +253,12 @@ export interface ProxyRequest {
    * requests. Requests from fetch() and XMLHttpRequest include the full body.
    */
   body: string | null;
+  /** HTTP status code for inbound interceptions. */
+  status?: number;
+  /** Response headers for inbound interceptions. */
+  responseHeaders?: Record<string, string>;
+  /** Base64-encoded response body for inbound interceptions. */
+  responseBody?: string | null;
   /** ID of the webview that made this request */
   webviewId: string;
 }
@@ -269,12 +277,71 @@ export interface ProxyResponse {
 }
 
 /**
- * Callback function that handles proxied requests.
- * Return a ProxyResponse to provide a custom response (recommended with CapacitorHttp),
- * a fetch Response object, or null to let the request pass through normally.
+ * Request override returned to native when an outbound proxy rule delegates to JS.
+ * All body values must be base64-encoded.
+ * @since 9.1.0
+ */
+export interface ProxyRequestOverride {
+  /** Absolute URL to request. */
+  url: string;
+  /** HTTP method to use. */
+  method?: string;
+  /** Request headers as key-value pairs. */
+  headers?: Record<string, string>;
+  /** Base64-encoded request body. */
+  body?: string | null;
+}
+
+/**
+ * Decision returned to native for a delegated proxy event.
+ * @since 9.1.0
+ */
+export interface ProxyDecision {
+  /** For outbound events, override the native request before it is executed. */
+  request?: ProxyRequestOverride | null;
+  /** For inbound events, override the native response before it reaches the WebView. */
+  response?: ProxyResponse | null;
+  /** Cancels the request entirely. */
+  cancel?: boolean;
+}
+
+/**
+ * Native-first proxy rule used on both Android and iOS.
+ * Regexes are applied only to the fields that are provided.
+ * @since 9.1.0
+ */
+export interface NativeProxyRule {
+  /** Stable identifier to help debug which rule matched. */
+  id?: string;
+  /** Regex applied to the request URL. */
+  urlRegex?: string;
+  /** Regex applied to the HTTP method. */
+  methodRegex?: string;
+  /** Regex applied to serialized request headers. */
+  headerRegex?: string;
+  /** Regex applied to the base64-decoded request body when available. */
+  bodyRegex?: string;
+  /** Regex applied to the HTTP status code string for inbound rules. */
+  statusRegex?: string;
+  /** Regex applied to serialized response headers for inbound rules. */
+  responseHeaderRegex?: string;
+  /** Regex applied to the base64-decoded response body for inbound rules. */
+  responseBodyRegex?: string;
+  /** If true, only matches main-frame requests when the platform exposes that information. */
+  mainFrameOnly?: boolean;
+  /** Native action to take when the rule matches. */
+  action: 'continue' | 'cancel' | 'delegateToJs';
+}
+
+/**
+ * Callback function that handles proxied requests delegated by native rules.
+ * Return a ProxyDecision/ProxyRequestOverride/ProxyResponse to override native behavior,
+ * a fetch Response object for inbound overrides, or null to let native continue normally.
  * @since 9.0.0
  */
-export type ProxyHandler = (request: ProxyRequest) => Promise<Response | ProxyResponse | null>;
+export type ProxyHandler = (
+  request: ProxyRequest,
+) => Promise<Response | ProxyResponse | ProxyRequestOverride | ProxyDecision | null>;
 
 export interface OpenWebViewOptions {
   /**
@@ -570,13 +637,29 @@ export interface OpenWebViewOptions {
    */
   preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
   /**
-   * When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler
-   * registered via addProxyHandler(). The handler can return a custom Response or null
-   * for pass-through.
+   * Legacy blanket proxy mode.
+   * When true, all HTTP/HTTPS requests are delegated to JavaScript.
+   * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
    *
    * @since 9.0.0
    */
   proxyRequests?: boolean;
+  /**
+   * Native-first outbound proxy rules.
+   * Native evaluates these before a request leaves the device.
+   * Only rules with `action: "delegateToJs"` cross the Capacitor bridge.
+   *
+   * @since 9.1.0
+   */
+  outboundProxyRules?: NativeProxyRule[];
+  /**
+   * Native-first inbound proxy rules.
+   * Native evaluates these after the response is fetched and before it reaches the webview.
+   * Only rules with `action: "delegateToJs"` cross the Capacitor bridge.
+   *
+   * @since 9.1.0
+   */
+  inboundProxyRules?: NativeProxyRule[];
   /**
    * buttonNearDone allows for a creation of a custom button near the done/close button.
    * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
@@ -962,18 +1045,18 @@ export interface InAppBrowserPlugin {
   ): Promise<PluginListenerHandle>;
 
   /**
-   * Listen for proxied requests from the in-app browser webview.
+   * Listen for proxy events delegated by native rules from the in-app browser webview.
    * Use addProxyHandler() wrapper instead of calling this directly.
    * @since 9.0.0
    */
   addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
 
   /**
-   * Internal method: sends a proxied response back to native.
+   * Internal method: sends a proxied decision back to native.
    * Called by addProxyHandler() wrapper — not intended for direct use.
    * @since 9.0.0
    */
-  handleProxyRequest(options: { requestId: string; response: ProxyResponse | null; webviewId?: string }): Promise<void>;
+  handleProxyRequest(options: { requestId: string; decision?: ProxyDecision | null; response?: ProxyResponse | null; webviewId?: string }): Promise<void>;
 
   /**
    * Remove all listeners for this plugin.

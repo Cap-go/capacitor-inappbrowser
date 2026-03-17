@@ -46,6 +46,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -85,6 +86,38 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new ActivityResultContracts.StartActivityForResult(),
             this::handleFileChooserResult
         );
+    }
+
+    private List<NativeProxyRule> parseProxyRules(JSArray rawRules, String optionName, PluginCall call) {
+        List<NativeProxyRule> parsed = new ArrayList<>();
+        if (rawRules == null) {
+            return parsed;
+        }
+
+        for (int i = 0; i < rawRules.length(); i++) {
+            try {
+                JSONObject rule = rawRules.getJSONObject(i);
+                parsed.add(
+                    new NativeProxyRule(
+                        rule.optString("id", null),
+                        NativeProxyRule.compilePattern(rule.optString("urlRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("methodRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("headerRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("bodyRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("statusRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("responseHeaderRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("responseBodyRegex", null)),
+                        rule.optBoolean("mainFrameOnly", false),
+                        NativeProxyRule.Action.fromString(rule.optString("action", "continue"))
+                    )
+                );
+            } catch (JSONException | PatternSyntaxException e) {
+                call.reject("Invalid " + optionName + " at index " + i + ": " + e.getMessage());
+                return null;
+            }
+        }
+
+        return parsed;
     }
 
     private void registerWebView(String id, WebViewDialog dialog) {
@@ -576,6 +609,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
 
         options.setProxyRequests(Boolean.TRUE.equals(call.getBoolean("proxyRequests", false)));
+        List<NativeProxyRule> outboundProxyRules = parseProxyRules(call.getArray("outboundProxyRules"), "outboundProxyRules", call);
+        if (outboundProxyRules == null) {
+            return;
+        }
+        options.setOutboundProxyRules(outboundProxyRules);
+        List<NativeProxyRule> inboundProxyRules = parseProxyRules(call.getArray("inboundProxyRules"), "inboundProxyRules", call);
+        if (inboundProxyRules == null) {
+            return;
+        }
+        options.setInboundProxyRules(inboundProxyRules);
 
         try {
             // Try to set buttonNearDone if present, with better error handling
@@ -725,9 +768,21 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 }
 
                 @Override
-                public void proxyRequestEvent(String requestId, String url, String method, String headersJson, String body, String wvId) {
+                public void proxyRequestEvent(
+                    String requestId,
+                    String phase,
+                    String url,
+                    String method,
+                    String headersJson,
+                    String body,
+                    Integer status,
+                    String responseHeadersJson,
+                    String responseBody,
+                    String wvId
+                ) {
                     JSObject data = new JSObject();
                     data.put("requestId", requestId);
+                    data.put("phase", phase);
                     data.put("url", url);
                     data.put("method", method);
                     try {
@@ -736,6 +791,17 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         data.put("headers", new JSObject());
                     }
                     data.put("body", body);
+                    if (status != null) {
+                        data.put("status", status);
+                    }
+                    if (responseHeadersJson != null) {
+                        try {
+                            data.put("responseHeaders", new JSObject(responseHeadersJson));
+                        } catch (Exception e) {
+                            data.put("responseHeaders", new JSObject());
+                        }
+                    }
+                    data.put("responseBody", responseBody);
                     data.put("webviewId", wvId);
                     notifyListeners("proxyRequest", data);
                 }
@@ -1089,8 +1155,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             call.reject("Target WebView not found for proxy request");
             return;
         }
-        JSObject response = call.getObject("response");
-        webViewDialog.handleProxyResponse(requestId, response);
+        JSObject decision = call.getObject("decision");
+        if (decision == null) {
+            decision = call.getObject("response");
+        }
+        webViewDialog.handleProxyResponse(requestId, decision);
         call.resolve();
     }
 

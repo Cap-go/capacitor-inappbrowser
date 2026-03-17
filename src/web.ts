@@ -106,7 +106,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       .map((x) => x.join('='))
       .join(',');
 
-    const popup = window.open(options.authEndpoint, 'Authorization', settings)!;
+    const popup = window.open(options.authEndpoint, 'Authorization', settings);
+    if (!popup) {
+      throw new Error('Failed to open authorization window');
+    }
     if (typeof popup.focus === 'function') {
       popup.focus();
     }
