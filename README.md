@@ -248,6 +248,46 @@ InAppBrowser.addListener("messageFromWebview", (event) => {
 window.mobileApp.close();
 ```
 
+### Google Pay (Android)
+
+To enable Google Pay inside the in-app browser on Android you must do **all three** of the following:
+
+#### 1. Enable the option when opening the browser
+
+Pass `enableGooglePaySupport: true` in your `openWebView` call:
+
+```ts
+InAppBrowser.openWebView({
+  url: 'https://your-checkout-page.example.com',
+  enableGooglePaySupport: true,
+});
+```
+
+#### 2. Add Payment Request intent queries to your `AndroidManifest.xml`
+
+Android 11+ enforces [Package Visibility](https://developer.android.com/training/package-visibility). Without these entries the WebView cannot discover Google Pay and the payment sheet will never appear.
+
+Add the following inside the `<manifest>` tag of your app's `AndroidManifest.xml` (typically `android/app/src/main/AndroidManifest.xml`):
+
+```xml
+<queries>
+  <!-- Required for Google Pay / Payment Request API in WebView -->
+  <intent>
+    <action android:name="org.chromium.intent.action.PAY" />
+  </intent>
+  <intent>
+    <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
+  </intent>
+  <intent>
+    <action android:name="org.chromium.intent.action.UPDATE_PAYMENT_DETAILS" />
+  </intent>
+</queries>
+```
+
+#### 3. Require WebView 120 or later
+
+The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. Devices running an older WebView version will not be able to complete Google Pay transactions. Most modern Android devices already meet this requirement.
+
 ## API
 
 <docgen-index>

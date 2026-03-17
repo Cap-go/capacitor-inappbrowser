@@ -51,7 +51,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
