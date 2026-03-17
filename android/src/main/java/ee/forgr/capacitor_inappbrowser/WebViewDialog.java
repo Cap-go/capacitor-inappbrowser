@@ -135,6 +135,7 @@ public class WebViewDialog extends Dialog {
     public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
     public ValueCallback<Uri> mUploadMessage;
     public ValueCallback<Uri[]> mFilePathCallback;
+    private boolean openWebViewResolved;
 
     // Temporary URI for storing camera capture
     public Uri tempCameraUri;
@@ -154,6 +155,7 @@ public class WebViewDialog extends Dialog {
         this._context = context;
         this.permissionHandler = permissionHandler;
         this.isInitialized = false;
+        this.openWebViewResolved = false;
         this.capacitorWebView = capacitorWebView;
     }
 
@@ -163,6 +165,16 @@ public class WebViewDialog extends Dialog {
 
     public String getInstanceId() {
         return instanceId;
+    }
+
+    private void resolveOpenWebViewIfNeeded() {
+        if (openWebViewResolved || _options == null || _options.getPluginCall() == null) {
+            return;
+        }
+        openWebViewResolved = true;
+        JSObject result = new JSObject();
+        result.put("id", instanceId);
+        _options.getPluginCall().resolve(result);
     }
 
     // Add this class to provide safer JavaScript interface
@@ -978,10 +990,10 @@ public class WebViewDialog extends Dialog {
                 show();
                 applyHiddenMode();
             }
-            _options.getPluginCall().resolve();
+            resolveOpenWebViewIfNeeded();
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
-            _options.getPluginCall().resolve();
+            resolveOpenWebViewIfNeeded();
         }
     }
 
@@ -2796,7 +2808,7 @@ public class WebViewDialog extends Dialog {
                             boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
                             if (!usePreShowScript) {
                                 show();
-                                _options.getPluginCall().resolve();
+                                resolveOpenWebViewIfNeeded();
                             } else {
                                 executorService.execute(
                                     new Runnable() {
@@ -2811,7 +2823,7 @@ public class WebViewDialog extends Dialog {
                                                     @Override
                                                     public void run() {
                                                         show();
-                                                        _options.getPluginCall().resolve();
+                                                        resolveOpenWebViewIfNeeded();
                                                     }
                                                 }
                                             );

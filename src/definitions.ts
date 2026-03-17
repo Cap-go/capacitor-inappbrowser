@@ -400,6 +400,9 @@ export interface OpenWebViewOptions {
   /**
    * Open url in a new window fullscreen
    * isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately.
+   * Promise timing: on Android, `openWebView()` resolves with the webview id when the webview is ready to be controlled
+   * (immediately for hidden/immediate presentation, after the first page load when `isPresentAfterPageLoad` is `true`).
+   * On iOS, the promise resolves with the id as soon as the native webview is created, even if presentation is deferred.
    * @since 0.1.0
    * @default false
    * @example
@@ -851,6 +854,9 @@ export interface InAppBrowserPlugin {
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+   *
+   * Promise timing differs by platform when `isPresentAfterPageLoad` is used.
+   * Android resolves with `{ id }` after the dialog is ready to control, while iOS resolves with `{ id }` immediately after creating the native webview.
    *
    * @returns Promise that resolves with the created webview id.
    * @since 0.1.0
