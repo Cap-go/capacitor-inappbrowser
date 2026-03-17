@@ -1,5 +1,7 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import com.getcapacitor.JSObject;
+
 public interface WebViewCallbacks {
     public void urlChangeEvent(String url);
 
@@ -14,4 +16,6 @@ public interface WebViewCallbacks {
     public void buttonNearDoneClicked();
 
     public void confirmBtnClicked(String url);
+
+    public void screenshotTaken(JSObject screenshot);
 }

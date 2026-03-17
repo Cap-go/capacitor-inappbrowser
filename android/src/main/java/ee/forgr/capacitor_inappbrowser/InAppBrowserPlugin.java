@@ -570,6 +570,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setToolbarTextColor(call.getString("toolbarTextColor"));
         options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
         options.setIgnoreUntrustedSSLError(Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false)));
+        options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
+        options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
 
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");
@@ -586,9 +588,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
         }
 
+        JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
         try {
             // Try to set buttonNearDone if present, with better error handling
-            JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
             if (buttonNearDoneObj != null) {
                 try {
                     // Provide better debugging for buttonNearDone
@@ -603,13 +605,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                             int resourceId = getContext().getResources().getIdentifier(icon, "drawable", getContext().getPackageName());
                             if (resourceId == 0) {
                                 Log.e("InAppBrowser", "Vector resource not found: " + icon);
-                                // List available drawable resources to help debugging
-                                try {
-                                    final StringBuilder availableResources = getStringBuilder();
-                                    Log.d("InAppBrowser", availableResources.toString());
-                                } catch (Exception e) {
-                                    Log.e("InAppBrowser", "Error listing resources: " + e.getMessage());
-                                }
+                                call.reject("buttonNearDone validation failed: vector resource not found: " + icon);
+                                return;
                             } else {
                                 Log.d("InAppBrowser", "Vector resource found with ID: " + resourceId);
                             }
@@ -621,10 +618,14 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     options.setButtonNearDone(buttonNearDone);
                 } catch (Exception e) {
                     Log.e("InAppBrowser", "Error setting buttonNearDone: " + e.getMessage(), e);
+                    call.reject("buttonNearDone validation failed: " + e.getMessage());
+                    return;
                 }
             }
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error processing buttonNearDone: " + e.getMessage(), e);
+            call.reject("buttonNearDone validation failed: " + e.getMessage());
+            return;
         }
 
         options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
@@ -677,14 +678,20 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
 
         // Validate buttonNearDone compatibility with toolbar type
-        if (call.getData().has("buttonNearDone")) {
+        if (buttonNearDoneObj != null && options.getShowScreenshotButton()) {
+            call.reject("showScreenshotButton is not compatible with buttonNearDone");
+            return;
+        }
+
+        if (buttonNearDoneObj != null || options.getShowScreenshotButton()) {
             String toolbarType = options.getToolbarType();
             if (
                 TextUtils.equals(toolbarType, "activity") ||
                 TextUtils.equals(toolbarType, "navigation") ||
                 TextUtils.equals(toolbarType, "blank")
             ) {
-                call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType);
+                String optionName = options.getShowScreenshotButton() ? "showScreenshotButton" : "buttonNearDone";
+                call.reject(optionName + " is not compatible with toolbarType: " + toolbarType);
                 return;
             }
         }
@@ -741,6 +748,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void confirmBtnClicked(String url) {
                     notifyListeners("confirmBtnClicked", new JSObject().put("id", webViewId).put("url", url));
+                }
+
+                @Override
+                public void screenshotTaken(JSObject screenshot) {
+                    JSObject event = new JSObject();
+                    Iterator<String> keys = screenshot.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        event.put(key, screenshot.opt(key));
+                    }
+                    event.put("id", webViewId);
+                    notifyListeners("screenshotTaken", event);
                 }
 
                 @Override
@@ -1029,6 +1048,37 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         Log.e("InAppBrowser", "Error executing script: " + e.getMessage());
                         call.reject("Failed to execute script: " + e.getMessage());
                     }
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void takeScreenshot(PluginCall call) {
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    String targetId = resolveTargetId(call);
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+
+                    dialog.takeScreenshot(
+                        new WebViewDialog.ScreenshotResultCallback() {
+                            @Override
+                            public void onSuccess(JSObject screenshot) {
+                                call.resolve(screenshot);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                call.reject(message);
+                            }
+                        }
+                    );
                 }
             }
         );

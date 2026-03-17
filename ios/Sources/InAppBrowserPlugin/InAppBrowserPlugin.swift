@@ -47,6 +47,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "takeScreenshot", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
@@ -376,9 +377,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let webViewId = UUID().uuidString
+        let showScreenshotButton = call.getBool("showScreenshotButton", false)
+        let buttonNearDoneSettings = call.getObject("buttonNearDone")
 
         var buttonNearDoneIcon: UIImage?
-        if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
+        if let buttonNearDoneSettings {
             guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
                 call.reject("IOS settings not found")
                 return
@@ -407,7 +410,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             } else {
                 // Look in app's web assets/public directory
                 guard let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") else {
-                    print("[DEBUG] Failed to locate web assets directory")
+                    call.reject("Failed to locate bundled web assets")
                     return
                 }
 
@@ -462,35 +465,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 if !foundImage {
-                    print("[DEBUG] Failed to load buttonNearDone icon: \(icon)")
-
-                    // Debug info
-                    if let resourceURL = Bundle.main.resourceURL {
-                        print("[DEBUG] Resource URL: \(resourceURL.path)")
-
-                        // List directories to help debugging
-                        do {
-                            let contents = try FileManager.default.contentsOfDirectory(atPath: resourceURL.path)
-                            print("[DEBUG] Root bundle contents: \(contents)")
-
-                            // Check if public or www directories exist
-                            if contents.contains("public") {
-                                let publicContents = try FileManager.default.contentsOfDirectory(
-                                    atPath: resourceURL.appendingPathComponent("public").path)
-                                print("[DEBUG] Public dir contents: \(publicContents)")
-                            }
-
-                            if contents.contains("www") {
-                                let wwwContents = try FileManager.default.contentsOfDirectory(
-                                    atPath: resourceURL.appendingPathComponent("www").path)
-                                print("[DEBUG] WWW dir contents: \(wwwContents)")
-                            }
-                        } catch {
-                            print("[DEBUG] Error listing directories: \(error)")
-                        }
-                    }
+                    call.reject("Failed to load buttonNearDone icon: \(icon)")
+                    return
                 }
             }
+        }
+
+        if showScreenshotButton, buttonNearDoneSettings != nil {
+            call.reject("showScreenshotButton is not compatible with buttonNearDone")
+            return
         }
 
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
@@ -508,6 +491,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
+        let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -554,10 +538,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         // Validate buttonNearDone compatibility with toolbar type
-        if call.getString("buttonNearDone") != nil {
+        if buttonNearDoneSettings != nil || showScreenshotButton {
             let toolbarType = call.getString("toolbarType", "")
             if toolbarType == "activity" || toolbarType == "navigation" || toolbarType == "blank" {
-                call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType)
+                let optionName = showScreenshotButton ? "showScreenshotButton" : "buttonNearDone"
+                call.reject(optionName + " is not compatible with toolbarType: " + toolbarType)
                 return
             }
         }
@@ -626,7 +611,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 enabledSafeTopMargin: enabledSafeTopMargin,
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
-                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl
+                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
+                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage
             )
 
             guard let webViewController = self.webViewController else {
@@ -748,7 +734,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if let buttonNearDoneIcon = buttonNearDoneIcon {
                 webViewController.buttonNearDoneIcon = buttonNearDoneIcon
                 print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
+            } else if showScreenshotButton {
+                webViewController.buttonNearDoneIcon = UIImage(systemName: "camera")?.withRenderingMode(.alwaysTemplate)
             }
+            webViewController.showScreenshotButton = showScreenshotButton
 
             webViewController.capBrowserPlugin = self
             webViewController.title = call.getString("title", "New Window")
@@ -1138,6 +1127,25 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.postMessageToJS(message: eventData)
             call.resolve()
+        }
+    }
+
+    @objc func takeScreenshot(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.takeScreenshot { result in
+                switch result {
+                case .success(let screenshot):
+                    call.resolve(screenshot)
+                case .failure(let error):
+                    call.reject(error.localizedDescription)
+                }
+            }
         }
     }
 

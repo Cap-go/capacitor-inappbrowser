@@ -304,12 +304,14 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
 * [`postMessage(...)`](#postmessage)
+* [`takeScreenshot(...)`](#takescreenshot)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
 * [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
+* [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
 * [`removeAllListeners()`](#removealllisteners)
@@ -499,6 +501,7 @@ JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
 - `window.mobileApp.close()`: Closes the webview from JavaScript
 - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+- `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true
 
 Promise timing differs by platform when `isPresentAfterPageLoad` is used.
 Android resolves with `{ id }` after the dialog is ready to control, while iOS resolves with `{ id }` immediately after creating the native webview.
@@ -544,6 +547,24 @@ When `id` is omitted, broadcasts to all open webviews.
 | Param         | Type                                                                                   |
 | ------------- | -------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; id?: string; }</code> |
+
+--------------------
+
+
+### takeScreenshot(...)
+
+```typescript
+takeScreenshot(options?: { id?: string | undefined; } | undefined) => Promise<ScreenshotResult>
+```
+
+Captures the current webview viewport as a PNG screenshot.
+When `id` is omitted, targets the active webview.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
+
+**Returns:** <code>Promise&lt;<a href="#screenshotresult">ScreenshotResult</a>&gt;</code>
 
 --------------------
 
@@ -659,6 +680,25 @@ This method is inject at runtime in the webview
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'messageFromWebview'</code>                                                                                                |
 | **`listenerFunc`** | <code>(event: { id?: string; detail?: <a href="#record">Record</a>&lt;string, any&gt;; rawMessage?: string; }) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('screenshotTaken', ...)
+
+```typescript
+addListener(eventName: 'screenshotTaken', listenerFunc: (event: ScreenshotResult & { id?: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered whenever a screenshot is captured from the plugin API,
+the native screenshot button, or the injected JavaScript bridge.
+
+| Param              | Type                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'screenshotTaken'</code>                                                                       |
+| **`listenerFunc`** | <code>(event: <a href="#screenshotresult">ScreenshotResult</a> & { id?: string; }) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -903,7 +943,8 @@ And in the AndroidManifest.xml file:
 | **`method`**                           | <code>string</code>                                                                                                                                                    | HTTP method to use for the initial request. **Optional parameter - defaults to GET if not specified.** Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests. When specified with 'POST', 'PUT', or 'PATCH' methods that support a body, you can also provide a `body` parameter with the request payload. **Platform Notes:** - iOS: Full support for all HTTP methods with headers - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations              | <code>"GET"</code>                                            | 8.2.0  |
 | **`body`**                             | <code>string</code>                                                                                                                                                    | HTTP body to send with the request when using POST, PUT, or other methods that support a body. Should be a string (use JSON.stringify for JSON data). **Optional parameter - only used when `method` is specified and supports a request body.** Omitting this parameter (or using GET method) results in standard behavior without a request body.                                                                                                                                                                                                        |                                                               | 8.2.0  |
 | **`materialPicker`**                   | <code>boolean</code>                                                                                                                                                   | materialPicker: if true, uses Material Design theme for date and time pickers on Android. This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 7.4.1  |
-| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig                                                                                                                                                               |                                                               | 6.10.0 |
+| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                              |                                                               | 6.10.0 |
+| **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.4.0  |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
@@ -930,6 +971,7 @@ And in the AndroidManifest.xml file:
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
 | **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 6.9.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
+| **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a native screenshot button near the done/close button. The button is hidden by default and captures the current viewport when tapped. This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it. The button is only shown when toolbarType is not "activity", "navigation", or "blank".                                                                                                                                                                                                                       | <code>false</code>                                            | 8.4.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
 | **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                             | <code>false</code>                                            | 0.1.0  |
 | **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS). - On both platforms, only HTTPS links whose host matches any entry in this list will attempt to open via the corresponding native application. - If the app is not installed or the system cannot handle the link, the URL will continue loading inside the in-app browser. - Matching is host-based (case-insensitive), ignoring the "www." prefix. - When `preventDeeplink` is enabled, all external handling is blocked regardless of this list. | <code>[]</code>                                               | 7.12.0 |
@@ -966,6 +1008,18 @@ And in the AndroidManifest.xml file:
 | **`message`**    | <code>string</code> | Message shown in the disclaimer dialog | <code>"Message"</code> |
 | **`confirmBtn`** | <code>string</code> | Text for the confirm button            | <code>"Confirm"</code> |
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
+
+
+#### ScreenshotResult
+
+| Prop           | Type                     | Description                                                    |
+| -------------- | ------------------------ | -------------------------------------------------------------- |
+| **`format`**   | <code>'png'</code>       | Image format used for the screenshot.                          |
+| **`mimeType`** | <code>'image/png'</code> | MIME type of the generated screenshot.                         |
+| **`base64`**   | <code>string</code>      | Base64-encoded screenshot payload without the data URL prefix. |
+| **`dataUrl`**  | <code>string</code>      | Data URL for direct use in HTML img tags or uploads.           |
+| **`width`**    | <code>number</code>      | Screenshot width in pixels.                                    |
+| **`height`**   | <code>number</code>      | Screenshot height in pixels.                                   |
 
 
 #### PluginListenerHandle

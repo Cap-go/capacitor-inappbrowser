@@ -186,7 +186,9 @@ public class Options {
     private Integer x = null;
     private Integer y = null;
     private boolean hidden = false;
+    private boolean showScreenshotButton = false;
     private boolean allowWebViewJsVisibilityControl = false;
+    private boolean allowScreenshotsFromWebPage = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
@@ -233,6 +235,22 @@ public class Options {
 
     public boolean getMaterialPicker() {
         return materialPicker;
+    }
+
+    public boolean getShowScreenshotButton() {
+        return showScreenshotButton;
+    }
+
+    public void setShowScreenshotButton(boolean showScreenshotButton) {
+        this.showScreenshotButton = showScreenshotButton;
+    }
+
+    public boolean getAllowScreenshotsFromWebPage() {
+        return allowScreenshotsFromWebPage;
+    }
+
+    public void setAllowScreenshotsFromWebPage(boolean allowScreenshotsFromWebPage) {
+        this.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage;
     }
 
     public void setMaterialPicker(boolean materialPicker) {

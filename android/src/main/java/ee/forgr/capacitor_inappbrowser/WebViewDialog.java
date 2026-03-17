@@ -67,6 +67,7 @@ import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -282,6 +283,39 @@ public class WebViewDialog extends Dialog {
                 setHidden(false);
             });
         }
+
+        @JavascriptInterface
+        public void takeScreenshot(String requestId) {
+            if (requestId == null || requestId.isEmpty()) {
+                Log.e("InAppBrowser", "Cannot take screenshot - requestId is empty");
+                return;
+            }
+
+            if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
+                rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
+                return;
+            }
+
+            WebViewDialog.this.takeScreenshot(
+                new ScreenshotResultCallback() {
+                    @Override
+                    public void onSuccess(JSObject screenshot) {
+                        resolveJavaScriptScreenshot(requestId, screenshot);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        rejectJavaScriptScreenshot(requestId, message);
+                    }
+                }
+            );
+        }
+    }
+
+    public interface ScreenshotResultCallback {
+        void onSuccess(JSObject screenshot);
+
+        void onError(String message);
     }
 
     private boolean isJavaScriptControlAllowed() {
@@ -1360,6 +1394,124 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private String toJsonString(JSObject object) {
+        return object == null ? null : object.toString();
+    }
+
+    private void resolveJavaScriptScreenshot(String requestId, JSObject screenshot) {
+        if (_webView == null) {
+            return;
+        }
+        JSObject payload = new JSObject();
+        payload.put("requestId", requestId);
+        payload.put("result", screenshot);
+        String jsonPayload = toJsonString(payload);
+        if (jsonPayload == null) {
+            return;
+        }
+        String script = "window.__capgoInAppBrowserResolveScreenshot(" + jsonPayload + ");";
+        _webView.post(() -> {
+            if (_webView != null) {
+                _webView.evaluateJavascript(script, null);
+            }
+        });
+    }
+
+    private void rejectJavaScriptScreenshot(String requestId, String message) {
+        if (_webView == null) {
+            return;
+        }
+        JSObject payload = new JSObject();
+        payload.put("requestId", requestId);
+        payload.put("message", message);
+        String jsonPayload = toJsonString(payload);
+        if (jsonPayload == null) {
+            return;
+        }
+        String script = "window.__capgoInAppBrowserRejectScreenshot(" + jsonPayload + ");";
+        _webView.post(() -> {
+            if (_webView != null) {
+                _webView.evaluateJavascript(script, null);
+            }
+        });
+    }
+
+    public void takeScreenshot(ScreenshotResultCallback callback) {
+        if (_webView == null) {
+            callback.onError("WebView is not initialized");
+            return;
+        }
+
+        _webView.post(() -> {
+            if (_webView == null) {
+                callback.onError("WebView is not initialized");
+                return;
+            }
+
+            int width = _webView.getWidth() > 0 ? _webView.getWidth() : _webView.getMeasuredWidth();
+            int height = _webView.getHeight() > 0 ? _webView.getHeight() : _webView.getMeasuredHeight();
+            if (width <= 0 || height <= 0) {
+                callback.onError("WebView is not ready to capture a screenshot");
+                return;
+            }
+
+            final Bitmap bitmap;
+            try {
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            } catch (OutOfMemoryError error) {
+                callback.onError("Not enough memory to allocate screenshot buffer");
+                return;
+            }
+            Canvas canvas = new Canvas(bitmap);
+            _webView.draw(canvas);
+
+            executorService.execute(() -> {
+                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)) {
+                        postScreenshotError(callback, "Failed to encode screenshot");
+                        return;
+                    }
+
+                    String base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP);
+                    JSObject result = new JSObject();
+                    result.put("format", "png");
+                    result.put("mimeType", "image/png");
+                    result.put("base64", base64);
+                    result.put("dataUrl", "data:image/png;base64," + base64);
+                    result.put("width", width);
+                    result.put("height", height);
+
+                    postScreenshotSuccess(callback, result);
+                } catch (IOException e) {
+                    postScreenshotError(callback, "Failed to encode screenshot: " + e.getMessage());
+                } finally {
+                    bitmap.recycle();
+                }
+            });
+        });
+    }
+
+    private void postScreenshotSuccess(ScreenshotResultCallback callback, JSObject result) {
+        if (_webView == null) {
+            callback.onError("WebView is not initialized");
+            return;
+        }
+        _webView.post(() -> {
+            if (_options != null && _options.getCallbacks() != null) {
+                _options.getCallbacks().screenshotTaken(result);
+            }
+            callback.onSuccess(result);
+        });
+    }
+
+    private void postScreenshotError(ScreenshotResultCallback callback, String message) {
+        if (_webView == null) {
+            callback.onError(message);
+            return;
+        }
+        _webView.post(() -> callback.onError(message));
+    }
+
     private void injectJavaScriptInterface() {
         if (_webView == null) {
             Log.w("InAppBrowser", "Cannot inject JavaScript interface - WebView is null");
@@ -1387,9 +1539,48 @@ public class WebViewDialog extends Dialog {
                     """;
             }
 
+            String screenshotBridge =
+                _options != null && _options.getAllowScreenshotsFromWebPage()
+                    ? """
+                          ,
+                          takeScreenshot: function() {
+                            return new Promise(function(resolve, reject) {
+                              try {
+                                if (!nativeBridge.takeScreenshot) {
+                                  reject(new Error('Screenshot bridge is not available'));
+                                  return;
+                                }
+                                var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                                window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
+                                nativeBridge.takeScreenshot(requestId);
+                              } catch(e) {
+                                reject(e);
+                              }
+                            });
+                          }
+                      """
+                    : "";
+
             String script = String.format(
                 """
                 (function() {
+                  window.__capgoInAppBrowserPendingScreenshots = window.__capgoInAppBrowserPendingScreenshots || {};
+                  window.__capgoInAppBrowserResolveScreenshot = window.__capgoInAppBrowserResolveScreenshot || function(payload) {
+                    var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                    if (!pending) {
+                      return;
+                    }
+                    delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                    pending.resolve(payload.result);
+                  };
+                  window.__capgoInAppBrowserRejectScreenshot = window.__capgoInAppBrowserRejectScreenshot || function(payload) {
+                    var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                    if (!pending) {
+                      return;
+                    }
+                    delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                    pending.reject(new Error(payload.message));
+                  };
                   // Prefer AndroidInterface when available, otherwise fall back to native window.mobileApp
                   var nativeBridge = window.AndroidInterface || window.mobileApp;
                   if (nativeBridge) {
@@ -1409,7 +1600,7 @@ public class WebViewDialog extends Dialog {
                         } catch(e) {
                           console.error('Error in mobileApp.close:', e);
                         }
-                      }%s
+                      }%s%s
                     };
                   }
                   // Override window.print function to use our PrintInterface
@@ -1424,7 +1615,8 @@ public class WebViewDialog extends Dialog {
                   }
                 })();
                 """,
-                mobileAppExtras
+                mobileAppExtras,
+                screenshotBridge
             );
 
             _webView.post(() -> {
@@ -2033,118 +2225,119 @@ public class WebViewDialog extends Dialog {
             // Status bar color is already set at the top of this method, no need to set again
 
             Options.ButtonNearDone buttonNearDone = _options.getButtonNearDone();
-            if (buttonNearDone != null) {
+            if (buttonNearDone != null || _options.getShowScreenshotButton()) {
                 ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
                 buttonNearDoneView.setVisibility(View.VISIBLE);
 
-                // Handle different icon types
-                String iconType = buttonNearDone.getIconType();
-                if ("vector".equals(iconType)) {
-                    // Use native Android vector drawable
-                    try {
-                        String iconName = buttonNearDone.getIcon();
-                        // Convert name to Android resource ID (remove file extension if present)
-                        if (iconName.endsWith(".xml")) {
-                            iconName = iconName.substring(0, iconName.length() - 4);
-                        }
+                if (_options.getShowScreenshotButton()) {
+                    buttonNearDoneView.setImageResource(android.R.drawable.ic_menu_camera);
+                    buttonNearDoneView.setColorFilter(iconColor);
+                    buttonNearDoneView.setOnClickListener((view) ->
+                        takeScreenshot(
+                            new ScreenshotResultCallback() {
+                                @Override
+                                public void onSuccess(JSObject screenshot) {}
 
-                        // Get resource ID
-                        int resourceId = _context.getResources().getIdentifier(iconName, "drawable", _context.getPackageName());
+                                @Override
+                                public void onError(String message) {
+                                    Log.e("InAppBrowser", "Failed to capture screenshot from toolbar: " + message);
+                                }
+                            }
+                        )
+                    );
+                } else {
+                    // Handle different icon types
+                    String iconType = buttonNearDone.getIconType();
+                    if ("vector".equals(iconType)) {
+                        // Use native Android vector drawable
+                        try {
+                            String iconName = buttonNearDone.getIcon();
+                            if (iconName.endsWith(".xml")) {
+                                iconName = iconName.substring(0, iconName.length() - 4);
+                            }
 
-                        if (resourceId != 0) {
-                            // Set the vector drawable
-                            buttonNearDoneView.setImageResource(resourceId);
-                            // Apply color filter
-                            buttonNearDoneView.setColorFilter(iconColor);
-                            Log.d("InAppBrowser", "Successfully loaded vector drawable: " + iconName);
-                        } else {
-                            Log.e("InAppBrowser", "Vector drawable not found: " + iconName + ", using fallback");
-                            // Fallback to a common system icon
+                            int resourceId = _context.getResources().getIdentifier(iconName, "drawable", _context.getPackageName());
+
+                            if (resourceId != 0) {
+                                buttonNearDoneView.setImageResource(resourceId);
+                                buttonNearDoneView.setColorFilter(iconColor);
+                                Log.d("InAppBrowser", "Successfully loaded vector drawable: " + iconName);
+                            } else {
+                                Log.e("InAppBrowser", "Vector drawable not found: " + iconName + ", using fallback");
+                                buttonNearDoneView.setImageResource(android.R.drawable.ic_menu_info_details);
+                                buttonNearDoneView.setColorFilter(iconColor);
+                            }
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error loading vector drawable: " + e.getMessage());
                             buttonNearDoneView.setImageResource(android.R.drawable.ic_menu_info_details);
                             buttonNearDoneView.setColorFilter(iconColor);
                         }
-                    } catch (Exception e) {
-                        Log.e("InAppBrowser", "Error loading vector drawable: " + e.getMessage());
-                        // Fallback to a common system icon
-                        buttonNearDoneView.setImageResource(android.R.drawable.ic_menu_info_details);
-                        buttonNearDoneView.setColorFilter(iconColor);
-                    }
-                } else if ("asset".equals(iconType)) {
-                    // Handle SVG from assets
-                    AssetManager assetManager = _context.getAssets();
-                    InputStream inputStream = null;
-                    try {
-                        // Try to load from public folder first
-                        String iconPath = "public/" + buttonNearDone.getIcon();
+                    } else if ("asset".equals(iconType)) {
+                        // Handle SVG from assets
+                        AssetManager assetManager = _context.getAssets();
+                        InputStream inputStream = null;
                         try {
-                            inputStream = assetManager.open(iconPath);
-                        } catch (IOException e) {
-                            // If not found in public, try root assets
+                            String iconPath = "public/" + buttonNearDone.getIcon();
                             try {
-                                inputStream = assetManager.open(buttonNearDone.getIcon());
-                            } catch (IOException e2) {
-                                Log.e("InAppBrowser", "SVG file not found in assets: " + buttonNearDone.getIcon());
+                                inputStream = assetManager.open(iconPath);
+                            } catch (IOException e) {
+                                try {
+                                    inputStream = assetManager.open(buttonNearDone.getIcon());
+                                } catch (IOException e2) {
+                                    Log.e("InAppBrowser", "SVG file not found in assets: " + buttonNearDone.getIcon());
+                                    buttonNearDoneView.setVisibility(View.GONE);
+                                    return;
+                                }
+                            }
+
+                            SVG svg = SVG.getFromInputStream(inputStream);
+                            if (svg == null) {
+                                Log.e("InAppBrowser", "Failed to parse SVG icon: " + buttonNearDone.getIcon());
                                 buttonNearDoneView.setVisibility(View.GONE);
                                 return;
                             }
-                        }
 
-                        // Parse and render SVG
-                        SVG svg = SVG.getFromInputStream(inputStream);
-                        if (svg == null) {
-                            Log.e("InAppBrowser", "Failed to parse SVG icon: " + buttonNearDone.getIcon());
+                            float width = buttonNearDone.getWidth() > 0 ? buttonNearDone.getWidth() : 24;
+                            float height = buttonNearDone.getHeight() > 0 ? buttonNearDone.getHeight() : 24;
+                            float density = _context.getResources().getDisplayMetrics().density;
+                            int targetWidth = Math.round(width * density);
+                            int targetHeight = Math.round(height * density);
+
+                            svg.setDocumentWidth(targetWidth);
+                            svg.setDocumentHeight(targetHeight);
+
+                            Bitmap bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
+                            Canvas canvas = new Canvas(bitmap);
+                            svg.renderToCanvas(canvas);
+
+                            Paint paint = new Paint();
+                            paint.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
+                            Canvas colorFilterCanvas = new Canvas(bitmap);
+                            colorFilterCanvas.drawBitmap(bitmap, 0, 0, paint);
+
+                            buttonNearDoneView.setImageBitmap(bitmap);
+                            buttonNearDoneView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                            buttonNearDoneView.setPadding(12, 12, 12, 12);
+                        } catch (SVGParseException e) {
+                            Log.e("InAppBrowser", "Error loading SVG icon: " + e.getMessage(), e);
                             buttonNearDoneView.setVisibility(View.GONE);
-                            return;
-                        }
-
-                        // Get the dimensions from options or use SVG's size
-                        float width = buttonNearDone.getWidth() > 0 ? buttonNearDone.getWidth() : 24;
-                        float height = buttonNearDone.getHeight() > 0 ? buttonNearDone.getHeight() : 24;
-
-                        // Get density for proper scaling
-                        float density = _context.getResources().getDisplayMetrics().density;
-                        int targetWidth = Math.round(width * density);
-                        int targetHeight = Math.round(height * density);
-
-                        // Set document size
-                        svg.setDocumentWidth(targetWidth);
-                        svg.setDocumentHeight(targetHeight);
-
-                        // Create a bitmap and render SVG to it for better quality
-                        Bitmap bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
-                        Canvas canvas = new Canvas(bitmap);
-                        svg.renderToCanvas(canvas);
-
-                        // Apply color filter to the bitmap
-                        Paint paint = new Paint();
-                        paint.setColorFilter(new PorterDuffColorFilter(iconColor, PorterDuff.Mode.SRC_IN));
-                        Canvas colorFilterCanvas = new Canvas(bitmap);
-                        colorFilterCanvas.drawBitmap(bitmap, 0, 0, paint);
-
-                        // Set the colored bitmap as image
-                        buttonNearDoneView.setImageBitmap(bitmap);
-                        buttonNearDoneView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                        buttonNearDoneView.setPadding(12, 12, 12, 12); // Standard button padding
-                    } catch (SVGParseException e) {
-                        Log.e("InAppBrowser", "Error loading SVG icon: " + e.getMessage(), e);
-                        buttonNearDoneView.setVisibility(View.GONE);
-                    } finally {
-                        if (inputStream != null) {
-                            try {
-                                inputStream.close();
-                            } catch (IOException e) {
-                                Log.e("InAppBrowser", "Error closing input stream: " + e.getMessage());
+                        } finally {
+                            if (inputStream != null) {
+                                try {
+                                    inputStream.close();
+                                } catch (IOException e) {
+                                    Log.e("InAppBrowser", "Error closing input stream: " + e.getMessage());
+                                }
                             }
                         }
+                    } else {
+                        // Default fallback or unsupported type
+                        Log.e("InAppBrowser", "Unsupported icon type: " + iconType);
+                        buttonNearDoneView.setVisibility(View.GONE);
                     }
-                } else {
-                    // Default fallback or unsupported type
-                    Log.e("InAppBrowser", "Unsupported icon type: " + iconType);
-                    buttonNearDoneView.setVisibility(View.GONE);
-                }
 
-                // Set the click listener
-                buttonNearDoneView.setOnClickListener((view) -> _options.getCallbacks().buttonNearDoneClicked());
+                    buttonNearDoneView.setOnClickListener((view) -> _options.getCallbacks().buttonNearDoneClicked());
+                }
             } else {
                 ImageButton buttonNearDoneView = _toolbar.findViewById(R.id.buttonNearDone);
                 buttonNearDoneView.setVisibility(View.GONE);
