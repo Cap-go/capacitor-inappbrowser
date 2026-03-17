@@ -1633,7 +1633,11 @@ fileprivate extension WKWebViewController {
 
     @objc func buttonNearDoneDidClick(sender: AnyObject) {
         if showScreenshotButton {
-            takeScreenshot { _ in }
+            takeScreenshot { result in
+                if case .failure(let error) = result {
+                    print("[InAppBrowser] Failed to capture screenshot from toolbar button: \(error.localizedDescription)")
+                }
+            }
             return
         }
         emit("buttonNearDoneClick")
