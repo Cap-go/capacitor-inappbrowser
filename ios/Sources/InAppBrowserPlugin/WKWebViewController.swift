@@ -299,6 +299,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var activityBarButtonItemImage: UIImage?
 
     open var buttonNearDoneIcon: UIImage?
+    open var showScreenshotButton = false
 
     fileprivate var webView: WKWebView?
     fileprivate var progressView: UIProgressView?
@@ -550,6 +551,79 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         capBrowserPlugin?.notifyListeners(eventName, data: payload(with: data))
     }
 
+    private func jsonString(from object: Any) -> String? {
+        guard JSONSerialization.isValidJSONObject(object),
+              let data = try? JSONSerialization.data(withJSONObject: object),
+              let string = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+
+    private func resolveJavaScriptScreenshot(requestId: String, result: [String: Any]) {
+        guard let payload = jsonString(from: ["requestId": requestId, "result": result]) else {
+            return
+        }
+        let script = "window.__capgoInAppBrowserResolveScreenshot(\(payload));"
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
+    }
+
+    private func rejectJavaScriptScreenshot(requestId: String, message: String) {
+        guard let payload = jsonString(from: ["requestId": requestId, "message": message]) else {
+            return
+        }
+        let script = "window.__capgoInAppBrowserRejectScreenshot(\(payload));"
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
+    }
+
+    func takeScreenshot(completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        DispatchQueue.main.async {
+            guard let webView = self.webView else {
+                completion(.failure(NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "WebView is not initialized"])))
+                return
+            }
+
+            let targetSize = webView.bounds.size
+            guard targetSize.width > 0, targetSize.height > 0 else {
+                completion(.failure(NSError(domain: "InAppBrowser", code: 2, userInfo: [NSLocalizedDescriptionKey: "WebView is not ready to capture a screenshot"])))
+                return
+            }
+
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = webView.bounds
+            configuration.afterScreenUpdates = false
+
+            webView.takeSnapshot(with: configuration) { image, error in
+                if let error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let image,
+                      let imageData = image.pngData() else {
+                    completion(.failure(NSError(domain: "InAppBrowser", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to encode screenshot"])))
+                    return
+                }
+
+                let base64 = imageData.base64EncodedString()
+                let result: [String: Any] = [
+                    "format": "png",
+                    "mimeType": "image/png",
+                    "base64": base64,
+                    "dataUrl": "data:image/png;base64,\(base64)",
+                    "width": Int(image.size.width * image.scale),
+                    "height": Int(image.size.height * image.scale)
+                ]
+                self.emit("screenshotTaken", data: result)
+                completion(.success(result))
+            }
+        }
+    }
+
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "messageHandler" {
@@ -586,6 +660,21 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 return
             }
             capBrowserPlugin?.setHiddenFromJavaScript(false)
+        } else if message.name == "takeScreenshot" {
+            guard let body = message.body as? [String: Any],
+                  let requestId = body["requestId"] as? String,
+                  !requestId.isEmpty else {
+                return
+            }
+
+            takeScreenshot { result in
+                switch result {
+                case .success(let screenshot):
+                    self.resolveJavaScriptScreenshot(requestId: requestId, result: screenshot)
+                case .failure(let error):
+                    self.rejectJavaScriptScreenshot(requestId: requestId, message: error.localizedDescription)
+                }
+            }
         } else if message.name == "magicPrint" {
             if let webView = self.webView {
                 let printController = UIPrintInteractionController.shared
@@ -603,6 +692,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func mobileAppScriptSource() -> String {
+        let screenshotControls = """
+                                ,
+                                takeScreenshot: function() {
+                                        return new Promise(function(resolve, reject) {
+                                                if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.takeScreenshot)) {
+                                                        reject(new Error('Screenshot bridge is not available'));
+                                                        return;
+                                                }
+                                                var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                                                window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
+                                                window.webkit.messageHandlers.takeScreenshot.postMessage({ requestId: requestId });
+                                        });
+                                }
+                """
         let extraControls = allowWebViewJsVisibilityControl ? """
                                 ,
                                 hide: function() {
@@ -613,18 +716,33 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 }
                 """ : ""
         return """
-                if (!window.mobileApp) {
-                        window.mobileApp = {
-                                postMessage: function(message) {
-                                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
-                                                window.webkit.messageHandlers.messageHandler.postMessage(message);
-                                        }
-                                },
-                                close: function() {
-                                        window.webkit.messageHandlers.close.postMessage(null);
-                                }\(extraControls)
-                        };
-                }
+                window.__capgoInAppBrowserPendingScreenshots = window.__capgoInAppBrowserPendingScreenshots || {};
+                window.__capgoInAppBrowserResolveScreenshot = window.__capgoInAppBrowserResolveScreenshot || function(payload) {
+                        var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                        if (!pending) {
+                                return;
+                        }
+                        delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                        pending.resolve(payload.result);
+                };
+                window.__capgoInAppBrowserRejectScreenshot = window.__capgoInAppBrowserRejectScreenshot || function(payload) {
+                        var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                        if (!pending) {
+                                return;
+                        }
+                        delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
+                        pending.reject(new Error(payload.message));
+                };
+                window.mobileApp = Object.assign({}, window.mobileApp || {}, {
+                        postMessage: function(message) {
+                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.messageHandler) {
+                                        window.webkit.messageHandlers.messageHandler.postMessage(message);
+                                }
+                        },
+                        close: function() {
+                                window.webkit.messageHandlers.close.postMessage(null);
+                        }\(extraControls)\(screenshotControls)
+                });
                 """
     }
 
@@ -672,6 +790,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "close")
         userContentController.add(weakHandler, name: "hide")
         userContentController.add(weakHandler, name: "show")
+        userContentController.add(weakHandler, name: "takeScreenshot")
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
@@ -1087,6 +1206,7 @@ public extension WKWebViewController {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "hide")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "show")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
@@ -1496,6 +1616,10 @@ fileprivate extension WKWebViewController {
     }
 
     @objc func buttonNearDoneDidClick(sender: AnyObject) {
+        if showScreenshotButton {
+            takeScreenshot { _ in }
+            return
+        }
         emit("buttonNearDoneClick")
     }
 

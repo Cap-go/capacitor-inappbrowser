@@ -47,11 +47,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "takeScreenshot", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateDimensions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -376,9 +377,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let webViewId = UUID().uuidString
+        let showScreenshotButton = call.getBool("showScreenshotButton", false)
+        let buttonNearDoneSettings = call.getObject("buttonNearDone")
 
         var buttonNearDoneIcon: UIImage?
-        if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
+        if let buttonNearDoneSettings {
             guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
                 call.reject("IOS settings not found")
                 return
@@ -493,6 +496,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
 
+        if showScreenshotButton, buttonNearDoneSettings != nil {
+            call.reject("showScreenshotButton is not compatible with buttonNearDone")
+            return
+        }
+
         let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
         let closeModal = call.getBool("closeModal", false)
         let closeModalTitle = call.getString("closeModalTitle", "Close")
@@ -554,10 +562,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         // Validate buttonNearDone compatibility with toolbar type
-        if call.getString("buttonNearDone") != nil {
+        if buttonNearDoneSettings != nil || showScreenshotButton {
             let toolbarType = call.getString("toolbarType", "")
             if toolbarType == "activity" || toolbarType == "navigation" || toolbarType == "blank" {
-                call.reject("buttonNearDone is not compatible with toolbarType: " + toolbarType)
+                let optionName = showScreenshotButton ? "showScreenshotButton" : "buttonNearDone"
+                call.reject(optionName + " is not compatible with toolbarType: " + toolbarType)
                 return
             }
         }
@@ -748,7 +757,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if let buttonNearDoneIcon = buttonNearDoneIcon {
                 webViewController.buttonNearDoneIcon = buttonNearDoneIcon
                 print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
+            } else if showScreenshotButton {
+                webViewController.buttonNearDoneIcon = UIImage(systemName: "camera")?.withRenderingMode(.alwaysTemplate)
             }
+            webViewController.showScreenshotButton = showScreenshotButton
 
             webViewController.capBrowserPlugin = self
             webViewController.title = call.getString("title", "New Window")
@@ -1138,6 +1150,25 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.postMessageToJS(message: eventData)
             call.resolve()
+        }
+    }
+
+    @objc func takeScreenshot(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.takeScreenshot { result in
+                switch result {
+                case .success(let screenshot):
+                    call.resolve(screenshot)
+                case .failure(let error):
+                    call.reject(error.localizedDescription)
+                }
+            }
         }
     }
 

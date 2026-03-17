@@ -9,6 +9,7 @@ import type {
   DimensionOptions,
   OpenSecureWindowOptions,
   OpenSecureWindowResponse,
+  ScreenshotResult,
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
@@ -72,6 +73,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   async postMessage(options: Record<string, any>): Promise<any> {
     console.log('postMessage', options);
     return options;
+  }
+
+  async takeScreenshot(): Promise<ScreenshotResult> {
+    throw this.unimplemented('Screenshots are not supported on web.');
   }
 
   async goBack(): Promise<any> {

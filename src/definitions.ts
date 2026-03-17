@@ -218,6 +218,33 @@ export interface DisclaimerOptions {
   cancelBtn: string;
 }
 
+export interface ScreenshotResult {
+  /**
+   * Image format used for the screenshot.
+   */
+  format: 'png';
+  /**
+   * MIME type of the generated screenshot.
+   */
+  mimeType: 'image/png';
+  /**
+   * Base64-encoded screenshot payload without the data URL prefix.
+   */
+  base64: string;
+  /**
+   * Data URL for direct use in HTML img tags or uploads.
+   */
+  dataUrl: string;
+  /**
+   * Screenshot width in pixels.
+   */
+  width: number;
+  /**
+   * Screenshot height in pixels.
+   */
+  height: number;
+}
+
 export interface CloseWebviewOptions {
   /**
    * Target webview id to close. If omitted, closes the active webview.
@@ -310,6 +337,7 @@ export interface OpenWebViewOptions {
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event)
    * - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig
+   * - `window.mobileApp.takeScreenshot()`: Captures the current webview viewport as a PNG and resolves with the screenshot data
    *
    * @example
    * // In your webpage loaded in the webview:
@@ -585,6 +613,16 @@ export interface OpenWebViewOptions {
     };
   };
   /**
+   * Shows a native screenshot button near the done/close button.
+   * The button is hidden by default and captures the current viewport when tapped.
+   * This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it.
+   * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
+   *
+   * @default false
+   * @since 8.4.0
+   */
+  showScreenshotButton?: boolean;
+  /**
    * textZoom: sets the text zoom of the page in percent.
    * Allows users to increase or decrease the text size for better readability.
    * @since 7.6.0
@@ -854,6 +892,7 @@ export interface InAppBrowserPlugin {
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+   * - `window.mobileApp.takeScreenshot()`: Captures the current webview viewport as a PNG and resolves with the screenshot data
    *
    * Promise timing differs by platform when `isPresentAfterPageLoad` is used.
    * Android resolves with `{ id }` after the dialog is ready to control, while iOS resolves with `{ id }` immediately after creating the native webview.
@@ -874,6 +913,11 @@ export interface InAppBrowserPlugin {
    * When `id` is omitted, broadcasts to all open webviews.
    */
   postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void>;
+  /**
+   * Captures the current webview viewport as a PNG screenshot.
+   * When `id` is omitted, targets the active webview.
+   */
+  takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult>;
   /**
    * Sets the URL of the webview.
    * When `id` is omitted, targets the active webview.
@@ -911,6 +955,15 @@ export interface InAppBrowserPlugin {
   addListener(
     eventName: 'messageFromWebview',
     listenerFunc: (event: { id?: string; detail?: Record<string, any>; rawMessage?: string }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Will be triggered whenever a screenshot is captured from the plugin API,
+   * the native screenshot button, or the injected JavaScript bridge.
+   */
+  addListener(
+    eventName: 'screenshotTaken',
+    listenerFunc: (event: ScreenshotResult & { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
@@ -1077,6 +1130,13 @@ export interface InAppBrowserWebViewAPIs {
      * @since 8.0.8
      */
     show(): void;
+
+    /**
+     * Capture the current WebView viewport as a PNG screenshot.
+     *
+     * @since 8.4.0
+     */
+    takeScreenshot(): Promise<ScreenshotResult>;
   };
 
   /**
