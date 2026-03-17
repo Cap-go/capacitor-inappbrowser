@@ -53,61 +53,67 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         super.init(coder: aDecoder)
     }
 
-    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil) {
+    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = source
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.initWebview()
     }
 
-    public init(url: URL, credentials: WKWebViewCredentials? = nil) {
+    public init(url: URL, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
         self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
         self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String]) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
         self.enabledSafeTopMargin = enabledSafeTopMargin
         self.source = .remote(url)
         self.credentials = credentials
+        self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -596,7 +602,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    func injectJavaScriptInterface() {
+    private func mobileAppScriptSource() -> String {
         let extraControls = allowWebViewJsVisibilityControl ? """
                                 ,
                                 hide: function() {
@@ -606,7 +612,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         window.webkit.messageHandlers.show.postMessage(null);
                                 }
                 """ : ""
-        let script = """
+        return """
                 if (!window.mobileApp) {
                         window.mobileApp = {
                                 postMessage: function(message) {
@@ -620,6 +626,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         };
                 }
                 """
+    }
+
+    private func addMobileAppUserScript(to userContentController: WKUserContentController) {
+        let script = WKUserScript(
+            source: mobileAppScriptSource(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        userContentController.addUserScript(script)
+    }
+
+    func injectJavaScriptInterface() {
+        let script = mobileAppScriptSource()
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
                 if let error = error {
@@ -666,6 +685,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             forMainFrameOnly: false
         )
         userContentController.addUserScript(script)
+        addMobileAppUserScript(to: userContentController)
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController

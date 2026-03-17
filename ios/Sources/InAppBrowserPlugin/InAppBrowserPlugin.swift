@@ -626,16 +626,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 enabledSafeTopMargin: enabledSafeTopMargin,
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
-                )
+                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl
+            )
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
                 return
             }
 
-            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.instanceId = webViewId
-            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
 
             // Set HTTP method and body if provided
             if let method = httpMethod {
