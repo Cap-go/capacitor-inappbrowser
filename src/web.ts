@@ -75,7 +75,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return options;
   }
 
-  async takeScreenshot(): Promise<ScreenshotResult> {
+  async takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
     throw this.unimplemented('Screenshots are not supported on web.');
   }
 

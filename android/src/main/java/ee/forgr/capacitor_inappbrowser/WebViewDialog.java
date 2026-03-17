@@ -291,6 +291,11 @@ public class WebViewDialog extends Dialog {
                 return;
             }
 
+            if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
+                rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
+                return;
+            }
+
             WebViewDialog.this.takeScreenshot(
                 new ScreenshotResultCallback() {
                     @Override
@@ -1450,35 +1455,61 @@ public class WebViewDialog extends Dialog {
                 return;
             }
 
-            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            final Bitmap bitmap;
+            try {
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            } catch (OutOfMemoryError error) {
+                callback.onError("Not enough memory to allocate screenshot buffer");
+                return;
+            }
             Canvas canvas = new Canvas(bitmap);
             _webView.draw(canvas);
 
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)) {
-                    callback.onError("Failed to encode screenshot");
-                    return;
-                }
+            executorService.execute(() -> {
+                try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                    if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)) {
+                        postScreenshotError(callback, "Failed to encode screenshot");
+                        return;
+                    }
 
-                String base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP);
-                JSObject result = new JSObject();
-                result.put("format", "png");
-                result.put("mimeType", "image/png");
-                result.put("base64", base64);
-                result.put("dataUrl", "data:image/png;base64," + base64);
-                result.put("width", width);
-                result.put("height", height);
+                    String base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP);
+                    JSObject result = new JSObject();
+                    result.put("format", "png");
+                    result.put("mimeType", "image/png");
+                    result.put("base64", base64);
+                    result.put("dataUrl", "data:image/png;base64," + base64);
+                    result.put("width", width);
+                    result.put("height", height);
 
-                if (_options != null && _options.getCallbacks() != null) {
-                    _options.getCallbacks().screenshotTaken(result);
+                    postScreenshotSuccess(callback, result);
+                } catch (IOException e) {
+                    postScreenshotError(callback, "Failed to encode screenshot: " + e.getMessage());
+                } finally {
+                    bitmap.recycle();
                 }
-                callback.onSuccess(result);
-            } catch (IOException e) {
-                callback.onError("Failed to encode screenshot: " + e.getMessage());
-            } finally {
-                bitmap.recycle();
-            }
+            });
         });
+    }
+
+    private void postScreenshotSuccess(ScreenshotResultCallback callback, JSObject result) {
+        if (_webView == null) {
+            callback.onError("WebView is not initialized");
+            return;
+        }
+        _webView.post(() -> {
+            if (_options != null && _options.getCallbacks() != null) {
+                _options.getCallbacks().screenshotTaken(result);
+            }
+            callback.onSuccess(result);
+        });
+    }
+
+    private void postScreenshotError(ScreenshotResultCallback callback, String message) {
+        if (_webView == null) {
+            callback.onError(message);
+            return;
+        }
+        _webView.post(() -> callback.onError(message));
     }
 
     private void injectJavaScriptInterface() {
@@ -1507,6 +1538,28 @@ public class WebViewDialog extends Dialog {
                             }
                     """;
             }
+
+            String screenshotBridge =
+                _options != null && _options.getAllowScreenshotsFromWebPage()
+                    ? """
+                          ,
+                          takeScreenshot: function() {
+                            return new Promise(function(resolve, reject) {
+                              try {
+                                if (!nativeBridge.takeScreenshot) {
+                                  reject(new Error('Screenshot bridge is not available'));
+                                  return;
+                                }
+                                var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                                window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
+                                nativeBridge.takeScreenshot(requestId);
+                              } catch(e) {
+                                reject(e);
+                              }
+                            });
+                          }
+                      """
+                    : "";
 
             String script = String.format(
                 """
@@ -1547,22 +1600,7 @@ public class WebViewDialog extends Dialog {
                         } catch(e) {
                           console.error('Error in mobileApp.close:', e);
                         }
-                      },
-                      takeScreenshot: function() {
-                        return new Promise(function(resolve, reject) {
-                          try {
-                            if (!nativeBridge.takeScreenshot) {
-                              reject(new Error('Screenshot bridge is not available'));
-                              return;
-                            }
-                            var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-                            window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
-                            nativeBridge.takeScreenshot(requestId);
-                          } catch(e) {
-                            reject(e);
-                          }
-                        });
-                      }%s
+                      }%s%s
                     };
                   }
                   // Override window.print function to use our PrintInterface
@@ -1577,7 +1615,8 @@ public class WebViewDialog extends Dialog {
                   }
                 })();
                 """,
-                mobileAppExtras
+                mobileAppExtras,
+                screenshotBridge
             );
 
             _webView.post(() -> {

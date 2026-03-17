@@ -571,6 +571,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
         options.setIgnoreUntrustedSSLError(Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false)));
         options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
+        options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
 
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");
@@ -604,13 +605,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                             int resourceId = getContext().getResources().getIdentifier(icon, "drawable", getContext().getPackageName());
                             if (resourceId == 0) {
                                 Log.e("InAppBrowser", "Vector resource not found: " + icon);
-                                // List available drawable resources to help debugging
-                                try {
-                                    final StringBuilder availableResources = getStringBuilder();
-                                    Log.d("InAppBrowser", availableResources.toString());
-                                } catch (Exception e) {
-                                    Log.e("InAppBrowser", "Error listing resources: " + e.getMessage());
-                                }
+                                call.reject("buttonNearDone validation failed: vector resource not found: " + icon);
+                                return;
                             } else {
                                 Log.d("InAppBrowser", "Vector resource found with ID: " + resourceId);
                             }
@@ -622,10 +618,14 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     options.setButtonNearDone(buttonNearDone);
                 } catch (Exception e) {
                     Log.e("InAppBrowser", "Error setting buttonNearDone: " + e.getMessage(), e);
+                    call.reject("buttonNearDone validation failed: " + e.getMessage());
+                    return;
                 }
             }
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error processing buttonNearDone: " + e.getMessage(), e);
+            call.reject("buttonNearDone validation failed: " + e.getMessage());
+            return;
         }
 
         options.setShareDisclaimer(call.getObject("shareDisclaimer", null));
@@ -752,8 +752,14 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
                 @Override
                 public void screenshotTaken(JSObject screenshot) {
-                    screenshot.put("id", webViewId);
-                    notifyListeners("screenshotTaken", screenshot);
+                    JSObject event = new JSObject();
+                    Iterator<String> keys = screenshot.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        event.put(key, screenshot.opt(key));
+                    }
+                    event.put("id", webViewId);
+                    notifyListeners("screenshotTaken", event);
                 }
 
                 @Override

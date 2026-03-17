@@ -410,7 +410,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             } else {
                 // Look in app's web assets/public directory
                 guard let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") else {
-                    print("[DEBUG] Failed to locate web assets directory")
+                    call.reject("Failed to locate bundled web assets")
                     return
                 }
 
@@ -465,33 +465,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 if !foundImage {
-                    print("[DEBUG] Failed to load buttonNearDone icon: \(icon)")
-
-                    // Debug info
-                    if let resourceURL = Bundle.main.resourceURL {
-                        print("[DEBUG] Resource URL: \(resourceURL.path)")
-
-                        // List directories to help debugging
-                        do {
-                            let contents = try FileManager.default.contentsOfDirectory(atPath: resourceURL.path)
-                            print("[DEBUG] Root bundle contents: \(contents)")
-
-                            // Check if public or www directories exist
-                            if contents.contains("public") {
-                                let publicContents = try FileManager.default.contentsOfDirectory(
-                                    atPath: resourceURL.appendingPathComponent("public").path)
-                                print("[DEBUG] Public dir contents: \(publicContents)")
-                            }
-
-                            if contents.contains("www") {
-                                let wwwContents = try FileManager.default.contentsOfDirectory(
-                                    atPath: resourceURL.appendingPathComponent("www").path)
-                                print("[DEBUG] WWW dir contents: \(wwwContents)")
-                            }
-                        } catch {
-                            print("[DEBUG] Error listing directories: \(error)")
-                        }
-                    }
+                    call.reject("Failed to load buttonNearDone icon: \(icon)")
+                    return
                 }
             }
         }
@@ -516,6 +491,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
+        let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -635,7 +611,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 enabledSafeTopMargin: enabledSafeTopMargin,
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
-                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl
+                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
+                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage
             )
 
             guard let webViewController = self.webViewController else {

@@ -53,33 +53,36 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         super.init(coder: aDecoder)
     }
 
-    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false) {
+    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = source
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.initWebview()
     }
 
-    public init(url: URL, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false) {
+    public init(url: URL, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, allowWebViewJsVisibilityControl: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -87,12 +90,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -100,13 +104,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -114,6 +119,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -128,6 +134,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var tintColor: UIColor?
     open var allowsFileURL = true
     open var allowWebViewJsVisibilityControl = false
+    open var allowScreenshotsFromWebPage = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
@@ -667,6 +674,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 return
             }
 
+            guard allowScreenshotsFromWebPage else {
+                self.rejectJavaScriptScreenshot(requestId: requestId, message: "Screenshot bridge is not enabled for this page")
+                return
+            }
+
             takeScreenshot { result in
                 switch result {
                 case .success(let screenshot):
@@ -692,7 +704,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func mobileAppScriptSource() -> String {
-        let screenshotControls = """
+        let screenshotControls = allowScreenshotsFromWebPage ? """
                                 ,
                                 takeScreenshot: function() {
                                         return new Promise(function(resolve, reject) {
@@ -705,7 +717,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                                 window.webkit.messageHandlers.takeScreenshot.postMessage({ requestId: requestId });
                                         });
                                 }
-                """
+                """ : ""
         let extraControls = allowWebViewJsVisibilityControl ? """
                                 ,
                                 hide: function() {
@@ -790,7 +802,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "close")
         userContentController.add(weakHandler, name: "hide")
         userContentController.add(weakHandler, name: "show")
-        userContentController.add(weakHandler, name: "takeScreenshot")
+        if allowScreenshotsFromWebPage {
+            userContentController.add(weakHandler, name: "takeScreenshot")
+        }
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
@@ -1206,7 +1220,9 @@ public extension WKWebViewController {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "hide")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "show")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
+        if allowScreenshotsFromWebPage {
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
+        }
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")

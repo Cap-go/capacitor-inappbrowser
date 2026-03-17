@@ -337,7 +337,7 @@ export interface OpenWebViewOptions {
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event)
    * - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig
-   * - `window.mobileApp.takeScreenshot()`: Captures the current webview viewport as a PNG and resolves with the screenshot data
+   * - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true
    *
    * @example
    * // In your webpage loaded in the webview:
@@ -351,6 +351,14 @@ export interface OpenWebViewOptions {
    * @since 6.10.0
    */
   jsInterface?: never; // This property doesn't exist, it's just for documentation
+  /**
+   * Allows page JavaScript to call `window.mobileApp.takeScreenshot()`.
+   * Disabled by default so only the host app can trigger native screenshots through the plugin API.
+   *
+   * @default false
+   * @since 8.4.0
+   */
+  allowScreenshotsFromWebPage?: boolean;
   /**
    * Share options for the webview. When provided, shows a disclaimer dialog before sharing content.
    * This is useful for:
@@ -892,7 +900,7 @@ export interface InAppBrowserPlugin {
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
    * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
-   * - `window.mobileApp.takeScreenshot()`: Captures the current webview viewport as a PNG and resolves with the screenshot data
+   * - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true
    *
    * Promise timing differs by platform when `isPresentAfterPageLoad` is used.
    * Android resolves with `{ id }` after the dialog is ready to control, while iOS resolves with `{ id }` immediately after creating the native webview.
@@ -1133,6 +1141,7 @@ export interface InAppBrowserWebViewAPIs {
 
     /**
      * Capture the current WebView viewport as a PNG screenshot.
+     * Requires `allowScreenshotsFromWebPage` to be enabled when opening the webview.
      *
      * @since 8.4.0
      */
