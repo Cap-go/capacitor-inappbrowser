@@ -1053,12 +1053,8 @@ public class WebViewDialog extends Dialog {
         if (window == null || window.getDecorView() == null) {
             return;
         }
-        WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
-            window, window.getDecorView()
-        );
-        insetsController.setSystemBarsBehavior(
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        );
+        WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(window, window.getDecorView());
+        insetsController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         insetsController.hide(WindowInsetsCompat.Type.navigationBars());
     }
 
