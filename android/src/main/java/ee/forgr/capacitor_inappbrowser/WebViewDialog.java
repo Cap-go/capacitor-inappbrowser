@@ -3151,7 +3151,10 @@ public class WebViewDialog extends Dialog {
         try {
             URL url = new URL(proxiedRequest.bridgedOriginalUrl);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod(proxiedRequest.bridgedMethod != null ? proxiedRequest.bridgedMethod.toUpperCase(java.util.Locale.ROOT) : "GET");
+            String method = proxiedRequest.bridgedMethod != null
+                ? proxiedRequest.bridgedMethod.toUpperCase(java.util.Locale.ROOT)
+                : "GET";
+            conn.setRequestMethod(method);
             conn.setInstanceFollowRedirects(true);
 
             if (proxiedRequest.bridgedHeaders != null) {
