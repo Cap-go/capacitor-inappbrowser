@@ -373,15 +373,7 @@ public class WebViewDialog extends Dialog {
             getWindow() != null ? getWindow().getDecorView() : null
         );
 
-        // Hide the Android system navigation bar if the option is enabled.
-        // Uses sticky immersive mode: the bar reappears on edge swipe,
-        // then auto-hides again after a short delay.
-        if (_options != null && _options.getHideNavigationBar()) {
-            insetsController.setSystemBarsBehavior(
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            );
-            insetsController.hide(WindowInsetsCompat.Type.navigationBars());
-        }
+        applyImmersiveModeIfNeeded();
 
         if (getWindow() != null) {
             getWindow()
@@ -1048,6 +1040,28 @@ public class WebViewDialog extends Dialog {
         isHiddenModeActive = true;
     }
 
+    /**
+     * Apply sticky immersive mode to hide the system navigation bar if the option is enabled.
+     * Called from presentWebView() on initial setup, and from restoreVisibleMode() / setHidden(false)
+     * to reapply immersive mode whenever the dialog transitions back to visible.
+     */
+    private void applyImmersiveModeIfNeeded() {
+        if (_options == null || !_options.getHideNavigationBar()) {
+            return;
+        }
+        Window window = getWindow();
+        if (window == null || window.getDecorView() == null) {
+            return;
+        }
+        WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
+            window, window.getDecorView()
+        );
+        insetsController.setSystemBarsBehavior(
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        );
+        insetsController.hide(WindowInsetsCompat.Type.navigationBars());
+    }
+
     private void restoreVisibleMode() {
         Window window = getWindow();
         if (window == null) {
@@ -1083,6 +1097,9 @@ public class WebViewDialog extends Dialog {
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
+
+        // Reapply immersive mode after restoring visibility
+        applyImmersiveModeIfNeeded();
     }
 
     public void setHidden(boolean hidden) {

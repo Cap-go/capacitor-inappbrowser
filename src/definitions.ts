@@ -615,6 +615,7 @@ export interface OpenWebViewOptions {
    * The navigation bar reappears temporarily when the user swipes from the bottom edge,
    * then auto-hides again. Useful for apps that use immersive mode in their main activity
    * and want the WebView dialog to match.
+   * **Android only** — ignored on iOS.
    * @since 8.2.1
    * @default false
    * @example
