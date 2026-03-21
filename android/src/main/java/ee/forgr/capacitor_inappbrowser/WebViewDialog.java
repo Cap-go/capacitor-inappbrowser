@@ -2569,23 +2569,22 @@ public class WebViewDialog extends Dialog {
                     String proxyId = UUID.randomUUID().toString();
                     ProxiedRequest proxiedRequest = new ProxiedRequest();
 
-                    // For bridged requests, store original URL so null response
-                    // can do a native pass-through instead of loading the /_capgo_proxy_ URL
-                    if (requestUrl.contains("/_capgo_proxy_?")) {
-                        proxiedRequest.bridgedOriginalUrl = originalUrl;
-                        proxiedRequest.bridgedMethod = method;
-                        try {
-                            JSONObject hdr = new JSONObject(headersJson);
-                            Map<String, String> hdrMap = new HashMap<>();
-                            Iterator<String> keys = hdr.keys();
-                            while (keys.hasNext()) {
-                                String k = keys.next();
-                                hdrMap.put(k, hdr.getString(k));
-                            }
-                            proxiedRequest.bridgedHeaders = hdrMap;
-                        } catch (JSONException e) {
-                            proxiedRequest.bridgedHeaders = new HashMap<>();
+                    // Store original URL, method and headers so that a null proxy
+                    // response always triggers executeNativePassThrough instead of
+                    // falling back to the WebView's default loader.
+                    proxiedRequest.bridgedOriginalUrl = originalUrl;
+                    proxiedRequest.bridgedMethod = method;
+                    try {
+                        JSONObject hdr = new JSONObject(headersJson);
+                        Map<String, String> hdrMap = new HashMap<>();
+                        Iterator<String> keys = hdr.keys();
+                        while (keys.hasNext()) {
+                            String k = keys.next();
+                            hdrMap.put(k, hdr.getString(k));
                         }
+                        proxiedRequest.bridgedHeaders = hdrMap;
+                    } catch (JSONException e) {
+                        proxiedRequest.bridgedHeaders = new HashMap<>();
                     }
 
                     addProxiedRequest(proxyId, proxiedRequest);
@@ -3079,14 +3078,10 @@ public class WebViewDialog extends Dialog {
         }
 
         if (response == null) {
-            // null response = pass through
+            // null response = native pass-through for ALL request types
             if (proxiedRequest.bridgedOriginalUrl != null) {
-                // Bridged fetch/XHR: URL was rewritten to /_capgo_proxy_, so WebView
-                // can't load it directly. Do a native pass-through fetch instead.
                 executeNativePassThrough(proxiedRequest);
             }
-            // For direct resource loads the response stays null, which tells
-            // shouldInterceptRequest to return null and let WebView load normally.
             synchronized (proxiedRequestsHashmap) {
                 proxiedRequestsHashmap.remove(requestId);
             }
