@@ -51,6 +51,64 @@ import { InAppBrowser } from '@capgo/inappbrowser'
 InAppBrowser.open({ url: "YOUR_URL" });
 ```
 
+### Android GeckoView Engine
+
+Android embedded sessions can now use either the default system WebView backend or an optional GeckoView backend.
+
+1. Add the optional Gecko dependency configuration in your Capacitor config.
+2. Run sync so the plugin writes the matching Android Gradle properties.
+3. Select Gecko globally with `defaultEngine` or per session with `engine: 'gecko'`.
+
+```ts
+/// <reference types="@capacitor/cli" />
+
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  plugins: {
+    InAppBrowser: {
+      defaultEngine: 'system',
+      engines: {
+        gecko: {
+          dependencyType: 'implementation',
+          version: '148.0.20260309125808',
+        },
+      },
+    },
+  },
+};
+
+export default config;
+```
+
+```bash
+bunx cap sync android
+```
+
+```ts
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://capgo.app',
+  engine: 'gecko',
+});
+```
+
+GeckoView is intentionally optional.
+
+- `dependencyType: 'none'`: keep Gecko fully disabled
+- `dependencyType: 'compileOnly'`: compile against Gecko in the plugin/app project without bundling it from this library
+- `dependencyType: 'implementation'`: bundle Gecko from the plugin dependency graph
+
+Current Gecko support on Android includes embedded navigation, toolbar presentation, JS bridge messaging, screenshots, safe-area sizing, visibility control, and initial custom request headers.
+
+Current Gecko limitations compared with the default Android WebView backend:
+
+- `proxyRequests` is not implemented yet
+- non-`GET` initial loads are not implemented yet
+- initial request bodies are not implemented yet
+- the Android WebView Google Pay compatibility helper is not implemented yet
+
+If you need full parity with the existing Android `proxyRequests` flow today, keep using `engine: 'system'`.
+
 ### Customize Chrome Custom Tab Appearance (Android)
 
 The `open()` method launches a Chrome Custom Tab on Android. You can customize its appearance to blend with your app:
@@ -938,6 +996,7 @@ And in the AndroidManifest.xml file:
 | Prop                                   | Type                                                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Default                                                       | Since  |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------ |
 | **`url`**                              | <code>string</code>                                                                                                                                                    | Target URL to load.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                               | 0.1.0  |
+| **`engine`**                           | <code><a href="#androidwebviewengine">AndroidWebViewEngine</a></code>                                                                                                  | Android rendering engine to use for this embedded browser session. - `system`: Android WebView backend bundled by default. - `gecko`: Mozilla GeckoView backend. Requires optional native dependency injection. When omitted, the plugin falls back to the Capacitor config default and then to `system`. **Android only** — ignored on iOS and Web.                                                                                                                                                                                                       | <code>"system"</code>                                         | 8.4.0  |
 | **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                                                                                            | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                               | 0.1.0  |
 | **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>                                                                                                                    | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                               | 6.1.0  |
 | **`method`**                           | <code>string</code>                                                                                                                                                    | HTTP method to use for the initial request. **Optional parameter - defaults to GET if not specified.** Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests. When specified with 'POST', 'PUT', or 'PATCH' methods that support a body, you can also provide a `body` parameter with the request payload. **Platform Notes:** - iOS: Full support for all HTTP methods with headers - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations              | <code>"GET"</code>                                            | 8.2.0  |
@@ -1090,7 +1149,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -1104,12 +1165,19 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
 
 <code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
+
+
+#### AndroidWebViewEngine
+
+<code>'system' | 'gecko'</code>
 
 
 #### UrlChangeListener

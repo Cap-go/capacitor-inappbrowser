@@ -14,6 +14,23 @@ import java.util.regex.Pattern;
 
 public class Options {
 
+    public enum BrowserEngine {
+        SYSTEM,
+        GECKO;
+
+        public static BrowserEngine fromString(String value) {
+            if (value == null) {
+                return SYSTEM;
+            }
+
+            try {
+                return BrowserEngine.valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return SYSTEM;
+            }
+        }
+    }
+
     public enum InvisibilityMode {
         AWARE,
         FAKE_VISIBLE;
@@ -192,6 +209,7 @@ public class Options {
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
+    private BrowserEngine browserEngine = BrowserEngine.SYSTEM;
 
     public Integer getWidth() {
         return width;
@@ -580,5 +598,13 @@ public class Options {
 
     public void setHttpBody(String httpBody) {
         this.httpBody = httpBody;
+    }
+
+    public BrowserEngine getBrowserEngine() {
+        return browserEngine;
+    }
+
+    public void setBrowserEngine(BrowserEngine browserEngine) {
+        this.browserEngine = browserEngine;
     }
 }

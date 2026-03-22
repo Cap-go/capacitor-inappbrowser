@@ -67,6 +67,8 @@ export enum InvisibilityMode {
   FAKE_VISIBLE = 'FAKE_VISIBLE',
 }
 
+export type AndroidWebViewEngine = 'system' | 'gecko';
+
 export interface Headers {
   [key: string]: string;
 }
@@ -264,6 +266,18 @@ export interface OpenWebViewOptions {
    * @example "https://capgo.app"
    */
   url: string;
+  /**
+   * Android rendering engine to use for this embedded browser session.
+   * - `system`: Android WebView backend bundled by default.
+   * - `gecko`: Mozilla GeckoView backend. Requires optional native dependency injection.
+   *
+   * When omitted, the plugin falls back to the Capacitor config default and then to `system`.
+   *
+   * **Android only** — ignored on iOS and Web.
+   * @default "system"
+   * @since 8.4.0
+   */
+  engine?: AndroidWebViewEngine;
   /**
    * Headers to send with the request.
    * @since 0.1.0
