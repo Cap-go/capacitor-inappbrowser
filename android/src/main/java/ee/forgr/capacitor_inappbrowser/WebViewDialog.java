@@ -2685,7 +2685,7 @@ public class WebViewDialog extends Dialog {
                     if (isNotHttpOrHttps) {
                         try {
                             Intent intent;
-                            if (url.startsWith("intent://")) {
+                            if (url.startsWith("intent:")) {
                                 intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
                             } else {
                                 intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
