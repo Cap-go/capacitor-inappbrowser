@@ -21,6 +21,8 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
@@ -87,6 +89,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONException;
@@ -3288,15 +3291,42 @@ public class WebViewDialog extends Dialog {
                 _webView.removeJavascriptInterface("PreShowScriptInterface");
                 _webView.removeJavascriptInterface("PrintInterface");
 
-                // Load blank page and cleanup
-                _webView.loadUrl("about:blank");
-                _webView.onPause();
                 _webView.removeAllViews();
-                _webView.destroy();
+
+                final WebView webViewToDestroy = _webView;
                 _webView = null;
+                final Handler mainHandler = new Handler(Looper.getMainLooper());
+                final AtomicBoolean destroyCalled = new AtomicBoolean(false);
+
+                final Runnable doDestroy = () -> {
+                    if (!destroyCalled.getAndSet(true)) {
+                        try {
+                            webViewToDestroy.onPause();
+                            webViewToDestroy.destroy();
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error destroying WebView: " + e.getMessage());
+                        }
+                    }
+                };
+
+                // Let Chromium finish unloading the page before pausing and destroying
+                // the renderer so active media capture can be released cleanly.
+                webViewToDestroy.setWebViewClient(
+                    new WebViewClient() {
+                        @Override
+                        public void onPageFinished(WebView view, String url) {
+                            if ("about:blank".equals(url)) {
+                                mainHandler.postDelayed(doDestroy, 200);
+                            }
+                        }
+                    }
+                );
+                webViewToDestroy.loadUrl("about:blank");
+
+                // Fallback in case the unload navigation never completes.
+                mainHandler.postDelayed(doDestroy, 3000);
             } catch (Exception e) {
                 Log.e("InAppBrowser", "Error during WebView cleanup: " + e.getMessage());
-                // Force set to null even if cleanup failed
                 _webView = null;
             }
         }
