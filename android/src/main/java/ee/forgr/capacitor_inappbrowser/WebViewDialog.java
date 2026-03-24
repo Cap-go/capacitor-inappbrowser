@@ -149,6 +149,8 @@ public class WebViewDialog extends Dialog {
         void handleCameraPermissionRequest(PermissionRequest request);
 
         void handleMicrophonePermissionRequest(PermissionRequest request);
+
+        void clearPendingPermissionRequest(PermissionRequest request);
     }
 
     private final PermissionHandler permissionHandler;
@@ -3260,6 +3262,7 @@ public class WebViewDialog extends Dialog {
 
                 if (currentPermissionRequest != null) {
                     try {
+                        permissionHandler.clearPendingPermissionRequest(currentPermissionRequest);
                         currentPermissionRequest.deny();
                     } catch (Exception e) {
                         Log.w("InAppBrowser", "Could not deny pending media permission request: " + e.getMessage());
