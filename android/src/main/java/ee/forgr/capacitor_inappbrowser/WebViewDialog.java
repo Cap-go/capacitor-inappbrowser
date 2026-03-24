@@ -3404,9 +3404,8 @@ public class WebViewDialog extends Dialog {
                   return stoppedTracks;
                 })();
                 """;
-            webView.evaluateJavascript(
-                stopMediaCaptureScript,
-                (result) -> Log.d("InAppBrowser", "Stopped active media tracks before dismiss: " + result)
+            webView.evaluateJavascript(stopMediaCaptureScript, (result) ->
+                Log.d("InAppBrowser", "Stopped active media tracks before dismiss: " + result)
             );
         } catch (Exception e) {
             Log.w("InAppBrowser", "Could not force-stop media capture before dismiss: " + e.getMessage());
