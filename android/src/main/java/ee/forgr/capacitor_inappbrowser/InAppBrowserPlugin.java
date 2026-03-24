@@ -274,6 +274,13 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
     }
 
+    @Override
+    public void clearPendingPermissionRequest(PermissionRequest request) {
+        if (currentPermissionRequest == request) {
+            currentPermissionRequest = null;
+        }
+    }
+
     CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
         @Override
         public void onCustomTabsServiceConnected(ComponentName name, CustomTabsClient client) {
