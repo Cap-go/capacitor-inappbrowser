@@ -57,4 +57,11 @@ public class ProxyBridge {
         }
         return storedRequests.remove(requestId);
     }
+
+    public StoredRequest peek(String requestId) {
+        if (requestId == null) {
+            return null;
+        }
+        return storedRequests.get(requestId);
+    }
 }

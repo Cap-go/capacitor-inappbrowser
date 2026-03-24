@@ -21,6 +21,8 @@ import android.net.Uri;
 import android.net.http.SslError;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
@@ -88,6 +90,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -2201,6 +2204,61 @@ public class WebViewDialog extends Dialog {
     }
 
     private void setWebViewClient() {
+        final PinnedProxyWebViewClient pinnedProxyWebViewClient = new PinnedProxyWebViewClient(
+            _context,
+            9090,
+            _options.getProxyRequests(),
+            proxyBridge,
+            null,
+            (request, capturedRequest) -> {
+                String originalUrl = capturedRequest.url;
+                String method = capturedRequest.method;
+                String headersJson = capturedRequest.headersJson;
+                String base64Body = capturedRequest.bodyBase64 != null ? capturedRequest.bodyBase64 : "";
+
+                String proxyId = UUID.randomUUID().toString();
+                ProxiedRequest proxiedRequest = new ProxiedRequest();
+
+                proxiedRequest.bridgedOriginalUrl = originalUrl;
+                proxiedRequest.bridgedMethod = method;
+                try {
+                    JSONObject hdr = new JSONObject(headersJson);
+                    Map<String, String> hdrMap = new HashMap<>();
+                    Iterator<String> keys = hdr.keys();
+                    while (keys.hasNext()) {
+                        String k = keys.next();
+                        hdrMap.put(k, hdr.getString(k));
+                    }
+                    proxiedRequest.bridgedHeaders = hdrMap;
+                } catch (JSONException e) {
+                    proxiedRequest.bridgedHeaders = new HashMap<>();
+                }
+
+                addProxiedRequest(proxyId, proxiedRequest);
+
+                String dialogId = instanceId != null ? instanceId : "";
+                _options.getCallbacks().proxyRequestEvent(
+                    proxyId,
+                    originalUrl,
+                    method,
+                    headersJson,
+                    base64Body.isEmpty() ? null : base64Body,
+                    dialogId
+                );
+
+                try {
+                    if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                        return proxiedRequest.response;
+                    }
+                    Log.e("InAppBrowserProxy", "Semaphore timed out for: " + originalUrl);
+                    removeProxiedRequest(proxyId);
+                } catch (InterruptedException e) {
+                    Log.e("InAppBrowserProxy", "Semaphore wait error", e);
+                    Thread.currentThread().interrupt();
+                }
+                return null;
+            }
+        );
         _webView.setWebViewClient(
             new WebViewClient() {
                 /**
@@ -2511,102 +2569,7 @@ public class WebViewDialog extends Dialog {
                     if (view == null || _webView == null) {
                         return null;
                     }
-                    if (!_options.getProxyRequests()) {
-                        return null;
-                    }
-
-                    String requestUrl = request.getUrl().toString();
-                    String originalUrl;
-                    String method;
-                    String headersJson;
-                    String base64Body;
-
-                    if (requestUrl.contains("/_capgo_proxy_?")) {
-                        // JS-patched fetch/XHR: extract original URL and stored request data
-                        Uri uri = request.getUrl();
-                        originalUrl = uri.getQueryParameter("u");
-                        String requestId = uri.getQueryParameter("rid");
-                        if (originalUrl == null || requestId == null) {
-                            return null;
-                        }
-
-                        ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
-                        method = stored != null ? stored.method : "GET";
-                        headersJson = stored != null ? stored.headersJson : "{}";
-                        base64Body = stored != null ? stored.base64Body : "";
-                    } else {
-                        // Direct resource load (img, link, script, etc.) — extract from WebResourceRequest
-                        // Note: WebResourceRequest does not expose the request body, so for non-GET/HEAD
-                        // methods (e.g. form POST) the base64Body will be empty. This is an Android
-                        // platform limitation — the proxy handler receives the URL/headers/method but
-                        // must re-fetch the body if needed. In practice, direct resource loads from HTML
-                        // (img, link, script, iframe) are always GET.
-                        String scheme = request.getUrl().getScheme();
-                        if (scheme == null || (!scheme.equals("http") && !scheme.equals("https"))) {
-                            return null;
-                        }
-
-                        originalUrl = requestUrl;
-                        method = request.getMethod();
-
-                        // Convert request headers to JSON
-                        Map<String, String> reqHeaders = request.getRequestHeaders();
-                        JSONObject headersObj = new JSONObject();
-                        if (reqHeaders != null) {
-                            for (Map.Entry<String, String> entry : reqHeaders.entrySet()) {
-                                try {
-                                    headersObj.put(entry.getKey(), entry.getValue());
-                                } catch (JSONException e) {
-                                    // skip malformed header
-                                }
-                            }
-                        }
-                        headersJson = headersObj.toString();
-                        base64Body = "";
-                    }
-
-                    // Create a new requestId for the semaphore wait
-                    String proxyId = UUID.randomUUID().toString();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
-
-                    // Store original URL, method and headers so that a null proxy
-                    // response always triggers executeNativePassThrough instead of
-                    // falling back to the WebView's default loader.
-                    proxiedRequest.bridgedOriginalUrl = originalUrl;
-                    proxiedRequest.bridgedMethod = method;
-                    try {
-                        JSONObject hdr = new JSONObject(headersJson);
-                        Map<String, String> hdrMap = new HashMap<>();
-                        Iterator<String> keys = hdr.keys();
-                        while (keys.hasNext()) {
-                            String k = keys.next();
-                            hdrMap.put(k, hdr.getString(k));
-                        }
-                        proxiedRequest.bridgedHeaders = hdrMap;
-                    } catch (JSONException e) {
-                        proxiedRequest.bridgedHeaders = new HashMap<>();
-                    }
-
-                    addProxiedRequest(proxyId, proxiedRequest);
-
-                    // Fire proxyRequest event to the Capacitor plugin
-                    String dialogId = instanceId != null ? instanceId : "";
-                    _options
-                        .getCallbacks()
-                        .proxyRequestEvent(proxyId, originalUrl, method, headersJson, base64Body.isEmpty() ? null : base64Body, dialogId);
-
-                    // Wait for response (10 seconds max)
-                    try {
-                        if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                            return proxiedRequest.response;
-                        } else {
-                            Log.e("InAppBrowserProxy", "Semaphore timed out for: " + originalUrl);
-                            removeProxiedRequest(proxyId);
-                        }
-                    } catch (InterruptedException e) {
-                        Log.e("InAppBrowserProxy", "Semaphore wait error", e);
-                    }
-                    return null;
+                    return pinnedProxyWebViewClient.shouldInterceptRequest(view, request);
                 }
 
                 @Override
@@ -2829,9 +2792,15 @@ public class WebViewDialog extends Dialog {
                         }
                         return;
                     }
+                    if (_options.getProxyRequests()) {
+                        pinnedProxyWebViewClient.handlePinnedSslError(view, handler, error);
+                        return;
+                    }
+
                     boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
-                    if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) handler.proceed();
-                    else {
+                    if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
+                        handler.proceed();
+                    } else {
                         super.onReceivedSslError(view, handler, error);
                     }
                 }
@@ -2980,15 +2949,42 @@ public class WebViewDialog extends Dialog {
                 _webView.removeJavascriptInterface("PreShowScriptInterface");
                 _webView.removeJavascriptInterface("PrintInterface");
 
-                // Load blank page and cleanup
-                _webView.loadUrl("about:blank");
-                _webView.onPause();
                 _webView.removeAllViews();
-                _webView.destroy();
+
+                final WebView webViewToDestroy = _webView;
                 _webView = null;
+                final Handler mainHandler = new Handler(Looper.getMainLooper());
+                final AtomicBoolean destroyCalled = new AtomicBoolean(false);
+
+                final Runnable doDestroy = () -> {
+                    if (!destroyCalled.getAndSet(true)) {
+                        try {
+                            webViewToDestroy.onPause();
+                            webViewToDestroy.destroy();
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error destroying WebView: " + e.getMessage());
+                        }
+                    }
+                };
+
+                // Let Chromium finish unloading the page before pausing and destroying
+                // the renderer so active media capture can be released cleanly.
+                webViewToDestroy.setWebViewClient(
+                    new WebViewClient() {
+                        @Override
+                        public void onPageFinished(WebView view, String url) {
+                            if ("about:blank".equals(url)) {
+                                mainHandler.postDelayed(doDestroy, 200);
+                            }
+                        }
+                    }
+                );
+                webViewToDestroy.loadUrl("about:blank");
+
+                // Fallback in case the unload navigation never completes.
+                mainHandler.postDelayed(doDestroy, 3000);
             } catch (Exception e) {
                 Log.e("InAppBrowser", "Error during WebView cleanup: " + e.getMessage());
-                // Force set to null even if cleanup failed
                 _webView = null;
             }
         }

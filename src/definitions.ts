@@ -546,6 +546,7 @@ export interface OpenWebViewOptions {
   showArrow?: boolean;
   /**
    * ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.
+    * On Android, this does not bypass strict local proxy certificate pinning when proxyRequests is enabled.
    * @since 6.1.0
    * @default false
    */
@@ -573,6 +574,7 @@ export interface OpenWebViewOptions {
    * When true, all HTTP/HTTPS requests from the webview are sent to the proxy handler
    * registered via addProxyHandler(). The handler can return a custom Response or null
    * for pass-through.
+    * On Android, intercepted requests use strict certificate pinning for the configured local proxy path.
    *
    * @since 9.0.0
    */
