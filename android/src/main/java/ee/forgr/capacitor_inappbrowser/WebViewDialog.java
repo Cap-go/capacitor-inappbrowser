@@ -3258,6 +3258,16 @@ public class WebViewDialog extends Dialog {
                 // Stop loading first to prevent any ongoing operations
                 _webView.stopLoading();
 
+                if (currentPermissionRequest != null) {
+                    try {
+                        currentPermissionRequest.deny();
+                    } catch (Exception e) {
+                        Log.w("InAppBrowser", "Could not deny pending media permission request: " + e.getMessage());
+                    } finally {
+                        currentPermissionRequest = null;
+                    }
+                }
+
                 // Clear any pending callbacks to prevent memory leaks
                 if (mFilePathCallback != null) {
                     mFilePathCallback.onReceiveValue(null);
@@ -3285,6 +3295,8 @@ public class WebViewDialog extends Dialog {
                 } catch (Exception e) {
                     Log.w("InAppBrowser", "Could not clear file inputs (WebView may be in invalid state): " + e.getMessage());
                 }
+
+                forceStopMediaCapture(_webView);
 
                 // Remove JavaScript interfaces before destroying
                 _webView.removeJavascriptInterface("AndroidInterface");
@@ -3343,6 +3355,61 @@ public class WebViewDialog extends Dialog {
             super.dismiss();
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
+        }
+    }
+
+    private void forceStopMediaCapture(WebView webView) {
+        try {
+            String stopMediaCaptureScript = """
+                (function() {
+                  var stoppedTracks = 0;
+                  function stopStream(value) {
+                    try {
+                      if (!value || typeof value.getTracks !== 'function') {
+                        return;
+                      }
+                      var tracks = value.getTracks();
+                      for (var i = 0; i < tracks.length; i++) {
+                        try {
+                          tracks[i].stop();
+                          stoppedTracks++;
+                        } catch (e) {}
+                      }
+                    } catch (e) {}
+                  }
+
+                  try {
+                    var mediaElements = document.querySelectorAll('audio,video');
+                    for (var i = 0; i < mediaElements.length; i++) {
+                      var element = mediaElements[i];
+                      try { stopStream(element.srcObject); } catch (e) {}
+                      try { element.pause(); } catch (e) {}
+                      try { element.srcObject = null; } catch (e) {}
+                    }
+                  } catch (e) {}
+
+                  try {
+                    var windowKeys = Object.keys(window);
+                    for (var j = 0; j < windowKeys.length; j++) {
+                      var value = window[windowKeys[j]];
+                      stopStream(value);
+                      if (Array.isArray(value)) {
+                        for (var k = 0; k < value.length; k++) {
+                          stopStream(value[k]);
+                        }
+                      }
+                    }
+                  } catch (e) {}
+
+                  return stoppedTracks;
+                })();
+                """;
+            webView.evaluateJavascript(
+                stopMediaCaptureScript,
+                (result) -> Log.d("InAppBrowser", "Stopped active media tracks before dismiss: " + result)
+            );
+        } catch (Exception e) {
+            Log.w("InAppBrowser", "Could not force-stop media capture before dismiss: " + e.getMessage());
         }
     }
 
