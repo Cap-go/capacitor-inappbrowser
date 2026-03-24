@@ -141,6 +141,8 @@ public class WebViewDialog extends Dialog {
     public ValueCallback<Uri> mUploadMessage;
     public ValueCallback<Uri[]> mFilePathCallback;
     private boolean openWebViewResolved;
+    private boolean isDismissing = false;
+    private PermissionRequest pendingCameraLaunchPermissionRequest;
 
     // Temporary URI for storing camera capture
     public Uri tempCameraUri;
@@ -750,17 +752,29 @@ public class WebViewDialog extends Dialog {
 
                             @Override
                             public void grant(String[] resources) {
+                                pendingCameraLaunchPermissionRequest = null;
+                                if (isDismissing) {
+                                    Log.d("InAppBrowser", "Ignoring delayed camera permission grant during dismiss");
+                                    return;
+                                }
                                 // Permission granted, now launch the camera
                                 launchCameraWithPermission(useFrontCamera);
                             }
 
                             @Override
                             public void deny() {
+                                pendingCameraLaunchPermissionRequest = null;
+                                if (isDismissing) {
+                                    Log.d("InAppBrowser", "Ignoring delayed camera permission denial during dismiss");
+                                    return;
+                                }
                                 // Permission denied, fall back to file picker
                                 Log.e("InAppBrowser", "Camera permission denied, falling back to file picker");
                                 fallbackToFilePicker();
                             }
                         };
+
+                        pendingCameraLaunchPermissionRequest = tempRequest;
 
                         // Request camera permission through the plugin
                         permissionHandler.handleCameraPermissionRequest(tempRequest);
@@ -3257,8 +3271,15 @@ public class WebViewDialog extends Dialog {
         // First, stop any ongoing operations and disable further interactions
         if (_webView != null) {
             try {
+                isDismissing = true;
+
                 // Stop loading first to prevent any ongoing operations
                 _webView.stopLoading();
+
+                if (pendingCameraLaunchPermissionRequest != null) {
+                    permissionHandler.clearPendingPermissionRequest(pendingCameraLaunchPermissionRequest);
+                    pendingCameraLaunchPermissionRequest = null;
+                }
 
                 if (currentPermissionRequest != null) {
                     try {
@@ -3324,22 +3345,28 @@ public class WebViewDialog extends Dialog {
                     }
                 };
 
+                // Schedule the fallback before the navigation handoff so destroy still
+                // runs if setWebViewClient/loadUrl throws.
+                mainHandler.postDelayed(doDestroy, 3000);
+
                 // Let Chromium finish unloading the page before pausing and destroying
                 // the renderer so active media capture can be released cleanly.
-                webViewToDestroy.setWebViewClient(
-                    new WebViewClient() {
-                        @Override
-                        public void onPageFinished(WebView view, String url) {
-                            if ("about:blank".equals(url)) {
-                                mainHandler.postDelayed(doDestroy, 200);
+                try {
+                    webViewToDestroy.setWebViewClient(
+                        new WebViewClient() {
+                            @Override
+                            public void onPageFinished(WebView view, String url) {
+                                if ("about:blank".equals(url)) {
+                                    mainHandler.postDelayed(doDestroy, 200);
+                                }
                             }
                         }
-                    }
-                );
-                webViewToDestroy.loadUrl("about:blank");
-
-                // Fallback in case the unload navigation never completes.
-                mainHandler.postDelayed(doDestroy, 3000);
+                    );
+                    webViewToDestroy.loadUrl("about:blank");
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Falling back to immediate WebView destroy: " + e.getMessage());
+                    doDestroy.run();
+                }
             } catch (Exception e) {
                 Log.e("InAppBrowser", "Error during WebView cleanup: " + e.getMessage());
                 _webView = null;
