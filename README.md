@@ -98,7 +98,8 @@ InAppBrowser.updateDimensions({
 });
 ```
 
-**Touch Passthrough**: When custom dimensions are set (not fullscreen), touches outside the webview bounds will pass through to the underlying Capacitor webview, allowing the user to interact with your app in the exposed areas. This enables picture-in-picture style experiences where the InAppBrowser floats above your content.
+**Touch Passthrough**: When custom dimensions are set (not fullscreen), touches outside the webview bounds will pass through to the underlying Capacitor webview, allowing the user to interact with your app in the exposed areas. 
+This enables picture-in-picture style experiences where the InAppBrowser floats above your content.
 
 ### Open WebView with Safe Margin
 
@@ -1090,7 +1091,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -1104,7 +1107,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
