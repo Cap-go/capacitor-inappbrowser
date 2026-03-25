@@ -128,6 +128,9 @@ public class WebViewDialog extends Dialog {
     // Temporary URI for storing camera capture
     public Uri tempCameraUri;
 
+    // Proxy: when true, trust MITM-generated SSL certs
+    private boolean isProxyActive = false;
+
     public interface PermissionHandler {
         void handleCameraPermissionRequest(PermissionRequest request);
 
@@ -155,6 +158,10 @@ public class WebViewDialog extends Dialog {
 
     public String getInstanceId() {
         return instanceId;
+    }
+
+    public void setProxyActive(boolean proxyActive) {
+        this.isProxyActive = proxyActive;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -2939,6 +2946,11 @@ public class WebViewDialog extends Dialog {
                         if (handler != null) {
                             handler.cancel();
                         }
+                        return;
+                    }
+                    // When proxy is active, trust MITM-generated certs
+                    if (isProxyActive) {
+                        handler.proceed();
                         return;
                     }
                     boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
