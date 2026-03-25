@@ -28,20 +28,22 @@ protocol ProxyEventDelegate: AnyObject {
 /// Behaviour:
 ///  - Binds to `127.0.0.1` on a random port.
 ///  - Regular HTTP requests: parsed, rule-matched, events fired.
-///  - CONNECT requests: blind TCP tunnel (MITM requires full cert generation,
-///    which is a TODO — see `CertificateAuthority`).
+///  - CONNECT requests: MITM TLS termination when a CertificateAuthority is
+///    available and a rule could match the host; blind TCP tunnel otherwise.
 class SwiftNIOProxyServer {
 
     private var channel: Channel?
     private let group: MultiThreadedEventLoopGroup
     private let ruleMatcher: ProxyRuleMatcher
+    private let certificateAuthority: CertificateAuthority?
     weak var delegate: ProxyEventDelegate?
     private(set) var isProxyActive: Bool = false
 
     static let timeoutSeconds: Int64 = 10
 
-    init(ruleMatcher: ProxyRuleMatcher) {
+    init(ruleMatcher: ProxyRuleMatcher, certificateAuthority: CertificateAuthority?) {
         self.ruleMatcher = ruleMatcher
+        self.certificateAuthority = certificateAuthority
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
     }
 
@@ -57,7 +59,8 @@ class SwiftNIOProxyServer {
                     channel.pipeline.addHandler(
                         ProxyHTTPHandler(
                             ruleMatcher: self.ruleMatcher,
-                            delegate: self.delegate
+                            delegate: self.delegate,
+                            certificateAuthority: self.certificateAuthority
                         )
                     )
                 }
