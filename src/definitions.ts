@@ -1,5 +1,58 @@
 import type { PluginListenerHandle } from '@capacitor/core';
 
+// --- Proxy Interception Types ---
+
+export interface ProxyRule {
+  urlPattern: string;
+  methods?: string[];
+  includeBody?: boolean;
+  intercept: 'request' | 'response' | 'both';
+  onRequest?: (req: ProxyRequest) => Promise<ModifiedRequest | null>;
+  onResponse?: (res: ProxyResponse) => Promise<ModifiedResponse | null>;
+}
+
+export interface NativeProxyRule {
+  ruleIndex: number;
+  urlPattern: string;
+  methods?: string[];
+  includeBody?: boolean;
+  intercept: 'request' | 'response' | 'both';
+}
+
+export interface ProxyRequest {
+  requestId: string;
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+
+export interface ModifiedRequest {
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface ProxyResponse {
+  requestId: string;
+  url: string;
+  status: number;
+  headers: Record<string, string>;
+  body?: string;
+}
+
+export interface ModifiedResponse {
+  status?: number;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export type ProxyErrorCode =
+  | 'PROXY_START_FAILED'
+  | 'PROXY_ALREADY_ACTIVE'
+  | 'PLATFORM_UNSUPPORTED';
+
 export interface UrlEvent {
   /**
    * Webview instance id.
@@ -804,6 +857,16 @@ export interface OpenWebViewOptions {
    * invisibilityMode: InvisibilityMode.FAKE_VISIBLE
    */
   invisibilityMode?: InvisibilityMode;
+
+  /**
+   * Proxy rules for intercepting and modifying requests/responses within the webview.
+   * Each rule specifies a URL pattern and whether to intercept requests, responses, or both.
+   * Callbacks (onRequest/onResponse) are handled in the JS layer and stripped before
+   * sending rules to native.
+   *
+   * @since 9.0.0
+   */
+  proxyRules?: ProxyRule[];
 }
 
 export interface DimensionOptions {
@@ -984,6 +1047,43 @@ export interface InAppBrowserPlugin {
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
+
+  /**
+   * Listen for intercepted proxy requests matching a rule.
+   *
+   * @since 9.0.0
+   */
+  addListener(
+    eventName: 'proxyRequestIntercept',
+    listenerFunc: (event: ProxyRequest & { ruleIndex: number }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Listen for intercepted proxy responses matching a rule.
+   *
+   * @since 9.0.0
+   */
+  addListener(
+    eventName: 'proxyResponseIntercept',
+    listenerFunc: (event: ProxyResponse & { ruleIndex: number }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Respond to an intercepted proxy request with optional modifications.
+   * Pass `null` for `modifiedRequest` to forward the original request unchanged.
+   *
+   * @since 9.0.0
+   */
+  handleProxyRequest(options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void>;
+
+  /**
+   * Respond to an intercepted proxy response with optional modifications.
+   * Pass `null` for `modifiedResponse` to forward the original response unchanged.
+   *
+   * @since 9.0.0
+   */
+  handleProxyResponse(options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void>;
+
   /**
    * Remove all listeners for this plugin.
    *
