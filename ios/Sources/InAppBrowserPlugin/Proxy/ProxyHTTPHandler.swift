@@ -160,7 +160,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
             )
         ]
         if rule.includeBody, let body = body, body.readableBytes > 0 {
-            let data = body.getData(at: body.readerIndex, length: body.readableBytes) ?? Data()
+            let data = Data(body.readableBytesView)
             requestData["body"] = data.base64EncodedString()
         }
 
@@ -189,7 +189,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                     }
                     if let newBodyB64 = mods["body"] as? String,
                        let bodyData = Data(base64Encoded: newBodyB64) {
-                        modifiedBody = context.channel.allocator.buffer(data: bodyData)
+                        modifiedBody = context.channel.allocator.buffer(bytes: bodyData)
                         modifiedHead.headers.replaceOrAdd(
                             name: "content-length",
                             value: "\(bodyData.count)"
@@ -339,7 +339,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
             )
         ]
         if rule.includeBody, let body = body, body.readableBytes > 0 {
-            let data = body.getData(at: body.readerIndex, length: body.readableBytes) ?? Data()
+            let data = Data(body.readableBytesView)
             responseData["body"] = data.base64EncodedString()
         }
 
@@ -363,7 +363,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
                     }
                     if let newBodyB64 = mods["body"] as? String,
                        let bodyData = Data(base64Encoded: newBodyB64) {
-                        modifiedBody = self?.clientContext.channel.allocator.buffer(data: bodyData)
+                        modifiedBody = self?.clientContext.channel.allocator.buffer(bytes: bodyData)
                         modifiedHead.headers.replaceOrAdd(
                             name: "content-length",
                             value: "\(bodyData.count)"
