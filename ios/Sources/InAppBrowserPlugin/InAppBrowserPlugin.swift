@@ -1,6 +1,7 @@
 import Foundation
 import Capacitor
 import WebKit
+import Network
 import AuthenticationServices
 
 extension UIColor {
@@ -52,7 +53,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "handleProxyResponse", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -74,6 +77,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var closeModalOk: String?
     private var closeModalCancel: String?
     private var openSecureWindowCall: CAPPluginCall?
+
+    // MARK: - Proxy state
+    private var activeProxyServer: SwiftNIOProxyServer?
+    private var activeRuleMatcher: ProxyRuleMatcher?
+    private var isProxyActive: Bool = false
+    private var pendingProxyRequests: [String: ([String: Any]?) -> Void] = [:]
+    private var pendingProxyResponses: [String: ([String: Any]?) -> Void] = [:]
+    private let proxyLock = NSLock()
+    private var proxyDataStore: AnyObject? // WKWebsiteDataStore stored as AnyObject for iOS <17 compat
 
     private func setup() {
         self.isSetupDone = true
@@ -222,6 +234,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     func handleWebViewDidClose(id: String, url: String) {
+        // Clean up proxy when the web view closes
+        cleanupProxy()
+
         if !id.isEmpty, webViewControllers[id] != nil {
             self.notifyListeners("closeEvent", data: ["id": id, "url": url])
             unregisterWebView(id: id)
@@ -594,6 +609,51 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        // MARK: Proxy setup (before main-thread webview creation)
+        var proxyWebsiteDataStore: WKWebsiteDataStore?
+        let proxyRulesRaw = call.getArray("proxyRules") as? [[String: Any]]
+        if let proxyRulesArray = proxyRulesRaw, !proxyRulesArray.isEmpty {
+            guard activeProxyServer == nil else {
+                call.reject("Another proxied WebView is already active", "PROXY_ALREADY_ACTIVE")
+                return
+            }
+
+            if #unavailable(iOS 17.0) {
+                call.reject("Proxy requires iOS 17 or later", "PLATFORM_UNSUPPORTED")
+                return
+            }
+
+            do {
+                let rules = try ProxyRuleMatcher.parse(from: proxyRulesArray)
+                activeRuleMatcher = ProxyRuleMatcher(rules: rules)
+
+                let proxyServer = SwiftNIOProxyServer(ruleMatcher: activeRuleMatcher!)
+                proxyServer.delegate = self
+                let proxyPort = try proxyServer.start()
+                activeProxyServer = proxyServer
+                isProxyActive = true
+
+                // Configure proxy on a non-persistent data store (iOS 17+)
+                if #available(iOS 17.0, *) {
+                    let dataStore = WKWebsiteDataStore.nonPersistent()
+                    let proxyEndpoint = NWEndpoint.hostPort(
+                        host: NWEndpoint.Host("127.0.0.1"),
+                        port: NWEndpoint.Port(rawValue: UInt16(proxyPort))!
+                    )
+                    let proxyConfig = ProxyConfiguration(httpCONNECTProxy: proxyEndpoint)
+                    dataStore.proxyConfigurations = [proxyConfig]
+                    proxyWebsiteDataStore = dataStore
+                    self.proxyDataStore = dataStore
+                }
+
+                print("[InAppBrowser] Proxy started on port \(proxyPort)")
+            } catch {
+                cleanupProxy()
+                call.reject("Failed to start proxy: \(error.localizedDescription)", "PROXY_START_FAILED")
+                return
+            }
+        }
+
         DispatchQueue.main.async {
             guard let url = URL(string: urlString) else {
                 call.reject("Invalid URL format")
@@ -612,7 +672,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
-                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage
+                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
+                customWebsiteDataStore: proxyWebsiteDataStore
             )
 
             guard let webViewController = self.webViewController else {
@@ -621,6 +682,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.instanceId = webViewId
+
+            // Set proxy active flag so cert challenges are trusted
+            if self.isProxyActive {
+                webViewController.isProxyActive = true
+            }
 
             // Set HTTP method and body if provided
             if let method = httpMethod {
@@ -1251,6 +1317,54 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // MARK: - Proxy request/response handlers
+
+    @objc func handleProxyRequest(_ call: CAPPluginCall) {
+        guard let requestId = call.getString("requestId") else {
+            call.reject("requestId required")
+            return
+        }
+        let modifiedRequest = call.getObject("modifiedRequest")
+        proxyLock.lock()
+        let completion = pendingProxyRequests.removeValue(forKey: requestId)
+        proxyLock.unlock()
+        completion?(modifiedRequest as? [String: Any])
+        call.resolve()
+    }
+
+    @objc func handleProxyResponse(_ call: CAPPluginCall) {
+        guard let requestId = call.getString("requestId") else {
+            call.reject("requestId required")
+            return
+        }
+        let modifiedResponse = call.getObject("modifiedResponse")
+        proxyLock.lock()
+        let completion = pendingProxyResponses.removeValue(forKey: requestId)
+        proxyLock.unlock()
+        completion?(modifiedResponse as? [String: Any])
+        call.resolve()
+    }
+
+    // MARK: - Proxy lifecycle
+
+    private func cleanupProxy() {
+        activeProxyServer?.stop()
+        activeProxyServer = nil
+        activeRuleMatcher = nil
+        isProxyActive = false
+        proxyDataStore = nil
+
+        proxyLock.lock()
+        let pendingReqs = pendingProxyRequests
+        let pendingRes = pendingProxyResponses
+        pendingProxyRequests.removeAll()
+        pendingProxyResponses.removeAll()
+        proxyLock.unlock()
+
+        for (_, completion) in pendingReqs { completion(nil) }
+        for (_, completion) in pendingRes { completion(nil) }
+    }
+
     @objc func close(_ call: CAPPluginCall) {
         let isAnimated = call.getBool("isAnimated", true)
 
@@ -1466,5 +1580,51 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 extension InAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()
+    }
+}
+
+// MARK: - ProxyEventDelegate
+
+extension InAppBrowserPlugin: ProxyEventDelegate {
+    func onRequestIntercept(requestId: String, ruleIndex: Int,
+                            requestData: [String: Any],
+                            completion: @escaping ([String: Any]?) -> Void) {
+        proxyLock.lock()
+        pendingProxyRequests[requestId] = completion
+        proxyLock.unlock()
+
+        var eventData: [String: Any] = requestData
+        eventData["requestId"] = requestId
+        eventData["ruleIndex"] = ruleIndex
+        notifyListeners("proxyRequestIntercept", data: eventData)
+
+        // Timeout: if JS doesn't respond within 10s, forward unmodified.
+        DispatchQueue.global().asyncAfter(deadline: .now() + Double(SwiftNIOProxyServer.timeoutSeconds)) { [weak self] in
+            self?.proxyLock.lock()
+            let pending = self?.pendingProxyRequests.removeValue(forKey: requestId)
+            self?.proxyLock.unlock()
+            pending?(nil)
+        }
+    }
+
+    func onResponseIntercept(requestId: String, ruleIndex: Int,
+                             responseData: [String: Any],
+                             completion: @escaping ([String: Any]?) -> Void) {
+        proxyLock.lock()
+        pendingProxyResponses[requestId] = completion
+        proxyLock.unlock()
+
+        var eventData: [String: Any] = responseData
+        eventData["requestId"] = requestId
+        eventData["ruleIndex"] = ruleIndex
+        notifyListeners("proxyResponseIntercept", data: eventData)
+
+        // Timeout: if JS doesn't respond within 10s, forward unmodified.
+        DispatchQueue.global().asyncAfter(deadline: .now() + Double(SwiftNIOProxyServer.timeoutSeconds)) { [weak self] in
+            self?.proxyLock.lock()
+            let pending = self?.pendingProxyResponses.removeValue(forKey: requestId)
+            self?.proxyLock.unlock()
+            pending?(nil)
+        }
     }
 }
