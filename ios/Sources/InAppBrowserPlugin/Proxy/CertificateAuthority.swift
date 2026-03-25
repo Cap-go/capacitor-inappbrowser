@@ -2,6 +2,10 @@ import Foundation
 import Security
 import CryptoKit
 import NIOSSL
+import X509
+import SwiftASN1
+@preconcurrency import Crypto
+import _CryptoExtras
 
 /// Errors specific to the proxy subsystem.
 enum ProxyError: Error, LocalizedError {
@@ -24,28 +28,25 @@ enum ProxyError: Error, LocalizedError {
 ///
 /// Responsibilities:
 ///  1. Generate a self-signed CA cert (RSA 2048) at first launch.
-///  2. Persist it to app storage (PKCS12 keystore).
+///  2. Persist it to app storage (cert DER + key DER).
 ///  3. Generate domain-specific leaf certs signed by the CA on demand.
 ///  4. Cache domain `NIOSSLContext`s.
 ///  5. Expose CA fingerprint for selective trust.
-///
-/// **NOTE:** Full certificate generation (ASN.1 / leaf certs) is a TODO.
-/// This file is a *skeleton* that compiles and provides the public API
-/// contract the rest of the proxy system depends on.  The `buildDomainContext`
-/// and `generateNewCA` methods contain placeholders that will be filled once a
-/// proper ASN.1 builder (e.g. swift-certificates or a manual DER encoder) is
-/// integrated.
 class CertificateAuthority {
 
     // MARK: - State
 
-    private var caPrivateKeyData: Data?
+    /// The CA RSA private key (swift-crypto type).
+    private var caKey: _RSA.Signing.PrivateKey?
+
+    /// The CA certificate DER bytes.
     private var caCertDER: [UInt8]?
+
+    /// Cached NIOSSLContext per domain.
     private var domainContextCache: [String: NIOSSLContext] = [:]
     private let lock = NSLock()
 
-    private static let keystoreFile = "capgo_proxy_ca.p12"
-    private static let keystorePassword = "capgo-proxy"
+    private static let caFile = "capgo_proxy_ca.dat"
 
     // MARK: - Public API
 
@@ -69,14 +70,14 @@ class CertificateAuthority {
 
     /// Whether the CA material has been loaded / generated.
     var isLoaded: Bool {
-        return caCertDER != nil && caPrivateKeyData != nil
+        return caCertDER != nil && caKey != nil
     }
 
     /// Heuristic check used by `WKNavigationDelegate` to decide whether to
     /// trust a server certificate presented through the local proxy.
     ///
     /// For the initial implementation we trust any certificate when the proxy
-    /// is active — matching the Android approach.  A more robust check will
+    /// is active -- matching the Android approach.  A more robust check will
     /// compare the issuer against the CA cert once full cert generation is done.
     func isCertSignedByCA(certificate: SecCertificate) -> Bool {
         guard caCertDER != nil else { return false }
@@ -106,131 +107,179 @@ class CertificateAuthority {
         let appSupport = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
-        return appSupport.appendingPathComponent(keystoreFile)
+        return appSupport.appendingPathComponent(caFile)
     }
 
-    // MARK: - CA Generation (skeleton)
+    // MARK: - CA Generation
 
     private func generateNewCA() throws {
-        // Generate RSA 2048 key pair using the Security framework.
-        let keyParams: [String: Any] = [
-            kSecAttrKeyType as String: kSecAttrKeyTypeRSA,
-            kSecAttrKeySizeInBits as String: 2048
-        ]
+        // Generate RSA 2048 key pair using swift-crypto.
+        let rsaKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        self.caKey = rsaKey
 
-        var error: Unmanaged<CFError>?
-        guard let privateKey = SecKeyCreateRandomKey(keyParams as CFDictionary, &error) else {
-            throw ProxyError.certGenerationFailed(
-                "Failed to generate CA key: \(error?.takeRetainedValue().localizedDescription ?? "unknown")")
+        // Build a self-signed X.509 v3 CA certificate using swift-certificates.
+        let caPrivKey = Certificate.PrivateKey(rsaKey)
+
+        let now = Date()
+        let threeYearsLater = Calendar.current.date(byAdding: .year, value: 3, to: now)!
+
+        let caName = try DistinguishedName {
+            CommonName("Capgo InAppBrowser Proxy CA")
         }
 
-        guard let privateKeyData = SecKeyCopyExternalRepresentation(privateKey, &error) as Data? else {
-            throw ProxyError.certGenerationFailed("Failed to export private key DER representation")
+        let extensions = try Certificate.Extensions {
+            Critical(BasicConstraints.isCertificateAuthority(maxPathLength: nil))
+            KeyUsage(keyCertSign: true, cRLSign: true)
+            SubjectKeyIdentifier(hash: caPrivKey.publicKey)
         }
 
-        self.caPrivateKeyData = privateKeyData
+        let caCert = try Certificate(
+            version: .v3,
+            serialNumber: Certificate.SerialNumber(),
+            publicKey: caPrivKey.publicKey,
+            notValidBefore: now,
+            notValidAfter: threeYearsLater,
+            issuer: caName,
+            subject: caName,
+            signatureAlgorithm: .sha256WithRSAEncryption,
+            extensions: extensions,
+            issuerPrivateKey: caPrivKey
+        )
 
-        // TODO: Build a self-signed X.509 v3 certificate (DER encoded) using either:
-        //   - swift-certificates (https://github.com/apple/swift-certificates)
-        //   - A manual ASN.1/DER builder
-        //
-        // The certificate should:
-        //   - Use the RSA key pair generated above
-        //   - Have Subject: CN=Capgo InAppBrowser Proxy CA
-        //   - Be a CA cert (basicConstraints: CA:TRUE)
-        //   - Have a reasonable validity period (e.g. 3 years)
-        //   - Include subjectKeyIdentifier and authorityKeyIdentifier extensions
-        //
-        // For now we store a nil placeholder.  The proxy will operate in
-        // "blind tunnel" mode (no MITM) until this is completed.
-        self.caCertDER = nil
+        // Serialize the certificate to DER.
+        var serializer = DER.Serializer()
+        try caCert.serialize(into: &serializer)
+        self.caCertDER = serializer.serializedBytes
 
-        print("[CertificateAuthority] RSA key pair generated. Full cert generation is TODO.")
+        print("[CertificateAuthority] Generated new CA cert (RSA 2048, SHA256).")
     }
 
     // MARK: - Persistence
+    //
+    // Storage format:
+    //   [4 bytes: cert DER length, big-endian] [cert DER bytes] [key PKCS8 DER bytes]
+    //
+    // We intentionally avoid PKCS12 because `SecPKCS12Export` is macOS-only.
 
     private func loadFromDisk(_ url: URL) throws {
         let data = try Data(contentsOf: url)
-
-        var importResult: CFArray?
-        let options: [String: Any] = [
-            kSecImportExportPassphrase as String: Self.keystorePassword
-        ]
-        let status = SecPKCS12Import(data as CFData, options as CFDictionary, &importResult)
-        guard status == errSecSuccess,
-              let items = importResult as? [[String: Any]],
-              let first = items.first else {
-            throw ProxyError.certGenerationFailed("Failed to import PKCS12: OSStatus \(status)")
+        guard data.count > 4 else {
+            throw ProxyError.certGenerationFailed("CA file too small: \(url.lastPathComponent)")
         }
 
-        // Extract identity (cert + key) from the PKCS12 bundle.
-        if let identityRef = first[kSecImportItemIdentity as String] {
-            let identity = identityRef as! SecIdentity  // swiftlint:disable:this force_cast
-
-            // Extract certificate
-            var certRef: SecCertificate?
-            SecIdentityCopyCertificate(identity, &certRef)
-            if let cert = certRef {
-                let certData = SecCertificateCopyData(cert) as Data
-                self.caCertDER = [UInt8](certData)
-            }
-
-            // Extract private key
-            var keyRef: SecKey?
-            SecIdentityCopyPrivateKey(identity, &keyRef)
-            if let key = keyRef {
-                var error: Unmanaged<CFError>?
-                if let keyData = SecKeyCopyExternalRepresentation(key, &error) as Data? {
-                    self.caPrivateKeyData = keyData
-                }
-            }
+        // Read cert length (4 bytes, big-endian).
+        let certLen = Int(
+            UInt32(data[0]) << 24 | UInt32(data[1]) << 16 |
+            UInt32(data[2]) << 8  | UInt32(data[3])
+        )
+        guard data.count > 4 + certLen else {
+            throw ProxyError.certGenerationFailed("CA file truncated: \(url.lastPathComponent)")
         }
 
-        if caPrivateKeyData == nil {
-            throw ProxyError.certGenerationFailed("PKCS12 did not contain a usable private key")
-        }
+        let certDER = [UInt8](data[4 ..< 4 + certLen])
+        let keyDER  = [UInt8](data[(4 + certLen)...])
+
+        // Validate the cert can be parsed.
+        _ = try NIOSSLCertificate(bytes: certDER, format: .der)
+
+        // Reconstruct the swift-crypto RSA key from PKCS#8 DER bytes.
+        let rsaKey = try _RSA.Signing.PrivateKey(derRepresentation: keyDER)
+
+        self.caCertDER = certDER
+        self.caKey = rsaKey
 
         print("[CertificateAuthority] Loaded CA from \(url.lastPathComponent)")
     }
 
     private func saveToDisk(_ url: URL) throws {
-        // TODO: Export CA cert + private key as PKCS12 and write to `url`.
-        // This requires a valid DER certificate to be available in `caCertDER`.
-        // Until generateNewCA produces a real cert, we skip persistence.
-
-        guard caCertDER != nil else {
-            print("[CertificateAuthority] Skipping disk persistence — no cert generated yet (TODO)")
+        guard let certDER = caCertDER, let key = caKey else {
+            print("[CertificateAuthority] Skipping disk persistence -- no cert generated yet")
             return
         }
 
-        // Placeholder for PKCS12 export:
-        // 1. Create SecCertificate from caCertDER
-        // 2. Reconstruct SecKey from caPrivateKeyData
-        // 3. Create SecIdentity
-        // 4. Export with SecPKCS12Export (or manual PKCS12 builder)
-        // 5. Write to url
+        // Save cert DER + key PKCS8 DER.
+        let keyDER = [UInt8](key.pkcs8DERRepresentation)
+
+        var blob = Data()
+        let certLen = UInt32(certDER.count).bigEndian
+        withUnsafeBytes(of: certLen) { blob.append(contentsOf: $0) }
+        blob.append(contentsOf: certDER)
+        blob.append(contentsOf: keyDER)
+
+        try blob.write(to: url, options: .atomic)
+        print("[CertificateAuthority] Saved CA to \(url.lastPathComponent)")
     }
 
-    // MARK: - Domain Context (skeleton)
+    // MARK: - Domain Context
 
     private func buildDomainContext(_ domain: String) throws -> NIOSSLContext {
-        // TODO: Generate a leaf certificate for `domain` signed by the CA,
-        // then create an NIOSSLContext with that leaf cert and the CA key.
-        //
-        // Steps:
-        //  1. Generate a new RSA 2048 key pair for the leaf
-        //  2. Build an X.509 v3 cert with:
-        //     - Subject: CN=<domain>
-        //     - SAN: DNS:<domain>
-        //     - Issuer: CN=Capgo InAppBrowser Proxy CA
-        //     - Signed by the CA private key
-        //  3. Convert to NIOSSLCertificate / NIOSSLPrivateKey
-        //  4. Build NIOSSLContext with the cert chain
+        guard let caKeyUnwrapped = caKey, let certDER = caCertDER else {
+            throw ProxyError.certGenerationFailed("CA not loaded -- cannot generate domain cert for: \(domain)")
+        }
 
-        // For now, throw an error indicating MITM is not yet available.
-        // The proxy server handles this gracefully by falling back to blind tunneling.
-        throw ProxyError.certGenerationFailed(
-            "Domain cert generation not yet implemented for: \(domain). Using blind tunnel mode.")
+        // Generate a new RSA key pair for the leaf certificate.
+        let leafKey = try _RSA.Signing.PrivateKey(keySize: .bits2048)
+        let leafPrivKey = Certificate.PrivateKey(leafKey)
+        let caPrivKey = Certificate.PrivateKey(caKeyUnwrapped)
+
+        let now = Date()
+        let thirtyDaysLater = Calendar.current.date(byAdding: .day, value: 30, to: now)!
+
+        let issuerName = try DistinguishedName {
+            CommonName("Capgo InAppBrowser Proxy CA")
+        }
+
+        let subjectName = try DistinguishedName {
+            CommonName(domain)
+        }
+
+        // Build the authority key identifier from the CA public key.
+        let caSKI = SubjectKeyIdentifier(hash: caPrivKey.publicKey)
+
+        let extensions = try Certificate.Extensions {
+            Critical(BasicConstraints.notCertificateAuthority)
+            KeyUsage(digitalSignature: true, keyEncipherment: true)
+            SubjectAlternativeNames([.dnsName(domain)])
+            SubjectKeyIdentifier(hash: leafPrivKey.publicKey)
+            AuthorityKeyIdentifier(keyIdentifier: caSKI.keyIdentifier)
+        }
+
+        let leafCert = try Certificate(
+            version: .v3,
+            serialNumber: Certificate.SerialNumber(),
+            publicKey: leafPrivKey.publicKey,
+            notValidBefore: now,
+            notValidAfter: thirtyDaysLater,
+            issuer: issuerName,
+            subject: subjectName,
+            signatureAlgorithm: .sha256WithRSAEncryption,
+            extensions: extensions,
+            issuerPrivateKey: caPrivKey
+        )
+
+        // Serialize the leaf cert to DER.
+        var leafSerializer = DER.Serializer()
+        try leafCert.serialize(into: &leafSerializer)
+        let leafCertDER = leafSerializer.serializedBytes
+
+        // Convert to NIOSSL types.
+        let nioLeafCert = try NIOSSLCertificate(bytes: leafCertDER, format: .der)
+        let nioCACert = try NIOSSLCertificate(bytes: certDER, format: .der)
+
+        // NIOSSLPrivateKey expects PKCS#8 DER format for RSA keys.
+        let leafPKCS8DER = [UInt8](leafKey.pkcs8DERRepresentation)
+        let nioLeafKey = try NIOSSLPrivateKey(bytes: leafPKCS8DER, format: .der)
+
+        // Create the TLS server configuration with the leaf cert chain.
+        var tlsConfig = TLSConfiguration.makeServerConfiguration(
+            certificateChain: [.certificate(nioLeafCert), .certificate(nioCACert)],
+            privateKey: .privateKey(nioLeafKey)
+        )
+        tlsConfig.minimumTLSVersion = .tlsv12
+
+        let sslContext = try NIOSSLContext(configuration: tlsConfig)
+
+        print("[CertificateAuthority] Generated leaf cert for domain: \(domain)")
+        return sslContext
     }
 }
