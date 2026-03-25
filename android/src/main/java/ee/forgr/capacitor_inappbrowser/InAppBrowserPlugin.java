@@ -586,15 +586,6 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             options.setTextZoom(textZoom);
         }
 
-        String proxyRequestsStr = call.getString("proxyRequests");
-        if (proxyRequestsStr != null) {
-            try {
-                options.setProxyRequestsPattern(Pattern.compile(proxyRequestsStr));
-            } catch (PatternSyntaxException e) {
-                Log.e("WebViewDialog", String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr));
-            }
-        }
-
         JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
         try {
             // Try to set buttonNearDone if present, with better error handling
@@ -1131,28 +1122,6 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 }
             }
         );
-    }
-
-    @PluginMethod
-    public void lsuakdchgbbaHandleProxiedRequest(PluginCall call) {
-        String webviewId = call.getString("webviewId");
-        WebViewDialog webViewDialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
-        if (webViewDialog != null) {
-            Boolean ok = call.getBoolean("ok", false);
-            String id = call.getString("id");
-            if (id == null) {
-                Log.e("InAppBrowserProxy", "CRITICAL ERROR, proxy id = null");
-                return;
-            }
-            if (Boolean.FALSE.equals(ok)) {
-                String result = call.getString("result", "");
-                webViewDialog.handleProxyResultError(result, id);
-            } else {
-                JSONObject object = call.getObject("result");
-                webViewDialog.handleProxyResultOk(object, id);
-            }
-        }
-        call.resolve();
     }
 
     @PluginMethod
