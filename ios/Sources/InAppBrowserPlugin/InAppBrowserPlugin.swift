@@ -81,6 +81,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Proxy state
     private var activeProxyServer: SwiftNIOProxyServer?
     private var activeRuleMatcher: ProxyRuleMatcher?
+    private var activeCertificateAuthority: CertificateAuthority?
     private var isProxyActive: Bool = false
     private var pendingProxyRequests: [String: ([String: Any]?) -> Void] = [:]
     private var pendingProxyResponses: [String: ([String: Any]?) -> Void] = [:]
@@ -627,7 +628,20 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 let rules = try ProxyRuleMatcher.parse(from: proxyRulesArray)
                 activeRuleMatcher = ProxyRuleMatcher(rules: rules)
 
-                let proxyServer = SwiftNIOProxyServer(ruleMatcher: activeRuleMatcher!)
+                // Initialize the Certificate Authority for MITM interception.
+                // If CA setup fails, the proxy will still work in blind tunnel mode.
+                var ca: CertificateAuthority?
+                do {
+                    let certAuth = CertificateAuthority()
+                    try certAuth.loadOrCreate()
+                    ca = certAuth
+                    activeCertificateAuthority = certAuth
+                    print("[InAppBrowser] Certificate Authority loaded (fingerprint: \(certAuth.getCACertFingerprint() ?? "n/a"))")
+                } catch {
+                    print("[InAppBrowser] Warning: CA setup failed (\(error.localizedDescription)). HTTPS interception will use blind tunnel mode.")
+                }
+
+                let proxyServer = SwiftNIOProxyServer(ruleMatcher: activeRuleMatcher!, certificateAuthority: ca)
                 proxyServer.delegate = self
                 let proxyPort = try proxyServer.start()
                 activeProxyServer = proxyServer
@@ -1351,6 +1365,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         activeProxyServer?.stop()
         activeProxyServer = nil
         activeRuleMatcher = nil
+        activeCertificateAuthority = nil
         isProxyActive = false
         proxyDataStore = nil
 

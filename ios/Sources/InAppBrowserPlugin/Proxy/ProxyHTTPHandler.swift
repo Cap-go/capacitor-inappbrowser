@@ -2,12 +2,16 @@ import Foundation
 import NIO
 import NIOCore
 import NIOHTTP1
+import NIOSSL
 
 // MARK: - ProxyHTTPHandler
 
 /// Handles incoming HTTP connections from the WKWebView.
 ///
-/// For `CONNECT` requests it establishes a blind TCP tunnel.
+/// For `CONNECT` requests it either performs MITM TLS termination (when a
+/// ``CertificateAuthority`` is available and a rule could match the host)
+/// or establishes a blind TCP tunnel.
+///
 /// For regular HTTP requests it matches rules, optionally fires
 /// interception events, and forwards to the upstream server.
 final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
@@ -16,13 +20,17 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
     private let ruleMatcher: ProxyRuleMatcher
     private weak var delegate: ProxyEventDelegate?
+    private let certificateAuthority: CertificateAuthority?
 
     private var requestHead: HTTPRequestHead?
     private var requestBody: ByteBuffer?
 
-    init(ruleMatcher: ProxyRuleMatcher, delegate: ProxyEventDelegate?) {
+    init(ruleMatcher: ProxyRuleMatcher,
+         delegate: ProxyEventDelegate?,
+         certificateAuthority: CertificateAuthority?) {
         self.ruleMatcher = ruleMatcher
         self.delegate = delegate
+        self.certificateAuthority = certificateAuthority
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -49,7 +57,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         }
     }
 
-    // MARK: - CONNECT (blind tunnel)
+    // MARK: - CONNECT
 
     private func handleConnect(context: ChannelHandlerContext, head: HTTPRequestHead) {
         let components = head.uri.split(separator: ":")
@@ -61,10 +69,82 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         context.write(wrapOutboundOut(.head(response)), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
 
-        // TODO: When cert generation is complete, do MITM for rule-matched hosts.
-        // For now, always use a blind TCP tunnel.
-        setupTCPTunnel(context: context, host: host, port: port)
+        if let ca = certificateAuthority, ca.isLoaded, ruleMatcher.anyRuleCouldMatchHost(host) {
+            // MITM: terminate TLS with domain cert, re-parse HTTP, intercept
+            setupMITM(context: context, host: host, port: port, ca: ca)
+        } else {
+            // Blind tunnel: no MITM needed
+            setupTCPTunnel(context: context, host: host, port: port)
+        }
     }
+
+    // MARK: - MITM Setup
+
+    private func setupMITM(context: ChannelHandlerContext, host: String, port: Int, ca: CertificateAuthority) {
+        do {
+            let sslContext = try ca.sslContextForDomain(host)
+            let sslHandler = NIOSSLServerHandler(context: sslContext)
+
+            // Capture what we need before removing self from the pipeline.
+            let ruleMatcher = self.ruleMatcher
+            let delegate = self.delegate
+
+            // Remove self and HTTP handlers, then add TLS + HTTP + intercept handler.
+            context.pipeline.removeHandler(self).flatMap {
+                // Remove HTTP server pipeline handler if present.
+                context.pipeline.handler(type: HTTPServerPipelineHandler.self).flatMap { handler in
+                    context.pipeline.removeHandler(handler)
+                }.flatMapError { _ in
+                    context.eventLoop.makeSucceededFuture(())
+                }
+            }.flatMap {
+                // Add TLS termination (presents our domain cert to the client/WebView).
+                context.pipeline.addHandler(sslHandler)
+            }.flatMap {
+                // Re-add HTTP codec after TLS.
+                context.pipeline.configureHTTPServerPipeline()
+            }.flatMap {
+                // Add MITM intercept handler.
+                context.pipeline.addHandler(
+                    MITMInterceptHandler(
+                        host: host,
+                        port: port,
+                        ruleMatcher: ruleMatcher,
+                        delegate: delegate
+                    )
+                )
+            }.whenFailure { error in
+                print("[ProxyHTTPHandler] MITM setup failed for \(host): \(error). Falling back to tunnel.")
+                // If MITM fails, fall back to blind tunnel.
+                self.setupTCPTunnelFallback(context: context, host: host, port: port)
+            }
+        } catch {
+            print("[ProxyHTTPHandler] Failed to get SSL context for \(host): \(error). Using tunnel.")
+            setupTCPTunnel(context: context, host: host, port: port)
+        }
+    }
+
+    /// Fallback tunnel setup used when MITM pipeline setup fails after self has been removed.
+    private func setupTCPTunnelFallback(context: ChannelHandlerContext, host: String, port: Int) {
+        let bootstrap = ClientBootstrap(group: context.eventLoop)
+            .channelInitializer { channel in
+                channel.eventLoop.makeSucceededFuture(())
+            }
+
+        bootstrap.connect(host: host, port: port).whenComplete { result in
+            switch result {
+            case .success(let upstreamChannel):
+                self.installTunnelHandlers(
+                    clientChannel: context.channel,
+                    upstreamChannel: upstreamChannel
+                )
+            case .failure:
+                context.close(promise: nil)
+            }
+        }
+    }
+
+    // MARK: - Blind TCP Tunnel
 
     private func setupTCPTunnel(context: ChannelHandlerContext, host: String, port: Int) {
         let bootstrap = ClientBootstrap(group: context.eventLoop)
@@ -104,7 +184,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                         )
                     }
                 } else {
-                    // No pipeline handler to remove — install tunnel anyway
+                    // No pipeline handler to remove -- install tunnel anyway
                     self.installTunnelHandlers(
                         clientChannel: context.channel,
                         upstreamChannel: upstreamChannel
@@ -143,7 +223,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
         guard let rule = ruleMatcher.match(url: url, method: method),
               rule.interceptsRequest else {
-            // No matching rule — forward directly.
+            // No matching rule -- forward directly.
             forwardToUpstream(context: context, head: head, body: body, rule: nil)
             return
         }
@@ -268,6 +348,188 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         let response = HTTPResponseHead(version: .http1_1, status: status)
         context.write(wrapOutboundOut(.head(response)), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        context.close(promise: nil)
+    }
+}
+
+// MARK: - MITMInterceptHandler
+
+/// Handles decrypted HTTP traffic after MITM TLS termination.
+///
+/// This handler operates on the plaintext side of the TLS connection.
+/// It reconstructs full HTTPS URLs, matches rules, fires interception events,
+/// and forwards requests upstream via TLS to the real server.
+final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler {
+    typealias InboundIn = HTTPServerRequestPart
+    typealias OutboundOut = HTTPServerResponsePart
+
+    private let host: String
+    private let port: Int
+    private let ruleMatcher: ProxyRuleMatcher
+    private weak var delegate: ProxyEventDelegate?
+
+    private var requestHead: HTTPRequestHead?
+    private var requestBody: ByteBuffer?
+
+    init(host: String, port: Int, ruleMatcher: ProxyRuleMatcher, delegate: ProxyEventDelegate?) {
+        self.host = host
+        self.port = port
+        self.ruleMatcher = ruleMatcher
+        self.delegate = delegate
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let part = unwrapInboundIn(data)
+        switch part {
+        case .head(let head):
+            requestHead = head
+            requestBody = context.channel.allocator.buffer(capacity: 0)
+        case .body(var buf):
+            requestBody?.writeBuffer(&buf)
+        case .end:
+            guard let head = requestHead else { return }
+            let fullUrl = "https://\(host)\(head.uri)"
+            handleDecryptedRequest(context: context, head: head, body: requestBody, fullUrl: fullUrl)
+            requestHead = nil
+            requestBody = nil
+        }
+    }
+
+    private func handleDecryptedRequest(
+        context: ChannelHandlerContext,
+        head: HTTPRequestHead,
+        body: ByteBuffer?,
+        fullUrl: String
+    ) {
+        let method = "\(head.method)"
+
+        // Check if any rule matches. If a matching rule intercepts requests, fire the event.
+        let matchedRule = ruleMatcher.match(url: fullUrl, method: method)
+
+        guard let rule = matchedRule, rule.interceptsRequest else {
+            // No interception needed -- forward directly upstream.
+            forwardUpstreamTLS(context: context, head: head, body: body, rule: matchedRule, fullUrl: fullUrl)
+            return
+        }
+
+        let requestId = UUID().uuidString
+        var requestData: [String: Any] = [
+            "url": fullUrl,
+            "method": method,
+            "headers": Dictionary(
+                head.headers.map { ($0.name, $0.value) },
+                uniquingKeysWith: { _, last in last }
+            )
+        ]
+        if rule.includeBody, let body = body, body.readableBytes > 0 {
+            requestData["body"] = Data(body.readableBytesView).base64EncodedString()
+        }
+
+        let eventLoop = context.eventLoop
+        delegate?.onRequestIntercept(
+            requestId: requestId,
+            ruleIndex: rule.ruleIndex,
+            requestData: requestData
+        ) { [weak self] modifications in
+            eventLoop.execute {
+                guard let self = self else { return }
+                var modifiedHead = head
+                var modifiedBody = body
+                if let mods = modifications {
+                    if let newUrl = mods["url"] as? String {
+                        modifiedHead.uri = newUrl
+                    }
+                    if let newMethod = mods["method"] as? String {
+                        modifiedHead.method = HTTPMethod(rawValue: newMethod)
+                    }
+                    if let newHeaders = mods["headers"] as? [String: String] {
+                        modifiedHead.headers = HTTPHeaders(
+                            newHeaders.map { ($0.key, $0.value) }
+                        )
+                    }
+                    if let newBodyB64 = mods["body"] as? String,
+                       let bodyData = Data(base64Encoded: newBodyB64) {
+                        modifiedBody = context.channel.allocator.buffer(bytes: bodyData)
+                        modifiedHead.headers.replaceOrAdd(
+                            name: "content-length",
+                            value: "\(bodyData.count)"
+                        )
+                    }
+                }
+                self.forwardUpstreamTLS(
+                    context: context,
+                    head: modifiedHead,
+                    body: modifiedBody,
+                    rule: rule,
+                    fullUrl: fullUrl
+                )
+            }
+        }
+    }
+
+    private func forwardUpstreamTLS(
+        context: ChannelHandlerContext,
+        head: HTTPRequestHead,
+        body: ByteBuffer?,
+        rule: NativeProxyRule?,
+        fullUrl: String
+    ) {
+        let upstreamHost = self.host
+        let upstreamPort = self.port
+
+        let bootstrap = ClientBootstrap(group: context.eventLoop)
+            .channelInitializer { channel in
+                do {
+                    // Add TLS client handler (trusts system CA store).
+                    let tlsConfig = TLSConfiguration.makeClientConfiguration()
+                    let sslContext = try NIOSSLContext(configuration: tlsConfig)
+                    let sslHandler = try NIOSSLClientHandler(
+                        context: sslContext,
+                        serverHostname: upstreamHost
+                    )
+                    return channel.pipeline.addHandler(sslHandler).flatMap {
+                        channel.pipeline.addHandlers([
+                            HTTPRequestEncoder(),
+                            ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
+                        ])
+                    }
+                } catch {
+                    return channel.eventLoop.makeFailedFuture(error)
+                }
+            }
+
+        bootstrap.connect(host: upstreamHost, port: upstreamPort).whenComplete { [weak self] result in
+            switch result {
+            case .success(let upstreamChannel):
+                // Send the request upstream.
+                upstreamChannel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                if let body = body, body.readableBytes > 0 {
+                    upstreamChannel.write(
+                        NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
+                }
+                upstreamChannel.writeAndFlush(
+                    NIOAny(HTTPClientRequestPart.end(nil)), promise: nil)
+
+                // Read the response and relay back to the client.
+                let responseHandler = UpstreamResponseHandler(
+                    clientContext: context,
+                    rule: rule,
+                    delegate: self?.delegate,
+                    requestUrl: fullUrl
+                )
+                upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
+                    context.close(promise: nil)
+                }
+
+            case .failure:
+                let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
+                context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
+                context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            }
+        }
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
