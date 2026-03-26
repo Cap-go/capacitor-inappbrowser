@@ -1428,6 +1428,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Store the call for later resolution
         self.openSecureWindowCall = call
 
+        let prefersEphemeral = call.getBool("prefersEphemeralWebBrowserSession") ?? false
+
         // Open the URL in a secure browser window
         DispatchQueue.main.async {
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: url.scheme) {
@@ -1457,6 +1459,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             // Present the session
+            session.prefersEphemeralWebBrowserSession = prefersEphemeral
             session.presentationContextProvider = self
             session.start()
         }
