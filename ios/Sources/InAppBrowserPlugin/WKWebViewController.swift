@@ -111,7 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, customWebsiteDataStore: WKWebsiteDataStore? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -120,6 +120,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.customWebsiteDataStore = customWebsiteDataStore
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -172,6 +173,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var disableOverscroll: Bool = false
+
+    /// When set before `initWebview()`, this data store will be used for the
+    /// WKWebView configuration instead of the default.  Used by the proxy
+    /// system to route traffic through the local MITM proxy (iOS 17+).
+    var customWebsiteDataStore: WKWebsiteDataStore?
+
+    /// When true, the cert challenge handler will trust all server certificates
+    /// (needed for the local MITM proxy's self-signed certs).
+    var isProxyActive: Bool = false
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -827,6 +837,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Enable background task processing
         webConfiguration.processPool = WKProcessPool()
+
+        // Apply custom data store if provided (used by proxy system)
+        if let customDS = customWebsiteDataStore {
+            webConfiguration.websiteDataStore = customDS
+        }
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -2079,6 +2094,16 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        // When the proxy is active, trust all server certificates (the proxy
+        // terminates TLS locally and re-encrypts to the upstream server).
+        if isProxyActive,
+           challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+           let serverTrust = challenge.protectionSpace.serverTrust {
+            let credential = URLCredential(trust: serverTrust)
+            completionHandler(.useCredential, credential)
+            return
+        }
+
         if let credentials = credentials,
            challenge.protectionSpace.receivesCredentialSecurely,
            let url = webView.url, challenge.protectionSpace.host == url.host, challenge.protectionSpace.protocol == url.scheme, challenge.protectionSpace.port == url.port ?? (url.scheme == "https" ? 443 : url.scheme == "http" ? 80 : nil) {

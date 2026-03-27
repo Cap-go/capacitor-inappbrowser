@@ -10,6 +10,8 @@ import type {
   OpenSecureWindowOptions,
   OpenSecureWindowResponse,
   ScreenshotResult,
+  ModifiedRequest,
+  ModifiedResponse,
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
@@ -37,6 +39,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async openWebView(options: OpenWebViewOptions): Promise<any> {
+    if (options.proxyRules && options.proxyRules.length > 0) {
+      throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
+    }
     console.log('openWebView', options);
     return options;
   }
@@ -102,6 +107,14 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   async setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setEnabledSafeBottomMargin not supported on web');
     return;
+  }
+
+  async handleProxyRequest(_options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void> {
+    throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
+  }
+
+  async handleProxyResponse(_options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void> {
+    throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 
   async openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse> {

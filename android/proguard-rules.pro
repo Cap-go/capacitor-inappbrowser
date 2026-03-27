@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# LittleProxy + Netty
+-keep class io.netty.** { *; }
+-keep class org.littleshoot.proxy.** { *; }
+-dontwarn io.netty.**
+-dontwarn org.littleshoot.**
+
+# BouncyCastle
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**

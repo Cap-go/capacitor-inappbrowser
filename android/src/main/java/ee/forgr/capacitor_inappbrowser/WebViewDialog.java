@@ -68,7 +68,6 @@ import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -84,33 +83,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog {
-
-    private static class ProxiedRequest {
-
-        private WebResourceResponse response;
-        private final Semaphore semaphore;
-
-        public WebResourceResponse getResponse() {
-            return response;
-        }
-
-        public ProxiedRequest() {
-            this.semaphore = new Semaphore(0);
-            this.response = null;
-        }
-    }
 
     private WebView _webView;
     private Toolbar _toolbar;
@@ -121,7 +103,6 @@ public class WebViewDialog extends Dialog {
     private boolean datePickerInjected = false; // Track if we've injected date picker fixes
     private final WebView capacitorWebView;
     private String instanceId = "";
-    private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
@@ -146,6 +127,9 @@ public class WebViewDialog extends Dialog {
 
     // Temporary URI for storing camera capture
     public Uri tempCameraUri;
+
+    // Proxy: when true, trust MITM-generated SSL certs
+    private boolean isProxyActive = false;
 
     public interface PermissionHandler {
         void handleCameraPermissionRequest(PermissionRequest request);
@@ -174,6 +158,10 @@ public class WebViewDialog extends Dialog {
 
     public String getInstanceId() {
         return instanceId;
+    }
+
+    public void setProxyActive(boolean proxyActive) {
+        this.isProxyActive = proxyActive;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -2441,74 +2429,6 @@ public class WebViewDialog extends Dialog {
         buttonNearDoneView.setColorFilter(iconColor);
     }
 
-    public void handleProxyResultError(String result, String id) {
-        Log.i("InAppBrowserProxy", String.format("handleProxyResultError: %s, ok: %s id: %s", result, false, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-        proxiedRequest.semaphore.release();
-    }
-
-    public void handleProxyResultOk(JSONObject result, String id) {
-        Log.i("InAppBrowserProxy", String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-
-        if (result == null) {
-            proxiedRequest.semaphore.release();
-            return;
-        }
-
-        Map<String, String> responseHeaders = new HashMap<>();
-        String body;
-        int code;
-
-        try {
-            body = result.getString("body");
-            code = result.getInt("code");
-            JSONObject headers = result.getJSONObject("headers");
-            for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
-                String headerName = it.next();
-                String header = headers.getString(headerName);
-                responseHeaders.put(headerName, header);
-            }
-        } catch (JSONException e) {
-            Log.e("InAppBrowserProxy", "Cannot parse OK result", e);
-            return;
-        }
-
-        String contentType = responseHeaders.get("Content-Type");
-        if (contentType == null) {
-            contentType = responseHeaders.get("content-type");
-        }
-        if (contentType == null) {
-            Log.e("InAppBrowserProxy", "'Content-Type' header is required");
-            return;
-        }
-
-        if (!((100 <= code && code <= 299) || (400 <= code && code <= 599))) {
-            Log.e("InAppBrowserProxy", String.format("Status code %s outside of the allowed range", code));
-            return;
-        }
-
-        WebResourceResponse webResourceResponse = new WebResourceResponse(
-            contentType,
-            "utf-8",
-            new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
-        );
-
-        webResourceResponse.setStatusCodeAndReasonPhrase(code, getReasonPhrase(code));
-        proxiedRequest.response = webResourceResponse;
-        proxiedRequest.semaphore.release();
-    }
-
     private void setWebViewClient() {
         _webView.setWebViewClient(
             new WebViewClient() {
@@ -2810,134 +2730,6 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
-                private String randomRequestId() {
-                    return UUID.randomUUID().toString();
-                }
-
-                private String toBase64(String raw) {
-                    String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
-                    if (s.endsWith("=")) {
-                        s = s.substring(0, s.length() - 2);
-                    }
-                    return s;
-                }
-
-                //
-                //        void handleRedirect(String currentUrl, Response response) {
-                //          String loc = response.header("Location");
-                //          _webView.evaluateJavascript("");
-                //        }
-                //
-                @Override
-                public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                    if (view == null || _webView == null) {
-                        return null;
-                    }
-                    Pattern pattern = _options.getProxyRequestsPattern();
-                    if (pattern == null) {
-                        return null;
-                    }
-                    Matcher matcher = pattern.matcher(request.getUrl().toString());
-                    if (!matcher.find()) {
-                        return null;
-                    }
-
-                    // Requests matches the regex
-                    if (Objects.equals(request.getMethod(), "POST")) {
-                        // Log.e("HTTP", String.format("returned null (ok) %s", request.getUrl().toString()));
-                        return null;
-                    }
-
-                    Log.i("InAppBrowserProxy", String.format("Proxying request: %s", request.getUrl().toString()));
-
-                    // We need to call a JS function
-                    String requestId = randomRequestId();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
-                    addProxiedRequest(requestId, proxiedRequest);
-
-                    // lsuakdchgbbaHandleProxiedRequest
-                    activity.runOnUiThread(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                StringBuilder headers = new StringBuilder();
-                                Map<String, String> requestHeaders = request.getRequestHeaders();
-                                for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
-                                    headers.append(
-                                        String.format("h[atob('%s')]=atob('%s');", toBase64(header.getKey()), toBase64(header.getValue()))
-                                    );
-                                }
-                                String jsTemplate = """
-                                    try {
-                                      function getHeaders() {
-                                        const h = {};
-                                        %s
-                                        return h;
-                                      }
-                                      window.InAppBrowserProxyRequest(new Request(atob('%s'), {
-                                        headers: getHeaders(),
-                                        method: '%s'
-                                      })).then(async (res) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: true,
-                                          result: (!!res ? {
-                                            headers: Object.fromEntries(res.headers.entries()),
-                                            code: res.status,
-                                            body: (await res.text())
-                                          } : null),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      }).catch((e) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: false,
-                                          result: e.toString(),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      });
-                                    } catch (e) {
-                                      Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                        ok: false,
-                                        result: e.toString(),
-                                        id: '%s',
-                                        webviewId: '%s'
-                                      });
-                                    }
-                                    """;
-                                String dialogId = instanceId != null ? instanceId : "";
-                                String s = String.format(
-                                    jsTemplate,
-                                    headers,
-                                    toBase64(request.getUrl().toString()),
-                                    request.getMethod(),
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId
-                                );
-                                // Log.i("HTTP", s);
-                                capacitorWebView.evaluateJavascript(s, null);
-                            }
-                        }
-                    );
-
-                    // 10 seconds wait max
-                    try {
-                        if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                            return proxiedRequest.response;
-                        } else {
-                            Log.e("InAppBrowserProxy", "Semaphore timed out");
-                            removeProxiedRequest(requestId); // prevent mem leak
-                        }
-                    } catch (InterruptedException e) {
-                        Log.e("InAppBrowserProxy", "Semaphore wait error", e);
-                    }
-                    return null;
-                }
-
                 @Override
                 public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler, String host, String realm) {
                     if (view == null || _webView == null) {
@@ -3156,6 +2948,11 @@ public class WebViewDialog extends Dialog {
                         }
                         return;
                     }
+                    // When proxy is active, trust MITM-generated certs
+                    if (isProxyActive) {
+                        handler.proceed();
+                        return;
+                    }
                     boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
                     if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) handler.proceed();
                     else {
@@ -3213,57 +3010,6 @@ public class WebViewDialog extends Dialog {
                 return activity.onKeyUp(keyCode, event);
         }
         return super.onKeyUp(keyCode, event);
-    }
-
-    public static String getReasonPhrase(int statusCode) {
-        return switch (statusCode) {
-            case (200) -> "OK";
-            case (201) -> "Created";
-            case (202) -> "Accepted";
-            case (203) -> "Non Authoritative Information";
-            case (204) -> "No Content";
-            case (205) -> "Reset Content";
-            case (206) -> "Partial Content";
-            case (207) -> "Partial Update OK";
-            case (300) -> "Multiple Choices";
-            case (301) -> "Moved Permanently";
-            case (302) -> "Moved Temporarily";
-            case (303) -> "See Other";
-            case (304) -> "Not Modified";
-            case (305) -> "Use Proxy";
-            case (307) -> "Temporary Redirect";
-            case (400) -> "Bad Request";
-            case (401) -> "Unauthorized";
-            case (402) -> "Payment Required";
-            case (403) -> "Forbidden";
-            case (404) -> "Not Found";
-            case (405) -> "Method Not Allowed";
-            case (406) -> "Not Acceptable";
-            case (407) -> "Proxy Authentication Required";
-            case (408) -> "Request Timeout";
-            case (409) -> "Conflict";
-            case (410) -> "Gone";
-            case (411) -> "Length Required";
-            case (412) -> "Precondition Failed";
-            case (413) -> "Request Entity Too Large";
-            case (414) -> "Request-URI Too Long";
-            case (415) -> "Unsupported Media Type";
-            case (416) -> "Requested Range Not Satisfiable";
-            case (417) -> "Expectation Failed";
-            case (418) -> "Reauthentication Required";
-            case (419) -> "Proxy Reauthentication Required";
-            case (422) -> "Unprocessable Entity";
-            case (423) -> "Locked";
-            case (424) -> "Failed Dependency";
-            case (500) -> "Server Error";
-            case (501) -> "Not Implemented";
-            case (502) -> "Bad Gateway";
-            case (503) -> "Service Unavailable";
-            case (504) -> "Gateway Timeout";
-            case (505) -> "HTTP Version Not Supported";
-            case (507) -> "Insufficient Storage";
-            default -> "";
-        };
     }
 
     @Override
@@ -3376,11 +3122,6 @@ public class WebViewDialog extends Dialog {
         // Shutdown executor service asynchronously to avoid blocking UI thread
         shutdownExecutorServiceAsync();
 
-        // Clear any remaining proxied requests
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.clear();
-        }
-
         try {
             super.dismiss();
         } catch (Exception e) {
@@ -3464,26 +3205,6 @@ public class WebViewDialog extends Dialog {
         );
         shutdownThread.setDaemon(true);
         shutdownThread.start();
-    }
-
-    public void addProxiedRequest(String key, ProxiedRequest request) {
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.put(key, request);
-        }
-    }
-
-    public ProxiedRequest getProxiedRequest(String key) {
-        synchronized (proxiedRequestsHashmap) {
-            ProxiedRequest request = proxiedRequestsHashmap.get(key);
-            proxiedRequestsHashmap.remove(key);
-            return request;
-        }
-    }
-
-    public void removeProxiedRequest(String key) {
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.remove(key);
-        }
     }
 
     private void shareUrl() {
