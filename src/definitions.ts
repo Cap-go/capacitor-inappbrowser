@@ -971,6 +971,8 @@ export interface OpenWebViewOptions {
    * named rules for outgoing requests and incoming responses on the same URL.
    * Android applies the proxy override process-wide, so only one proxied webview can be active
    * at a time and concurrent opens are rejected with `PROXY_ALREADY_ACTIVE`.
+   * On iOS, native proxy interception currently requires the Swift Package Manager integration;
+   * CocoaPods builds reject proxied webviews with `PROXY_START_FAILED`.
    *
    * @since 9.0.0
    */

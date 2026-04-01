@@ -1,3 +1,4 @@
+#if canImport(NIO) && canImport(NIOCore) && canImport(NIOPosix) && canImport(NIOHTTP1) && canImport(NIOSSL) && canImport(X509) && canImport(SwiftASN1) && canImport(Crypto) && canImport(_CryptoExtras)
 import Foundation
 import Security
 import CryptoKit
@@ -6,23 +7,6 @@ import X509
 import SwiftASN1
 @preconcurrency import Crypto
 import _CryptoExtras
-
-/// Errors specific to the proxy subsystem.
-enum ProxyError: Error, LocalizedError {
-    case certGenerationFailed(String)
-    case proxyStartFailed(String)
-    case bindFailed
-    case serverStopped
-
-    var errorDescription: String? {
-        switch self {
-        case .certGenerationFailed(let msg): return "Certificate generation failed: \(msg)"
-        case .proxyStartFailed(let msg): return "Proxy start failed: \(msg)"
-        case .bindFailed: return "Failed to bind proxy server to a port"
-        case .serverStopped: return "Proxy server has been stopped"
-        }
-    }
-}
 
 /// Manages a self-signed CA certificate used by the MITM proxy.
 ///
@@ -287,3 +271,4 @@ class CertificateAuthority {
         return sslContext
     }
 }
+#endif

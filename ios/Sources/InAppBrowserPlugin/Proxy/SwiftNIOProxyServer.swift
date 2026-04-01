@@ -1,27 +1,9 @@
+#if canImport(NIO) && canImport(NIOCore) && canImport(NIOPosix) && canImport(NIOHTTP1) && canImport(NIOSSL) && canImport(X509) && canImport(SwiftASN1) && canImport(Crypto) && canImport(_CryptoExtras)
 import Foundation
 import NIO
 import NIOCore
 import NIOPosix
 import NIOHTTP1
-
-/// Delegate protocol for proxy interception events.
-///
-/// The delegate (typically the plugin class) fires Capacitor events to
-/// JavaScript and waits for the JS side to call back with optional
-/// modifications before resuming the proxied request/response.
-protocol ProxyEventDelegate: AnyObject {
-    /// Called when a request matches an interception rule.
-    /// `completion` receives optional modifications, or `nil` to forward as-is.
-    func onRequestIntercept(requestId: String, ruleName: String,
-                            requestData: [String: Any],
-                            completion: @escaping ([String: Any]?) -> Void)
-
-    /// Called when a response matches an interception rule.
-    /// `completion` receives optional modifications, or `nil` to forward as-is.
-    func onResponseIntercept(requestId: String, ruleName: String,
-                             responseData: [String: Any],
-                             completion: @escaping ([String: Any]?) -> Void)
-}
 
 /// A local HTTP proxy server built on SwiftNIO.
 ///
@@ -86,3 +68,4 @@ class SwiftNIOProxyServer {
         print("[SwiftNIOProxyServer] Stopped")
     }
 }
+#endif

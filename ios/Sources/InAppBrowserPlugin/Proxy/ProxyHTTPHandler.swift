@@ -1,4 +1,5 @@
 // swiftlint:disable file_length
+#if canImport(NIO) && canImport(NIOCore) && canImport(NIOPosix) && canImport(NIOHTTP1) && canImport(NIOSSL) && canImport(X509) && canImport(SwiftASN1) && canImport(Crypto) && canImport(_CryptoExtras)
 import Foundation
 import NIO
 import NIOCore
@@ -1022,3 +1023,4 @@ final class TunnelHandler: ChannelInboundHandler {
         context.close(promise: nil)
     }
 }
+#endif
