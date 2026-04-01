@@ -3,6 +3,10 @@ function loopbackHost() {
   if (configuredHost) {
     return configuredHost;
   }
+  const capacitor = globalThis.Capacitor;
+  if (capacitor && typeof capacitor.isNativePlatform === "function" && capacitor.isNativePlatform()) {
+    return "127.0.0.1";
+  }
   return window.location.hostname || "localhost";
 }
 

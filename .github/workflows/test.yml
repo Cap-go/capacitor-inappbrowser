@@ -74,7 +74,7 @@ jobs:
       - name: Build example app for Android regression flow
         env:
           VITE_MAESTRO_PROXY_AUTORUN: '1'
-          VITE_MAESTRO_PROXY_SIGNAL: alert
+          VITE_MAESTRO_PROXY_SIGNAL: none
           VITE_MAESTRO_PROXY_AUTORUN_DELAY_MS: '1000'
         run: bun run example-app:prepare:android
       - name: Run Maestro proxy regression

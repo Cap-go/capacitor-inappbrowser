@@ -19,6 +19,34 @@ const entryHtml = `<!doctype html>
 </html>`;
 
 const appJs = `(() => {
+  const setVisibleResult = (message, details) => {
+    document.title = message;
+    document.body.dataset.proxyRegressionStatus = message;
+
+    let banner = document.getElementById('proxy-regression-result');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'proxy-regression-result';
+      banner.style.position = 'fixed';
+      banner.style.top = '16px';
+      banner.style.left = '16px';
+      banner.style.right = '16px';
+      banner.style.zIndex = '2147483647';
+      banner.style.padding = '14px 16px';
+      banner.style.borderRadius = '12px';
+      banner.style.background = 'rgba(17, 24, 39, 0.96)';
+      banner.style.color = '#fff';
+      banner.style.fontFamily = 'system-ui, sans-serif';
+      banner.style.fontSize = '16px';
+      banner.style.whiteSpace = 'pre-wrap';
+      banner.style.boxShadow = '0 10px 32px rgba(0, 0, 0, 0.35)';
+      document.body.appendChild(banner);
+    }
+
+    banner.textContent = details ? message + '\\n' + details : message;
+    window.alert(message);
+  };
+
   const postResult = (detail) => {
     if (window.mobileApp && typeof window.mobileApp.postMessage === 'function') {
       window.mobileApp.postMessage({ detail });
@@ -90,6 +118,9 @@ const appJs = `(() => {
         .filter(([, value]) => !value)
         .map(([key]) => key);
 
+      const message = failed.length === 0 ? 'Proxy regression passed' : 'Proxy regression failed';
+      setVisibleResult(message, failed.join(', '));
+
       postResult({
         type: 'proxyRegression',
         state: failed.length === 0 ? 'passed' : 'failed',
@@ -97,10 +128,12 @@ const appJs = `(() => {
         failed,
       });
     } catch (error) {
+      const reason = error && error.message ? error.message : String(error);
+      setVisibleResult('Proxy regression failed', reason);
       postResult({
         type: 'proxyRegression',
         state: 'failed',
-        reason: error && error.message ? error.message : String(error),
+        reason,
       });
     }
   })();
@@ -139,6 +172,7 @@ const server = Bun.serve({
   port,
   async fetch(request) {
     const url = new URL(request.url);
+    console.log(`[proxy-regression-server] ${request.method} ${url.pathname}`);
 
     if (url.pathname === '/health') {
       return new Response('ok');
