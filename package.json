@@ -47,7 +47,7 @@
     "prepublishOnly": "bun run build",
     "proxy:test:server": "bun scripts/proxy-regression-server.js",
     "example-app:prepare:android": "bun run build && cd example-app && bun install && bun run build && bunx cap sync android && cd android && ./gradlew app:assembleDebug",
-    "maestro:test:android": "adb wait-for-device && adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk && MAESTRO_DRIVER_STARTUP_TIMEOUT=${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000} $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml"
+    "maestro:test:android": "export PATH=\"$HOME/.maestro/bin:$PATH\"; adb wait-for-device && adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk && MAESTRO_DRIVER_STARTUP_TIMEOUT=${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000} maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",

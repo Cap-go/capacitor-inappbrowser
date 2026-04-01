@@ -55,7 +55,7 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
       - name: Install Maestro CLI
-        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+        run: export MAESTRO_VERSION=2.1.0 && curl -Ls "https://get.maestro.mobile.dev" | bash
       - name: Start proxy regression server
         run: |
           nohup bun run proxy:test:server >/tmp/proxy-regression-server.log 2>&1 &
@@ -78,7 +78,7 @@ jobs:
           arch: x86_64
           profile: pixel_7
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bun run maestro:test:android
+          script: export PATH="$HOME/.maestro/bin:$PATH" && bun run maestro:test:android
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest
