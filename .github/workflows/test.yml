@@ -54,6 +54,10 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install Maestro CLI
         run: export MAESTRO_VERSION=2.1.0 && curl -Ls "https://get.maestro.mobile.dev" | bash
       - name: Start proxy regression server
