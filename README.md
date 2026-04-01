@@ -1139,47 +1139,55 @@ And in the AndroidManifest.xml file:
 
 #### ProxyRequest
 
+Request payload emitted when a proxy rule intercepts an outgoing HTTP request.
+
 | Prop            | Type                                                  | Description                                                                                                                                                                                    |
 | --------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`id`**        | <code>string</code>                                   | Webview instance id that emitted this proxy event.                                                                                                                                             |
 | **`requestId`** | <code>string</code>                                   | UUID that identifies the intercepted HTTP flow. Request and response events for the same flow reuse this value even when they match different rules. Pass it back to `continueProxyRequest()`. |
 | **`ruleName`**  | <code>string</code>                                   | Name of the matched proxy rule.                                                                                                                                                                |
-| **`url`**       | <code>string</code>                                   |                                                                                                                                                                                                |
-| **`method`**    | <code>string</code>                                   |                                                                                                                                                                                                |
-| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> |                                                                                                                                                                                                |
-| **`body`**      | <code>string</code>                                   |                                                                                                                                                                                                |
+| **`url`**       | <code>string</code>                                   | Absolute request URL observed by the proxy.                                                                                                                                                    |
+| **`method`**    | <code>string</code>                                   | HTTP method sent upstream.                                                                                                                                                                     |
+| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Request headers. Repeated headers are returned as `string[]`.                                                                                                                                  |
+| **`body`**      | <code>string</code>                                   | Optional request body encoded as base64 when `includeBody` is enabled for the rule.                                                                                                            |
 
 
 #### ProxyResponse
+
+Response payload emitted when a proxy rule intercepts an upstream HTTP response.
 
 | Prop            | Type                                                  | Description                                                                                                                                                         |
 | --------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`id`**        | <code>string</code>                                   | Webview instance id that emitted this proxy event.                                                                                                                  |
 | **`requestId`** | <code>string</code>                                   | UUID that identifies the intercepted HTTP flow. Matching request and response events for the same flow reuse this value. Pass it back to `continueProxyResponse()`. |
 | **`ruleName`**  | <code>string</code>                                   | Name of the matched proxy rule.                                                                                                                                     |
-| **`url`**       | <code>string</code>                                   |                                                                                                                                                                     |
-| **`status`**    | <code>number</code>                                   |                                                                                                                                                                     |
-| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> |                                                                                                                                                                     |
-| **`body`**      | <code>string</code>                                   |                                                                                                                                                                     |
+| **`url`**       | <code>string</code>                                   | Absolute request URL associated with this response.                                                                                                                 |
+| **`status`**    | <code>number</code>                                   | HTTP status code returned by the upstream response.                                                                                                                 |
+| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Response headers. Repeated headers are returned as `string[]`.                                                                                                      |
+| **`body`**      | <code>string</code>                                   | Optional response body encoded as base64 when `includeBody` is enabled for the rule.                                                                                |
 
 
 #### ModifiedRequest
 
-| Prop          | Type                                                  |
-| ------------- | ----------------------------------------------------- |
-| **`url`**     | <code>string</code>                                   |
-| **`method`**  | <code>string</code>                                   |
-| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> |
-| **`body`**    | <code>string</code>                                   |
+Optional request overrides returned to `continueProxyRequest()`.
+
+| Prop          | Type                                                  | Description                                                              |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------ |
+| **`url`**     | <code>string</code>                                   | Replacement absolute request URL.                                        |
+| **`method`**  | <code>string</code>                                   | Replacement HTTP method.                                                 |
+| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Replacement request headers. Repeated headers can be sent as `string[]`. |
+| **`body`**    | <code>string</code>                                   | Replacement request body encoded as base64.                              |
 
 
 #### ModifiedResponse
 
-| Prop          | Type                                                  |
-| ------------- | ----------------------------------------------------- |
-| **`status`**  | <code>number</code>                                   |
-| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> |
-| **`body`**    | <code>string</code>                                   |
+Optional response overrides returned to `continueProxyResponse()`.
+
+| Prop          | Type                                                  | Description                                                               |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------- |
+| **`status`**  | <code>number</code>                                   | Replacement HTTP status code.                                             |
+| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Replacement response headers. Repeated headers can be sent as `string[]`. |
+| **`body`**    | <code>string</code>                                   | Replacement response body encoded as base64.                              |
 
 
 #### DimensionOptions

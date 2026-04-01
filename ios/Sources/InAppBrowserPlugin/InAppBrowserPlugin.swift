@@ -690,7 +690,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 authorizedAppLinks: authorizedAppLinks,
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
-                customWebsiteDataStore: proxyWebsiteDataStore
+                customWebsiteDataStore: proxyWebsiteDataStore,
+                configureBeforeLoad: { controller in
+                    controller.proxyCertificateAuthority = self.activeCertificateAuthority
+                    controller.isProxyActive = self.activeCertificateAuthority != nil
+                }
             )
 
             guard let webViewController = self.webViewController else {

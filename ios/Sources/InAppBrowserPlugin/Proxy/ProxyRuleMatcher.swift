@@ -49,20 +49,25 @@ class ProxyRuleMatcher {
         return nil
     }
 
-    /// Quick check: could *any* rule potentially match requests to `host`?
+    /// Quick check: could *any* rule potentially match requests to `host:port`?
     /// Used to decide whether CONNECT tunnels need MITM.
-    func anyRuleCouldMatchHost(_ host: String) -> Bool {
+    func anyRuleCouldMatchHostAndPort(_ host: String, port: Int) -> Bool {
+        let hostWithPort = "\(host):\(port)"
         let candidates = [
             host,
+            hostWithPort,
             "http://\(host)",
             "http://\(host)/",
+            "http://\(hostWithPort)",
+            "http://\(hostWithPort)/",
             "https://\(host)",
             "https://\(host)/",
+            "https://\(hostWithPort)",
+            "https://\(hostWithPort)/",
         ]
         for rule in rules {
             for candidate in candidates {
-                let range = NSRange(candidate.startIndex..., in: candidate)
-                if rule.urlPattern.firstMatch(in: candidate, range: range) != nil {
+                if matchesEntire(rule.urlPattern, in: candidate) {
                     return true
                 }
             }
@@ -70,7 +75,7 @@ class ProxyRuleMatcher {
             let pattern = rule.urlPattern.pattern.lowercased()
             guard pattern.contains("://") else { continue }
             if let hostHint = urlScopedHostHint(from: pattern) {
-                if hostHint == host.lowercased() {
+                if hostHint == host.lowercased() || hostHint == hostWithPort.lowercased() {
                     return true
                 }
                 continue
@@ -128,13 +133,20 @@ class ProxyRuleMatcher {
     }
 
     private func matches(rule: NativeProxyRule, url: String, method: String) -> Bool {
-        let range = NSRange(url.startIndex..., in: url)
-        guard rule.urlPattern.firstMatch(in: url, range: range) != nil else {
+        guard matchesEntire(rule.urlPattern, in: url) else {
             return false
         }
         if let methods = rule.methods, !methods.contains(method.uppercased()) {
             return false
         }
         return true
+    }
+
+    private func matchesEntire(_ regex: NSRegularExpression, in input: String) -> Bool {
+        let range = NSRange(input.startIndex..., in: input)
+        guard let match = regex.firstMatch(in: input, range: range) else {
+            return false
+        }
+        return NSEqualRanges(match.range, range)
     }
 }

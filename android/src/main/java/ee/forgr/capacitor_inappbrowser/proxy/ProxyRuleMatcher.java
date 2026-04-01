@@ -61,7 +61,7 @@ public class ProxyRuleMatcher {
         String[] candidates = new String[] { host, "http://" + host, "http://" + host + "/", "https://" + host, "https://" + host + "/" };
         for (NativeProxyRule rule : rules) {
             for (String candidate : candidates) {
-                if (rule.urlPattern.matcher(candidate).find()) {
+                if (matchesUrl(rule.urlPattern, candidate)) {
                     return true;
                 }
             }
@@ -107,8 +107,12 @@ public class ProxyRuleMatcher {
     }
 
     private boolean matches(NativeProxyRule rule, String url, String method) {
-        if (!rule.urlPattern.matcher(url).find()) return false;
+        if (!matchesUrl(rule.urlPattern, url)) return false;
         return rule.methods == null || rule.methods.contains(method.toUpperCase());
+    }
+
+    private boolean matchesUrl(Pattern pattern, String url) {
+        return pattern.matcher(url).matches();
     }
 
     private String urlScopedHostHint(String pattern) {

@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,7 +81,10 @@ public class MitmProxyServer {
      *
      * @return the port the server is listening on
      */
-    public int start() {
+    public synchronized int start() {
+        if (server != null) {
+            return port;
+        }
         server = DefaultHttpProxyServer.bootstrap()
             .withAddress(new InetSocketAddress("127.0.0.1", 0))
             .withManInTheMiddle(new ProxyMitmManager())
@@ -95,10 +99,11 @@ public class MitmProxyServer {
     /**
      * Stops the proxy server and releases resources.
      */
-    public void stop() {
+    public synchronized void stop() {
         if (server != null) {
             server.stop();
             server = null;
+            port = 0;
             Log.i(TAG, "MITM proxy stopped");
         }
     }
@@ -134,11 +139,28 @@ public class MitmProxyServer {
         private String extractHost(HttpRequest request) {
             String host = request.headers().get(HttpHeaderNames.HOST);
             if (host == null) {
-                host = request.uri();
+                try {
+                    URI parsedUri = URI.create(request.uri());
+                    host = parsedUri.getHost();
+                    if (host == null) {
+                        host = parsedUri.getAuthority();
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    host = request.uri();
+                }
             }
-            int colonIdx = host.indexOf(':');
-            if (colonIdx > 0) {
-                host = host.substring(0, colonIdx);
+
+            if (host == null) {
+                return "localhost";
+            }
+
+            if (host.startsWith("[") && host.contains("]")) {
+                return host.substring(1, host.indexOf(']'));
+            }
+
+            int colonIdx = host.lastIndexOf(':');
+            if (colonIdx > 0 && host.indexOf(':') == colonIdx) {
+                return host.substring(0, colonIdx);
             }
             return host;
         }
@@ -307,9 +329,11 @@ public class MitmProxyServer {
                 applyHeaders(fullReq.headers(), (Map<String, Object>) modifications.get("headers"));
             }
             if (modifications.containsKey("body")) {
-                byte[] newBody = Base64.decode((String) modifications.get("body"), Base64.DEFAULT);
-                fullReq.content().clear().writeBytes(newBody);
-                fullReq.headers().set(HttpHeaderNames.CONTENT_LENGTH, newBody.length);
+                byte[] newBody = decodeModifiedBody(modifications.get("body"), requestId, "request");
+                if (newBody != null) {
+                    fullReq.content().clear().writeBytes(newBody);
+                    fullReq.headers().set(HttpHeaderNames.CONTENT_LENGTH, newBody.length);
+                }
             }
 
             Log.d(TAG, "Applied request modifications for " + requestId);
@@ -330,9 +354,11 @@ public class MitmProxyServer {
                 applyHeaders(fullResp.headers(), (Map<String, Object>) modifications.get("headers"));
             }
             if (modifications.containsKey("body")) {
-                byte[] newBody = Base64.decode((String) modifications.get("body"), Base64.DEFAULT);
-                fullResp.content().clear().writeBytes(newBody);
-                fullResp.headers().set(HttpHeaderNames.CONTENT_LENGTH, newBody.length);
+                byte[] newBody = decodeModifiedBody(modifications.get("body"), requestId, "response");
+                if (newBody != null) {
+                    fullResp.content().clear().writeBytes(newBody);
+                    fullResp.headers().set(HttpHeaderNames.CONTENT_LENGTH, newBody.length);
+                }
             }
 
             Log.d(TAG, "Applied response modifications for " + requestId);
@@ -375,6 +401,20 @@ public class MitmProxyServer {
         if (future != null) {
             future.complete(null);
             Log.d(TAG, "Completed timed out intercept future for " + requestId);
+        }
+    }
+
+    private byte[] decodeModifiedBody(Object encodedBody, String requestId, String phase) {
+        if (!(encodedBody instanceof String)) {
+            Log.w(TAG, "Ignoring non-string " + phase + " body override for " + requestId);
+            return null;
+        }
+
+        try {
+            return Base64.decode((String) encodedBody, Base64.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Ignoring invalid base64 " + phase + " body override for " + requestId, e);
+            return null;
         }
     }
 }

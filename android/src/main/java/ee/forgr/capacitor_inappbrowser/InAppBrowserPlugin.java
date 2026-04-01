@@ -91,6 +91,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     private MitmProxyServer activeProxyServer;
     private ProxyRuleMatcher activeRuleMatcher;
     private String proxiedWebViewId;
+    private boolean proxyCleanupInProgress;
     private final ConcurrentHashMap<String, CompletableFuture<Map<String, Object>>> pendingProxyRequests = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<Map<String, Object>>> pendingProxyResponses = new ConcurrentHashMap<>();
 
@@ -1173,31 +1174,58 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     private void cleanupProxy() {
+        if (proxyCleanupInProgress) {
+            return;
+        }
+
         if (proxiedWebViewId != null) {
             WebViewDialog proxiedDialog = webViewDialogs.get(proxiedWebViewId);
             if (proxiedDialog != null) {
                 proxiedDialog.setProxyActive(false);
             }
         }
-        if (activeProxyServer != null) {
-            activeProxyServer.stop();
-            activeProxyServer = null;
-        }
-        activeRuleMatcher = null;
 
-        for (CompletableFuture<Map<String, Object>> f : pendingProxyRequests.values()) {
-            f.complete(null);
+        if (
+            activeProxyServer == null &&
+            activeRuleMatcher == null &&
+            proxiedWebViewId == null &&
+            pendingProxyRequests.isEmpty() &&
+            pendingProxyResponses.isEmpty()
+        ) {
+            return;
         }
-        pendingProxyRequests.clear();
-        for (CompletableFuture<Map<String, Object>> f : pendingProxyResponses.values()) {
-            f.complete(null);
-        }
-        pendingProxyResponses.clear();
+
+        proxyCleanupInProgress = true;
+        Runnable finalizeCleanup = () -> {
+            if (activeProxyServer != null) {
+                activeProxyServer.stop();
+                activeProxyServer = null;
+            }
+            activeRuleMatcher = null;
+
+            for (CompletableFuture<Map<String, Object>> f : pendingProxyRequests.values()) {
+                f.complete(null);
+            }
+            pendingProxyRequests.clear();
+            for (CompletableFuture<Map<String, Object>> f : pendingProxyResponses.values()) {
+                f.complete(null);
+            }
+            pendingProxyResponses.clear();
+
+            proxiedWebViewId = null;
+            proxyCleanupInProgress = false;
+        };
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            ProxyController.getInstance().clearProxyOverride(Runnable::run, () -> {});
+            try {
+                ProxyController.getInstance().clearProxyOverride(Runnable::run, finalizeCleanup);
+                return;
+            } catch (Exception e) {
+                Log.w("InAppBrowserPlugin", "Failed to clear WebView proxy override", e);
+            }
         }
-        proxiedWebViewId = null;
+
+        finalizeCleanup.run();
     }
 
     @PluginMethod

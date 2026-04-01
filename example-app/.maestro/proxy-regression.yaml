@@ -2,6 +2,11 @@ appId: ${APP_ID}
 ---
 - launchApp:
     clearState: true
+- scrollUntilVisible:
+    element:
+      text: "Run Proxy Regression Test"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "Run Proxy Regression Test"
 - tapOn:
     text: "Run Proxy Regression Test"

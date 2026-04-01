@@ -111,7 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, customWebsiteDataStore: WKWebsiteDataStore? = nil) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, customWebsiteDataStore: WKWebsiteDataStore? = nil, configureBeforeLoad: ((WKWebViewController) -> Void)? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -121,6 +121,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.customWebsiteDataStore = customWebsiteDataStore
+        configureBeforeLoad?(self)
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -2095,14 +2096,16 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        // When the proxy is active, trust all server certificates (the proxy
-        // terminates TLS locally and re-encrypts to the upstream server).
+        // When the proxy is active, only trust certificates issued by the
+        // active local MITM CA and fail closed for everything else.
         if isProxyActive,
-           challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust,
-           proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true {
-            let credential = URLCredential(trust: serverTrust)
-            completionHandler(.useCredential, credential)
+           challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+            guard let serverTrust = challenge.protectionSpace.serverTrust,
+                  proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            completionHandler(.useCredential, URLCredential(trust: serverTrust))
             return
         }
 

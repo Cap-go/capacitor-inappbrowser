@@ -1,11 +1,16 @@
 package ee.forgr.capacitor_inappbrowser.proxy;
 
 import android.content.Context;
+import android.util.Base64;
 import android.util.Log;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.math.BigInteger;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
@@ -13,7 +18,9 @@ import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.net.ssl.KeyManagerFactory;
@@ -37,9 +44,7 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 public class CertificateAuthority {
 
     private static final String TAG = "MitmCA";
-    private static final String CA_ALIAS = "mitm-ca";
-    private static final String KEYSTORE_FILE = "mitm_ca.p12";
-    private static final char[] KEYSTORE_PASS = "mitmproxy".toCharArray();
+    private static final String CA_FILE = "mitm_ca.bin";
 
     private X509Certificate caCert;
     private PrivateKey caPrivateKey;
@@ -52,11 +57,19 @@ public class CertificateAuthority {
 
     public CertificateAuthority(Context context) {
         try {
-            File ksFile = new File(context.getFilesDir(), KEYSTORE_FILE);
-            if (ksFile.exists()) {
-                loadExistingCA(ksFile);
+            File caFile = new File(context.getNoBackupFilesDir(), CA_FILE);
+            if (!caFile.exists()) {
+                generateNewCA(caFile);
             } else {
-                generateNewCA(ksFile);
+                try {
+                    loadExistingCA(caFile);
+                } catch (Exception e) {
+                    Log.w(TAG, "Stored CA could not be loaded, generating a new one", e);
+                    if (caFile.exists() && !caFile.delete()) {
+                        Log.w(TAG, "Failed to delete unreadable CA file: " + caFile.getAbsolutePath());
+                    }
+                    generateNewCA(caFile);
+                }
             }
             Log.i(TAG, "CA ready: " + caCert.getSubjectX500Principal());
         } catch (Exception e) {
@@ -64,17 +77,31 @@ public class CertificateAuthority {
         }
     }
 
-    private void loadExistingCA(File ksFile) throws Exception {
-        KeyStore ks = KeyStore.getInstance("PKCS12");
-        try (FileInputStream fis = new FileInputStream(ksFile)) {
-            ks.load(fis, KEYSTORE_PASS);
+    private void loadExistingCA(File caFile) throws Exception {
+        try (DataInputStream input = new DataInputStream(new FileInputStream(caFile))) {
+            int certLength = input.readInt();
+            if (certLength <= 0) {
+                throw new IllegalStateException("Invalid certificate length in stored CA");
+            }
+
+            byte[] certBytes = input.readNBytes(certLength);
+            if (certBytes.length != certLength) {
+                throw new IllegalStateException("Stored CA certificate is truncated");
+            }
+
+            byte[] keyBytes = input.readAllBytes();
+            if (keyBytes.length == 0) {
+                throw new IllegalStateException("Stored CA private key is missing");
+            }
+
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            caCert = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certBytes));
+            caPrivateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
         }
-        caCert = (X509Certificate) ks.getCertificate(CA_ALIAS);
-        caPrivateKey = (PrivateKey) ks.getKey(CA_ALIAS, KEYSTORE_PASS);
         Log.i(TAG, "Loaded existing CA from disk");
     }
 
-    private void generateNewCA(File ksFile) throws Exception {
+    private void generateNewCA(File caFile) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048, new SecureRandom());
         KeyPair caKeyPair = kpg.generateKeyPair();
@@ -101,12 +128,12 @@ public class CertificateAuthority {
         caCert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
         caPrivateKey = caKeyPair.getPrivate();
 
-        // Persist to PKCS12 keystore
-        KeyStore ks = KeyStore.getInstance("PKCS12");
-        ks.load(null, KEYSTORE_PASS);
-        ks.setKeyEntry(CA_ALIAS, caPrivateKey, KEYSTORE_PASS, new X509Certificate[] { caCert });
-        try (FileOutputStream fos = new FileOutputStream(ksFile)) {
-            ks.store(fos, KEYSTORE_PASS);
+        byte[] certBytes = caCert.getEncoded();
+        byte[] keyBytes = caPrivateKey.getEncoded();
+        try (DataOutputStream output = new DataOutputStream(new FileOutputStream(caFile))) {
+            output.writeInt(certBytes.length);
+            output.write(certBytes);
+            output.write(keyBytes);
         }
         Log.i(TAG, "Generated new CA and saved to disk");
     }
@@ -177,12 +204,13 @@ public class CertificateAuthority {
 
             X509Certificate domainCert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
 
+            char[] ephemeralPassword = randomPassword();
             KeyStore ks = KeyStore.getInstance("PKCS12");
-            ks.load(null, KEYSTORE_PASS);
-            ks.setKeyEntry("domain", domainKeyPair.getPrivate(), KEYSTORE_PASS, new X509Certificate[] { domainCert, caCert });
+            ks.load(null, ephemeralPassword);
+            ks.setKeyEntry("domain", domainKeyPair.getPrivate(), ephemeralPassword, new X509Certificate[] { domainCert, caCert });
 
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            kmf.init(ks, KEYSTORE_PASS);
+            kmf.init(ks, ephemeralPassword);
 
             SSLContext ctx = SSLContext.getInstance("TLS");
             ctx.init(kmf.getKeyManagers(), null, new SecureRandom());
@@ -192,6 +220,12 @@ public class CertificateAuthority {
         } catch (Exception e) {
             throw new RuntimeException("Failed to build SSL context for " + domain, e);
         }
+    }
+
+    private char[] randomPassword() {
+        byte[] passwordBytes = new byte[24];
+        new SecureRandom().nextBytes(passwordBytes);
+        return Base64.encodeToString(passwordBytes, Base64.NO_WRAP).toCharArray();
     }
 
     public X509Certificate getCaCert() {

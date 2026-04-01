@@ -185,7 +185,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         context.write(wrapOutboundOut(.head(response)), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
 
-        if let ca = certificateAuthority, ca.isLoaded, ruleMatcher.anyRuleCouldMatchHost(host) {
+        if let ca = certificateAuthority, ca.isLoaded, ruleMatcher.anyRuleCouldMatchHostAndPort(host, port: port) {
             // MITM: terminate TLS with domain cert, re-parse HTTP, intercept
             setupMITM(context: context, host: host, port: port, ca: ca)
         } else {
@@ -207,12 +207,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
             // Remove self and HTTP handlers, then add TLS + HTTP + intercept handler.
             context.pipeline.removeHandler(self).flatMap {
-                // Remove HTTP server pipeline handler if present.
-                context.pipeline.handler(type: HTTPServerPipelineHandler.self).flatMap { handler in
-                    context.pipeline.removeHandler(handler)
-                }.flatMapError { _ in
-                    context.eventLoop.makeSucceededFuture(())
-                }
+                self.removeHTTPCodecHandlers(from: context.pipeline)
             }.flatMap {
                 // Add TLS termination (presents our domain cert to the client/WebView).
                 context.pipeline.addHandler(sslHandler)
@@ -288,25 +283,13 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         context: ChannelHandlerContext,
         upstreamChannel: Channel
     ) {
-        // Remove ourselves first
-        context.pipeline.removeHandler(self).whenComplete { _ in
-            // Remove the HTTP server pipeline handler if present
-            context.pipeline.handler(type: HTTPServerPipelineHandler.self).whenComplete { result in
-                if case .success(let handler) = result {
-                    context.pipeline.removeHandler(handler).whenComplete { _ in
-                        self.installTunnelHandlers(
-                            clientChannel: context.channel,
-                            upstreamChannel: upstreamChannel
-                        )
-                    }
-                } else {
-                    // No pipeline handler to remove -- install tunnel anyway
-                    self.installTunnelHandlers(
-                        clientChannel: context.channel,
-                        upstreamChannel: upstreamChannel
-                    )
-                }
-            }
+        context.pipeline.removeHandler(self).flatMap {
+            self.removeHTTPCodecHandlers(from: context.pipeline)
+        }.whenComplete { _ in
+            self.installTunnelHandlers(
+                clientChannel: context.channel,
+                upstreamChannel: upstreamChannel
+            )
         }
     }
 
@@ -496,6 +479,25 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         context.close(promise: nil)
+    }
+
+    private func removeHTTPCodecHandlers(from pipeline: ChannelPipeline) -> EventLoopFuture<Void> {
+        removeHandlerIfPresent(HTTPServerPipelineHandler.self, from: pipeline)
+            .flatMap {
+                self.removeHandlerIfPresent(ByteToMessageHandler<HTTPRequestDecoder>.self, from: pipeline)
+            }
+            .flatMap {
+                self.removeHandlerIfPresent(HTTPResponseEncoder.self, from: pipeline)
+            }
+    }
+
+    private func removeHandlerIfPresent<Handler: RemovableChannelHandler>(
+        _ type: Handler.Type,
+        from pipeline: ChannelPipeline
+    ) -> EventLoopFuture<Void> {
+        pipeline.handler(type: type)
+            .flatMap { pipeline.removeHandler($0) }
+            .flatMapError { _ in pipeline.eventLoop.makeSucceededFuture(()) }
     }
 }
 

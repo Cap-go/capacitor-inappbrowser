@@ -32,14 +32,11 @@ export interface ProxyRule {
   intercept: ProxyInterceptMode;
 }
 
-export interface NativeProxyRule {
-  ruleName: string;
-  urlPattern: string;
-  methods?: string[];
-  includeBody?: boolean;
-  intercept: ProxyInterceptMode;
-}
+export type NativeProxyRule = ProxyRule;
 
+/**
+ * Request payload emitted when a proxy rule intercepts an outgoing HTTP request.
+ */
 export interface ProxyRequest {
   /**
    * Webview instance id that emitted this proxy event.
@@ -55,19 +52,49 @@ export interface ProxyRequest {
    * Name of the matched proxy rule.
    */
   ruleName: string;
+  /**
+   * Absolute request URL observed by the proxy.
+   */
   url: string;
+  /**
+   * HTTP method sent upstream.
+   */
   method: string;
+  /**
+   * Request headers. Repeated headers are returned as `string[]`.
+   */
   headers: ProxyHeaders;
+  /**
+   * Optional request body encoded as base64 when `includeBody` is enabled for the rule.
+   */
   body?: string;
 }
 
+/**
+ * Optional request overrides returned to `continueProxyRequest()`.
+ */
 export interface ModifiedRequest {
+  /**
+   * Replacement absolute request URL.
+   */
   url?: string;
+  /**
+   * Replacement HTTP method.
+   */
   method?: string;
+  /**
+   * Replacement request headers. Repeated headers can be sent as `string[]`.
+   */
   headers?: ProxyHeaders;
+  /**
+   * Replacement request body encoded as base64.
+   */
   body?: string;
 }
 
+/**
+ * Response payload emitted when a proxy rule intercepts an upstream HTTP response.
+ */
 export interface ProxyResponse {
   /**
    * Webview instance id that emitted this proxy event.
@@ -82,18 +109,45 @@ export interface ProxyResponse {
    * Name of the matched proxy rule.
    */
   ruleName: string;
+  /**
+   * Absolute request URL associated with this response.
+   */
   url: string;
+  /**
+   * HTTP status code returned by the upstream response.
+   */
   status: number;
+  /**
+   * Response headers. Repeated headers are returned as `string[]`.
+   */
   headers: ProxyHeaders;
+  /**
+   * Optional response body encoded as base64 when `includeBody` is enabled for the rule.
+   */
   body?: string;
 }
 
+/**
+ * Optional response overrides returned to `continueProxyResponse()`.
+ */
 export interface ModifiedResponse {
+  /**
+   * Replacement HTTP status code.
+   */
   status?: number;
+  /**
+   * Replacement response headers. Repeated headers can be sent as `string[]`.
+   */
   headers?: ProxyHeaders;
+  /**
+   * Replacement response body encoded as base64.
+   */
   body?: string;
 }
 
+/**
+ * Error codes returned by proxy startup and platform capability failures.
+ */
 export type ProxyErrorCode = 'PROXY_START_FAILED' | 'PROXY_ALREADY_ACTIVE' | 'PLATFORM_UNSUPPORTED';
 
 export interface UrlEvent {

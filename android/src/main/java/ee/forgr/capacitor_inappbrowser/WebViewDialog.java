@@ -542,7 +542,7 @@ public class WebViewDialog extends Dialog {
             _webView.getSettings().setTextZoom(_options.getTextZoom());
         }
 
-        _webView.setWebViewClient(new WebViewClient());
+        setWebViewClient();
 
         _webView.setWebChromeClient(
             new WebChromeClient() {
@@ -1050,7 +1050,6 @@ public class WebViewDialog extends Dialog {
         });
 
         setupToolbar();
-        setWebViewClient();
 
         if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
