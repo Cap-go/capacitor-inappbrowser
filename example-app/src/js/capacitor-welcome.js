@@ -73,6 +73,18 @@ window.customElements.define(
         <p>
           This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
         </p>
+        <h2>Proxy Regression</h2>
+        <p>
+          Run the split native proxy flow with named rules, request/response interception, and optional body forwarding.
+        </p>
+        <p>
+          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
+        </p>
+        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
+          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
+          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
+        </div>
+        <hr />
         <h2>Custom URL</h2>
         <p>
           Enter a URL to open in the in-app browser.
@@ -122,18 +134,6 @@ window.customElements.define(
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
-        <h2>Proxy Regression</h2>
-        <p>
-          Run the split native proxy flow with named rules, request/response interception, and optional body forwarding.
-        </p>
-        <p>
-          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
-        </p>
-        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
-          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
-          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
-        </div>
-        <hr />
         <h2>In-App Browser Demo</h2>
         <p>
           Open the Capacitor InAppBrowser plugin documentation in an in-app browser.
