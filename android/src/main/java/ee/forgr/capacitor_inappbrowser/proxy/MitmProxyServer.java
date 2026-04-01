@@ -190,6 +190,7 @@ public class MitmProxyServer {
 
     private class InterceptFilter extends HttpFiltersAdapter {
 
+        private final HttpRequest initialRequest;
         private NativeProxyRule requestRule;
         private NativeProxyRule responseRule;
         private String requestId;
@@ -197,6 +198,7 @@ public class MitmProxyServer {
 
         InterceptFilter(HttpRequest originalRequest) {
             super(originalRequest);
+            this.initialRequest = originalRequest;
         }
 
         @Override
@@ -206,7 +208,7 @@ public class MitmProxyServer {
             }
 
             FullHttpRequest fullRequest = (FullHttpRequest) httpObject;
-            String url = fullRequest.uri();
+            String url = absoluteUrlFor(fullRequest);
             String method = fullRequest.method().name();
 
             requestRule = ruleMatcher.matchRequest(url, method);
@@ -226,7 +228,7 @@ public class MitmProxyServer {
 
             // Build request data map for the event
             Map<String, Object> requestData = new HashMap<>();
-            requestData.put("url", fullRequest.uri());
+            requestData.put("url", url);
             requestData.put("method", fullRequest.method().name());
             requestData.put("headers", headersToMap(fullRequest.headers()));
             if (requestRule.includeBody && fullRequest.content().readableBytes() > 0) {
@@ -244,7 +246,7 @@ public class MitmProxyServer {
             try {
                 Map<String, Object> modifications = requestFuture.get(INTERCEPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 applyRequestModifications(fullRequest, modifications);
-                requestUrl = fullRequest.uri();
+                requestUrl = absoluteUrlFor(fullRequest);
                 responseRule = ruleMatcher.matchResponse(requestUrl, fullRequest.method().name());
             } catch (TimeoutException e) {
                 Log.w(TAG, "Request intercept timed out for " + requestId + ", passing through unmodified");
@@ -254,6 +256,67 @@ public class MitmProxyServer {
             }
 
             return null; // Continue with (possibly modified) request
+        }
+
+        private String absoluteUrlFor(HttpRequest request) {
+            String rawUri = request.uri();
+            try {
+                URI absoluteUri = URI.create(rawUri);
+                if (absoluteUri.getScheme() != null && absoluteUri.getHost() != null) {
+                    return absoluteUri.toString();
+                }
+            } catch (IllegalArgumentException ignored) {}
+
+            String authority = request.headers().get(HttpHeaderNames.HOST);
+            if (authority == null || authority.isEmpty()) {
+                authority = fallbackAuthority();
+            }
+            if (authority == null || authority.isEmpty()) {
+                return rawUri;
+            }
+
+            String relativeUri = rawUri.isEmpty() ? "/" : rawUri;
+            if (!relativeUri.startsWith("/")) {
+                relativeUri = "/" + relativeUri;
+            }
+
+            try {
+                URI requestUri = URI.create(relativeUri);
+                URI absoluteUri = new URI(
+                    usesSecureTunnel() ? "https" : "http",
+                    authority,
+                    requestUri.getRawPath(),
+                    requestUri.getRawQuery(),
+                    requestUri.getRawFragment()
+                );
+                return absoluteUri.toString();
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to rebuild absolute URL for " + rawUri, e);
+                return rawUri;
+            }
+        }
+
+        private boolean usesSecureTunnel() {
+            return initialRequest != null && HttpMethod.CONNECT.equals(initialRequest.method());
+        }
+
+        private String fallbackAuthority() {
+            if (initialRequest == null) {
+                return null;
+            }
+
+            String rawUri = initialRequest.uri();
+            try {
+                URI initialUri = URI.create(rawUri);
+                if (initialUri.getAuthority() != null) {
+                    return initialUri.getAuthority();
+                }
+            } catch (IllegalArgumentException ignored) {}
+
+            if (usesSecureTunnel()) {
+                return rawUri;
+            }
+            return null;
         }
 
         @Override

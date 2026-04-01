@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import NIO
 import NIOCore
@@ -7,6 +8,16 @@ import NIOSSL
 private struct ResolvedUpstreamRequest {
     let upstreamURL: URL
     let requestHead: HTTPRequestHead
+}
+
+private struct UpstreamForwardContext {
+    let clientContext: ChannelHandlerContext
+    let delegate: ProxyEventDelegate?
+    let responseRule: NativeProxyRule?
+    let requestId: String?
+    let requestUrl: String
+    let requestHead: HTTPRequestHead
+    let body: ByteBuffer?
 }
 
 private func proxyHeadersPayload(from headers: HTTPHeaders) -> [String: Any] {
@@ -118,6 +129,48 @@ private func resolveUpstreamRequest(from head: HTTPRequestHead,
     }
 
     return ResolvedUpstreamRequest(upstreamURL: upstreamURL, requestHead: requestHead)
+}
+
+private func sendUpstreamRequest(
+    on upstreamChannel: Channel,
+    requestHead: HTTPRequestHead,
+    body: ByteBuffer?
+) -> EventLoopFuture<Void> {
+    let promise = upstreamChannel.eventLoop.makePromise(of: Void.self)
+    upstreamChannel.write(NIOAny(HTTPClientRequestPart.head(requestHead)), promise: nil)
+    if let body, body.readableBytes > 0 {
+        upstreamChannel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
+    }
+    upstreamChannel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)), promise: promise)
+    return promise.futureResult
+}
+
+private func handleUpstreamConnection(
+    _ result: Result<Channel, Error>,
+    forward: UpstreamForwardContext,
+    onFailure: @escaping () -> Void
+) {
+    switch result {
+    case .success(let upstreamChannel):
+        let responseHandler = UpstreamResponseHandler(
+            clientContext: forward.clientContext,
+            rule: forward.responseRule,
+            delegate: forward.delegate,
+            requestUrl: forward.requestUrl,
+            requestId: forward.requestId
+        )
+
+        upstreamChannel.pipeline.addHandler(responseHandler)
+            .flatMap {
+                sendUpstreamRequest(on: upstreamChannel, requestHead: forward.requestHead, body: forward.body)
+            }
+            .whenFailure { _ in
+                forward.clientContext.close(promise: nil)
+            }
+
+    case .failure:
+        onFailure()
+    }
 }
 
 private func parseConnectTarget(_ authority: String) -> (host: String, port: Int) {
@@ -586,33 +639,23 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
             }
 
         bootstrap.connect(host: host, port: port).whenComplete { [weak self] result in
-            switch result {
-            case .success(let upstreamChannel):
-                // Send the request upstream.
-                upstreamChannel.write(
-                    NIOAny(HTTPClientRequestPart.head(request.requestHead)), promise: nil)
-                if let body = body, body.readableBytes > 0 {
-                    upstreamChannel.write(
-                        NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
-                }
-                upstreamChannel.writeAndFlush(
-                    NIOAny(HTTPClientRequestPart.end(nil)), promise: nil)
-
-                // Read the response and relay back to the client.
-                let responseHandler = UpstreamResponseHandler(
-                    clientContext: context,
-                    rule: responseRule,
-                    delegate: self?.delegate,
-                    requestUrl: requestUrl,
-                    requestId: requestId
-                )
-                upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
-                    context.close(promise: nil)
-                }
-
-            case .failure:
-                self?.sendErrorResponse(context: context, status: .badGateway)
+            guard let self else {
+                context.close(promise: nil)
+                return
             }
+            handleUpstreamConnection(
+                result,
+                forward: UpstreamForwardContext(
+                    clientContext: context,
+                    delegate: self.delegate,
+                    responseRule: responseRule,
+                    requestId: requestId,
+                    requestUrl: requestUrl,
+                    requestHead: request.requestHead,
+                    body: body
+                ),
+                onFailure: { self.sendErrorResponse(context: context, status: .badGateway) }
+            )
         }
     }
 
@@ -625,7 +668,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error _: Error) {
         context.close(promise: nil)
     }
 
@@ -825,38 +868,31 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
             }
 
         bootstrap.connect(host: upstreamHost, port: upstreamPort).whenComplete { [weak self] result in
-            switch result {
-            case .success(let upstreamChannel):
-                // Send the request upstream.
-                upstreamChannel.write(NIOAny(HTTPClientRequestPart.head(request.requestHead)), promise: nil)
-                if let body = body, body.readableBytes > 0 {
-                    upstreamChannel.write(
-                        NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
-                }
-                upstreamChannel.writeAndFlush(
-                    NIOAny(HTTPClientRequestPart.end(nil)), promise: nil)
-
-                // Read the response and relay back to the client.
-                let responseHandler = UpstreamResponseHandler(
-                    clientContext: context,
-                    rule: responseRule,
-                    delegate: self?.delegate,
-                    requestUrl: requestUrl,
-                    requestId: requestId
-                )
-                upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
-                    context.close(promise: nil)
-                }
-
-            case .failure:
-                let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
-                context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
-                context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            guard let self else {
+                context.close(promise: nil)
+                return
             }
+            handleUpstreamConnection(
+                result,
+                forward: UpstreamForwardContext(
+                    clientContext: context,
+                    delegate: self.delegate,
+                    responseRule: responseRule,
+                    requestId: requestId,
+                    requestUrl: requestUrl,
+                    requestHead: request.requestHead,
+                    body: body
+                ),
+                onFailure: {
+                    let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
+                    context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
+                    context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+                }
+            )
         }
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error _: Error) {
         context.close(promise: nil)
     }
 }
@@ -902,16 +938,12 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
 
         case .end:
             guard let head = responseHead else { return }
-            handleResponse(upstreamContext: context, head: head, body: responseBody)
+            handleResponse(head: head, body: responseBody)
             context.close(promise: nil)
         }
     }
 
-    private func handleResponse(
-        upstreamContext: ChannelHandlerContext,
-        head: HTTPResponseHead,
-        body: ByteBuffer?
-    ) {
+    private func handleResponse(head: HTTPResponseHead, body: ByteBuffer?) {
         guard let rule = rule, rule.interceptsResponse else {
             sendToClient(head: head, body: body)
             return
@@ -957,7 +989,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
             NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error _: Error) {
         context.close(promise: nil)
     }
 }
@@ -982,11 +1014,11 @@ final class TunnelHandler: ChannelInboundHandler {
         partnerChannel.writeAndFlush(NIOAny(buffer), promise: nil)
     }
 
-    func channelInactive(context: ChannelHandlerContext) {
+    func channelInactive(context _: ChannelHandlerContext) {
         partnerChannel.close(promise: nil)
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error _: Error) {
         context.close(promise: nil)
     }
 }

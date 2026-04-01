@@ -1,16 +1,40 @@
-import { Capacitor } from "@capacitor/core";
 import { InAppBrowser, ToolBarType } from "@capgo/inappbrowser";
+import { getLoopbackBaseUrl } from "./url.js";
 
 const PROXY_PORT = 8123;
+const RULE_MATRIX = [
+  { ruleName: "entry-response", path: "/entry", mode: "response", includeBody: true },
+  { ruleName: "meta-request", path: "/api/meta", methods: ["GET"], mode: "request", includeBody: false },
+  { ruleName: "meta-response", path: "/api/meta", methods: ["GET"], mode: "response", includeBody: false },
+  { ruleName: "fetch-request", path: "/api/fetch", methods: ["POST"], mode: "request", includeBody: true },
+  { ruleName: "fetch-response", path: "/api/fetch", methods: ["POST"], mode: "response", includeBody: true },
+  { ruleName: "xhr-request", path: "/api/xhr", methods: ["POST"], mode: "request", includeBody: true },
+  { ruleName: "xhr-response", path: "/api/xhr", methods: ["POST"], mode: "response", includeBody: true },
+];
+const SUMMARY_CHECKS = [
+  { key: "entryResponse", label: "Entry response", read: (summary, combined) => summary.entryResponse ?? combined.entryResponse },
+  { key: "proxyEventId", label: "Proxy event id", read: (_summary, combined) => combined.proxyEventId },
+  { key: "metaRequest", label: "Meta request", read: (summary) => summary.metaRequest },
+  { key: "metaRequestBodyOmitted", label: "Meta request body omitted", read: (_summary, combined) => combined.metaRequestBodyOmitted },
+  { key: "metaResponse", label: "Meta response", read: (summary) => summary.metaResponse },
+  { key: "metaResponseBodyOmitted", label: "Meta response body omitted", read: (_summary, combined) => combined.metaResponseBodyOmitted },
+  { key: "metaFlowRequestId", label: "Meta flow requestId", read: (_summary, combined) => combined.metaFlowRequestId },
+  { key: "fetchRequest", label: "Fetch request", read: (summary) => summary.fetchRequest },
+  { key: "fetchRequestBody", label: "Fetch request body", read: (summary) => summary.fetchRequestBody },
+  { key: "fetchResponse", label: "Fetch response", read: (summary) => summary.fetchResponse },
+  { key: "fetchFlowRequestId", label: "Fetch flow requestId", read: (_summary, combined) => combined.fetchFlowRequestId },
+  { key: "xhrRequest", label: "XHR request", read: (summary) => summary.xhrRequest },
+  { key: "xhrRequestBody", label: "XHR request body", read: (summary) => summary.xhrRequestBody },
+  { key: "xhrResponse", label: "XHR response", read: (summary) => summary.xhrResponse },
+  { key: "xhrFlowRequestId", label: "XHR flow requestId", read: (_summary, combined) => combined.xhrFlowRequestId },
+];
 
 function getProxyBaseUrl() {
-  return Capacitor.getPlatform() === "android"
-    ? `http://10.0.2.2:${PROXY_PORT}`
-    : `http://127.0.0.1:${PROXY_PORT}`;
+  return getLoopbackBaseUrl(PROXY_PORT);
 }
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 function encodeBase64Text(value) {
@@ -19,14 +43,14 @@ function encodeBase64Text(value) {
   const chunkSize = 0x8000;
   for (let index = 0; index < bytes.length; index += chunkSize) {
     const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCodePoint(...chunk);
   }
   return btoa(binary);
 }
 
 function decodeBase64Text(value) {
   const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, (char) => char.codePointAt(0));
   return new TextDecoder().decode(bytes);
 }
 
@@ -34,6 +58,68 @@ function rewriteJsonBase64(base64Value, patch) {
   const payload = JSON.parse(decodeBase64Text(base64Value));
   Object.assign(payload, patch);
   return encodeBase64Text(JSON.stringify(payload));
+}
+
+function cloneHeaders(headers) {
+  return headers ? { ...headers } : {};
+}
+
+function createProxyRules(proxyBasePattern) {
+  return RULE_MATRIX.map((rule) => ({
+    ...rule,
+    regex: `${proxyBasePattern}${rule.path}$`,
+  }));
+}
+
+function recordProxyEvent(event, seenProxyEventIds, flowRequestIds) {
+  if (event.id) {
+    seenProxyEventIds.add(event.id);
+  }
+  flowRequestIds.set(event.ruleName, event.requestId);
+  return event.id != null;
+}
+
+function requestIdMatches(flowRequestIds, requestRule, responseRule) {
+  const requestId = flowRequestIds.get(requestRule);
+  return requestId != null && requestId === flowRequestIds.get(responseRule);
+}
+
+function combinedSummaryFrom(summary, state, openedWebViewId) {
+  return {
+    ...summary,
+    metaRequestBodyOmitted: state.metaRequestBodyOmitted,
+    metaResponseBodyOmitted: state.metaResponseBodyOmitted,
+    proxyEventId:
+      state.proxyEventIdsValid &&
+      openedWebViewId !== null &&
+      state.seenProxyEventIds.size === 1 &&
+      state.seenProxyEventIds.has(openedWebViewId),
+    metaFlowRequestId: requestIdMatches(state.flowRequestIds, "meta-request", "meta-response"),
+    fetchFlowRequestId: requestIdMatches(state.flowRequestIds, "fetch-request", "fetch-response"),
+    xhrFlowRequestId: requestIdMatches(state.flowRequestIds, "xhr-request", "xhr-response"),
+  };
+}
+
+function summarizeChecks(summary, combinedSummary) {
+  const failedChecks = [];
+  const lines = SUMMARY_CHECKS.map(({ key, label, read }) => {
+    const passed = Boolean(read(summary, combinedSummary));
+    if (!passed) {
+      failedChecks.push(key);
+    }
+    return `${label} ${passed ? "OK" : "FAILED"}`;
+  });
+  return { failedChecks, lines };
+}
+
+function failureDetailsFrom(detail) {
+  if (detail.reason) {
+    return detail.reason;
+  }
+  if (Array.isArray(detail.failed) && detail.failed.length > 0) {
+    return detail.failed.join(", ");
+  }
+  return "Unknown proxy error";
 }
 
 export function setupProxyRegression(root) {
@@ -45,15 +131,17 @@ export function setupProxyRegression(root) {
     return;
   }
 
-  let listenerHandles = [];
-  let browserOpened = false;
-  let completed = false;
-  let metaRequestBodyOmitted = false;
-  let metaResponseBodyOmitted = false;
+  const state = {
+    listenerHandles: [],
+    browserOpened: false,
+    completed: false,
+    metaRequestBodyOmitted: false,
+    metaResponseBodyOmitted: false,
+    proxyEventIdsValid: true,
+    seenProxyEventIds: new Set(),
+    flowRequestIds: new Map(),
+  };
   let openedWebViewId = null;
-  let proxyEventIdsValid = true;
-  const seenProxyEventIds = new Set();
-  const flowRequestIds = new Map();
 
   const setStatus = (message, details = "") => {
     statusText.textContent = message;
@@ -61,26 +149,30 @@ export function setupProxyRegression(root) {
   };
 
   const removeListeners = async () => {
-    const handles = listenerHandles;
-    listenerHandles = [];
+    const handles = state.listenerHandles;
+    state.listenerHandles = [];
     for (const handle of handles) {
       try {
         await handle.remove();
-      } catch (_error) {}
+      } catch (error) {
+        console.debug("Failed to remove proxy listener", error);
+      }
     }
   };
 
   const finish = async (message, details = "") => {
-    completed = true;
+    state.completed = true;
     setStatus(message, details);
     runButton.disabled = false;
-    const shouldClose = browserOpened;
-    browserOpened = false;
+    const shouldClose = state.browserOpened;
+    state.browserOpened = false;
     await removeListeners();
     if (shouldClose) {
       try {
         await InAppBrowser.close();
-      } catch (_error) {}
+      } catch (error) {
+        console.debug("Failed to close InAppBrowser", error);
+      }
     }
   };
 
@@ -98,43 +190,42 @@ export function setupProxyRegression(root) {
           response: null,
         });
       }
-    } catch (_error) {}
+    } catch (continuationError) {
+      console.debug("Failed to continue intercepted proxy flow", continuationError);
+    }
     await finish("Proxy regression failed", `${stage} intercept failed: ${message}`);
   };
 
   async function handleProxyRequest(event) {
-    if (!event.id) {
-      proxyEventIdsValid = false;
-    } else {
-      seenProxyEventIds.add(event.id);
+    if (!recordProxyEvent(event, state.seenProxyEventIds, state.flowRequestIds)) {
+      state.proxyEventIdsValid = false;
     }
-    flowRequestIds.set(event.ruleName, event.requestId);
 
     let modifiedRequest = null;
 
-    if (event.ruleName === "meta-request") {
-      metaRequestBodyOmitted = !event.body;
+    switch (event.ruleName) {
+    case "meta-request":
+      state.metaRequestBodyOmitted = event.body == null;
       modifiedRequest = {
-        headers: {
-          ...(event.headers || {}),
-          "x-proxy-meta-request": event.ruleName,
-        },
+        headers: cloneHeaders(event.headers),
       };
-    }
-
-    if (event.ruleName === "fetch-request" || event.ruleName === "xhr-request") {
-      const headers = {
-        ...(event.headers || {}),
-        "x-proxy-request-rule": event.ruleName,
-      };
+      modifiedRequest.headers["x-proxy-meta-request"] = event.ruleName;
+      break;
+    case "fetch-request":
+    case "xhr-request": {
+      const headers = cloneHeaders(event.headers);
+      headers["x-proxy-request-rule"] = event.ruleName;
       modifiedRequest = { headers };
-
       if (event.body) {
         modifiedRequest.body = rewriteJsonBase64(event.body, {
           changed: true,
           requestRule: event.ruleName,
         });
       }
+      break;
+    }
+    default:
+      break;
     }
 
     await InAppBrowser.continueProxyRequest({
@@ -144,41 +235,43 @@ export function setupProxyRegression(root) {
   }
 
   async function handleProxyResponse(event) {
-    if (!event.id) {
-      proxyEventIdsValid = false;
-    } else {
-      seenProxyEventIds.add(event.id);
+    if (!recordProxyEvent(event, state.seenProxyEventIds, state.flowRequestIds)) {
+      state.proxyEventIdsValid = false;
     }
-    flowRequestIds.set(event.ruleName, event.requestId);
 
     let modifiedResponse = null;
 
-    if (event.ruleName === "meta-response") {
-      metaResponseBodyOmitted = !event.body;
+    switch (event.ruleName) {
+    case "meta-response":
+      state.metaResponseBodyOmitted = event.body == null;
       modifiedResponse = {
-        headers: {
-          ...(event.headers || {}),
-          "x-proxy-meta-response": event.ruleName,
-        },
+        headers: cloneHeaders(event.headers),
       };
-    }
-
-    if (event.ruleName === "entry-response" && event.body) {
-      const html = decodeBase64Text(event.body).replace(
-        "</head>",
-        '<meta name="proxy-entry" content="rewritten" /></head>',
-      );
-      modifiedResponse = {
-        body: encodeBase64Text(html),
-      };
-    }
-
-    if ((event.ruleName === "fetch-response" || event.ruleName === "xhr-response") && event.body) {
-      modifiedResponse = {
-        body: rewriteJsonBase64(event.body, {
-          proxyResponseRule: event.ruleName,
-        }),
-      };
+      modifiedResponse.headers["x-proxy-meta-response"] = event.ruleName;
+      break;
+    case "entry-response":
+      if (event.body) {
+        const html = decodeBase64Text(event.body).replace(
+          "</head>",
+          '<meta name="proxy-entry" content="rewritten" /></head>',
+        );
+        modifiedResponse = {
+          body: encodeBase64Text(html),
+        };
+      }
+      break;
+    case "fetch-response":
+    case "xhr-response":
+      if (event.body) {
+        modifiedResponse = {
+          body: rewriteJsonBase64(event.body, {
+            proxyResponseRule: event.ruleName,
+          }),
+        };
+      }
+      break;
+    default:
+      break;
     }
 
     await InAppBrowser.continueProxyResponse({
@@ -187,17 +280,37 @@ export function setupProxyRegression(root) {
     });
   }
 
+  async function handleProxyResultMessage(event) {
+    const detail = event.detail ?? undefined;
+    if (!detail || detail.type !== "proxyRegression") {
+      return;
+    }
+
+    if (detail.state === "passed") {
+      const summary = detail.summary ?? {};
+      const combinedSummary = combinedSummaryFrom(summary, state, openedWebViewId);
+      const { failedChecks, lines } = summarizeChecks(summary, combinedSummary);
+      await finish(
+        failedChecks.length === 0 ? "Proxy regression passed" : "Proxy regression failed",
+        lines.join("\n"),
+      );
+      return;
+    }
+
+    await finish("Proxy regression failed", failureDetailsFrom(detail));
+  }
+
   runButton.addEventListener("click", async () => {
     runButton.disabled = true;
-    browserOpened = false;
+    state.browserOpened = false;
     openedWebViewId = null;
-    completed = false;
-    metaRequestBodyOmitted = false;
-    metaResponseBodyOmitted = false;
-    proxyEventIdsValid = true;
-    seenProxyEventIds.clear();
-    flowRequestIds.clear();
-    setStatus("Proxy regression running...", "");
+    state.completed = false;
+    state.metaRequestBodyOmitted = false;
+    state.metaResponseBodyOmitted = false;
+    state.proxyEventIdsValid = true;
+    state.seenProxyEventIds.clear();
+    state.flowRequestIds.clear();
+    setStatus("Proxy regression running...");
 
     await removeListeners();
 
@@ -205,162 +318,43 @@ export function setupProxyRegression(root) {
     const proxyBasePattern = escapeRegex(proxyBaseUrl);
     const entryUrl = `${proxyBaseUrl}/entry`;
 
-    listenerHandles.push(
-      await InAppBrowser.addListener("proxyRequest", (event) => {
-        void handleProxyRequest(event).catch((error) => failIntercept("request", event, error));
+    state.listenerHandles = await Promise.all([
+      InAppBrowser.addListener("proxyRequest", (event) => {
+        handleProxyRequest(event).catch((error) => failIntercept("request", event, error));
       }),
-    );
-
-    listenerHandles.push(
-      await InAppBrowser.addListener("proxyResponse", (event) => {
-        void handleProxyResponse(event).catch((error) => failIntercept("response", event, error));
+      InAppBrowser.addListener("proxyResponse", (event) => {
+        handleProxyResponse(event).catch((error) => failIntercept("response", event, error));
       }),
-    );
-
-    listenerHandles.push(
-      await InAppBrowser.addListener("messageFromWebview", async (event) => {
-        const detail = event.detail ?? {};
-        if (detail.type !== "proxyRegression") {
-          return;
-        }
-
-        if (detail.state === "passed") {
-          const summary = detail.summary ?? {};
-          const combinedSummary = {
-            ...summary,
-            metaRequestBodyOmitted,
-            metaResponseBodyOmitted,
-            proxyEventId:
-              proxyEventIdsValid &&
-              openedWebViewId !== null &&
-              seenProxyEventIds.size === 1 &&
-              seenProxyEventIds.has(openedWebViewId),
-            metaFlowRequestId:
-              flowRequestIds.get("meta-request") != null &&
-              flowRequestIds.get("meta-request") === flowRequestIds.get("meta-response"),
-            fetchFlowRequestId:
-              flowRequestIds.get("fetch-request") != null &&
-              flowRequestIds.get("fetch-request") === flowRequestIds.get("fetch-response"),
-            xhrFlowRequestId:
-              flowRequestIds.get("xhr-request") != null &&
-              flowRequestIds.get("xhr-request") === flowRequestIds.get("xhr-response"),
-          };
-          const failedChecks = Object.entries(combinedSummary)
-            .filter(([, value]) => !value)
-            .map(([key]) => key);
-          const lines = [
-            summary.entryResponse ? "Entry response OK" : "Entry response FAILED",
-            combinedSummary.proxyEventId ? "Proxy event id OK" : "Proxy event id FAILED",
-            summary.metaRequest ? "Meta request OK" : "Meta request FAILED",
-            metaRequestBodyOmitted ? "Meta request body omitted OK" : "Meta request body omitted FAILED",
-            summary.metaResponse ? "Meta response OK" : "Meta response FAILED",
-            metaResponseBodyOmitted ? "Meta response body omitted OK" : "Meta response body omitted FAILED",
-            combinedSummary.metaFlowRequestId ? "Meta flow requestId OK" : "Meta flow requestId FAILED",
-            summary.fetchRequest ? "Fetch request OK" : "Fetch request FAILED",
-            summary.fetchRequestBody ? "Fetch request body OK" : "Fetch request body FAILED",
-            summary.fetchResponse ? "Fetch response OK" : "Fetch response FAILED",
-            combinedSummary.fetchFlowRequestId ? "Fetch flow requestId OK" : "Fetch flow requestId FAILED",
-            summary.xhrRequest ? "XHR request OK" : "XHR request FAILED",
-            summary.xhrRequestBody ? "XHR request body OK" : "XHR request body FAILED",
-            summary.xhrResponse ? "XHR response OK" : "XHR response FAILED",
-            combinedSummary.xhrFlowRequestId ? "XHR flow requestId OK" : "XHR flow requestId FAILED",
-          ];
-          if (failedChecks.length === 0) {
-            await finish("Proxy regression passed", lines.join("\n"));
-            return;
-          }
-          await finish("Proxy regression failed", lines.join("\n"));
-          return;
-        }
-
-        const failureDetails = detail.reason
-          ? detail.reason
-          : Array.isArray(detail.failed) && detail.failed.length > 0
-            ? detail.failed.join(", ")
-            : "Unknown proxy error";
-        await finish("Proxy regression failed", failureDetails);
+      InAppBrowser.addListener("messageFromWebview", (event) => {
+        handleProxyResultMessage(event).catch((error) => {
+          finish("Proxy regression failed", error?.message ?? String(error));
+        });
       }),
-    );
-
-    listenerHandles.push(
-      await InAppBrowser.addListener("pageLoadError", async () => {
-        if (!completed) {
+      InAppBrowser.addListener("pageLoadError", async () => {
+        if (!state.completed) {
           await finish("Proxy regression failed", "pageLoadError");
         }
       }),
-    );
-
-    listenerHandles.push(
-      await InAppBrowser.addListener("closeEvent", async () => {
-        if (!completed) {
-          browserOpened = false;
+      InAppBrowser.addListener("closeEvent", async () => {
+        if (!state.completed) {
+          state.browserOpened = false;
           runButton.disabled = false;
           await removeListeners();
           setStatus("Proxy regression failed", "Browser closed before results arrived");
         }
       }),
-    );
+    ]);
 
     try {
       const { id } = await InAppBrowser.openWebView({
         url: entryUrl,
         toolbarType: ToolBarType.BLANK,
-        proxyRules: [
-          {
-            ruleName: "entry-response",
-            regex: `${proxyBasePattern}/entry$`,
-            mode: "response",
-            includeBody: true,
-          },
-          {
-            ruleName: "meta-request",
-            regex: `${proxyBasePattern}/api/meta$`,
-            methods: ["GET"],
-            mode: "request",
-            includeBody: false,
-          },
-          {
-            ruleName: "meta-response",
-            regex: `${proxyBasePattern}/api/meta$`,
-            methods: ["GET"],
-            mode: "response",
-            includeBody: false,
-          },
-          {
-            ruleName: "fetch-request",
-            regex: `${proxyBasePattern}/api/fetch$`,
-            methods: ["POST"],
-            mode: "request",
-            includeBody: true,
-          },
-          {
-            ruleName: "fetch-response",
-            regex: `${proxyBasePattern}/api/fetch$`,
-            methods: ["POST"],
-            mode: "response",
-            includeBody: true,
-          },
-          {
-            ruleName: "xhr-request",
-            regex: `${proxyBasePattern}/api/xhr$`,
-            methods: ["POST"],
-            mode: "request",
-            includeBody: true,
-          },
-          {
-            ruleName: "xhr-response",
-            regex: `${proxyBasePattern}/api/xhr$`,
-            methods: ["POST"],
-            mode: "response",
-            includeBody: true,
-          },
-        ],
+        proxyRules: createProxyRules(proxyBasePattern),
       });
       openedWebViewId = id;
-      browserOpened = true;
+      state.browserOpened = true;
     } catch (error) {
-      const reason = error && error.message ? error.message : String(error);
-      await finish("Proxy regression failed", reason);
+      await finish("Proxy regression failed", error?.message ?? String(error));
     }
   });
 }

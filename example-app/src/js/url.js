@@ -1,5 +1,13 @@
-import { Capacitor } from "@capacitor/core";
+function loopbackHost() {
+  const configuredHost = globalThis.localStorage?.getItem("capgo.inappbrowser.host");
+  if (configuredHost) {
+    return configuredHost;
+  }
+  return window.location.hostname || "localhost";
+}
 
-const host = Capacitor.getPlatform() === "android" ? "10.0.2.2" : "127.0.0.1";
+export function getLoopbackBaseUrl(port) {
+  return `http://${loopbackHost()}:${port}`;
+}
 
-export const url = `http://${host}:8000/index.php`;
+export const url = `${getLoopbackBaseUrl(8000)}/index.php`;

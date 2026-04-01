@@ -2096,16 +2096,20 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-        // When the proxy is active, only trust certificates issued by the
-        // active local MITM CA and fail closed for everything else.
+        // When the proxy is active, trust MITM certificates issued by the
+        // local CA and fall back to WebKit's default trust evaluation for
+        // everything else.
         if isProxyActive,
            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
-            guard let serverTrust = challenge.protectionSpace.serverTrust,
-                  proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true else {
-                completionHandler(.cancelAuthenticationChallenge, nil)
+            guard let serverTrust = challenge.protectionSpace.serverTrust else {
+                completionHandler(.performDefaultHandling, nil)
                 return
             }
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
+            if proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true {
+                completionHandler(.useCredential, URLCredential(trust: serverTrust))
+            } else {
+                completionHandler(.performDefaultHandling, nil)
+            }
             return
         }
 

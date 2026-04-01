@@ -949,6 +949,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     );
                     dialog.setInstanceId(webViewId);
                     dialog.setProxyActive(proxyActive);
+                    if (proxyActive && activeProxyServer != null) {
+                        dialog.setProxyCaCertificate(activeProxyServer.getCa().getCaCert());
+                    }
                     dialog.activity = InAppBrowserPlugin.this.getActivity();
                     registerWebView(webViewId, dialog);
                     if (!proxyActive) {

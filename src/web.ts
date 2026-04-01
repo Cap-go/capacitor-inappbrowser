@@ -81,7 +81,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
-    void _options;
+    if (_options?.id) {
+      console.log('takeScreenshot not supported on web for', _options.id);
+    }
     throw this.unimplemented('Screenshots are not supported on web.');
   }
 
@@ -101,24 +103,22 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
-    void _options;
-    console.log('setEnabledSafeTopMargin not supported on web');
+    console.log('setEnabledSafeTopMargin not supported on web', _options.enabled, _options.id);
     return;
   }
 
   async setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
-    void _options;
-    console.log('setEnabledSafeBottomMargin not supported on web');
+    console.log('setEnabledSafeBottomMargin not supported on web', _options.enabled, _options.id);
     return;
   }
 
   async continueProxyRequest(_options: { requestId: string; request: ModifiedRequest | null }): Promise<void> {
-    void _options;
+    console.log('continueProxyRequest not supported on web', _options.requestId);
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 
   async continueProxyResponse(_options: { requestId: string; response: ModifiedResponse | null }): Promise<void> {
-    void _options;
+    console.log('continueProxyResponse not supported on web', _options.requestId);
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 

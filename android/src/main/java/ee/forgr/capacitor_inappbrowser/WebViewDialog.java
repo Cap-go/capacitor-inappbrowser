@@ -18,8 +18,10 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.net.http.SslCertificate;
 import android.net.http.SslError;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
@@ -68,6 +70,7 @@ import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -76,6 +79,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -130,6 +134,7 @@ public class WebViewDialog extends Dialog {
 
     // Proxy: when true, trust MITM-generated SSL certs
     private boolean isProxyActive = false;
+    private X509Certificate proxyCaCertificate;
 
     public interface PermissionHandler {
         void handleCameraPermissionRequest(PermissionRequest request);
@@ -162,6 +167,46 @@ public class WebViewDialog extends Dialog {
 
     public void setProxyActive(boolean proxyActive) {
         this.isProxyActive = proxyActive;
+        if (!proxyActive) {
+            this.proxyCaCertificate = null;
+        }
+    }
+
+    public void setProxyCaCertificate(X509Certificate proxyCaCertificate) {
+        this.proxyCaCertificate = proxyCaCertificate;
+    }
+
+    private boolean isProxyIssuedCertificate(SslError error) {
+        if (error == null || proxyCaCertificate == null) {
+            return false;
+        }
+
+        SslCertificate sslCertificate = error.getCertificate();
+        if (sslCertificate == null) {
+            return false;
+        }
+
+        try {
+            Bundle certificateState = SslCertificate.saveState(sslCertificate);
+            byte[] certificateBytes = certificateState != null ? certificateState.getByteArray("x509-certificate") : null;
+            if (certificateBytes == null || certificateBytes.length == 0) {
+                return false;
+            }
+
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            X509Certificate serverCertificate = (X509Certificate) certificateFactory.generateCertificate(
+                new ByteArrayInputStream(certificateBytes)
+            );
+            serverCertificate.checkValidity();
+            if (!serverCertificate.getIssuerX500Principal().equals(proxyCaCertificate.getSubjectX500Principal())) {
+                return false;
+            }
+            serverCertificate.verify(proxyCaCertificate.getPublicKey());
+            return true;
+        } catch (Exception e) {
+            Log.w("InAppBrowser", "Failed to validate proxy-issued certificate", e);
+            return false;
+        }
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -2948,7 +2993,12 @@ public class WebViewDialog extends Dialog {
                         return;
                     }
                     // When proxy is active, trust MITM-generated certs
-                    if (isProxyActive && error != null && error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
+                    if (
+                        isProxyActive &&
+                        error != null &&
+                        error.getPrimaryError() == SslError.SSL_UNTRUSTED &&
+                        isProxyIssuedCertificate(error)
+                    ) {
                         handler.proceed();
                         return;
                     }
