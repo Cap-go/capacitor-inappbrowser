@@ -2,6 +2,36 @@ appId: ${APP_ID}
 ---
 - launchApp:
     clearState: true
-- extendedWaitUntil:
-    visible: "Proxy regression passed"
-    timeout: 60000
+- evalScript: ${output.proxyRegressionComplete = false}
+- repeat:
+    times: 48
+    while:
+      true: ${output.proxyRegressionComplete == false}
+    commands:
+      - runFlow:
+          when:
+            visible: "Process system isn't responding"
+          commands:
+            - tapOn:
+                text: "Wait"
+                retryTapIfNoChange: true
+      - runFlow:
+          when:
+            visible: "Proxy regression failed"
+          commands:
+            - assertVisible: "Proxy regression passed"
+      - runFlow:
+          when:
+            visible: "Proxy regression passed"
+          commands:
+            - evalScript: ${output.proxyRegressionComplete = true}
+      - extendedWaitUntil:
+          visible: "Proxy regression passed"
+          timeout: 5000
+          optional: true
+      - runFlow:
+          when:
+            visible: "Proxy regression passed"
+          commands:
+            - evalScript: ${output.proxyRegressionComplete = true}
+- assertVisible: "Proxy regression passed"
