@@ -1166,10 +1166,7 @@ export interface InAppBrowserPlugin {
    *
    * @since 9.0.0
    */
-  addListener(
-    eventName: 'proxyResponse',
-    listenerFunc: (event: ProxyResponse) => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'proxyResponse', listenerFunc: (event: ProxyResponse) => void): Promise<PluginListenerHandle>;
 
   /**
    * @deprecated Use `proxyRequest`.
