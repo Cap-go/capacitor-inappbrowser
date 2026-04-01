@@ -68,22 +68,22 @@ class CertificateAuthority {
         return hash.map { String(format: "%02x", $0) }.joined()
     }
 
+    func caSecCertificate() -> SecCertificate? {
+        guard let certDER = caCertDER else { return nil }
+        return SecCertificateCreateWithData(nil, Data(certDER) as CFData)
+    }
+
     /// Whether the CA material has been loaded / generated.
     var isLoaded: Bool {
         return caCertDER != nil && caKey != nil
     }
 
-    /// Heuristic check used by `WKNavigationDelegate` to decide whether to
-    /// trust a server certificate presented through the local proxy.
-    ///
-    /// For the initial implementation we trust any certificate when the proxy
-    /// is active -- matching the Android approach.  A more robust check will
-    /// compare the issuer against the CA cert once full cert generation is done.
-    func isCertSignedByCA(certificate: SecCertificate) -> Bool {
-        guard caCertDER != nil else { return false }
-        // TODO: Verify the certificate chain against our CA.
-        // For now, trust any cert when proxy is active (same as Android approach).
-        return true
+    func isServerTrustSignedByCA(_ serverTrust: SecTrust) -> Bool {
+        guard let caCertificate = caSecCertificate() else { return false }
+
+        SecTrustSetAnchorCertificates(serverTrust, [caCertificate] as CFArray)
+        SecTrustSetAnchorCertificatesOnly(serverTrust, true)
+        return SecTrustEvaluateWithError(serverTrust, nil)
     }
 
     /// Returns (or creates and caches) an `NIOSSLContext` containing a leaf
@@ -207,6 +207,10 @@ class CertificateAuthority {
         blob.append(contentsOf: keyDER)
 
         try blob.write(to: url, options: .atomic)
+        try FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.complete],
+            ofItemAtPath: url.path
+        )
         print("[CertificateAuthority] Saved CA to \(url.lastPathComponent)")
     }
 

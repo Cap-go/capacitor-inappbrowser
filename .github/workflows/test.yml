@@ -54,10 +54,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - name: Install Maestro CLI
         run: curl -Ls "https://get.maestro.mobile.dev" | bash
       - name: Start proxy regression server
@@ -75,8 +71,10 @@ jobs:
         run: bun run example-app:prepare:android
       - name: Run Maestro proxy regression
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: 180000
         with:
-          api-level: 35
+          api-level: 34
           arch: x86_64
           profile: pixel_7
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none

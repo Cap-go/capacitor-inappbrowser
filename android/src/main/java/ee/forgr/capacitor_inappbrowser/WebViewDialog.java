@@ -2949,7 +2949,7 @@ public class WebViewDialog extends Dialog {
                         return;
                     }
                     // When proxy is active, trust MITM-generated certs
-                    if (isProxyActive) {
+                    if (isProxyActive && error != null && error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
                         handler.proceed();
                         return;
                     }

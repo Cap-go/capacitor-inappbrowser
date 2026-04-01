@@ -1067,7 +1067,7 @@ And in the AndroidManifest.xml file:
 | **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                             | <code>false</code>                                            | 8.0.2  |
 | **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
 | **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
-| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching intercept events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`.                                                                                                                                                                                                                                                                                                  |                                                               | 9.0.0  |
+| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching intercept events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`. Request-stage and response-stage matching happen independently, so you can use distinct named rules for outgoing requests and incoming responses on the same URL.                                                                                                                                |                                                               | 9.0.0  |
 
 
 #### Headers
@@ -1139,45 +1139,47 @@ And in the AndroidManifest.xml file:
 
 #### ProxyRequest
 
-| Prop            | Type                                                            | Description                                                                                                                             |
-| --------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **`requestId`** | <code>string</code>                                             | UUID that identifies the intercepted request flow. Matching response events reuse this value. Pass it back to `continueProxyRequest()`. |
-| **`ruleName`**  | <code>string</code>                                             | Name of the matched proxy rule.                                                                                                         |
-| **`url`**       | <code>string</code>                                             |                                                                                                                                         |
-| **`method`**    | <code>string</code>                                             |                                                                                                                                         |
-| **`headers`**   | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |                                                                                                                                         |
-| **`body`**      | <code>string</code>                                             |                                                                                                                                         |
+| Prop            | Type                                                  | Description                                                                                                                                                                                    |
+| --------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`id`**        | <code>string</code>                                   | Webview instance id that emitted this proxy event.                                                                                                                                             |
+| **`requestId`** | <code>string</code>                                   | UUID that identifies the intercepted HTTP flow. Request and response events for the same flow reuse this value even when they match different rules. Pass it back to `continueProxyRequest()`. |
+| **`ruleName`**  | <code>string</code>                                   | Name of the matched proxy rule.                                                                                                                                                                |
+| **`url`**       | <code>string</code>                                   |                                                                                                                                                                                                |
+| **`method`**    | <code>string</code>                                   |                                                                                                                                                                                                |
+| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> |                                                                                                                                                                                                |
+| **`body`**      | <code>string</code>                                   |                                                                                                                                                                                                |
 
 
 #### ProxyResponse
 
-| Prop            | Type                                                            | Description                                                                                                                                                                      |
-| --------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`requestId`** | <code>string</code>                                             | UUID that identifies the intercepted request flow. When both stages match, this is the same value emitted by `proxyRequestIntercept`. Pass it back to `continueProxyResponse()`. |
-| **`ruleName`**  | <code>string</code>                                             | Name of the matched proxy rule.                                                                                                                                                  |
-| **`url`**       | <code>string</code>                                             |                                                                                                                                                                                  |
-| **`status`**    | <code>number</code>                                             |                                                                                                                                                                                  |
-| **`headers`**   | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |                                                                                                                                                                                  |
-| **`body`**      | <code>string</code>                                             |                                                                                                                                                                                  |
+| Prop            | Type                                                  | Description                                                                                                                                                         |
+| --------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`id`**        | <code>string</code>                                   | Webview instance id that emitted this proxy event.                                                                                                                  |
+| **`requestId`** | <code>string</code>                                   | UUID that identifies the intercepted HTTP flow. Matching request and response events for the same flow reuse this value. Pass it back to `continueProxyResponse()`. |
+| **`ruleName`**  | <code>string</code>                                   | Name of the matched proxy rule.                                                                                                                                     |
+| **`url`**       | <code>string</code>                                   |                                                                                                                                                                     |
+| **`status`**    | <code>number</code>                                   |                                                                                                                                                                     |
+| **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> |                                                                                                                                                                     |
+| **`body`**      | <code>string</code>                                   |                                                                                                                                                                     |
 
 
 #### ModifiedRequest
 
-| Prop          | Type                                                            |
-| ------------- | --------------------------------------------------------------- |
-| **`url`**     | <code>string</code>                                             |
-| **`method`**  | <code>string</code>                                             |
-| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
-| **`body`**    | <code>string</code>                                             |
+| Prop          | Type                                                  |
+| ------------- | ----------------------------------------------------- |
+| **`url`**     | <code>string</code>                                   |
+| **`method`**  | <code>string</code>                                   |
+| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> |
+| **`body`**    | <code>string</code>                                   |
 
 
 #### ModifiedResponse
 
-| Prop          | Type                                                            |
-| ------------- | --------------------------------------------------------------- |
-| **`status`**  | <code>number</code>                                             |
-| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
-| **`body`**    | <code>string</code>                                             |
+| Prop          | Type                                                  |
+| ------------- | ----------------------------------------------------- |
+| **`status`**  | <code>number</code>                                   |
+| **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> |
+| **`body`**    | <code>string</code>                                   |
 
 
 #### DimensionOptions
@@ -1266,6 +1268,14 @@ Construct a type with a set of properties K of type T
 #### ConfirmBtnListener
 
 <code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
+
+
+#### ProxyHeaders
+
+Proxy headers as exposed to and accepted from JavaScript.
+Repeated headers are represented as `string[]`.
+
+<code><a href="#record">Record</a>&lt;string, string | string[]&gt;</code>
 
 
 ### Enums

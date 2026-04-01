@@ -83,6 +83,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var activeRuleMatcher: ProxyRuleMatcher?
     private var activeCertificateAuthority: CertificateAuthority?
     private var isProxyActive: Bool = false
+    private var proxiedWebViewId: String?
     private var pendingProxyRequests: [String: ([String: Any]?) -> Void] = [:]
     private var pendingProxyResponses: [String: ([String: Any]?) -> Void] = [:]
     private let proxyLock = NSLock()
@@ -235,8 +236,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     func handleWebViewDidClose(id: String, url: String) {
-        // Clean up proxy when the web view closes
-        cleanupProxy()
+        if !id.isEmpty, id == proxiedWebViewId {
+            cleanupProxy()
+        }
 
         if !id.isEmpty, webViewControllers[id] != nil {
             self.notifyListeners("closeEvent", data: ["id": id, "url": url])
@@ -610,6 +612,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        guard let initialURL = URL(string: urlString) else {
+            call.reject("Invalid URL format")
+            return
+        }
+
         // MARK: Proxy setup (before main-thread webview creation)
         var proxyWebsiteDataStore: WKWebsiteDataStore?
         let proxyRulesRaw = call.getArray("proxyRules") as? [[String: Any]]
@@ -645,7 +652,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 proxyServer.delegate = self
                 let proxyPort = try proxyServer.start()
                 activeProxyServer = proxyServer
-                isProxyActive = true
+                isProxyActive = ca != nil
+                proxiedWebViewId = webViewId
 
                 // Configure proxy on a non-persistent data store (iOS 17+)
                 if #available(iOS 17.0, *) {
@@ -669,13 +677,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            guard let url = URL(string: urlString) else {
-                call.reject("Invalid URL format")
-                return
-            }
-
             self.webViewController = WKWebViewController.init(
-                url: url,
+                url: initialURL,
                 headers: headers,
                 isInspectable: isInspectable,
                 credentials: credentials,
@@ -691,6 +694,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             )
 
             guard let webViewController = self.webViewController else {
+                if self.proxiedWebViewId == webViewId {
+                    self.cleanupProxy()
+                }
                 call.reject("Failed to initialize WebViewController")
                 return
             }
@@ -700,6 +706,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // Set proxy active flag so cert challenges are trusted
             if self.isProxyActive {
                 webViewController.isProxyActive = true
+                webViewController.proxyCertificateAuthority = self.activeCertificateAuthority
             }
 
             // Set HTTP method and body if provided
@@ -743,7 +750,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
-            webViewController.source = .remote(url)
+            webViewController.source = .remote(initialURL)
             webViewController.leftNavigationBarItemTypes = []
 
             // Configure close button based on showArrow
@@ -1010,11 +1017,17 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if hidden {
                 guard let webView = webViewController.capableWebView else {
+                    if self.proxiedWebViewId == webViewId {
+                        self.cleanupProxy()
+                    }
                     call.reject("Failed to get webview for hidden mode")
                     return
                 }
                 // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
                 if !self.attachWebViewToWindow(webView) {
+                    if self.proxiedWebViewId == webViewId {
+                        self.cleanupProxy()
+                    }
                     call.reject("Failed to get active window for hidden webview")
                     return
                 }
@@ -1342,7 +1355,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         proxyLock.lock()
         let completion = pendingProxyRequests.removeValue(forKey: requestId)
         proxyLock.unlock()
-        completion?(modifiedRequest as? [String: Any])
+        guard let completion else {
+            call.reject("Unknown or expired requestId")
+            return
+        }
+        completion(modifiedRequest as? [String: Any])
         call.resolve()
     }
 
@@ -1355,7 +1372,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         proxyLock.lock()
         let completion = pendingProxyResponses.removeValue(forKey: requestId)
         proxyLock.unlock()
-        completion?(modifiedResponse as? [String: Any])
+        guard let completion else {
+            call.reject("Unknown or expired requestId")
+            return
+        }
+        completion(modifiedResponse as? [String: Any])
         call.resolve()
     }
 
@@ -1367,7 +1388,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         activeRuleMatcher = nil
         activeCertificateAuthority = nil
         isProxyActive = false
+        proxiedWebViewId = nil
         proxyDataStore = nil
+
+        for controller in webViewControllers.values {
+            controller.isProxyActive = false
+            controller.proxyCertificateAuthority = nil
+        }
+        webViewController?.isProxyActive = false
+        webViewController?.proxyCertificateAuthority = nil
 
         proxyLock.lock()
         let pendingReqs = pendingProxyRequests
@@ -1612,6 +1641,9 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
         proxyLock.unlock()
 
         var eventData: [String: Any] = requestData
+        if let proxiedWebViewId {
+            eventData["id"] = proxiedWebViewId
+        }
         eventData["requestId"] = requestId
         eventData["ruleName"] = ruleName
         notifyListeners("proxyRequestIntercept", data: eventData)
@@ -1633,6 +1665,9 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
         proxyLock.unlock()
 
         var eventData: [String: Any] = responseData
+        if let proxiedWebViewId {
+            eventData["id"] = proxiedWebViewId
+        }
         eventData["requestId"] = requestId
         eventData["ruleName"] = ruleName
         notifyListeners("proxyResponseIntercept", data: eventData)

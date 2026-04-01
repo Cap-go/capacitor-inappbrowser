@@ -4,6 +4,122 @@ import NIOCore
 import NIOHTTP1
 import NIOSSL
 
+private struct ResolvedUpstreamRequest {
+    let upstreamURL: URL
+    let requestHead: HTTPRequestHead
+}
+
+private func proxyHeadersPayload(from headers: HTTPHeaders) -> [String: Any] {
+    var grouped: [String: [String]] = [:]
+    for header in headers {
+        grouped[header.name, default: []].append(header.value)
+    }
+
+    return grouped.reduce(into: [:]) { result, entry in
+        if entry.value.count == 1, let value = entry.value.first {
+            result[entry.key] = value
+        } else {
+            result[entry.key] = entry.value
+        }
+    }
+}
+
+private func httpHeaders(from payload: [String: Any]) -> HTTPHeaders {
+    var headers = HTTPHeaders()
+    for (name, value) in payload {
+        for headerValue in proxyHeaderValues(from: value) {
+            headers.add(name: name, value: headerValue)
+        }
+    }
+    return headers
+}
+
+private func proxyHeaderValues(from value: Any) -> [String] {
+    if let headerValue = value as? String {
+        return [headerValue]
+    }
+    if let headerValues = value as? [String] {
+        return headerValues
+    }
+    if let headerValues = value as? [Any] {
+        return headerValues.map { String(describing: $0) }
+    }
+    return [String(describing: value)]
+}
+
+private func defaultPort(for scheme: String) -> Int? {
+    switch scheme.lowercased() {
+    case "http":
+        return 80
+    case "https":
+        return 443
+    default:
+        return nil
+    }
+}
+
+private func hostHeaderValue(for url: URL) -> String? {
+    guard let host = url.host else {
+        return nil
+    }
+
+    if let port = url.port, port != defaultPort(for: url.scheme ?? "") {
+        return "\(host):\(port)"
+    }
+    return host
+}
+
+private func originForm(for url: URL) -> String {
+    let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    var requestURI = components?.percentEncodedPath ?? url.path
+    if requestURI.isEmpty {
+        requestURI = "/"
+    }
+    if let query = components?.percentEncodedQuery, !query.isEmpty {
+        requestURI += "?\(query)"
+    }
+    return requestURI
+}
+
+private func resolveUpstreamRequest(from head: HTTPRequestHead,
+                                    defaultScheme: String? = nil,
+                                    defaultHost: String? = nil,
+                                    defaultPortValue: Int? = nil) -> ResolvedUpstreamRequest? {
+    let upstreamURL: URL
+
+    if let absoluteURL = URL(string: head.uri), absoluteURL.scheme != nil, absoluteURL.host != nil {
+        upstreamURL = absoluteURL
+    } else {
+        guard let defaultHost, let scheme = defaultScheme else {
+            return nil
+        }
+
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = defaultHost
+        if let defaultPortValue, defaultPortValue != defaultPort(for: scheme) {
+            components.port = defaultPortValue
+        }
+        guard let baseURL = components.url else {
+            return nil
+        }
+
+        let relativeURI = head.uri.hasPrefix("/") ? head.uri : "/\(head.uri)"
+        guard let relativeURL = URL(string: relativeURI, relativeTo: baseURL)?.absoluteURL else {
+            return nil
+        }
+        upstreamURL = relativeURL
+    }
+
+    var requestHead = head
+    requestHead.uri = originForm(for: upstreamURL)
+    if let hostHeader = hostHeaderValue(for: upstreamURL) {
+        requestHead.headers.replaceOrAdd(name: "host", value: hostHeader)
+    }
+
+    return ResolvedUpstreamRequest(upstreamURL: upstreamURL, requestHead: requestHead)
+}
+
 // MARK: - ProxyHTTPHandler
 
 /// Handles incoming HTTP connections from the WKWebView.
@@ -218,30 +334,34 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         head: HTTPRequestHead,
         body: ByteBuffer?
     ) {
-        let url = head.uri
-        let method = "\(head.method)"
-        let matchedRule = ruleMatcher.match(url: url, method: method)
-        let requestId = matchedRule.map { _ in UUID().uuidString }
+        guard let originalRequest = resolveUpstreamRequest(from: head) else {
+            sendErrorResponse(context: context, status: .badGateway)
+            return
+        }
 
-        guard let rule = matchedRule, rule.interceptsRequest else {
+        let requestUrl = originalRequest.upstreamURL.absoluteString
+        let method = "\(originalRequest.requestHead.method)"
+        let requestRule = ruleMatcher.matchRequest(url: requestUrl, method: method)
+        let responseRule = ruleMatcher.matchResponse(url: requestUrl, method: method)
+        let requestId = (requestRule != nil || responseRule != nil) ? UUID().uuidString : nil
+
+        guard let rule = requestRule else {
             forwardToUpstream(
                 context: context,
-                head: head,
+                request: originalRequest,
                 body: body,
-                rule: matchedRule,
-                requestId: requestId
+                responseRule: responseRule,
+                requestId: requestId,
+                requestUrl: requestUrl
             )
             return
         }
 
         // Build the request data dictionary for the JS event.
         var requestData: [String: Any] = [
-            "url": url,
+            "url": requestUrl,
             "method": method,
-            "headers": Dictionary(
-                head.headers.map { ($0.name, $0.value) },
-                uniquingKeysWith: { _, last in last }
-            )
+            "headers": proxyHeadersPayload(from: originalRequest.requestHead.headers),
         ]
         if rule.includeBody, let body = body, body.readableBytes > 0 {
             let data = Data(body.readableBytesView)
@@ -256,7 +376,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
             requestData: requestData
         ) { [weak self] modifications in
             eventLoop.execute {
-                var modifiedHead = head
+                guard let self else { return }
+                var modifiedHead = originalRequest.requestHead
                 var modifiedBody = body
 
                 if let mods = modifications {
@@ -266,10 +387,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                     if let newMethod = mods["method"] as? String {
                         modifiedHead.method = HTTPMethod(rawValue: newMethod)
                     }
-                    if let newHeaders = mods["headers"] as? [String: String] {
-                        modifiedHead.headers = HTTPHeaders(
-                            newHeaders.map { ($0.key, $0.value) }
-                        )
+                    if let newHeaders = mods["headers"] as? [String: Any] {
+                        modifiedHead.headers = httpHeaders(from: newHeaders)
                     }
                     if let newBodyB64 = mods["body"] as? String,
                        let bodyData = Data(base64Encoded: newBodyB64) {
@@ -281,12 +400,29 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                     }
                 }
 
-                self?.forwardToUpstream(
+                guard let resolvedRequest = resolveUpstreamRequest(
+                    from: modifiedHead,
+                    defaultScheme: originalRequest.upstreamURL.scheme,
+                    defaultHost: originalRequest.upstreamURL.host,
+                    defaultPortValue: originalRequest.upstreamURL.port ?? defaultPort(for: originalRequest.upstreamURL.scheme ?? "")
+                ) else {
+                    self.sendErrorResponse(context: context, status: .badGateway)
+                    return
+                }
+
+                let finalRequestUrl = resolvedRequest.upstreamURL.absoluteString
+                let finalResponseRule = self.ruleMatcher.matchResponse(
+                    url: finalRequestUrl,
+                    method: "\(resolvedRequest.requestHead.method)"
+                )
+
+                self.forwardToUpstream(
                     context: context,
-                    head: modifiedHead,
+                    request: resolvedRequest,
                     body: modifiedBody,
-                    rule: rule,
-                    requestId: requestId
+                    responseRule: finalResponseRule,
+                    requestId: requestId,
+                    requestUrl: finalRequestUrl
                 )
             }
         }
@@ -296,17 +432,18 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
     private func forwardToUpstream(
         context: ChannelHandlerContext,
-        head: HTTPRequestHead,
+        request: ResolvedUpstreamRequest,
         body: ByteBuffer?,
-        rule: NativeProxyRule?,
-        requestId: String?
+        responseRule: NativeProxyRule?,
+        requestId: String?,
+        requestUrl: String
     ) {
-        guard let url = URL(string: head.uri), let host = url.host else {
+        guard let host = request.upstreamURL.host else {
             sendErrorResponse(context: context, status: .badGateway)
             return
         }
 
-        let port = url.port ?? (url.scheme == "https" ? 443 : 80)
+        let port = request.upstreamURL.port ?? defaultPort(for: request.upstreamURL.scheme ?? "http") ?? 80
 
         let bootstrap = ClientBootstrap(group: context.eventLoop)
             .channelInitializer { channel in
@@ -322,7 +459,7 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
             case .success(let upstreamChannel):
                 // Send the request upstream.
                 upstreamChannel.write(
-                    NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                    NIOAny(HTTPClientRequestPart.head(request.requestHead)), promise: nil)
                 if let body = body, body.readableBytes > 0 {
                     upstreamChannel.write(
                         NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
@@ -333,9 +470,9 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                 // Read the response and relay back to the client.
                 let responseHandler = UpstreamResponseHandler(
                     clientContext: context,
-                    rule: rule,
+                    rule: responseRule,
                     delegate: self?.delegate,
-                    requestUrl: head.uri,
+                    requestUrl: requestUrl,
                     requestId: requestId
                 )
                 upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
@@ -398,8 +535,7 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
             requestBody?.writeBuffer(&buf)
         case .end:
             guard let head = requestHead else { return }
-            let fullUrl = "https://\(host)\(head.uri)"
-            handleDecryptedRequest(context: context, head: head, body: requestBody, fullUrl: fullUrl)
+            handleDecryptedRequest(context: context, head: head, body: requestBody)
             requestHead = nil
             requestBody = nil
         }
@@ -408,33 +544,41 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
     private func handleDecryptedRequest(
         context: ChannelHandlerContext,
         head: HTTPRequestHead,
-        body: ByteBuffer?,
-        fullUrl: String
+        body: ByteBuffer?
     ) {
-        let method = "\(head.method)"
+        guard let originalRequest = resolveUpstreamRequest(
+            from: head,
+            defaultScheme: "https",
+            defaultHost: self.host,
+            defaultPortValue: self.port
+        ) else {
+            let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
+            context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
+            context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            return
+        }
 
-        // Check if any rule matches. If a matching rule intercepts requests, fire the event.
-        let matchedRule = ruleMatcher.match(url: fullUrl, method: method)
-        let requestId = matchedRule.map { _ in UUID().uuidString }
+        let requestUrl = originalRequest.upstreamURL.absoluteString
+        let method = "\(originalRequest.requestHead.method)"
+        let requestRule = ruleMatcher.matchRequest(url: requestUrl, method: method)
+        let responseRule = ruleMatcher.matchResponse(url: requestUrl, method: method)
+        let requestId = (requestRule != nil || responseRule != nil) ? UUID().uuidString : nil
 
-        guard let rule = matchedRule, rule.interceptsRequest else {
+        guard let rule = requestRule else {
             forwardUpstreamTLS(
                 context: context,
-                head: head,
+                request: originalRequest,
                 body: body,
-                rule: matchedRule,
+                responseRule: responseRule,
                 requestId: requestId,
-                fullUrl: fullUrl
+                requestUrl: requestUrl
             )
             return
         }
         var requestData: [String: Any] = [
-            "url": fullUrl,
+            "url": requestUrl,
             "method": method,
-            "headers": Dictionary(
-                head.headers.map { ($0.name, $0.value) },
-                uniquingKeysWith: { _, last in last }
-            )
+            "headers": proxyHeadersPayload(from: originalRequest.requestHead.headers),
         ]
         if rule.includeBody, let body = body, body.readableBytes > 0 {
             requestData["body"] = Data(body.readableBytesView).base64EncodedString()
@@ -448,7 +592,7 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
         ) { [weak self] modifications in
             eventLoop.execute {
                 guard let self = self else { return }
-                var modifiedHead = head
+                var modifiedHead = originalRequest.requestHead
                 var modifiedBody = body
                 if let mods = modifications {
                     if let newUrl = mods["url"] as? String {
@@ -457,10 +601,8 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
                     if let newMethod = mods["method"] as? String {
                         modifiedHead.method = HTTPMethod(rawValue: newMethod)
                     }
-                    if let newHeaders = mods["headers"] as? [String: String] {
-                        modifiedHead.headers = HTTPHeaders(
-                            newHeaders.map { ($0.key, $0.value) }
-                        )
+                    if let newHeaders = mods["headers"] as? [String: Any] {
+                        modifiedHead.headers = httpHeaders(from: newHeaders)
                     }
                     if let newBodyB64 = mods["body"] as? String,
                        let bodyData = Data(base64Encoded: newBodyB64) {
@@ -471,13 +613,29 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
                         )
                     }
                 }
+                guard let resolvedRequest = resolveUpstreamRequest(
+                    from: modifiedHead,
+                    defaultScheme: "https",
+                    defaultHost: self.host,
+                    defaultPortValue: self.port
+                ) else {
+                    let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
+                    context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
+                    context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+                    return
+                }
+                let finalRequestUrl = resolvedRequest.upstreamURL.absoluteString
+                let finalResponseRule = self.ruleMatcher.matchResponse(
+                    url: finalRequestUrl,
+                    method: "\(resolvedRequest.requestHead.method)"
+                )
                 self.forwardUpstreamTLS(
                     context: context,
-                    head: modifiedHead,
+                    request: resolvedRequest,
                     body: modifiedBody,
-                    rule: rule,
+                    responseRule: finalResponseRule,
                     requestId: requestId,
-                    fullUrl: fullUrl
+                    requestUrl: finalRequestUrl
                 )
             }
         }
@@ -485,14 +643,19 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
 
     private func forwardUpstreamTLS(
         context: ChannelHandlerContext,
-        head: HTTPRequestHead,
+        request: ResolvedUpstreamRequest,
         body: ByteBuffer?,
-        rule: NativeProxyRule?,
+        responseRule: NativeProxyRule?,
         requestId: String?,
-        fullUrl: String
+        requestUrl: String
     ) {
-        let upstreamHost = self.host
-        let upstreamPort = self.port
+        guard let upstreamHost = request.upstreamURL.host else {
+            let errResp = HTTPResponseHead(version: .http1_1, status: .badGateway)
+            context.write(NIOAny(HTTPServerResponsePart.head(errResp)), promise: nil)
+            context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            return
+        }
+        let upstreamPort = request.upstreamURL.port ?? defaultPort(for: request.upstreamURL.scheme ?? "https") ?? self.port
 
         let bootstrap = ClientBootstrap(group: context.eventLoop)
             .channelInitializer { channel in
@@ -519,7 +682,7 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
             switch result {
             case .success(let upstreamChannel):
                 // Send the request upstream.
-                upstreamChannel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                upstreamChannel.write(NIOAny(HTTPClientRequestPart.head(request.requestHead)), promise: nil)
                 if let body = body, body.readableBytes > 0 {
                     upstreamChannel.write(
                         NIOAny(HTTPClientRequestPart.body(.byteBuffer(body))), promise: nil)
@@ -530,9 +693,9 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
                 // Read the response and relay back to the client.
                 let responseHandler = UpstreamResponseHandler(
                     clientContext: context,
-                    rule: rule,
+                    rule: responseRule,
                     delegate: self?.delegate,
-                    requestUrl: fullUrl,
+                    requestUrl: requestUrl,
                     requestId: requestId
                 )
                 upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
@@ -613,10 +776,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
         var responseData: [String: Any] = [
             "url": requestUrl,
             "status": Int(head.status.code),
-            "headers": Dictionary(
-                head.headers.map { ($0.name, $0.value) },
-                uniquingKeysWith: { _, last in last }
-            )
+            "headers": proxyHeadersPayload(from: head.headers),
         ]
         if rule.includeBody, let body = body, body.readableBytes > 0 {
             let data = Data(body.readableBytesView)
@@ -636,10 +796,8 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
                     if let status = mods["status"] as? Int {
                         modifiedHead.status = HTTPResponseStatus(statusCode: status)
                     }
-                    if let newHeaders = mods["headers"] as? [String: String] {
-                        modifiedHead.headers = HTTPHeaders(
-                            newHeaders.map { ($0.key, $0.value) }
-                        )
+                    if let newHeaders = mods["headers"] as? [String: Any] {
+                        modifiedHead.headers = httpHeaders(from: newHeaders)
                     }
                     if let newBodyB64 = mods["body"] as? String,
                        let bodyData = Data(base64Encoded: newBodyB64) {

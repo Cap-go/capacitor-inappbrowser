@@ -90,6 +90,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     // Proxy state
     private MitmProxyServer activeProxyServer;
     private ProxyRuleMatcher activeRuleMatcher;
+    private String proxiedWebViewId;
     private final ConcurrentHashMap<String, CompletableFuture<Map<String, Object>>> pendingProxyRequests = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<Map<String, Object>>> pendingProxyResponses = new ConcurrentHashMap<>();
 
@@ -139,6 +140,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
         }
         return webViewDialog;
+    }
+
+    private void cleanupProxyIfOwner(String webViewId) {
+        if (webViewId != null && webViewId.equals(proxiedWebViewId)) {
+            cleanupProxy();
+        }
     }
 
     private WebViewDialog findFileChooserDialog() {
@@ -738,8 +745,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 @Override
                 public void closeEvent(String url) {
                     notifyListeners("closeEvent", new JSObject().put("id", webViewId).put("url", url));
+                    cleanupProxyIfOwner(webViewId);
                     unregisterWebView(webViewId);
-                    cleanupProxy();
                 }
 
                 @Override
@@ -892,6 +899,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         // Check for proxy rules
         final boolean proxyActive;
+        final ProxyConfig proxyConfig;
         JSArray proxyRulesJson = call.getArray("proxyRules");
         if (proxyRulesJson != null && proxyRulesJson.length() > 0) {
             // Check if proxy already active
@@ -916,13 +924,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 int proxyPort = activeProxyServer.start();
 
                 // Set ProxyController override
-                ProxyConfig proxyConfig = new ProxyConfig.Builder().addProxyRule("http://127.0.0.1:" + proxyPort).build();
-
-                ProxyController.getInstance().setProxyOverride(
-                    proxyConfig,
-                    Runnable::run,
-                    () -> {} // Proxy override active — WebView will use it
-                );
+                proxyConfig = new ProxyConfig.Builder().addProxyRule("http://127.0.0.1:" + proxyPort).build();
+                proxiedWebViewId = webViewId;
                 proxyActive = true;
             } catch (Exception e) {
                 cleanupProxy();
@@ -931,6 +934,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
         } else {
             proxyActive = false;
+            proxyConfig = null;
         }
 
         this.getActivity().runOnUiThread(
@@ -948,7 +952,31 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     dialog.setProxyActive(proxyActive);
                     dialog.activity = InAppBrowserPlugin.this.getActivity();
                     registerWebView(webViewId, dialog);
-                    dialog.presentWebView();
+                    if (!proxyActive) {
+                        dialog.presentWebView();
+                        return;
+                    }
+
+                    try {
+                        ProxyController.getInstance().setProxyOverride(proxyConfig, Runnable::run, () -> {
+                            Activity activity = InAppBrowserPlugin.this.getActivity();
+                            if (activity == null) {
+                                cleanupProxy();
+                                unregisterWebView(webViewId);
+                                dialog.setProxyActive(false);
+                                dialog.dismiss();
+                                options.getPluginCall().reject("Failed to activate WebView proxy: activity is unavailable");
+                                return;
+                            }
+                            activity.runOnUiThread(dialog::presentWebView);
+                        });
+                    } catch (Exception e) {
+                        cleanupProxy();
+                        unregisterWebView(webViewId);
+                        dialog.setProxyActive(false);
+                        dialog.dismiss();
+                        options.getPluginCall().reject("Failed to activate WebView proxy: " + e.getMessage(), "PROXY_START_FAILED");
+                    }
                 }
             }
         );
@@ -977,13 +1005,15 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             return;
         }
         JSObject modifiedRequest = call.getObject("modifiedRequest");
-        CompletableFuture<Map<String, Object>> future = pendingProxyRequests.remove(requestId);
-        if (future != null) {
-            if (modifiedRequest != null) {
-                future.complete(jsObjectToMap(modifiedRequest));
-            } else {
-                future.complete(null);
-            }
+        CompletableFuture<Map<String, Object>> future = pendingProxyRequests.get(requestId);
+        if (future == null) {
+            call.reject("Unknown or expired requestId");
+            return;
+        }
+        if (modifiedRequest != null) {
+            future.complete(jsObjectToMap(modifiedRequest));
+        } else {
+            future.complete(null);
         }
         call.resolve();
     }
@@ -996,13 +1026,15 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             return;
         }
         JSObject modifiedResponse = call.getObject("modifiedResponse");
-        CompletableFuture<Map<String, Object>> future = pendingProxyResponses.remove(requestId);
-        if (future != null) {
-            if (modifiedResponse != null) {
-                future.complete(jsObjectToMap(modifiedResponse));
-            } else {
-                future.complete(null);
-            }
+        CompletableFuture<Map<String, Object>> future = pendingProxyResponses.get(requestId);
+        if (future == null) {
+            call.reject("Unknown or expired requestId");
+            return;
+        }
+        if (modifiedResponse != null) {
+            future.complete(jsObjectToMap(modifiedResponse));
+        } else {
+            future.complete(null);
         }
         call.resolve();
     }
@@ -1012,22 +1044,71 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         Iterator<String> keys = obj.keys();
         while (keys.hasNext()) {
             String key = keys.next();
-            Object value = obj.opt(key);
-            if (value instanceof JSObject) {
-                // Convert nested JSObject (like headers) to Map<String, String>
-                JSObject nested = (JSObject) value;
-                Map<String, String> nestedMap = new HashMap<>();
-                Iterator<String> nestedKeys = nested.keys();
-                while (nestedKeys.hasNext()) {
-                    String nk = nestedKeys.next();
-                    nestedMap.put(nk, nested.optString(nk));
-                }
-                map.put(key, nestedMap);
-            } else {
-                map.put(key, value);
-            }
+            map.put(key, jsonValueToJava(obj.opt(key)));
         }
         return map;
+    }
+
+    private Object jsonValueToJava(Object value) {
+        if (value == null || JSONObject.NULL.equals(value)) {
+            return null;
+        }
+        if (value instanceof JSObject) {
+            return jsObjectToMap((JSObject) value);
+        }
+        if (value instanceof JSONObject) {
+            JSONObject object = (JSONObject) value;
+            Map<String, Object> map = new HashMap<>();
+            Iterator<String> keys = object.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                map.put(key, jsonValueToJava(object.opt(key)));
+            }
+            return map;
+        }
+        if (value instanceof JSArray) {
+            return jsonArrayToList((JSArray) value);
+        }
+        if (value instanceof org.json.JSONArray) {
+            return jsonArrayToList((org.json.JSONArray) value);
+        }
+        return value;
+    }
+
+    private List<Object> jsonArrayToList(org.json.JSONArray array) {
+        List<Object> values = new ArrayList<>();
+        for (int index = 0; index < array.length(); index++) {
+            values.add(jsonValueToJava(array.opt(index)));
+        }
+        return values;
+    }
+
+    private JSObject mapToJSObject(Map<String, Object> map) {
+        JSObject object = new JSObject();
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            object.put(entry.getKey(), javaValueToJs(entry.getValue()));
+        }
+        return object;
+    }
+
+    private Object javaValueToJs(Object value) {
+        if (value instanceof Map<?, ?> mapValue) {
+            JSObject object = new JSObject();
+            for (Map.Entry<?, ?> entry : mapValue.entrySet()) {
+                if (entry.getKey() != null) {
+                    object.put(String.valueOf(entry.getKey()), javaValueToJs(entry.getValue()));
+                }
+            }
+            return object;
+        }
+        if (value instanceof Iterable<?> iterableValue) {
+            JSArray array = new JSArray();
+            for (Object item : iterableValue) {
+                array.put(javaValueToJs(item));
+            }
+            return array;
+        }
+        return value;
     }
 
     @SuppressWarnings("unchecked")
@@ -1041,19 +1122,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             ) {
                 CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
                 pendingProxyRequests.put(requestId, future);
+                future.whenComplete((ignored, error) -> pendingProxyRequests.remove(requestId, future));
 
                 JSObject eventData = new JSObject();
+                if (proxiedWebViewId != null) {
+                    eventData.put("id", proxiedWebViewId);
+                }
                 eventData.put("requestId", requestId);
                 eventData.put("ruleName", ruleName);
                 eventData.put("url", requestData.get("url"));
                 eventData.put("method", requestData.get("method"));
                 if (requestData.get("headers") != null) {
-                    JSObject headersObj = new JSObject();
-                    Map<String, String> headers = (Map<String, String>) requestData.get("headers");
-                    for (Map.Entry<String, String> e : headers.entrySet()) {
-                        headersObj.put(e.getKey(), e.getValue());
-                    }
-                    eventData.put("headers", headersObj);
+                    eventData.put("headers", mapToJSObject((Map<String, Object>) requestData.get("headers")));
                 }
                 if (requestData.containsKey("body")) {
                     eventData.put("body", requestData.get("body"));
@@ -1070,19 +1150,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             ) {
                 CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
                 pendingProxyResponses.put(requestId, future);
+                future.whenComplete((ignored, error) -> pendingProxyResponses.remove(requestId, future));
 
                 JSObject eventData = new JSObject();
+                if (proxiedWebViewId != null) {
+                    eventData.put("id", proxiedWebViewId);
+                }
                 eventData.put("requestId", requestId);
                 eventData.put("ruleName", ruleName);
                 eventData.put("url", responseData.get("url"));
                 eventData.put("status", responseData.get("status"));
                 if (responseData.get("headers") != null) {
-                    JSObject headersObj = new JSObject();
-                    Map<String, String> headers = (Map<String, String>) responseData.get("headers");
-                    for (Map.Entry<String, String> e : headers.entrySet()) {
-                        headersObj.put(e.getKey(), e.getValue());
-                    }
-                    eventData.put("headers", headersObj);
+                    eventData.put("headers", mapToJSObject((Map<String, Object>) responseData.get("headers")));
                 }
                 if (responseData.containsKey("body")) {
                     eventData.put("body", responseData.get("body"));
@@ -1094,24 +1173,31 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     private void cleanupProxy() {
+        if (proxiedWebViewId != null) {
+            WebViewDialog proxiedDialog = webViewDialogs.get(proxiedWebViewId);
+            if (proxiedDialog != null) {
+                proxiedDialog.setProxyActive(false);
+            }
+        }
         if (activeProxyServer != null) {
             activeProxyServer.stop();
             activeProxyServer = null;
-            activeRuleMatcher = null;
-
-            for (CompletableFuture<Map<String, Object>> f : pendingProxyRequests.values()) {
-                f.complete(null);
-            }
-            pendingProxyRequests.clear();
-            for (CompletableFuture<Map<String, Object>> f : pendingProxyResponses.values()) {
-                f.complete(null);
-            }
-            pendingProxyResponses.clear();
-
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-                ProxyController.getInstance().clearProxyOverride(Runnable::run, () -> {});
-            }
         }
+        activeRuleMatcher = null;
+
+        for (CompletableFuture<Map<String, Object>> f : pendingProxyRequests.values()) {
+            f.complete(null);
+        }
+        pendingProxyRequests.clear();
+        for (CompletableFuture<Map<String, Object>> f : pendingProxyResponses.values()) {
+            f.complete(null);
+        }
+        pendingProxyResponses.clear();
+
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+            ProxyController.getInstance().clearProxyOverride(Runnable::run, () -> {});
+        }
+        proxiedWebViewId = null;
     }
 
     @PluginMethod
@@ -1371,13 +1457,13 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                             }
                             notifyListeners("closeEvent", eventData);
 
+                            cleanupProxyIfOwner(targetId);
                             dialog.dismiss();
                             if (targetId != null) {
                                 unregisterWebView(targetId);
                             } else {
                                 webViewDialog = null;
                             }
-                            cleanupProxy();
                             call.resolve();
                         } else {
                             // Secondary fallback inside UI thread

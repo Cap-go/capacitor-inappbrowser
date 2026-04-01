@@ -39,18 +39,45 @@ public class ProxyRuleMatcher {
         this.rules = rules;
     }
 
-    public NativeProxyRule match(String url, String method) {
+    public NativeProxyRule matchRequest(String url, String method) {
         for (NativeProxyRule rule : rules) {
-            if (!rule.urlPattern.matcher(url).find()) continue;
-            if (rule.methods != null && !rule.methods.contains(method.toUpperCase())) continue;
+            if (!rule.interceptsRequest()) continue;
+            if (!matches(rule, url, method)) continue;
+            return rule;
+        }
+        return null;
+    }
+
+    public NativeProxyRule matchResponse(String url, String method) {
+        for (NativeProxyRule rule : rules) {
+            if (!rule.interceptsResponse()) continue;
+            if (!matches(rule, url, method)) continue;
             return rule;
         }
         return null;
     }
 
     public boolean anyRuleCouldMatchHost(String host) {
+        String[] candidates = new String[] { host, "http://" + host, "http://" + host + "/", "https://" + host, "https://" + host + "/" };
         for (NativeProxyRule rule : rules) {
-            if (rule.urlPattern.matcher(host).find()) return true;
+            for (String candidate : candidates) {
+                if (rule.urlPattern.matcher(candidate).find()) {
+                    return true;
+                }
+            }
+
+            String pattern = rule.urlPattern.pattern().toLowerCase();
+            if (!pattern.contains("://")) continue;
+
+            String hostHint = urlScopedHostHint(pattern);
+            if (hostHint != null) {
+                if (hostHint.equals(host.toLowerCase())) {
+                    return true;
+                }
+                continue;
+            }
+
+            return true;
         }
         return false;
     }
@@ -71,8 +98,34 @@ public class ProxyRuleMatcher {
             }
             boolean includeBody = obj.optBoolean("includeBody", false);
             String intercept = obj.getString("intercept");
+            if (!"request".equals(intercept) && !"response".equals(intercept) && !"both".equals(intercept)) {
+                throw new IllegalArgumentException("Invalid intercept '" + intercept + "' for rule '" + ruleName + "'");
+            }
             rules.add(new NativeProxyRule(ruleName, urlPattern, methods, includeBody, intercept));
         }
         return rules;
+    }
+
+    private boolean matches(NativeProxyRule rule, String url, String method) {
+        if (!rule.urlPattern.matcher(url).find()) return false;
+        return rule.methods == null || rule.methods.contains(method.toUpperCase());
+    }
+
+    private String urlScopedHostHint(String pattern) {
+        int schemeIndex = pattern.indexOf("://");
+        if (schemeIndex < 0) {
+            return null;
+        }
+
+        String remainder = pattern.substring(schemeIndex + 3);
+        int slashIndex = remainder.indexOf('/');
+        String authority = slashIndex >= 0 ? remainder.substring(0, slashIndex) : remainder;
+        authority = authority.replace("^", "").replace("$", "").replace("\\.", ".").replace("\\-", "-");
+
+        if (authority.matches(".*[\\\\\\[\\]\\(\\)\\{\\}\\+\\*\\?\\|].*")) {
+            return null;
+        }
+
+        return authority.toLowerCase();
     }
 }

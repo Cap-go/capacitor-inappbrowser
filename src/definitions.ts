@@ -3,6 +3,11 @@ import type { PluginListenerHandle } from '@capacitor/core';
 // --- Proxy Interception Types ---
 
 export type ProxyInterceptMode = 'request' | 'response' | 'both';
+/**
+ * Proxy headers as exposed to and accepted from JavaScript.
+ * Repeated headers are represented as `string[]`.
+ */
+export type ProxyHeaders = Record<string, string | string[]>;
 
 export interface ProxyRule {
   /**
@@ -37,7 +42,12 @@ export interface NativeProxyRule {
 
 export interface ProxyRequest {
   /**
-   * UUID that identifies the intercepted request flow. Matching response events reuse this value.
+   * Webview instance id that emitted this proxy event.
+   */
+  id?: string;
+  /**
+   * UUID that identifies the intercepted HTTP flow. Request and response events for the same flow
+   * reuse this value even when they match different rules.
    * Pass it back to `continueProxyRequest()`.
    */
   requestId: string;
@@ -47,21 +57,25 @@ export interface ProxyRequest {
   ruleName: string;
   url: string;
   method: string;
-  headers: Record<string, string>;
+  headers: ProxyHeaders;
   body?: string;
 }
 
 export interface ModifiedRequest {
   url?: string;
   method?: string;
-  headers?: Record<string, string>;
+  headers?: ProxyHeaders;
   body?: string;
 }
 
 export interface ProxyResponse {
   /**
-   * UUID that identifies the intercepted request flow. When both stages match, this is the same value
-   * emitted by `proxyRequestIntercept`. Pass it back to `continueProxyResponse()`.
+   * Webview instance id that emitted this proxy event.
+   */
+  id?: string;
+  /**
+   * UUID that identifies the intercepted HTTP flow. Matching request and response events for the
+   * same flow reuse this value. Pass it back to `continueProxyResponse()`.
    */
   requestId: string;
   /**
@@ -70,13 +84,13 @@ export interface ProxyResponse {
   ruleName: string;
   url: string;
   status: number;
-  headers: Record<string, string>;
+  headers: ProxyHeaders;
   body?: string;
 }
 
 export interface ModifiedResponse {
   status?: number;
-  headers?: Record<string, string>;
+  headers?: ProxyHeaders;
   body?: string;
 }
 
@@ -899,6 +913,8 @@ export interface OpenWebViewOptions {
    * Proxy rules for intercepting and modifying requests/responses within the webview.
    * JavaScript listens for matching intercept events and must continue the flow by calling
    * `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`.
+   * Request-stage and response-stage matching happen independently, so you can use distinct
+   * named rules for outgoing requests and incoming responses on the same URL.
    *
    * @since 9.0.0
    */

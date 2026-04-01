@@ -180,8 +180,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var customWebsiteDataStore: WKWebsiteDataStore?
 
     /// When true, the cert challenge handler will trust all server certificates
-    /// (needed for the local MITM proxy's self-signed certs).
+    /// issued by the active local MITM proxy certificate authority.
     var isProxyActive: Bool = false
+    var proxyCertificateAuthority: CertificateAuthority?
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -2098,7 +2099,8 @@ extension WKWebViewController: WKNavigationDelegate {
         // terminates TLS locally and re-encrypts to the upstream server).
         if isProxyActive,
            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
+           let serverTrust = challenge.protectionSpace.serverTrust,
+           proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true {
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
             return

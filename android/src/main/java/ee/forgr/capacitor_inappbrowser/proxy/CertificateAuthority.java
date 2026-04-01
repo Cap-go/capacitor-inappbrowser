@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -123,6 +124,9 @@ public class CertificateAuthority {
             ctx.init(null, tmf.getTrustManagers(), new SecureRandom());
             SSLEngine engine = ctx.createSSLEngine(peerHost, peerPort);
             engine.setUseClientMode(true);
+            SSLParameters parameters = engine.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            engine.setSSLParameters(parameters);
             return engine;
         } catch (Exception e) {
             throw new RuntimeException("Failed to create server SSLEngine", e);

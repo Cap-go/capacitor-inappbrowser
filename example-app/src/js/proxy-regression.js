@@ -50,6 +50,10 @@ export function setupProxyRegression(root) {
   let completed = false;
   let metaRequestBodyOmitted = false;
   let metaResponseBodyOmitted = false;
+  let openedWebViewId = null;
+  let proxyEventIdsValid = true;
+  const seenProxyEventIds = new Set();
+  const flowRequestIds = new Map();
 
   const setStatus = (message, details = "") => {
     statusText.textContent = message;
@@ -80,7 +84,32 @@ export function setupProxyRegression(root) {
     }
   };
 
+  const failIntercept = async (stage, event, error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      if (stage === "request") {
+        await InAppBrowser.continueProxyRequest({
+          requestId: event.requestId,
+          modifiedRequest: null,
+        });
+      } else {
+        await InAppBrowser.continueProxyResponse({
+          requestId: event.requestId,
+          modifiedResponse: null,
+        });
+      }
+    } catch (_error) {}
+    await finish("Proxy regression failed", `${stage} intercept failed: ${message}`);
+  };
+
   async function handleProxyRequest(event) {
+    if (!event.id) {
+      proxyEventIdsValid = false;
+    } else {
+      seenProxyEventIds.add(event.id);
+    }
+    flowRequestIds.set(event.ruleName, event.requestId);
+
     let modifiedRequest = null;
 
     if (event.ruleName === "meta-request") {
@@ -115,6 +144,13 @@ export function setupProxyRegression(root) {
   }
 
   async function handleProxyResponse(event) {
+    if (!event.id) {
+      proxyEventIdsValid = false;
+    } else {
+      seenProxyEventIds.add(event.id);
+    }
+    flowRequestIds.set(event.ruleName, event.requestId);
+
     let modifiedResponse = null;
 
     if (event.ruleName === "meta-response") {
@@ -154,9 +190,13 @@ export function setupProxyRegression(root) {
   runButton.addEventListener("click", async () => {
     runButton.disabled = true;
     browserOpened = false;
+    openedWebViewId = null;
     completed = false;
     metaRequestBodyOmitted = false;
     metaResponseBodyOmitted = false;
+    proxyEventIdsValid = true;
+    seenProxyEventIds.clear();
+    flowRequestIds.clear();
     setStatus("Proxy regression running...", "");
 
     await removeListeners();
@@ -167,13 +207,13 @@ export function setupProxyRegression(root) {
 
     listenerHandles.push(
       await InAppBrowser.addListener("proxyRequestIntercept", (event) => {
-        void handleProxyRequest(event);
+        void handleProxyRequest(event).catch((error) => failIntercept("request", event, error));
       }),
     );
 
     listenerHandles.push(
       await InAppBrowser.addListener("proxyResponseIntercept", (event) => {
-        void handleProxyResponse(event);
+        void handleProxyResponse(event).catch((error) => failIntercept("response", event, error));
       }),
     );
 
@@ -190,22 +230,40 @@ export function setupProxyRegression(root) {
             ...summary,
             metaRequestBodyOmitted,
             metaResponseBodyOmitted,
+            proxyEventId:
+              proxyEventIdsValid &&
+              openedWebViewId !== null &&
+              seenProxyEventIds.size === 1 &&
+              seenProxyEventIds.has(openedWebViewId),
+            metaFlowRequestId:
+              flowRequestIds.get("meta-request") != null &&
+              flowRequestIds.get("meta-request") === flowRequestIds.get("meta-response"),
+            fetchFlowRequestId:
+              flowRequestIds.get("fetch-request") != null &&
+              flowRequestIds.get("fetch-request") === flowRequestIds.get("fetch-response"),
+            xhrFlowRequestId:
+              flowRequestIds.get("xhr-request") != null &&
+              flowRequestIds.get("xhr-request") === flowRequestIds.get("xhr-response"),
           };
           const failedChecks = Object.entries(combinedSummary)
             .filter(([, value]) => !value)
             .map(([key]) => key);
           const lines = [
             summary.entryResponse ? "Entry response OK" : "Entry response FAILED",
+            combinedSummary.proxyEventId ? "Proxy event id OK" : "Proxy event id FAILED",
             summary.metaRequest ? "Meta request OK" : "Meta request FAILED",
             metaRequestBodyOmitted ? "Meta request body omitted OK" : "Meta request body omitted FAILED",
             summary.metaResponse ? "Meta response OK" : "Meta response FAILED",
             metaResponseBodyOmitted ? "Meta response body omitted OK" : "Meta response body omitted FAILED",
+            combinedSummary.metaFlowRequestId ? "Meta flow requestId OK" : "Meta flow requestId FAILED",
             summary.fetchRequest ? "Fetch request OK" : "Fetch request FAILED",
             summary.fetchRequestBody ? "Fetch request body OK" : "Fetch request body FAILED",
             summary.fetchResponse ? "Fetch response OK" : "Fetch response FAILED",
+            combinedSummary.fetchFlowRequestId ? "Fetch flow requestId OK" : "Fetch flow requestId FAILED",
             summary.xhrRequest ? "XHR request OK" : "XHR request FAILED",
             summary.xhrRequestBody ? "XHR request body OK" : "XHR request body FAILED",
             summary.xhrResponse ? "XHR response OK" : "XHR response FAILED",
+            combinedSummary.xhrFlowRequestId ? "XHR flow requestId OK" : "XHR flow requestId FAILED",
           ];
           if (failedChecks.length === 0) {
             await finish("Proxy regression passed", lines.join("\n"));
@@ -244,7 +302,7 @@ export function setupProxyRegression(root) {
     );
 
     try {
-      await InAppBrowser.openWebView({
+      const { id } = await InAppBrowser.openWebView({
         url: entryUrl,
         toolbarType: ToolBarType.BLANK,
         proxyRules: [
@@ -298,6 +356,7 @@ export function setupProxyRegression(root) {
           },
         ],
       });
+      openedWebViewId = id;
       browserOpened = true;
     } catch (error) {
       const reason = error && error.message ? error.message : String(error);
