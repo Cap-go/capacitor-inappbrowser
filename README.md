@@ -315,6 +315,8 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
+* [`handleProxyRequest(...)`](#handleproxyrequest)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
@@ -742,6 +744,44 @@ Will be triggered when page load error
 --------------------
 
 
+### addListener('proxyRequest', ...)
+
+```typescript
+addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for proxied requests delegated by the native runtime.
+Prefer `addProxyHandler()` instead of calling this directly.
+
+| Param              | Type                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'proxyRequest'</code>                                               |
+| **`listenerFunc`** | <code>(event: <a href="#proxyrequest">ProxyRequest</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 9.0.0
+
+--------------------
+
+
+### handleProxyRequest(...)
+
+```typescript
+handleProxyRequest(options: { requestId: string; decision?: ProxyDecision | null; response?: ProxyResponse | null; webviewId?: string; }) => Promise<void>
+```
+
+Internal method used by `addProxyHandler()` to send a proxy decision back to native.
+
+| Param         | Type                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; decision?: <a href="#proxydecision">ProxyDecision</a> \| null; response?: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
+
+**Since:** 9.0.0
+
+--------------------
+
+
 ### removeAllListeners()
 
 ```typescript
@@ -970,7 +1010,9 @@ And in the AndroidManifest.xml file:
 | **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 6.1.0  |
 | **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
-| **`proxyRequests`**                    | <code>string</code>                                                                                                                                                    | proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 6.9.0  |
+| **`proxyRequests`**                    | <code>string \| boolean</code>                                                                                                                                         | Proxy interception mode. - `true`: legacy blanket mode, delegates all HTTP/HTTPS requests to JavaScript. - `string`: Android-only regex mode kept for backward compatibility. Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.                                                                                                                                                                                                                                                                                               |                                                               | 6.9.0  |
+| **`outboundProxyRules`**               | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first outbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 9.1.0  |
+| **`inboundProxyRules`**                | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first inbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                               | 9.1.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
 | **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a native screenshot button near the done/close button. The button is hidden by default and captures the current viewport when tapped. This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it. The button is only shown when toolbarType is not "activity", "navigation", or "blank".                                                                                                                                                                                                                       | <code>false</code>                                            | 8.4.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
@@ -1011,6 +1053,26 @@ And in the AndroidManifest.xml file:
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
 
 
+#### NativeProxyRule
+
+Native-first proxy rule used on Android and iOS.
+
+Any regex property that is omitted is treated as a wildcard.
+
+| Prop                      | Type                                                  |
+| ------------------------- | ----------------------------------------------------- |
+| **`id`**                  | <code>string</code>                                   |
+| **`urlRegex`**            | <code>string</code>                                   |
+| **`methodRegex`**         | <code>string</code>                                   |
+| **`headerRegex`**         | <code>string</code>                                   |
+| **`bodyRegex`**           | <code>string</code>                                   |
+| **`statusRegex`**         | <code>string</code>                                   |
+| **`responseHeaderRegex`** | <code>string</code>                                   |
+| **`responseBodyRegex`**   | <code>string</code>                                   |
+| **`mainFrameOnly`**       | <code>boolean</code>                                  |
+| **`action`**              | <code>'continue' \| 'cancel' \| 'delegateToJs'</code> |
+
+
 #### ScreenshotResult
 
 | Prop           | Type                     | Description                                                    |
@@ -1044,6 +1106,64 @@ And in the AndroidManifest.xml file:
 | --------- | ------------------- | ------------------------------ | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
+
+#### ProxyRequest
+
+Represents an intercepted HTTP request from the in-app browser webview.
+
+Request and response bodies are base64-encoded when present.
+
+| Prop                  | Type                                                            |
+| --------------------- | --------------------------------------------------------------- |
+| **`requestId`**       | <code>string</code>                                             |
+| **`phase`**           | <code>'outbound' \| 'inbound'</code>                            |
+| **`url`**             | <code>string</code>                                             |
+| **`method`**          | <code>string</code>                                             |
+| **`headers`**         | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
+| **`body`**            | <code>string \| null</code>                                     |
+| **`status`**          | <code>number</code>                                             |
+| **`responseHeaders`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
+| **`responseBody`**    | <code>string \| null</code>                                     |
+| **`webviewId`**       | <code>string</code>                                             |
+
+
+#### ProxyDecision
+
+Decision returned to native when handling a proxied request.
+
+| Prop           | Type                                                                          |
+| -------------- | ----------------------------------------------------------------------------- |
+| **`request`**  | <code><a href="#proxyrequestoverride">ProxyRequestOverride</a> \| null</code> |
+| **`response`** | <code><a href="#proxyresponse">ProxyResponse</a> \| null</code>               |
+| **`cancel`**   | <code>boolean</code>                                                          |
+
+
+#### ProxyRequestOverride
+
+Request override returned to native for an outbound proxied request.
+
+The body must be base64-encoded when present.
+
+| Prop          | Type                                                            |
+| ------------- | --------------------------------------------------------------- |
+| **`url`**     | <code>string</code>                                             |
+| **`method`**  | <code>string</code>                                             |
+| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
+| **`body`**    | <code>string \| null</code>                                     |
+
+
+#### ProxyResponse
+
+Response payload returned to native for a proxied request.
+
+The body must be base64-encoded.
+
+| Prop          | Type                                                            |
+| ------------- | --------------------------------------------------------------- |
+| **`body`**    | <code>string</code>                                             |
+| **`status`**  | <code>number</code>                                             |
+| **`headers`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
 
 
 #### DimensionOptions

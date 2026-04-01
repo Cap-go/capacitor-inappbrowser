@@ -6,6 +6,7 @@ import {
   BackgroundColor,
   InvisibilityMode,
 } from "@capgo/inappbrowser";
+import { setupProxyRegression } from "./proxy-regression.js";
 
 // Default URL configuration
 let testWebappUrl = "http://localhost:8000/index.php";
@@ -121,6 +122,17 @@ window.customElements.define(
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
+        <h2>Proxy Regression</h2>
+        <p>
+          Run a self-contained proxy flow that serves the page, script, fetch, and XHR through <code>addProxyHandler()</code>.
+        </p>
+        <p>
+          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
+        </p>
+        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
+          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
+          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
+        </div>
         <hr />
         <h2>In-App Browser Demo</h2>
         <p>
@@ -245,6 +257,8 @@ window.customElements.define(
           domOutput.textContent = "";
         }
       }
+
+      setupProxyRegression(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot
@@ -598,7 +612,7 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import("./url.js");
+              const { url } = await import(/* @vite-ignore */ "./url.js");
               urlToUse = url;
             } catch (e) {
               console.warn(
@@ -839,7 +853,7 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import("./url.js");
+              const { url } = await import(/* @vite-ignore */ "./url.js");
               urlToUse = url;
             } catch (e) {
               console.warn(

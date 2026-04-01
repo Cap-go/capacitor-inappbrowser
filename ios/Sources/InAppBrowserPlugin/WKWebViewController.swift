@@ -111,7 +111,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -120,6 +120,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.proxyRequests = proxyRequests
+        self.proxySchemeHandler = proxySchemeHandler
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -172,6 +174,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var disableOverscroll: Bool = false
+    var proxyRequests: Bool = false
+    var proxySchemeHandler: ProxySchemeHandler?
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -794,6 +798,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         let webConfiguration = WKWebViewConfiguration()
         let userContentController = WKUserContentController()
+
+        if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
+            WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
+            if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
+                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
+            } else {
+                print("[InAppBrowser][Proxy] WARNING: handlesURLScheme swizzle failed; proxy scheme handler not registered")
+            }
+        }
 
         let weakHandler = WeakScriptMessageHandler(self)
         userContentController.add(weakHandler, name: "messageHandler")

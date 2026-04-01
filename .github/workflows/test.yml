@@ -40,6 +40,32 @@ jobs:
       - name: Build
         id: build_code
         run: bun run verify:android
+  maestro_android_proxy_regression:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Install root dependencies
+        run: bun i
+      - name: Setup java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - name: Install Maestro CLI
+        run: curl -Ls "https://get.maestro.mobile.dev" | bash
+      - name: Build example app for Android regression flow
+        run: bun run example-app:prepare:android
+      - name: Run Maestro proxy regression
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_7
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bun run maestro:test:android
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest

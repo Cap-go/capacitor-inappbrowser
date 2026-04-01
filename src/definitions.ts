@@ -90,6 +90,96 @@ export interface Credentials {
   password: string;
 }
 
+/**
+ * Represents an intercepted HTTP request from the in-app browser webview.
+ *
+ * Request and response bodies are base64-encoded when present.
+ *
+ * @since 9.0.0
+ */
+export interface ProxyRequest {
+  requestId: string;
+  phase: 'outbound' | 'inbound';
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string | null;
+  status?: number;
+  responseHeaders?: Record<string, string>;
+  responseBody?: string | null;
+  webviewId: string;
+}
+
+/**
+ * Response payload returned to native for a proxied request.
+ *
+ * The body must be base64-encoded.
+ *
+ * @since 9.0.0
+ */
+export interface ProxyResponse {
+  body: string;
+  status: number;
+  headers: Record<string, string>;
+}
+
+/**
+ * Request override returned to native for an outbound proxied request.
+ *
+ * The body must be base64-encoded when present.
+ *
+ * @since 9.1.0
+ */
+export interface ProxyRequestOverride {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | null;
+}
+
+/**
+ * Decision returned to native when handling a proxied request.
+ *
+ * @since 9.1.0
+ */
+export interface ProxyDecision {
+  request?: ProxyRequestOverride | null;
+  response?: ProxyResponse | null;
+  cancel?: boolean;
+}
+
+/**
+ * Native-first proxy rule used on Android and iOS.
+ *
+ * Any regex property that is omitted is treated as a wildcard.
+ *
+ * @since 9.1.0
+ */
+export interface NativeProxyRule {
+  id?: string;
+  urlRegex?: string;
+  methodRegex?: string;
+  headerRegex?: string;
+  bodyRegex?: string;
+  statusRegex?: string;
+  responseHeaderRegex?: string;
+  responseBodyRegex?: string;
+  mainFrameOnly?: boolean;
+  action: 'continue' | 'cancel' | 'delegateToJs';
+}
+
+/**
+ * JavaScript callback used to handle proxied requests.
+ *
+ * Return a `Response`, `ProxyResponse`, `ProxyRequestOverride`, `ProxyDecision`,
+ * or `null` to let native continue unchanged.
+ *
+ * @since 9.0.0
+ */
+export type ProxyHandler = (
+  request: ProxyRequest,
+) => Promise<Response | ProxyResponse | ProxyRequestOverride | ProxyDecision | null>;
+
 export interface OpenOptions {
   /**
    * Target URL to load.
@@ -582,10 +672,28 @@ export interface OpenWebViewOptions {
    */
   preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
   /**
-   * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
+   * Proxy interception mode.
+   *
+   * - `true`: legacy blanket mode, delegates all HTTP/HTTPS requests to JavaScript.
+   * - `string`: Android-only regex mode kept for backward compatibility.
+   *
+   * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
+   *
    * @since 6.9.0
    */
-  proxyRequests?: string;
+  proxyRequests?: boolean | string;
+  /**
+   * Native-first outbound proxy rules.
+   *
+   * @since 9.1.0
+   */
+  outboundProxyRules?: NativeProxyRule[];
+  /**
+   * Native-first inbound proxy rules.
+   *
+   * @since 9.1.0
+   */
+  inboundProxyRules?: NativeProxyRule[];
   /**
    * buttonNearDone allows for a creation of a custom button near the done/close button.
    * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
@@ -997,6 +1105,24 @@ export interface InAppBrowserPlugin {
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Listen for proxied requests delegated by the native runtime.
+   * Prefer `addProxyHandler()` instead of calling this directly.
+   *
+   * @since 9.0.0
+   */
+  addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
+  /**
+   * Internal method used by `addProxyHandler()` to send a proxy decision back to native.
+   *
+   * @since 9.0.0
+   */
+  handleProxyRequest(options: {
+    requestId: string;
+    decision?: ProxyDecision | null;
+    response?: ProxyResponse | null;
+    webviewId?: string;
+  }): Promise<void>;
   /**
    * Remove all listeners for this plugin.
    *

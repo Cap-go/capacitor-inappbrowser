@@ -31,20 +31,23 @@
     "native"
   ],
   "scripts": {
-    "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
+    "verify": "bun run verify:ios && bun run verify:android && bun run verify:web",
     "verify:ios": "xcodebuild -scheme CapgoInappbrowser -destination generic/platform=iOS",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
-    "verify:web": "npm run build",
-    "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
-    "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
+    "verify:web": "bun run build",
+    "lint": "bun run eslint && bun run prettier -- --check && bun run swiftlint -- lint",
+    "fmt": "bun run eslint -- --fix && bun run prettier -- --write && bun run swiftlint -- --fix --format",
     "eslint": "eslint .",
     "prettier": "prettier-pretty-check \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
     "docgen": "docgen --api InAppBrowserPlugin --output-readme README.md --output-json dist/docs.json",
-    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
+    "build:proxy-bridge": "esbuild src/proxy-bridge.ts --bundle --outfile=android/src/main/assets/proxy-bridge.js --format=iife --target=es2015",
+    "build": "bun run clean && bun run docgen && tsc && rollup -c rollup.config.mjs && bun run build:proxy-bridge",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "bun run build",
+    "example-app:prepare:android": "bun run build && cd example-app && bun install && bun run build && bunx cap sync android && cd android && ./gradlew app:assembleDebug",
+    "maestro:test:android": "adb wait-for-device && adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk && $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",
@@ -56,6 +59,7 @@
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@types/node": "^24.10.1",
+    "esbuild": "^0.27.3",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.31.0",
     "husky": "^9.1.7",
@@ -74,7 +78,33 @@
     "extends": "@ionic/eslint-config/recommended"
   },
   "prettier": "@ionic/prettier-config",
-  "swiftlint": "@ionic/swiftlint-config",
+  "swiftlint": {
+    "excluded": [
+      "${PWD}/node_modules",
+      "${PWD}/ios/Pods",
+      "${PWD}/example-app",
+      "${PWD}/ios/Sources/InAppBrowserPlugin/InAppBrowserPlugin.swift",
+      "${PWD}/ios/Sources/InAppBrowserPlugin/WKWebViewController.swift"
+    ],
+    "opt_in_rules": [
+      "implicitly_unwrapped_optional",
+      "file_name_no_space",
+      "force_unwrapping",
+      "function_default_parameter_at_end",
+      "lower_acl_than_parent",
+      "modifier_order",
+      "overridden_super_call",
+      "unowned_variable_capture",
+      "unused_import"
+    ],
+    "line_length": {
+      "warning": 150,
+      "ignores_function_declarations": true,
+      "ignores_comments": true,
+      "ignores_interpolated_strings": true,
+      "ignores_urls": true
+    }
+  },
   "capacitor": {
     "ios": {
       "src": "ios"

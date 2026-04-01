@@ -89,6 +89,38 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         );
     }
 
+    private List<NativeProxyRule> parseProxyRules(JSArray rawRules, String optionName, PluginCall call) {
+        List<NativeProxyRule> parsed = new ArrayList<>();
+        if (rawRules == null) {
+            return parsed;
+        }
+
+        for (int index = 0; index < rawRules.length(); index++) {
+            try {
+                JSONObject rule = rawRules.getJSONObject(index);
+                parsed.add(
+                    new NativeProxyRule(
+                        rule.optString("id", null),
+                        NativeProxyRule.compilePattern(rule.optString("urlRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("methodRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("headerRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("bodyRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("statusRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("responseHeaderRegex", null)),
+                        NativeProxyRule.compilePattern(rule.optString("responseBodyRegex", null)),
+                        rule.optBoolean("mainFrameOnly", false),
+                        NativeProxyRule.Action.fromString(rule.optString("action", "continue"))
+                    )
+                );
+            } catch (JSONException | PatternSyntaxException error) {
+                call.reject("Invalid " + optionName + " at index " + index + ": " + error.getMessage());
+                return null;
+            }
+        }
+
+        return parsed;
+    }
+
     private void registerWebView(String id, WebViewDialog dialog) {
         webViewDialogs.put(id, dialog);
         webViewStack.remove(id);
@@ -586,6 +618,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             options.setTextZoom(textZoom);
         }
 
+        options.setProxyRequests(Boolean.TRUE.equals(call.getBoolean("proxyRequests", false)));
+
         String proxyRequestsStr = call.getString("proxyRequests");
         if (proxyRequestsStr != null) {
             try {
@@ -594,6 +628,18 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 Log.e("WebViewDialog", String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr));
             }
         }
+
+        List<NativeProxyRule> outboundProxyRules = parseProxyRules(call.getArray("outboundProxyRules"), "outboundProxyRules", call);
+        if (outboundProxyRules == null) {
+            return;
+        }
+        options.setOutboundProxyRules(outboundProxyRules);
+
+        List<NativeProxyRule> inboundProxyRules = parseProxyRules(call.getArray("inboundProxyRules"), "inboundProxyRules", call);
+        if (inboundProxyRules == null) {
+            return;
+        }
+        options.setInboundProxyRules(inboundProxyRules);
 
         JSObject buttonNearDoneObj = call.getObject("buttonNearDone");
         try {
@@ -767,6 +813,45 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                     }
                     event.put("id", webViewId);
                     notifyListeners("screenshotTaken", event);
+                }
+
+                @Override
+                public void proxyRequestEvent(
+                    String requestId,
+                    String phase,
+                    String url,
+                    String method,
+                    String headersJson,
+                    String body,
+                    Integer status,
+                    String responseHeadersJson,
+                    String responseBody,
+                    String dialogWebViewId
+                ) {
+                    JSObject event = new JSObject();
+                    event.put("requestId", requestId);
+                    event.put("phase", phase);
+                    event.put("url", url);
+                    event.put("method", method);
+                    try {
+                        event.put("headers", new JSObject(headersJson));
+                    } catch (Exception ignored) {
+                        event.put("headers", new JSObject());
+                    }
+                    event.put("body", body);
+                    if (status != null) {
+                        event.put("status", status);
+                    }
+                    if (responseHeadersJson != null) {
+                        try {
+                            event.put("responseHeaders", new JSObject(responseHeadersJson));
+                        } catch (Exception ignored) {
+                            event.put("responseHeaders", new JSObject());
+                        }
+                    }
+                    event.put("responseBody", responseBody);
+                    event.put("webviewId", dialogWebViewId);
+                    notifyListeners("proxyRequest", event);
                 }
 
                 @Override
@@ -1135,23 +1220,47 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void lsuakdchgbbaHandleProxiedRequest(PluginCall call) {
-        String webviewId = call.getString("webviewId");
-        WebViewDialog webViewDialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
-        if (webViewDialog != null) {
-            Boolean ok = call.getBoolean("ok", false);
-            String id = call.getString("id");
-            if (id == null) {
-                Log.e("InAppBrowserProxy", "CRITICAL ERROR, proxy id = null");
-                return;
-            }
-            if (Boolean.FALSE.equals(ok)) {
-                String result = call.getString("result", "");
-                webViewDialog.handleProxyResultError(result, id);
-            } else {
-                JSONObject object = call.getObject("result");
-                webViewDialog.handleProxyResultOk(object, id);
+        String requestId = call.getString("id");
+        if (requestId == null) {
+            Log.e("InAppBrowserProxy", "CRITICAL ERROR, proxy id = null");
+            call.resolve();
+            return;
+        }
+        JSObject decision = null;
+        if (Boolean.TRUE.equals(call.getBoolean("ok", false))) {
+            JSONObject object = call.getObject("result");
+            if (object != null) {
+                decision = new JSObject();
+                decision.put("response", object);
             }
         }
+        handleProxyRequestInternal(call.getString("webviewId"), requestId, decision, call);
+    }
+
+    @PluginMethod
+    public void handleProxyRequest(PluginCall call) {
+        String requestId = call.getString("requestId");
+        if (requestId == null) {
+            call.reject("requestId is required");
+            return;
+        }
+
+        JSObject decision = call.getObject("decision");
+        if (decision == null) {
+            decision = call.getObject("response");
+        }
+
+        handleProxyRequestInternal(call.getString("webviewId"), requestId, decision, call);
+    }
+
+    private void handleProxyRequestInternal(String webviewId, String requestId, JSObject decision, PluginCall call) {
+        WebViewDialog dialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
+        if (dialog == null) {
+            call.reject("Target WebView not found for proxy request");
+            return;
+        }
+
+        dialog.handleProxyResponse(requestId, decision);
         call.resolve();
     }
 

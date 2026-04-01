@@ -52,7 +52,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -64,6 +65,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var invisibilityMode: InvisibilityMode = .aware
     var webViewController: WKWebViewController?
     private var webViewControllers: [String: WKWebViewController] = [:]
+    private var proxySchemeHandlers: [String: ProxySchemeHandler] = [:]
     private var webViewStack: [String] = []
     private var activeWebViewId: String?
     private weak var presentationContainerView: UIView?
@@ -98,6 +100,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func unregisterWebView(id: String) {
+        proxySchemeHandlers[id]?.cancelAllPendingTasks()
+        proxySchemeHandlers[id] = nil
         webViewControllers[id] = nil
         navigationControllers[id] = nil
         webViewStack.removeAll { $0 == id }
@@ -143,6 +147,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         return stores
+    }
+
+    private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
+        try rawRules.compactMap { item in
+            guard let dictionary = item as? [String: Any] else { return nil }
+            return try NativeProxyRule.from(dictionary: dictionary)
+        }
     }
 
     func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
@@ -588,6 +599,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
+        let proxyRequests = call.getBool("proxyRequests") ?? false
+        let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
+        let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
+        let outboundProxyRules: [NativeProxyRule]
+        let inboundProxyRules: [NativeProxyRule]
+        do {
+            outboundProxyRules = try parseProxyRules(outboundProxyRulesRaw)
+            inboundProxyRules = try parseProxyRules(inboundProxyRulesRaw)
+        } catch {
+            call.reject("Invalid proxy rules: \(error.localizedDescription)")
+            return
+        }
+
         // Validate dimension parameters
         if width != nil && height == nil {
             call.reject("Height must be specified when width is provided")
@@ -598,6 +622,18 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let url = URL(string: urlString) else {
                 call.reject("Invalid URL format")
                 return
+            }
+
+            var proxyHandler: ProxySchemeHandler?
+            if proxyRequests || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+                proxyHandler = ProxySchemeHandler(
+                    plugin: self,
+                    webviewId: webViewId,
+                    legacyProxyRequests: proxyRequests,
+                    outboundRules: outboundProxyRules,
+                    inboundRules: inboundProxyRules
+                )
+                self.proxySchemeHandlers[webViewId] = proxyHandler
             }
 
             self.webViewController = WKWebViewController.init(
@@ -612,7 +648,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
-                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage
+                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
+                proxyRequests: proxyRequests,
+                proxySchemeHandler: proxyHandler
             )
 
             guard let webViewController = self.webViewController else {
@@ -1249,6 +1287,80 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve()
         }
+    }
+
+    @objc func handleProxyRequest(_ call: CAPPluginCall) {
+        guard let requestId = call.getString("requestId") else {
+            call.reject("requestId is required")
+            return
+        }
+
+        let webviewId = call.getString("webviewId")
+        let decisionObj = call.getObject("decision") ?? call.getObject("response")
+
+        var handler: ProxySchemeHandler?
+        if let webviewId = webviewId {
+            handler = proxySchemeHandlers[webviewId]
+        } else if proxySchemeHandlers.count == 1 {
+            handler = proxySchemeHandlers.values.first
+        } else if proxySchemeHandlers.count > 1 {
+            call.reject("webviewId is required when multiple webviews are open")
+            return
+        }
+
+        guard let proxyHandler = handler else {
+            call.reject("No proxy handler found")
+            return
+        }
+
+        var responseDict: [String: Any]?
+        if let decisionObj = decisionObj {
+            var dict: [String: Any] = [:]
+            if let cancel = decisionObj["cancel"] as? Bool {
+                dict["cancel"] = cancel
+            }
+            if let request = decisionObj["request"] as? JSObject {
+                var requestDict: [String: Any] = [:]
+                requestDict["url"] = request["url"]
+                requestDict["method"] = request["method"]
+                requestDict["body"] = request["body"]
+                if let headers = request["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
+                    }
+                    requestDict["headers"] = headersDict
+                }
+                dict["request"] = requestDict
+            }
+
+            let responsePayload = (decisionObj["response"] as? JSObject) ?? decisionObj
+            if responsePayload["status"] != nil {
+                var responsePayloadDict: [String: Any] = [:]
+                responsePayloadDict["status"] = responsePayload["status"]
+                responsePayloadDict["body"] = responsePayload["body"]
+                if let headers = responsePayload["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
+                    }
+                    responsePayloadDict["headers"] = headersDict
+                }
+                if decisionObj["response"] != nil {
+                    dict["response"] = responsePayloadDict
+                } else {
+                    dict.merge(responsePayloadDict) { _, new in new }
+                }
+            }
+            responseDict = dict
+        }
+
+        proxyHandler.handleResponse(requestId: requestId, responseData: responseDict)
+        call.resolve()
     }
 
     @objc func close(_ call: CAPPluginCall) {

@@ -94,6 +94,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
+  async handleProxyRequest(): Promise<void> {
+    console.log('handleProxyRequest not supported on web');
+    return;
+  }
+
   async setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setEnabledSafeTopMargin not supported on web');
     return;

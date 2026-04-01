@@ -172,6 +172,9 @@ public class Options {
     private String preShowScript;
     private String toolbarTextColor;
     private Pattern proxyRequestsPattern = null;
+    private boolean proxyRequests = false;
+    private List<NativeProxyRule> outboundProxyRules = new ArrayList<>();
+    private List<NativeProxyRule> inboundProxyRules = new ArrayList<>();
     private boolean materialPicker = false;
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
@@ -287,6 +290,34 @@ public class Options {
 
     public void setProxyRequestsPattern(Pattern proxyRequestsPattern) {
         this.proxyRequestsPattern = proxyRequestsPattern;
+    }
+
+    public boolean getProxyRequests() {
+        return proxyRequests;
+    }
+
+    public void setProxyRequests(boolean proxyRequests) {
+        this.proxyRequests = proxyRequests;
+    }
+
+    public List<NativeProxyRule> getOutboundProxyRules() {
+        return outboundProxyRules;
+    }
+
+    public void setOutboundProxyRules(List<NativeProxyRule> outboundProxyRules) {
+        this.outboundProxyRules = outboundProxyRules != null ? outboundProxyRules : new ArrayList<>();
+    }
+
+    public List<NativeProxyRule> getInboundProxyRules() {
+        return inboundProxyRules;
+    }
+
+    public void setInboundProxyRules(List<NativeProxyRule> inboundProxyRules) {
+        this.inboundProxyRules = inboundProxyRules != null ? inboundProxyRules : new ArrayList<>();
+    }
+
+    public boolean shouldEnableNativeProxy() {
+        return proxyRequests || proxyRequestsPattern != null || !outboundProxyRules.isEmpty() || !inboundProxyRules.isEmpty();
     }
 
     public PluginCall getPluginCall() {

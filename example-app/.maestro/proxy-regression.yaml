@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Run Proxy Regression Test"
+- tapOn:
+    text: "Run Proxy Regression Test"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Proxy regression passed"
+    timeout: 30000
+- assertVisible: "Script loaded"
+- assertVisible: "Fetch OK"
+- assertVisible: "XHR OK"
+- assertNotVisible: "Proxy regression failed"
