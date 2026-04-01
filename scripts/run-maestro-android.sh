@@ -11,19 +11,29 @@ readonly maestro_flow="example-app/.maestro/proxy-regression.yaml"
 export PATH="$HOME/.maestro/bin:$PATH"
 export MAESTRO_DRIVER_STARTUP_TIMEOUT="${MAESTRO_DRIVER_STARTUP_TIMEOUT:-180000}"
 
-wait_for_device() {
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
   if command -v timeout >/dev/null 2>&1; then
-    timeout 60s adb wait-for-device
+    timeout "${timeout_seconds}s" "$@"
     return
   fi
 
-  adb wait-for-device
+  "$@"
+}
+
+diagnose_device() {
+  adb shell getprop sys.boot_completed || true
+  adb shell getprop dev.bootcomplete || true
+  adb shell getprop init.svc.bootanim || true
+  adb logcat -d -b main -b system -b crash -t 200 || true
 }
 
 wait_for_package_manager() {
   local deadline=$((SECONDS + package_manager_timeout_seconds))
 
-  wait_for_device
+  run_with_timeout 60 adb wait-for-device
 
   echo "Waiting up to ${package_manager_timeout_seconds}s for Android package manager readiness"
   while ((SECONDS < deadline)); do
@@ -35,10 +45,7 @@ wait_for_package_manager() {
   done
 
   echo "Android package manager did not become ready within ${package_manager_timeout_seconds}s" >&2
-  adb shell getprop sys.boot_completed || true
-  adb shell getprop dev.bootcomplete || true
-  adb shell getprop init.svc.bootanim || true
-  adb logcat -d -b main -b system -b crash -t 200 || true
+  diagnose_device
   return 1
 }
 
@@ -60,18 +67,15 @@ run_maestro() {
 }
 
 wait_for_package_manager
-adb reverse tcp:8000 tcp:8000
-adb reverse tcp:8123 tcp:8123
-adb install -r "$app_apk"
+run_with_timeout 30 adb reverse tcp:8000 tcp:8000
+run_with_timeout 30 adb reverse tcp:8123 tcp:8123
+run_with_timeout 180 adb install -r "$app_apk"
 
 set +e
 run_maestro
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then
-  adb shell getprop sys.boot_completed || true
-  adb shell getprop dev.bootcomplete || true
-  adb shell getprop init.svc.bootanim || true
-  adb logcat -d -b main -b system -b crash -t 200 || true
+  diagnose_device
   exit "$status"
 fi
