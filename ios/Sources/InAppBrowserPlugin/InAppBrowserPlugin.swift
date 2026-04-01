@@ -1355,7 +1355,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("requestId required")
             return
         }
-        let modifiedRequest = call.getObject("modifiedRequest")
+        let modifiedRequest = call.getObject("request") ?? call.getObject("modifiedRequest")
         proxyLock.lock()
         let completion = pendingProxyRequests.removeValue(forKey: requestId)
         proxyLock.unlock()
@@ -1363,7 +1363,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Unknown or expired requestId")
             return
         }
-        completion(modifiedRequest as? [String: Any])
+        completion(modifiedRequest)
         call.resolve()
     }
 
@@ -1372,7 +1372,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("requestId required")
             return
         }
-        let modifiedResponse = call.getObject("modifiedResponse")
+        let modifiedResponse = call.getObject("response") ?? call.getObject("modifiedResponse")
         proxyLock.lock()
         let completion = pendingProxyResponses.removeValue(forKey: requestId)
         proxyLock.unlock()
@@ -1380,7 +1380,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Unknown or expired requestId")
             return
         }
-        completion(modifiedResponse as? [String: Any])
+        completion(modifiedResponse)
         call.resolve()
     }
 
@@ -1650,6 +1650,7 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
         }
         eventData["requestId"] = requestId
         eventData["ruleName"] = ruleName
+        notifyListeners("proxyRequest", data: eventData)
         notifyListeners("proxyRequestIntercept", data: eventData)
 
         // Timeout: if JS doesn't respond within 10s, forward unmodified.
@@ -1674,6 +1675,7 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
         }
         eventData["requestId"] = requestId
         eventData["ruleName"] = ruleName
+        notifyListeners("proxyResponse", data: eventData)
         notifyListeners("proxyResponseIntercept", data: eventData)
 
         // Timeout: if JS doesn't respond within 10s, forward unmodified.

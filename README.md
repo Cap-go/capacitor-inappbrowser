@@ -315,6 +315,8 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
+* [`addListener('proxyResponse', ...)`](#addlistenerproxyresponse-)
 * [`addListener('proxyRequestIntercept', ...)`](#addlistenerproxyrequestintercept-)
 * [`addListener('proxyResponseIntercept', ...)`](#addlistenerproxyresponseintercept-)
 * [`continueProxyRequest(...)`](#continueproxyrequest)
@@ -746,13 +748,51 @@ Will be triggered when page load error
 --------------------
 
 
+### addListener('proxyRequest', ...)
+
+```typescript
+addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for intercepted proxy requests matching a rule.
+
+| Param              | Type                                                                      |
+| ------------------ | ------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'proxyRequest'</code>                                               |
+| **`listenerFunc`** | <code>(event: <a href="#proxyrequest">ProxyRequest</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 9.0.0
+
+--------------------
+
+
+### addListener('proxyResponse', ...)
+
+```typescript
+addListener(eventName: 'proxyResponse', listenerFunc: (event: ProxyResponse) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for intercepted proxy responses matching a rule.
+
+| Param              | Type                                                                        |
+| ------------------ | --------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'proxyResponse'</code>                                                |
+| **`listenerFunc`** | <code>(event: <a href="#proxyresponse">ProxyResponse</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 9.0.0
+
+--------------------
+
+
 ### addListener('proxyRequestIntercept', ...)
 
 ```typescript
 addListener(eventName: 'proxyRequestIntercept', listenerFunc: (event: ProxyRequest) => void) => Promise<PluginListenerHandle>
 ```
-
-Listen for intercepted proxy requests matching a rule.
 
 | Param              | Type                                                                      |
 | ------------------ | ------------------------------------------------------------------------- |
@@ -772,8 +812,6 @@ Listen for intercepted proxy requests matching a rule.
 addListener(eventName: 'proxyResponseIntercept', listenerFunc: (event: ProxyResponse) => void) => Promise<PluginListenerHandle>
 ```
 
-Listen for intercepted proxy responses matching a rule.
-
 | Param              | Type                                                                        |
 | ------------------ | --------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'proxyResponseIntercept'</code>                                       |
@@ -789,15 +827,15 @@ Listen for intercepted proxy responses matching a rule.
 ### continueProxyRequest(...)
 
 ```typescript
-continueProxyRequest(options: { requestId: string; modifiedRequest: ModifiedRequest | null; }) => Promise<void>
+continueProxyRequest(options: { requestId: string; request: ModifiedRequest | null; }) => Promise<void>
 ```
 
 Continue an intercepted proxy request with optional modifications.
-Pass `null` for `modifiedRequest` to forward the original request unchanged.
+Pass `null` for `request` to forward the original request unchanged.
 
-| Param         | Type                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------ |
-| **`options`** | <code>{ requestId: string; modifiedRequest: <a href="#modifiedrequest">ModifiedRequest</a> \| null; }</code> |
+| Param         | Type                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; request: <a href="#modifiedrequest">ModifiedRequest</a> \| null; }</code> |
 
 **Since:** 9.0.0
 
@@ -807,15 +845,15 @@ Pass `null` for `modifiedRequest` to forward the original request unchanged.
 ### continueProxyResponse(...)
 
 ```typescript
-continueProxyResponse(options: { requestId: string; modifiedResponse: ModifiedResponse | null; }) => Promise<void>
+continueProxyResponse(options: { requestId: string; response: ModifiedResponse | null; }) => Promise<void>
 ```
 
 Continue an intercepted proxy response with optional modifications.
-Pass `null` for `modifiedResponse` to forward the original response unchanged.
+Pass `null` for `response` to forward the original response unchanged.
 
-| Param         | Type                                                                                                            |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ requestId: string; modifiedResponse: <a href="#modifiedresponse">ModifiedResponse</a> \| null; }</code> |
+| Param         | Type                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; response: <a href="#modifiedresponse">ModifiedResponse</a> \| null; }</code> |
 
 **Since:** 9.0.0
 
@@ -1067,7 +1105,7 @@ And in the AndroidManifest.xml file:
 | **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                             | <code>false</code>                                            | 8.0.2  |
 | **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
 | **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
-| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching intercept events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`. Request-stage and response-stage matching happen independently, so you can use distinct named rules for outgoing requests and incoming responses on the same URL.                                                                                                                                |                                                               | 9.0.0  |
+| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching `proxyRequest` and `proxyResponse` events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`. Request-stage and response-stage matching happen independently, so you can use distinct named rules for outgoing requests and incoming responses on the same URL.                                                                                                       |                                                               | 9.0.0  |
 
 
 #### Headers
@@ -1093,13 +1131,13 @@ And in the AndroidManifest.xml file:
 
 #### ProxyRule
 
-| Prop              | Type                                                              | Description                                                                         |
-| ----------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| **`ruleName`**    | <code>string</code>                                               | Stable rule identifier returned to JS when a request or response matches this rule. |
-| **`urlPattern`**  | <code>string</code>                                               | Regular expression used to match the full request URL.                              |
-| **`methods`**     | <code>string[]</code>                                             | Optional HTTP methods to match. When omitted, all methods match.                    |
-| **`includeBody`** | <code>boolean</code>                                              | Whether the request or response body should be sent to JS as base64.                |
-| **`intercept`**   | <code><a href="#proxyinterceptmode">ProxyInterceptMode</a></code> | Which stage of the proxy flow this rule should intercept.                           |
+| Prop              | Type                                                    | Description                                                                         |
+| ----------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **`ruleName`**    | <code>string</code>                                     | Stable rule identifier returned to JS when a request or response matches this rule. |
+| **`regex`**       | <code>string</code>                                     | Regular expression used to match the full request URL.                              |
+| **`methods`**     | <code>string[]</code>                                   | Optional HTTP methods to match. When omitted, all methods match.                    |
+| **`includeBody`** | <code>boolean</code>                                    | Whether the request or response body should be sent to JS as base64.                |
+| **`mode`**        | <code><a href="#proxyrulemode">ProxyRuleMode</a></code> | Which stage of the proxy flow this rule should match.                               |
 
 
 #### ScreenshotResult
@@ -1258,7 +1296,7 @@ Construct a type with a set of properties K of type T
 <code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
 
 
-#### ProxyInterceptMode
+#### ProxyRuleMode
 
 <code>'request' | 'response' | 'both'</code>
 

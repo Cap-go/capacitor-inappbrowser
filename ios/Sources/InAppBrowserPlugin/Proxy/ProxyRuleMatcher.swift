@@ -92,12 +92,12 @@ class ProxyRuleMatcher {
     static func parse(from array: [[String: Any]]) throws -> [NativeProxyRule] {
         try array.map { dict in
             guard let ruleName = dict["ruleName"] as? String,
-                  let pattern = dict["urlPattern"] as? String,
-                  let intercept = dict["intercept"] as? String else {
+                  let pattern = (dict["regex"] as? String) ?? (dict["urlPattern"] as? String),
+                  let intercept = (dict["mode"] as? String) ?? (dict["intercept"] as? String) else {
                 throw ProxyError.proxyStartFailed("Invalid proxy rule: missing required fields")
             }
             guard ["request", "response", "both"].contains(intercept) else {
-                throw ProxyError.proxyStartFailed("Invalid intercept '\(intercept)' for rule '\(ruleName)'")
+                throw ProxyError.proxyStartFailed("Invalid mode '\(intercept)' for rule '\(ruleName)'")
             }
             let regex = try NSRegularExpression(pattern: pattern)
             let methods = (dict["methods"] as? [String])?.map { $0.uppercased() }

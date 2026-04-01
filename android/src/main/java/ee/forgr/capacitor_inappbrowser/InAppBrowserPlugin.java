@@ -1005,7 +1005,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             call.reject("requestId is required");
             return;
         }
-        JSObject modifiedRequest = call.getObject("modifiedRequest");
+        JSObject modifiedRequest = call.getObject("request");
+        if (modifiedRequest == null) {
+            modifiedRequest = call.getObject("modifiedRequest");
+        }
         CompletableFuture<Map<String, Object>> future = pendingProxyRequests.get(requestId);
         if (future == null) {
             call.reject("Unknown or expired requestId");
@@ -1026,7 +1029,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             call.reject("requestId is required");
             return;
         }
-        JSObject modifiedResponse = call.getObject("modifiedResponse");
+        JSObject modifiedResponse = call.getObject("response");
+        if (modifiedResponse == null) {
+            modifiedResponse = call.getObject("modifiedResponse");
+        }
         CompletableFuture<Map<String, Object>> future = pendingProxyResponses.get(requestId);
         if (future == null) {
             call.reject("Unknown or expired requestId");
@@ -1139,6 +1145,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 if (requestData.containsKey("body")) {
                     eventData.put("body", requestData.get("body"));
                 }
+                notifyListeners("proxyRequest", eventData);
                 notifyListeners("proxyRequestIntercept", eventData);
                 return future;
             }
@@ -1167,6 +1174,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 if (responseData.containsKey("body")) {
                     eventData.put("body", responseData.get("body"));
                 }
+                notifyListeners("proxyResponse", eventData);
                 notifyListeners("proxyResponseIntercept", eventData);
                 return future;
             }

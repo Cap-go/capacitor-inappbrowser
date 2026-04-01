@@ -2,7 +2,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 // --- Proxy Interception Types ---
 
-export type ProxyInterceptMode = 'request' | 'response' | 'both';
+export type ProxyRuleMode = 'request' | 'response' | 'both';
 /**
  * Proxy headers as exposed to and accepted from JavaScript.
  * Repeated headers are represented as `string[]`.
@@ -17,7 +17,7 @@ export interface ProxyRule {
   /**
    * Regular expression used to match the full request URL.
    */
-  urlPattern: string;
+  regex: string;
   /**
    * Optional HTTP methods to match. When omitted, all methods match.
    */
@@ -27,9 +27,9 @@ export interface ProxyRule {
    */
   includeBody?: boolean;
   /**
-   * Which stage of the proxy flow this rule should intercept.
+   * Which stage of the proxy flow this rule should match.
    */
-  intercept: ProxyInterceptMode;
+  mode: ProxyRuleMode;
 }
 
 export type NativeProxyRule = ProxyRule;
@@ -965,7 +965,7 @@ export interface OpenWebViewOptions {
 
   /**
    * Proxy rules for intercepting and modifying requests/responses within the webview.
-   * JavaScript listens for matching intercept events and must continue the flow by calling
+   * JavaScript listens for matching `proxyRequest` and `proxyResponse` events and must continue the flow by calling
    * `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`.
    * Request-stage and response-stage matching happen independently, so you can use distinct
    * named rules for outgoing requests and incoming responses on the same URL.
@@ -1159,13 +1159,30 @@ export interface InAppBrowserPlugin {
    *
    * @since 9.0.0
    */
+  addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
+
+  /**
+   * Listen for intercepted proxy responses matching a rule.
+   *
+   * @since 9.0.0
+   */
+  addListener(
+    eventName: 'proxyResponse',
+    listenerFunc: (event: ProxyResponse) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * @deprecated Use `proxyRequest`.
+   *
+   * @since 9.0.0
+   */
   addListener(
     eventName: 'proxyRequestIntercept',
     listenerFunc: (event: ProxyRequest) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
-   * Listen for intercepted proxy responses matching a rule.
+   * @deprecated Use `proxyResponse`.
    *
    * @since 9.0.0
    */
@@ -1176,19 +1193,19 @@ export interface InAppBrowserPlugin {
 
   /**
    * Continue an intercepted proxy request with optional modifications.
-   * Pass `null` for `modifiedRequest` to forward the original request unchanged.
+   * Pass `null` for `request` to forward the original request unchanged.
    *
    * @since 9.0.0
    */
-  continueProxyRequest(options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void>;
+  continueProxyRequest(options: { requestId: string; request: ModifiedRequest | null }): Promise<void>;
 
   /**
    * Continue an intercepted proxy response with optional modifications.
-   * Pass `null` for `modifiedResponse` to forward the original response unchanged.
+   * Pass `null` for `response` to forward the original response unchanged.
    *
    * @since 9.0.0
    */
-  continueProxyResponse(options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void>;
+  continueProxyResponse(options: { requestId: string; response: ModifiedResponse | null }): Promise<void>;
 
   /**
    * Remove all listeners for this plugin.

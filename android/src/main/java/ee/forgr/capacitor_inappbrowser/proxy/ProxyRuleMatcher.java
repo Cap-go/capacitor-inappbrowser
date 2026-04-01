@@ -87,7 +87,10 @@ public class ProxyRuleMatcher {
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject obj = jsonArray.getJSONObject(i);
             String ruleName = obj.getString("ruleName");
-            String urlPattern = obj.getString("urlPattern");
+            String urlPattern = obj.optString("regex", obj.optString("urlPattern", null));
+            if (urlPattern == null || urlPattern.isEmpty()) {
+                throw new IllegalArgumentException("Missing regex for rule '" + ruleName + "'");
+            }
             List<String> methods = null;
             if (obj.has("methods") && !obj.isNull("methods")) {
                 JSONArray methodsArr = obj.getJSONArray("methods");
@@ -97,9 +100,12 @@ public class ProxyRuleMatcher {
                 }
             }
             boolean includeBody = obj.optBoolean("includeBody", false);
-            String intercept = obj.getString("intercept");
+            String intercept = obj.optString("mode", obj.optString("intercept", null));
+            if (intercept == null || intercept.isEmpty()) {
+                throw new IllegalArgumentException("Missing mode for rule '" + ruleName + "'");
+            }
             if (!"request".equals(intercept) && !"response".equals(intercept) && !"both".equals(intercept)) {
-                throw new IllegalArgumentException("Invalid intercept '" + intercept + "' for rule '" + ruleName + "'");
+                throw new IllegalArgumentException("Invalid mode '" + intercept + "' for rule '" + ruleName + "'");
             }
             rules.add(new NativeProxyRule(ruleName, urlPattern, methods, includeBody, intercept));
         }

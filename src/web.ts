@@ -112,15 +112,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
-  async continueProxyRequest(_options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void> {
+  async continueProxyRequest(_options: { requestId: string; request: ModifiedRequest | null }): Promise<void> {
     void _options;
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 
-  async continueProxyResponse(_options: {
-    requestId: string;
-    modifiedResponse: ModifiedResponse | null;
-  }): Promise<void> {
+  async continueProxyResponse(_options: { requestId: string; response: ModifiedResponse | null }): Promise<void> {
     void _options;
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }

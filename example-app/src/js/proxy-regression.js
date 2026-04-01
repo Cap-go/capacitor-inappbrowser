@@ -90,12 +90,12 @@ export function setupProxyRegression(root) {
       if (stage === "request") {
         await InAppBrowser.continueProxyRequest({
           requestId: event.requestId,
-          modifiedRequest: null,
+          request: null,
         });
       } else {
         await InAppBrowser.continueProxyResponse({
           requestId: event.requestId,
-          modifiedResponse: null,
+          response: null,
         });
       }
     } catch (_error) {}
@@ -139,7 +139,7 @@ export function setupProxyRegression(root) {
 
     await InAppBrowser.continueProxyRequest({
       requestId: event.requestId,
-      modifiedRequest,
+      request: modifiedRequest,
     });
   }
 
@@ -183,7 +183,7 @@ export function setupProxyRegression(root) {
 
     await InAppBrowser.continueProxyResponse({
       requestId: event.requestId,
-      modifiedResponse,
+      response: modifiedResponse,
     });
   }
 
@@ -206,13 +206,13 @@ export function setupProxyRegression(root) {
     const entryUrl = `${proxyBaseUrl}/entry`;
 
     listenerHandles.push(
-      await InAppBrowser.addListener("proxyRequestIntercept", (event) => {
+      await InAppBrowser.addListener("proxyRequest", (event) => {
         void handleProxyRequest(event).catch((error) => failIntercept("request", event, error));
       }),
     );
 
     listenerHandles.push(
-      await InAppBrowser.addListener("proxyResponseIntercept", (event) => {
+      await InAppBrowser.addListener("proxyResponse", (event) => {
         void handleProxyResponse(event).catch((error) => failIntercept("response", event, error));
       }),
     );
@@ -308,50 +308,50 @@ export function setupProxyRegression(root) {
         proxyRules: [
           {
             ruleName: "entry-response",
-            urlPattern: `${proxyBasePattern}/entry$`,
-            intercept: "response",
+            regex: `${proxyBasePattern}/entry$`,
+            mode: "response",
             includeBody: true,
           },
           {
             ruleName: "meta-request",
-            urlPattern: `${proxyBasePattern}/api/meta$`,
+            regex: `${proxyBasePattern}/api/meta$`,
             methods: ["GET"],
-            intercept: "request",
+            mode: "request",
             includeBody: false,
           },
           {
             ruleName: "meta-response",
-            urlPattern: `${proxyBasePattern}/api/meta$`,
+            regex: `${proxyBasePattern}/api/meta$`,
             methods: ["GET"],
-            intercept: "response",
+            mode: "response",
             includeBody: false,
           },
           {
             ruleName: "fetch-request",
-            urlPattern: `${proxyBasePattern}/api/fetch$`,
+            regex: `${proxyBasePattern}/api/fetch$`,
             methods: ["POST"],
-            intercept: "request",
+            mode: "request",
             includeBody: true,
           },
           {
             ruleName: "fetch-response",
-            urlPattern: `${proxyBasePattern}/api/fetch$`,
+            regex: `${proxyBasePattern}/api/fetch$`,
             methods: ["POST"],
-            intercept: "response",
+            mode: "response",
             includeBody: true,
           },
           {
             ruleName: "xhr-request",
-            urlPattern: `${proxyBasePattern}/api/xhr$`,
+            regex: `${proxyBasePattern}/api/xhr$`,
             methods: ["POST"],
-            intercept: "request",
+            mode: "request",
             includeBody: true,
           },
           {
             ruleName: "xhr-response",
-            urlPattern: `${proxyBasePattern}/api/xhr$`,
+            regex: `${proxyBasePattern}/api/xhr$`,
             methods: ["POST"],
-            intercept: "response",
+            mode: "response",
             includeBody: true,
           },
         ],
