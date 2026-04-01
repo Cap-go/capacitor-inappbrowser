@@ -72,6 +72,10 @@ jobs:
           cat /tmp/proxy-regression-server.log
           exit 1
       - name: Build example app for Android regression flow
+        env:
+          VITE_MAESTRO_PROXY_AUTORUN: '1'
+          VITE_MAESTRO_PROXY_SIGNAL: alert
+          VITE_MAESTRO_PROXY_AUTORUN_DELAY_MS: '1000'
         run: bun run example-app:prepare:android
       - name: Run Maestro proxy regression
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
@@ -84,6 +88,15 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: export PATH="$HOME/.maestro/bin:$PATH" && bun run maestro:test:android
+      - name: Upload Maestro debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-android-proxy-regression-debug
+          path: |
+            /home/runner/.maestro/tests
+            /tmp/proxy-regression-server.log
+          if-no-files-found: ignore
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest

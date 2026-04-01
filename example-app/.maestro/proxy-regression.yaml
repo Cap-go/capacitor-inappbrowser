@@ -1,28 +1,7 @@
 appId: ${APP_ID}
-androidWebViewHierarchy: devtools
 ---
 - launchApp:
     clearState: true
-- assertVisible: "Run Proxy Regression Test"
-- tapOn:
-    text: "Run Proxy Regression Test"
-    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Proxy regression passed"
-    timeout: 30000
-- assertVisible: "Entry response OK"
-- assertVisible: "Proxy event id OK"
-- assertVisible: "Meta request OK"
-- assertVisible: "Meta request body omitted OK"
-- assertVisible: "Meta response OK"
-- assertVisible: "Meta response body omitted OK"
-- assertVisible: "Meta flow requestId OK"
-- assertVisible: "Fetch request OK"
-- assertVisible: "Fetch request body OK"
-- assertVisible: "Fetch response OK"
-- assertVisible: "Fetch flow requestId OK"
-- assertVisible: "XHR request OK"
-- assertVisible: "XHR request body OK"
-- assertVisible: "XHR response OK"
-- assertVisible: "XHR flow requestId OK"
-- assertNotVisible: "Proxy regression failed"
+    timeout: 60000

@@ -2,6 +2,12 @@ import { InAppBrowser, ToolBarType } from "@capgo/inappbrowser";
 import { getLoopbackBaseUrl } from "./url.js";
 
 const PROXY_PORT = 8123;
+const MAESTRO_PROXY_AUTORUN = import.meta.env.VITE_MAESTRO_PROXY_AUTORUN === "1";
+const MAESTRO_PROXY_SIGNAL = import.meta.env.VITE_MAESTRO_PROXY_SIGNAL ?? "alert";
+const MAESTRO_PROXY_AUTORUN_DELAY_MS = Number.parseInt(
+  import.meta.env.VITE_MAESTRO_PROXY_AUTORUN_DELAY_MS ?? "1000",
+  10,
+);
 const RULE_MATRIX = [
   { ruleName: "entry-response", path: "/entry", mode: "response", includeBody: true },
   { ruleName: "meta-request", path: "/api/meta", methods: ["GET"], mode: "request", includeBody: false },
@@ -122,7 +128,36 @@ function failureDetailsFrom(detail) {
   return "Unknown proxy error";
 }
 
-export function setupProxyRegression(root) {
+function ensureMaestroStatusOverlay() {
+  const overlayId = "maestro-proxy-regression-status";
+  const existingOverlay = document.getElementById(overlayId);
+  if (existingOverlay) {
+    return existingOverlay;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.id = overlayId;
+  overlay.style.position = "fixed";
+  overlay.style.top = "12px";
+  overlay.style.left = "12px";
+  overlay.style.right = "12px";
+  overlay.style.zIndex = "2147483647";
+  overlay.style.padding = "12px";
+  overlay.style.borderRadius = "10px";
+  overlay.style.backgroundColor = "rgba(17, 24, 39, 0.92)";
+  overlay.style.color = "#ffffff";
+  overlay.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  overlay.style.fontSize = "14px";
+  overlay.style.lineHeight = "1.4";
+  overlay.style.whiteSpace = "pre-wrap";
+  overlay.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.25)";
+  overlay.style.pointerEvents = "none";
+  overlay.textContent = "Proxy regression awaiting autorun...";
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+export function setupProxyRegression(root, options = {}) {
   const runButton = root.querySelector("#run-proxy-regression");
   const statusText = root.querySelector("#proxy-regression-status-text");
   const detailsText = root.querySelector("#proxy-regression-details");
@@ -131,6 +166,10 @@ export function setupProxyRegression(root) {
     return;
   }
 
+  const autoStart = options.autoStart ?? MAESTRO_PROXY_AUTORUN;
+  const autoStartDelayMs = options.autoStartDelayMs ?? MAESTRO_PROXY_AUTORUN_DELAY_MS;
+  const resultSignal = options.resultSignal ?? (autoStart ? MAESTRO_PROXY_SIGNAL : "none");
+  const maestroStatusOverlay = autoStart ? ensureMaestroStatusOverlay() : null;
   const state = {
     listenerHandles: [],
     browserOpened: false,
@@ -146,6 +185,25 @@ export function setupProxyRegression(root) {
   const setStatus = (message, details = "") => {
     statusText.textContent = message;
     detailsText.textContent = details;
+    if (maestroStatusOverlay) {
+      maestroStatusOverlay.textContent = details ? `${message}\n${details}` : message;
+      maestroStatusOverlay.dataset.status = message;
+    }
+    if (autoStart) {
+      document.title = message;
+      document.body.dataset.proxyRegressionStatus = message;
+    }
+  };
+
+  const signalResult = (message, details = "") => {
+    if (resultSignal !== "alert") {
+      return;
+    }
+    const alertMessage =
+      message === "Proxy regression passed" ? message : [message, details].filter(Boolean).join("\n\n");
+    window.setTimeout(() => {
+      window.alert(alertMessage);
+    }, 150);
   };
 
   const removeListeners = async () => {
@@ -174,6 +232,7 @@ export function setupProxyRegression(root) {
         console.debug("Failed to close InAppBrowser", error);
       }
     }
+    signalResult(message, details);
   };
 
   const failIntercept = async (stage, event, error) => {
@@ -300,7 +359,10 @@ export function setupProxyRegression(root) {
     await finish("Proxy regression failed", failureDetailsFrom(detail));
   }
 
-  runButton.addEventListener("click", async () => {
+  const runRegression = async () => {
+    if (runButton.disabled) {
+      return;
+    }
     runButton.disabled = true;
     state.browserOpened = false;
     openedWebViewId = null;
@@ -356,5 +418,20 @@ export function setupProxyRegression(root) {
     } catch (error) {
       await finish("Proxy regression failed", error?.message ?? String(error));
     }
+  };
+
+  runButton.addEventListener("click", () => {
+    runRegression().catch((error) => {
+      finish("Proxy regression failed", error?.message ?? String(error));
+    });
   });
+
+  if (autoStart) {
+    setStatus("Proxy regression waiting for autorun...");
+    window.setTimeout(() => {
+      runRegression().catch((error) => {
+        finish("Proxy regression failed", error?.message ?? String(error));
+      });
+    }, autoStartDelayMs);
+  }
 }
