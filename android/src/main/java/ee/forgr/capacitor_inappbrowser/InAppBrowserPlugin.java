@@ -28,6 +28,9 @@ import androidx.browser.customtabs.CustomTabsClient;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
+import androidx.webkit.ProxyConfig;
+import androidx.webkit.ProxyController;
+import androidx.webkit.WebViewFeature;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -37,6 +40,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import ee.forgr.capacitor_inappbrowser.proxy.MitmProxyServer;
+import ee.forgr.capacitor_inappbrowser.proxy.ProxyRuleMatcher;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -52,11 +57,6 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
-import androidx.webkit.ProxyConfig;
-import androidx.webkit.ProxyController;
-import androidx.webkit.WebViewFeature;
-import ee.forgr.capacitor_inappbrowser.proxy.MitmProxyServer;
-import ee.forgr.capacitor_inappbrowser.proxy.ProxyRuleMatcher;
 
 @CapacitorPlugin(
     name = "InAppBrowser",
@@ -908,8 +908,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
             try {
                 // Parse rules
-                java.util.List<ProxyRuleMatcher.NativeProxyRule> rules =
-                        ProxyRuleMatcher.parseFromJson(proxyRulesJson);
+                java.util.List<ProxyRuleMatcher.NativeProxyRule> rules = ProxyRuleMatcher.parseFromJson(proxyRulesJson);
                 activeRuleMatcher = new ProxyRuleMatcher(rules);
 
                 // Start proxy server (CA is created internally by MitmProxyServer)
@@ -917,9 +916,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 int proxyPort = activeProxyServer.start();
 
                 // Set ProxyController override
-                ProxyConfig proxyConfig = new ProxyConfig.Builder()
-                    .addProxyRule("http://127.0.0.1:" + proxyPort)
-                    .build();
+                ProxyConfig proxyConfig = new ProxyConfig.Builder().addProxyRule("http://127.0.0.1:" + proxyPort).build();
 
                 ProxyController.getInstance().setProxyOverride(
                     proxyConfig,
@@ -973,7 +970,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     // ---- Proxy integration methods ----
 
     @PluginMethod
-    public void handleProxyRequest(PluginCall call) {
+    public void continueProxyRequest(PluginCall call) {
         String requestId = call.getString("requestId");
         if (requestId == null) {
             call.reject("requestId is required");
@@ -992,7 +989,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     @PluginMethod
-    public void handleProxyResponse(PluginCall call) {
+    public void continueProxyResponse(PluginCall call) {
         String requestId = call.getString("requestId");
         if (requestId == null) {
             call.reject("requestId is required");
@@ -1038,13 +1035,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         return new MitmProxyServer.ProxyEventListener() {
             @Override
             public CompletableFuture<Map<String, Object>> onRequestIntercept(
-                    String requestId, int ruleIndex, Map<String, Object> requestData) {
+                String requestId,
+                String ruleName,
+                Map<String, Object> requestData
+            ) {
                 CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
                 pendingProxyRequests.put(requestId, future);
 
                 JSObject eventData = new JSObject();
                 eventData.put("requestId", requestId);
-                eventData.put("ruleIndex", ruleIndex);
+                eventData.put("ruleName", ruleName);
                 eventData.put("url", requestData.get("url"));
                 eventData.put("method", requestData.get("method"));
                 if (requestData.get("headers") != null) {
@@ -1064,13 +1064,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
             @Override
             public CompletableFuture<Map<String, Object>> onResponseIntercept(
-                    String requestId, int ruleIndex, Map<String, Object> responseData) {
+                String requestId,
+                String ruleName,
+                Map<String, Object> responseData
+            ) {
                 CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
                 pendingProxyResponses.put(requestId, future);
 
                 JSObject eventData = new JSObject();
                 eventData.put("requestId", requestId);
-                eventData.put("ruleIndex", ruleIndex);
+                eventData.put("ruleName", ruleName);
                 eventData.put("url", responseData.get("url"));
                 eventData.put("status", responseData.get("status"));
                 if (responseData.get("headers") != null) {

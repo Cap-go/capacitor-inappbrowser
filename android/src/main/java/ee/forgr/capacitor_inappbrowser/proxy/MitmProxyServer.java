@@ -3,25 +3,7 @@ package ee.forgr.capacitor_inappbrowser.proxy;
 import android.content.Context;
 import android.util.Base64;
 import android.util.Log;
-
-import org.littleshoot.proxy.HttpFilters;
-import org.littleshoot.proxy.HttpFiltersAdapter;
-import org.littleshoot.proxy.HttpFiltersSourceAdapter;
-import org.littleshoot.proxy.HttpProxyServer;
-import org.littleshoot.proxy.MitmManager;
-import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
-
-import java.net.InetSocketAddress;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLSession;
-
+import ee.forgr.capacitor_inappbrowser.proxy.ProxyRuleMatcher.NativeProxyRule;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -32,8 +14,21 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-
-import ee.forgr.capacitor_inappbrowser.proxy.ProxyRuleMatcher.NativeProxyRule;
+import java.net.InetSocketAddress;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLSession;
+import org.littleshoot.proxy.HttpFilters;
+import org.littleshoot.proxy.HttpFiltersAdapter;
+import org.littleshoot.proxy.HttpFiltersSourceAdapter;
+import org.littleshoot.proxy.HttpProxyServer;
+import org.littleshoot.proxy.MitmManager;
+import org.littleshoot.proxy.impl.DefaultHttpProxyServer;
 
 public class MitmProxyServer {
 
@@ -50,23 +45,21 @@ public class MitmProxyServer {
          * Called when an outgoing request matches a rule with request interception.
          *
          * @param requestId   unique identifier for this request
-         * @param ruleIndex   the index of the matched rule
+         * @param ruleName    the name of the matched rule
          * @param requestData map containing url, method, headers, and optionally body (base64)
          * @return a future that resolves with modification instructions, or null/empty to pass through
          */
-        CompletableFuture<Map<String, Object>> onRequestIntercept(
-                String requestId, int ruleIndex, Map<String, Object> requestData);
+        CompletableFuture<Map<String, Object>> onRequestIntercept(String requestId, String ruleName, Map<String, Object> requestData);
 
         /**
          * Called when a response arrives for a request that matched a rule with response interception.
          *
          * @param requestId    unique identifier for the original request
-         * @param ruleIndex    the index of the matched rule
+         * @param ruleName     the name of the matched rule
          * @param responseData map containing status, headers, and optionally body (base64)
          * @return a future that resolves with modification instructions, or null/empty to pass through
          */
-        CompletableFuture<Map<String, Object>> onResponseIntercept(
-                String requestId, int ruleIndex, Map<String, Object> responseData);
+        CompletableFuture<Map<String, Object>> onResponseIntercept(String requestId, String ruleName, Map<String, Object> responseData);
     }
 
     private final CertificateAuthority ca;
@@ -88,11 +81,11 @@ public class MitmProxyServer {
      */
     public int start() {
         server = DefaultHttpProxyServer.bootstrap()
-                .withAddress(new InetSocketAddress("127.0.0.1", 0))
-                .withManInTheMiddle(new ProxyMitmManager())
-                .withFiltersSource(new InterceptFiltersSource())
-                .withAllowRequestToOriginServer(true)
-                .start();
+            .withAddress(new InetSocketAddress("127.0.0.1", 0))
+            .withManInTheMiddle(new ProxyMitmManager())
+            .withFiltersSource(new InterceptFiltersSource())
+            .withAllowRequestToOriginServer(true)
+            .start();
         port = server.getListenAddress().getPort();
         Log.i(TAG, "MITM proxy started on 127.0.0.1:" + port);
         return port;
@@ -176,6 +169,7 @@ public class MitmProxyServer {
 
         private NativeProxyRule matchedRule;
         private String requestId;
+        private String requestUrl;
 
         InterceptFilter(HttpRequest originalRequest) {
             super(originalRequest);
@@ -199,13 +193,14 @@ public class MitmProxyServer {
 
             matchedRule = rule;
             requestId = UUID.randomUUID().toString();
+            requestUrl = url;
 
             if (!rule.interceptsRequest()) {
                 // Rule only intercepts responses; let the request pass through
                 return null;
             }
 
-            Log.d(TAG, "Request matched rule " + rule.ruleIndex + ": " + method + " " + url);
+            Log.d(TAG, "Request matched rule " + rule.ruleName + ": " + method + " " + url);
 
             // Build request data map for the event
             Map<String, Object> requestData = new HashMap<>();
@@ -220,10 +215,10 @@ public class MitmProxyServer {
 
             // Fire event and wait for response
             try {
-                CompletableFuture<Map<String, Object>> future =
-                        listener.onRequestIntercept(requestId, rule.ruleIndex, requestData);
+                CompletableFuture<Map<String, Object>> future = listener.onRequestIntercept(requestId, rule.ruleName, requestData);
                 Map<String, Object> modifications = future.get(INTERCEPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 applyRequestModifications(fullRequest, modifications);
+                requestUrl = fullRequest.uri();
             } catch (TimeoutException e) {
                 Log.w(TAG, "Request intercept timed out for " + requestId + ", passing through unmodified");
             } catch (Exception e) {
@@ -245,13 +240,14 @@ public class MitmProxyServer {
 
             FullHttpResponse fullResponse = (FullHttpResponse) httpObject;
 
-            Log.d(TAG, "Response matched rule " + matchedRule.ruleIndex + " for request " + requestId);
+            Log.d(TAG, "Response matched rule " + matchedRule.ruleName + " for request " + requestId);
 
             // Build response data map for the event
             Map<String, Object> responseData = new HashMap<>();
+            responseData.put("url", requestUrl);
             responseData.put("status", fullResponse.status().code());
             responseData.put("headers", headersToMap(fullResponse.headers()));
-            if (fullResponse.content().readableBytes() > 0) {
+            if (matchedRule.includeBody && fullResponse.content().readableBytes() > 0) {
                 byte[] bodyBytes = new byte[fullResponse.content().readableBytes()];
                 fullResponse.content().getBytes(0, bodyBytes);
                 responseData.put("body", Base64.encodeToString(bodyBytes, Base64.NO_WRAP));
@@ -259,8 +255,7 @@ public class MitmProxyServer {
 
             // Fire event and wait for response
             try {
-                CompletableFuture<Map<String, Object>> future =
-                        listener.onResponseIntercept(requestId, matchedRule.ruleIndex, responseData);
+                CompletableFuture<Map<String, Object>> future = listener.onResponseIntercept(requestId, matchedRule.ruleName, responseData);
                 Map<String, Object> modifications = future.get(INTERCEPT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 applyResponseModifications(fullResponse, modifications);
             } catch (TimeoutException e) {

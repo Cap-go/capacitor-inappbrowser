@@ -2,25 +2,49 @@ import type { PluginListenerHandle } from '@capacitor/core';
 
 // --- Proxy Interception Types ---
 
+export type ProxyInterceptMode = 'request' | 'response' | 'both';
+
 export interface ProxyRule {
+  /**
+   * Stable rule identifier returned to JS when a request or response matches this rule.
+   */
+  ruleName: string;
+  /**
+   * Regular expression used to match the full request URL.
+   */
   urlPattern: string;
+  /**
+   * Optional HTTP methods to match. When omitted, all methods match.
+   */
   methods?: string[];
+  /**
+   * Whether the request or response body should be sent to JS as base64.
+   */
   includeBody?: boolean;
-  intercept: 'request' | 'response' | 'both';
-  onRequest?: (req: ProxyRequest) => Promise<ModifiedRequest | null>;
-  onResponse?: (res: ProxyResponse) => Promise<ModifiedResponse | null>;
+  /**
+   * Which stage of the proxy flow this rule should intercept.
+   */
+  intercept: ProxyInterceptMode;
 }
 
 export interface NativeProxyRule {
-  ruleIndex: number;
+  ruleName: string;
   urlPattern: string;
   methods?: string[];
   includeBody?: boolean;
-  intercept: 'request' | 'response' | 'both';
+  intercept: ProxyInterceptMode;
 }
 
 export interface ProxyRequest {
+  /**
+   * UUID that identifies the intercepted request flow. Matching response events reuse this value.
+   * Pass it back to `continueProxyRequest()`.
+   */
   requestId: string;
+  /**
+   * Name of the matched proxy rule.
+   */
+  ruleName: string;
   url: string;
   method: string;
   headers: Record<string, string>;
@@ -35,7 +59,15 @@ export interface ModifiedRequest {
 }
 
 export interface ProxyResponse {
+  /**
+   * UUID that identifies the intercepted request flow. When both stages match, this is the same value
+   * emitted by `proxyRequestIntercept`. Pass it back to `continueProxyResponse()`.
+   */
   requestId: string;
+  /**
+   * Name of the matched proxy rule.
+   */
+  ruleName: string;
   url: string;
   status: number;
   headers: Record<string, string>;
@@ -48,10 +80,7 @@ export interface ModifiedResponse {
   body?: string;
 }
 
-export type ProxyErrorCode =
-  | 'PROXY_START_FAILED'
-  | 'PROXY_ALREADY_ACTIVE'
-  | 'PLATFORM_UNSUPPORTED';
+export type ProxyErrorCode = 'PROXY_START_FAILED' | 'PROXY_ALREADY_ACTIVE' | 'PLATFORM_UNSUPPORTED';
 
 export interface UrlEvent {
   /**
@@ -868,9 +897,8 @@ export interface OpenWebViewOptions {
 
   /**
    * Proxy rules for intercepting and modifying requests/responses within the webview.
-   * Each rule specifies a URL pattern and whether to intercept requests, responses, or both.
-   * Callbacks (onRequest/onResponse) are handled in the JS layer and stripped before
-   * sending rules to native.
+   * JavaScript listens for matching intercept events and must continue the flow by calling
+   * `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`.
    *
    * @since 9.0.0
    */
@@ -1063,7 +1091,7 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'proxyRequestIntercept',
-    listenerFunc: (event: ProxyRequest & { ruleIndex: number }) => void,
+    listenerFunc: (event: ProxyRequest) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
@@ -1073,24 +1101,24 @@ export interface InAppBrowserPlugin {
    */
   addListener(
     eventName: 'proxyResponseIntercept',
-    listenerFunc: (event: ProxyResponse & { ruleIndex: number }) => void,
+    listenerFunc: (event: ProxyResponse) => void,
   ): Promise<PluginListenerHandle>;
 
   /**
-   * Respond to an intercepted proxy request with optional modifications.
+   * Continue an intercepted proxy request with optional modifications.
    * Pass `null` for `modifiedRequest` to forward the original request unchanged.
    *
    * @since 9.0.0
    */
-  handleProxyRequest(options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void>;
+  continueProxyRequest(options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void>;
 
   /**
-   * Respond to an intercepted proxy response with optional modifications.
+   * Continue an intercepted proxy response with optional modifications.
    * Pass `null` for `modifiedResponse` to forward the original response unchanged.
    *
    * @since 9.0.0
    */
-  handleProxyResponse(options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void>;
+  continueProxyResponse(options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void>;
 
   /**
    * Remove all listeners for this plugin.

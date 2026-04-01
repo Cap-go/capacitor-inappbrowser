@@ -220,15 +220,19 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
     ) {
         let url = head.uri
         let method = "\(head.method)"
+        let matchedRule = ruleMatcher.match(url: url, method: method)
+        let requestId = matchedRule.map { _ in UUID().uuidString }
 
-        guard let rule = ruleMatcher.match(url: url, method: method),
-              rule.interceptsRequest else {
-            // No matching rule -- forward directly.
-            forwardToUpstream(context: context, head: head, body: body, rule: nil)
+        guard let rule = matchedRule, rule.interceptsRequest else {
+            forwardToUpstream(
+                context: context,
+                head: head,
+                body: body,
+                rule: matchedRule,
+                requestId: requestId
+            )
             return
         }
-
-        let requestId = UUID().uuidString
 
         // Build the request data dictionary for the JS event.
         var requestData: [String: Any] = [
@@ -247,8 +251,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         // Fire the interception event and wait for a response from JS.
         let eventLoop = context.eventLoop
         delegate?.onRequestIntercept(
-            requestId: requestId,
-            ruleIndex: rule.ruleIndex,
+            requestId: requestId ?? UUID().uuidString,
+            ruleName: rule.ruleName,
             requestData: requestData
         ) { [weak self] modifications in
             eventLoop.execute {
@@ -281,7 +285,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                     context: context,
                     head: modifiedHead,
                     body: modifiedBody,
-                    rule: rule
+                    rule: rule,
+                    requestId: requestId
                 )
             }
         }
@@ -293,7 +298,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
         context: ChannelHandlerContext,
         head: HTTPRequestHead,
         body: ByteBuffer?,
-        rule: NativeProxyRule?
+        rule: NativeProxyRule?,
+        requestId: String?
     ) {
         guard let url = URL(string: head.uri), let host = url.host else {
             sendErrorResponse(context: context, status: .badGateway)
@@ -329,7 +335,8 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
                     clientContext: context,
                     rule: rule,
                     delegate: self?.delegate,
-                    requestUrl: head.uri
+                    requestUrl: head.uri,
+                    requestId: requestId
                 )
                 upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
                     context.close(promise: nil)
@@ -408,14 +415,19 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
 
         // Check if any rule matches. If a matching rule intercepts requests, fire the event.
         let matchedRule = ruleMatcher.match(url: fullUrl, method: method)
+        let requestId = matchedRule.map { _ in UUID().uuidString }
 
         guard let rule = matchedRule, rule.interceptsRequest else {
-            // No interception needed -- forward directly upstream.
-            forwardUpstreamTLS(context: context, head: head, body: body, rule: matchedRule, fullUrl: fullUrl)
+            forwardUpstreamTLS(
+                context: context,
+                head: head,
+                body: body,
+                rule: matchedRule,
+                requestId: requestId,
+                fullUrl: fullUrl
+            )
             return
         }
-
-        let requestId = UUID().uuidString
         var requestData: [String: Any] = [
             "url": fullUrl,
             "method": method,
@@ -430,8 +442,8 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
 
         let eventLoop = context.eventLoop
         delegate?.onRequestIntercept(
-            requestId: requestId,
-            ruleIndex: rule.ruleIndex,
+            requestId: requestId ?? UUID().uuidString,
+            ruleName: rule.ruleName,
             requestData: requestData
         ) { [weak self] modifications in
             eventLoop.execute {
@@ -464,6 +476,7 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
                     head: modifiedHead,
                     body: modifiedBody,
                     rule: rule,
+                    requestId: requestId,
                     fullUrl: fullUrl
                 )
             }
@@ -475,6 +488,7 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
         head: HTTPRequestHead,
         body: ByteBuffer?,
         rule: NativeProxyRule?,
+        requestId: String?,
         fullUrl: String
     ) {
         let upstreamHost = self.host
@@ -518,7 +532,8 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
                     clientContext: context,
                     rule: rule,
                     delegate: self?.delegate,
-                    requestUrl: fullUrl
+                    requestUrl: fullUrl,
+                    requestId: requestId
                 )
                 upstreamChannel.pipeline.addHandler(responseHandler).whenFailure { _ in
                     context.close(promise: nil)
@@ -548,6 +563,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
     private let rule: NativeProxyRule?
     private weak var delegate: ProxyEventDelegate?
     private let requestUrl: String
+    private let requestId: String?
 
     private var responseHead: HTTPResponseHead?
     private var responseBody: ByteBuffer?
@@ -555,11 +571,13 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
     init(clientContext: ChannelHandlerContext,
          rule: NativeProxyRule?,
          delegate: ProxyEventDelegate?,
-         requestUrl: String) {
+         requestUrl: String,
+         requestId: String?) {
         self.clientContext = clientContext
         self.rule = rule
         self.delegate = delegate
         self.requestUrl = requestUrl
+        self.requestId = requestId
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -590,7 +608,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
             return
         }
 
-        let requestId = UUID().uuidString
+        let requestId = self.requestId ?? UUID().uuidString
 
         var responseData: [String: Any] = [
             "url": requestUrl,
@@ -607,7 +625,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
 
         delegate?.onResponseIntercept(
             requestId: requestId,
-            ruleIndex: rule.ruleIndex,
+            ruleName: rule.ruleName,
             responseData: responseData
         ) { [weak self] modifications in
             self?.clientContext.eventLoop.execute {

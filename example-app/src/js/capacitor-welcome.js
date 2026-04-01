@@ -6,6 +6,7 @@ import {
   BackgroundColor,
   InvisibilityMode,
 } from "@capgo/inappbrowser";
+import { setupProxyRegression } from "./proxy-regression.js";
 
 // Default URL configuration
 let testWebappUrl = "http://localhost:8000/index.php";
@@ -121,6 +122,17 @@ window.customElements.define(
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
+        <h2>Proxy Regression</h2>
+        <p>
+          Run the split native proxy flow with named rules, request/response interception, and optional body forwarding.
+        </p>
+        <p>
+          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
+        </p>
+        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
+          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
+          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
+        </div>
         <hr />
         <h2>In-App Browser Demo</h2>
         <p>
@@ -162,7 +174,7 @@ window.customElements.define(
           <button class="button" id="open-test-webapp-activity" style="background-color: #ffc107; color: #212529;">🧪 Open Test Webapp (Activity Mode)</button>
         </p>
         <div id="webapp-status" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.8em; color: #666;">
-          <strong>Setup:</strong> Make sure to copy url.js.example to url.js and configure your local server URL.
+          <strong>Setup:</strong> Edit src/js/url.js if your local server is not running on http://localhost:8000/index.php.
         </div>
         <hr />
         <h2>Hidden WebView Test</h2>
@@ -245,6 +257,8 @@ window.customElements.define(
           domOutput.textContent = "";
         }
       }
+
+      setupProxyRegression(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot

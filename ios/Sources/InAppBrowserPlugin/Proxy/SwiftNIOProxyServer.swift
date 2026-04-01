@@ -12,13 +12,13 @@ import NIOHTTP1
 protocol ProxyEventDelegate: AnyObject {
     /// Called when a request matches an interception rule.
     /// `completion` receives optional modifications, or `nil` to forward as-is.
-    func onRequestIntercept(requestId: String, ruleIndex: Int,
+    func onRequestIntercept(requestId: String, ruleName: String,
                             requestData: [String: Any],
                             completion: @escaping ([String: Any]?) -> Void)
 
     /// Called when a response matches an interception rule.
     /// `completion` receives optional modifications, or `nil` to forward as-is.
-    func onResponseIntercept(requestId: String, ruleIndex: Int,
+    func onResponseIntercept(requestId: String, ruleName: String,
                              responseData: [String: Any],
                              completion: @escaping ([String: Any]?) -> Void)
 }

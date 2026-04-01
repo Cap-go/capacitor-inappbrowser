@@ -2,20 +2,6 @@ package ee.forgr.capacitor_inappbrowser.proxy;
 
 import android.content.Context;
 import android.util.Log;
-
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.GeneralName;
-import org.bouncycastle.asn1.x509.GeneralNames;
-import org.bouncycastle.asn1.x509.KeyUsage;
-import org.bouncycastle.cert.X509v3CertificateBuilder;
-import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -30,11 +16,22 @@ import java.security.Security;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
-
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.BasicConstraints;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
+import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 
 public class CertificateAuthority {
 
@@ -87,24 +84,26 @@ public class CertificateAuthority {
         Date notAfter = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
 
         X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
-                issuer, serial, notBefore, notAfter, issuer, caKeyPair.getPublic());
+            issuer,
+            serial,
+            notBefore,
+            notAfter,
+            issuer,
+            caKeyPair.getPublic()
+        );
 
         builder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
-        builder.addExtension(Extension.keyUsage, true,
-                new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
+        builder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
 
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA")
-                .build(caKeyPair.getPrivate());
+        ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(caKeyPair.getPrivate());
 
-        caCert = new JcaX509CertificateConverter()
-                .setProvider("BC")
-                .getCertificate(builder.build(signer));
+        caCert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
         caPrivateKey = caKeyPair.getPrivate();
 
         // Persist to PKCS12 keystore
         KeyStore ks = KeyStore.getInstance("PKCS12");
         ks.load(null, KEYSTORE_PASS);
-        ks.setKeyEntry(CA_ALIAS, caPrivateKey, KEYSTORE_PASS, new X509Certificate[]{caCert});
+        ks.setKeyEntry(CA_ALIAS, caPrivateKey, KEYSTORE_PASS, new X509Certificate[] { caCert });
         try (FileOutputStream fos = new FileOutputStream(ksFile)) {
             ks.store(fos, KEYSTORE_PASS);
         }
@@ -117,8 +116,7 @@ public class CertificateAuthority {
      */
     public SSLEngine createServerSSLEngine(String peerHost, int peerPort) {
         try {
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-                    TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init((KeyStore) null);
 
             SSLContext ctx = SSLContext.getInstance("TLS");
@@ -159,26 +157,27 @@ public class CertificateAuthority {
             Date notAfter = new Date(System.currentTimeMillis() + 30 * 24 * 60 * 60 * 1000L);
 
             X509v3CertificateBuilder builder = new JcaX509v3CertificateBuilder(
-                    issuer, serial, notBefore, notAfter, subject, domainKeyPair.getPublic());
+                issuer,
+                serial,
+                notBefore,
+                notAfter,
+                subject,
+                domainKeyPair.getPublic()
+            );
 
             // SAN extension so the cert matches the domain
             GeneralNames sans = new GeneralNames(new GeneralName(GeneralName.dNSName, domain));
             builder.addExtension(Extension.subjectAlternativeName, false, sans);
 
-            ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA")
-                    .build(caPrivateKey);
+            ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(caPrivateKey);
 
-            X509Certificate domainCert = new JcaX509CertificateConverter()
-                    .setProvider("BC")
-                    .getCertificate(builder.build(signer));
+            X509Certificate domainCert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
 
             KeyStore ks = KeyStore.getInstance("PKCS12");
             ks.load(null, KEYSTORE_PASS);
-            ks.setKeyEntry("domain", domainKeyPair.getPrivate(), KEYSTORE_PASS,
-                    new X509Certificate[]{domainCert, caCert});
+            ks.setKeyEntry("domain", domainKeyPair.getPrivate(), KEYSTORE_PASS, new X509Certificate[] { domainCert, caCert });
 
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(
-                    KeyManagerFactory.getDefaultAlgorithm());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(ks, KEYSTORE_PASS);
 
             SSLContext ctx = SSLContext.getInstance("TLS");

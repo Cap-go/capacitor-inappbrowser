@@ -81,6 +81,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
+    void _options;
     throw this.unimplemented('Screenshots are not supported on web.');
   }
 
@@ -100,20 +101,27 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    void _options;
     console.log('setEnabledSafeTopMargin not supported on web');
     return;
   }
 
   async setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    void _options;
     console.log('setEnabledSafeBottomMargin not supported on web');
     return;
   }
 
-  async handleProxyRequest(_options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void> {
+  async continueProxyRequest(_options: { requestId: string; modifiedRequest: ModifiedRequest | null }): Promise<void> {
+    void _options;
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 
-  async handleProxyResponse(_options: { requestId: string; modifiedResponse: ModifiedResponse | null }): Promise<void> {
+  async continueProxyResponse(_options: {
+    requestId: string;
+    modifiedResponse: ModifiedResponse | null;
+  }): Promise<void> {
+    void _options;
     throw Object.assign(new Error('Proxy interception is not supported on web'), { code: 'PLATFORM_UNSUPPORTED' });
   }
 
@@ -129,7 +137,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       .map((x) => x.join('='))
       .join(',');
 
-    const popup = window.open(options.authEndpoint, 'Authorization', settings)!;
+    const popup = window.open(options.authEndpoint, 'Authorization', settings);
+    if (!popup) {
+      throw new Error('Failed to open authorization window');
+    }
     if (typeof popup.focus === 'function') {
       popup.focus();
     }

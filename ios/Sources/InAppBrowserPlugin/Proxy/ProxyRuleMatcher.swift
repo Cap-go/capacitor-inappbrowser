@@ -2,7 +2,7 @@ import Foundation
 
 /// A single proxy interception rule, parsed from the JS plugin call options.
 struct NativeProxyRule {
-    let ruleIndex: Int
+    let ruleName: String
     let urlPattern: NSRegularExpression
     let methods: [String]?   // nil = all methods
     let includeBody: Bool
@@ -52,7 +52,7 @@ class ProxyRuleMatcher {
     /// Parse an array of dictionaries (from the JS bridge) into typed rules.
     static func parse(from array: [[String: Any]]) throws -> [NativeProxyRule] {
         try array.map { dict in
-            guard let ruleIndex = dict["ruleIndex"] as? Int,
+            guard let ruleName = dict["ruleName"] as? String,
                   let pattern = dict["urlPattern"] as? String,
                   let intercept = dict["intercept"] as? String else {
                 throw ProxyError.proxyStartFailed("Invalid proxy rule: missing required fields")
@@ -61,7 +61,7 @@ class ProxyRuleMatcher {
             let methods = (dict["methods"] as? [String])?.map { $0.uppercased() }
             let includeBody = dict["includeBody"] as? Bool ?? false
             return NativeProxyRule(
-                ruleIndex: ruleIndex,
+                ruleName: ruleName,
                 urlPattern: regex,
                 methods: methods,
                 includeBody: includeBody,

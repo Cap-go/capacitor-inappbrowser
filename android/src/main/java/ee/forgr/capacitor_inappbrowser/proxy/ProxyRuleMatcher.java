@@ -9,15 +9,15 @@ import org.json.JSONObject;
 public class ProxyRuleMatcher {
 
     public static class NativeProxyRule {
-        public final int ruleIndex;
+
+        public final String ruleName;
         public final Pattern urlPattern;
         public final List<String> methods; // null = all methods
         public final boolean includeBody;
         public final String intercept; // "request" | "response" | "both"
 
-        public NativeProxyRule(int ruleIndex, String urlPattern, List<String> methods,
-                               boolean includeBody, String intercept) {
-            this.ruleIndex = ruleIndex;
+        public NativeProxyRule(String ruleName, String urlPattern, List<String> methods, boolean includeBody, String intercept) {
+            this.ruleName = ruleName;
             this.urlPattern = Pattern.compile(urlPattern);
             this.methods = methods;
             this.includeBody = includeBody;
@@ -59,7 +59,7 @@ public class ProxyRuleMatcher {
         List<NativeProxyRule> rules = new ArrayList<>();
         for (int i = 0; i < jsonArray.length(); i++) {
             JSONObject obj = jsonArray.getJSONObject(i);
-            int ruleIndex = obj.getInt("ruleIndex");
+            String ruleName = obj.getString("ruleName");
             String urlPattern = obj.getString("urlPattern");
             List<String> methods = null;
             if (obj.has("methods") && !obj.isNull("methods")) {
@@ -71,7 +71,7 @@ public class ProxyRuleMatcher {
             }
             boolean includeBody = obj.optBoolean("includeBody", false);
             String intercept = obj.getString("intercept");
-            rules.add(new NativeProxyRule(ruleIndex, urlPattern, methods, includeBody, intercept));
+            rules.add(new NativeProxyRule(ruleName, urlPattern, methods, includeBody, intercept));
         }
         return rules;
     }

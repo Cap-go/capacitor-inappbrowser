@@ -1,4 +1,4 @@
-package app.capgo.plugin.InappBrowser;
+package app.capgo.inappbrowser;
 
 import com.getcapacitor.BridgeActivity;
 

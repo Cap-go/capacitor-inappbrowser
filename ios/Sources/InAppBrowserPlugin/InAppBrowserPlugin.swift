@@ -54,8 +54,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "handleProxyResponse", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "continueProxyRequest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "continueProxyResponse", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -1333,7 +1333,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - Proxy request/response handlers
 
-    @objc func handleProxyRequest(_ call: CAPPluginCall) {
+    @objc func continueProxyRequest(_ call: CAPPluginCall) {
         guard let requestId = call.getString("requestId") else {
             call.reject("requestId required")
             return
@@ -1346,7 +1346,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
-    @objc func handleProxyResponse(_ call: CAPPluginCall) {
+    @objc func continueProxyResponse(_ call: CAPPluginCall) {
         guard let requestId = call.getString("requestId") else {
             call.reject("requestId required")
             return
@@ -1604,7 +1604,7 @@ extension InAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
 // MARK: - ProxyEventDelegate
 
 extension InAppBrowserPlugin: ProxyEventDelegate {
-    func onRequestIntercept(requestId: String, ruleIndex: Int,
+    func onRequestIntercept(requestId: String, ruleName: String,
                             requestData: [String: Any],
                             completion: @escaping ([String: Any]?) -> Void) {
         proxyLock.lock()
@@ -1613,7 +1613,7 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
 
         var eventData: [String: Any] = requestData
         eventData["requestId"] = requestId
-        eventData["ruleIndex"] = ruleIndex
+        eventData["ruleName"] = ruleName
         notifyListeners("proxyRequestIntercept", data: eventData)
 
         // Timeout: if JS doesn't respond within 10s, forward unmodified.
@@ -1625,7 +1625,7 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
         }
     }
 
-    func onResponseIntercept(requestId: String, ruleIndex: Int,
+    func onResponseIntercept(requestId: String, ruleName: String,
                              responseData: [String: Any],
                              completion: @escaping ([String: Any]?) -> Void) {
         proxyLock.lock()
@@ -1634,7 +1634,7 @@ extension InAppBrowserPlugin: ProxyEventDelegate {
 
         var eventData: [String: Any] = responseData
         eventData["requestId"] = requestId
-        eventData["ruleIndex"] = ruleIndex
+        eventData["ruleName"] = ruleName
         notifyListeners("proxyResponseIntercept", data: eventData)
 
         // Timeout: if JS doesn't respond within 10s, forward unmodified.
