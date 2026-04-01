@@ -146,6 +146,41 @@ private func sendUpstreamRequest(
     return promise.futureResult
 }
 
+private func makeUpstreamBootstrap(
+    on eventLoop: EventLoop,
+    scheme: String,
+    serverHostname: String
+) -> ClientBootstrap {
+    ClientBootstrap(group: eventLoop)
+        .channelInitializer { channel in
+            let normalizedScheme = scheme.lowercased()
+            if normalizedScheme == "https" {
+                do {
+                    let tlsConfig = TLSConfiguration.makeClientConfiguration()
+                    let sslContext = try NIOSSLContext(configuration: tlsConfig)
+                    let sslHandler = try NIOSSLClientHandler(
+                        context: sslContext,
+                        serverHostname: serverHostname
+                    )
+                    return channel.pipeline.addHandler(sslHandler).flatMap {
+                        channel.pipeline.addHandlers([
+                            HTTPRequestEncoder(),
+                            ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
+                        ])
+                    }
+                } catch {
+                    return channel.eventLoop.makeFailedFuture(error)
+                }
+            }
+
+            let handlers: [ChannelHandler] = [
+                HTTPRequestEncoder(),
+                ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
+            ]
+            return channel.pipeline.addHandlers(handlers)
+        }
+}
+
 private func handleUpstreamConnection(
     _ result: Result<Channel, Error>,
     forward: UpstreamForwardContext,
@@ -630,14 +665,11 @@ final class ProxyHTTPHandler: ChannelInboundHandler, RemovableChannelHandler {
 
         let port = request.upstreamURL.port ?? defaultPort(for: request.upstreamURL.scheme ?? "http") ?? 80
 
-        let bootstrap = ClientBootstrap(group: context.eventLoop)
-            .channelInitializer { channel in
-                let handlers: [ChannelHandler] = [
-                    HTTPRequestEncoder(),
-                    ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
-                ]
-                return channel.pipeline.addHandlers(handlers)
-            }
+        let bootstrap = makeUpstreamBootstrap(
+            on: context.eventLoop,
+            scheme: request.upstreamURL.scheme ?? "http",
+            serverHostname: host
+        )
 
         bootstrap.connect(host: host, port: port).whenComplete { [weak self] result in
             guard let self else {
@@ -847,26 +879,11 @@ final class MITMInterceptHandler: ChannelInboundHandler, RemovableChannelHandler
         }
         let upstreamPort = request.upstreamURL.port ?? defaultPort(for: request.upstreamURL.scheme ?? "https") ?? self.port
 
-        let bootstrap = ClientBootstrap(group: context.eventLoop)
-            .channelInitializer { channel in
-                do {
-                    // Add TLS client handler (trusts system CA store).
-                    let tlsConfig = TLSConfiguration.makeClientConfiguration()
-                    let sslContext = try NIOSSLContext(configuration: tlsConfig)
-                    let sslHandler = try NIOSSLClientHandler(
-                        context: sslContext,
-                        serverHostname: upstreamHost
-                    )
-                    return channel.pipeline.addHandler(sslHandler).flatMap {
-                        channel.pipeline.addHandlers([
-                            HTTPRequestEncoder(),
-                            ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
-                        ])
-                    }
-                } catch {
-                    return channel.eventLoop.makeFailedFuture(error)
-                }
-            }
+        let bootstrap = makeUpstreamBootstrap(
+            on: context.eventLoop,
+            scheme: request.upstreamURL.scheme ?? "https",
+            serverHostname: upstreamHost
+        )
 
         bootstrap.connect(host: upstreamHost, port: upstreamPort).whenComplete { [weak self] result in
             guard let self else {
@@ -965,8 +982,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
             ruleName: rule.ruleName,
             responseData: responseData,
             eventLoop: clientContext.eventLoop
-        ) { [weak self] modifications in
-            guard let self else { return }
+        ) { modifications in
             var modifiedHead = head
             var modifiedBody = body
             applyResponseModifications(
