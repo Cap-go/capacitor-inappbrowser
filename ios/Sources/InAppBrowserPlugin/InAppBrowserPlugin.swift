@@ -162,7 +162,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private func activeWindow() -> UIWindow? {
         return UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .first { $0.activationState == .foregroundActive }?
+            .first { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }?
             .windows
             .first { $0.isKeyWindow }
     }
