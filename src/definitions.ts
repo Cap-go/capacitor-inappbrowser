@@ -969,6 +969,8 @@ export interface OpenWebViewOptions {
    * `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`.
    * Request-stage and response-stage matching happen independently, so you can use distinct
    * named rules for outgoing requests and incoming responses on the same URL.
+   * Android applies the proxy override process-wide, so only one proxied webview can be active
+   * at a time and concurrent opens are rejected with `PROXY_ALREADY_ACTIVE`.
    *
    * @since 9.0.0
    */

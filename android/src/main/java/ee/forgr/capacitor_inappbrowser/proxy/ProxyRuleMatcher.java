@@ -3,6 +3,7 @@ package ee.forgr.capacitor_inappbrowser.proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -18,7 +19,11 @@ public class ProxyRuleMatcher {
 
         public NativeProxyRule(String ruleName, String urlPattern, List<String> methods, boolean includeBody, String intercept) {
             this.ruleName = ruleName;
-            this.urlPattern = Pattern.compile(urlPattern);
+            try {
+                this.urlPattern = Pattern.compile(urlPattern);
+            } catch (PatternSyntaxException e) {
+                throw new IllegalArgumentException("Invalid regex for rule '" + ruleName + "': " + e.getMessage(), e);
+            }
             this.methods = methods;
             this.includeBody = includeBody;
             this.intercept = intercept;

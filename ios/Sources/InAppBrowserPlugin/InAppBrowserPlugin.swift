@@ -125,6 +125,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    private func discardRegisteredWebView(id: String) {
+        let controller = webViewControllers[id]
+        let navigationController = navigationControllers[id]
+        controller?.cleanupWebView()
+        navigationController?.dismiss(animated: false)
+        navigationController?.viewControllers = []
+        unregisterWebView(id: id)
+    }
+
     private func resolveWebViewController(for id: String?) -> WKWebViewController? {
         if let id {
             return webViewControllers[id]
@@ -677,6 +686,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
+            let usesProxyDataStore = proxyWebsiteDataStore != nil
             self.webViewController = WKWebViewController.init(
                 url: initialURL,
                 headers: headers,
@@ -692,8 +702,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
                 customWebsiteDataStore: proxyWebsiteDataStore,
                 configureBeforeLoad: { controller in
-                    controller.proxyCertificateAuthority = self.activeCertificateAuthority
-                    controller.isProxyActive = self.activeCertificateAuthority != nil
+                    controller.proxyCertificateAuthority = usesProxyDataStore ? self.activeCertificateAuthority : nil
+                    controller.isProxyActive = usesProxyDataStore && self.activeCertificateAuthority != nil
                 }
             )
 
@@ -708,9 +718,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.instanceId = webViewId
 
             // Set proxy active flag so cert challenges are trusted
-            if self.isProxyActive {
+            if usesProxyDataStore && self.isProxyActive {
                 webViewController.isProxyActive = true
                 webViewController.proxyCertificateAuthority = self.activeCertificateAuthority
+            } else {
+                webViewController.isProxyActive = false
+                webViewController.proxyCertificateAuthority = nil
             }
 
             // Set HTTP method and body if provided
@@ -1021,6 +1034,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             if hidden {
                 guard let webView = webViewController.capableWebView else {
+                    self.discardRegisteredWebView(id: webViewId)
                     if self.proxiedWebViewId == webViewId {
                         self.cleanupProxy()
                     }
@@ -1029,6 +1043,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
                 // Zero-frame in window hierarchy required for WKWebView JS execution when hidden
                 if !self.attachWebViewToWindow(webView) {
+                    self.discardRegisteredWebView(id: webViewId)
                     if self.proxiedWebViewId == webViewId {
                         self.cleanupProxy()
                     }

@@ -902,13 +902,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         final boolean proxyActive;
         final ProxyConfig proxyConfig;
         JSArray proxyRulesJson = call.getArray("proxyRules");
+        if (activeProxyServer != null) {
+            call.reject("Another WebView cannot be opened while proxy is active", "PROXY_ALREADY_ACTIVE");
+            return;
+        }
         if (proxyRulesJson != null && proxyRulesJson.length() > 0) {
-            // Check if proxy already active
-            if (activeProxyServer != null) {
-                call.reject("Another proxied WebView is already active", "PROXY_ALREADY_ACTIVE");
-                return;
-            }
-
             // Check platform support
             if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
                 call.reject("WebView proxy override not supported on this device", "PLATFORM_UNSUPPORTED");

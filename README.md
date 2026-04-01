@@ -308,43 +308,43 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 
 <docgen-index>
 
-- [`goBack(...)`](#goback)
-- [`open(...)`](#open)
-- [`clearCookies(...)`](#clearcookies)
-- [`clearAllCookies(...)`](#clearallcookies)
-- [`clearCache(...)`](#clearcache)
-- [`getCookies(...)`](#getcookies)
-- [`close(...)`](#close)
-- [`hide()`](#hide)
-- [`show()`](#show)
-- [`openWebView(...)`](#openwebview)
-- [`executeScript(...)`](#executescript)
-- [`postMessage(...)`](#postmessage)
-- [`takeScreenshot(...)`](#takescreenshot)
-- [`setUrl(...)`](#seturl)
-- [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
-- [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
-- [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
-- [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
-- [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
-- [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
-- [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
-- [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
-- [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
-- [`addListener('proxyResponse', ...)`](#addlistenerproxyresponse-)
-- [`addListener('proxyRequestIntercept', ...)`](#addlistenerproxyrequestintercept-)
-- [`addListener('proxyResponseIntercept', ...)`](#addlistenerproxyresponseintercept-)
-- [`continueProxyRequest(...)`](#continueproxyrequest)
-- [`continueProxyResponse(...)`](#continueproxyresponse)
-- [`removeAllListeners()`](#removealllisteners)
-- [`reload(...)`](#reload)
-- [`updateDimensions(...)`](#updatedimensions)
-- [`setEnabledSafeTopMargin(...)`](#setenabledsafetopmargin)
-- [`setEnabledSafeBottomMargin(...)`](#setenabledsafebottommargin)
-- [`openSecureWindow(...)`](#opensecurewindow)
-- [Interfaces](#interfaces)
-- [Type Aliases](#type-aliases)
-- [Enums](#enums)
+* [`goBack(...)`](#goback)
+* [`open(...)`](#open)
+* [`clearCookies(...)`](#clearcookies)
+* [`clearAllCookies(...)`](#clearallcookies)
+* [`clearCache(...)`](#clearcache)
+* [`getCookies(...)`](#getcookies)
+* [`close(...)`](#close)
+* [`hide()`](#hide)
+* [`show()`](#show)
+* [`openWebView(...)`](#openwebview)
+* [`executeScript(...)`](#executescript)
+* [`postMessage(...)`](#postmessage)
+* [`takeScreenshot(...)`](#takescreenshot)
+* [`setUrl(...)`](#seturl)
+* [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
+* [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
+* [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
+* [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
+* [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
+* [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
+* [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
+* [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
+* [`addListener('proxyResponse', ...)`](#addlistenerproxyresponse-)
+* [`addListener('proxyRequestIntercept', ...)`](#addlistenerproxyrequestintercept-)
+* [`addListener('proxyResponseIntercept', ...)`](#addlistenerproxyresponseintercept-)
+* [`continueProxyRequest(...)`](#continueproxyrequest)
+* [`continueProxyResponse(...)`](#continueproxyresponse)
+* [`removeAllListeners()`](#removealllisteners)
+* [`reload(...)`](#reload)
+* [`updateDimensions(...)`](#updatedimensions)
+* [`setEnabledSafeTopMargin(...)`](#setenabledsafetopmargin)
+* [`setEnabledSafeBottomMargin(...)`](#setenabledsafebottommargin)
+* [`openSecureWindow(...)`](#opensecurewindow)
+* [Interfaces](#interfaces)
+* [Type Aliases](#type-aliases)
+* [Enums](#enums)
 
 </docgen-index>
 
@@ -367,7 +367,8 @@ Navigates back in the WebView's history if possible
 
 **Since:** 7.21.0
 
----
+--------------------
+
 
 ### open(...)
 
@@ -385,7 +386,8 @@ Open url in a new window fullscreen, on android it use chrome custom tabs, on io
 
 **Since:** 0.1.0
 
----
+--------------------
+
 
 ### clearCookies(...)
 
@@ -404,7 +406,8 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 0.5.0
 
----
+--------------------
+
 
 ### clearAllCookies(...)
 
@@ -423,7 +426,8 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 6.5.0
 
----
+--------------------
+
 
 ### clearCache(...)
 
@@ -442,7 +446,8 @@ When `id` is omitted, applies to all open webviews.
 
 **Since:** 6.5.0
 
----
+--------------------
+
 
 ### getCookies(...)
 
@@ -458,7 +463,8 @@ Get cookies for a specific URL.
 
 **Returns:** <code>Promise&lt;<a href="#record">Record</a>&lt;string, string&gt;&gt;</code>
 
----
+--------------------
+
 
 ### close(...)
 
@@ -475,7 +481,8 @@ When `id` is omitted, closes the active webview.
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
----
+--------------------
+
 
 ### hide()
 
@@ -488,7 +495,8 @@ Use show() to bring it back.
 
 **Since:** 8.0.8
 
----
+--------------------
+
 
 ### show()
 
@@ -500,7 +508,8 @@ Show a previously hidden webview.
 
 **Since:** 8.0.8
 
----
+--------------------
+
 
 ### openWebView(...)
 
@@ -512,7 +521,6 @@ Open url in a new webview with toolbars, and enhanced capabilities, like camera 
 
 JavaScript Interface:
 When you open a webview with this method, a JavaScript interface is automatically injected that provides:
-
 - `window.mobileApp.close()`: Closes the webview from JavaScript
 - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
 - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true
@@ -528,7 +536,8 @@ Android resolves with `{ id }` after the dialog is ready to control, while iOS r
 
 **Since:** 0.1.0
 
----
+--------------------
+
 
 ### executeScript(...)
 
@@ -543,7 +552,8 @@ When `id` is omitted, executes in all open webviews.
 | ------------- | ------------------------------------------- |
 | **`options`** | <code>{ code: string; id?: string; }</code> |
 
----
+--------------------
+
 
 ### postMessage(...)
 
@@ -560,7 +570,8 @@ When `id` is omitted, broadcasts to all open webviews.
 | ------------- | -------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ detail: <a href="#record">Record</a>&lt;string, any&gt;; id?: string; }</code> |
 
----
+--------------------
+
 
 ### takeScreenshot(...)
 
@@ -577,7 +588,8 @@ When `id` is omitted, targets the active webview.
 
 **Returns:** <code>Promise&lt;<a href="#screenshotresult">ScreenshotResult</a>&gt;</code>
 
----
+--------------------
+
 
 ### setUrl(...)
 
@@ -594,7 +606,8 @@ When `id` is omitted, targets the active webview.
 
 **Returns:** <code>Promise&lt;any&gt;</code>
 
----
+--------------------
+
 
 ### addListener('urlChangeEvent', ...)
 
@@ -613,7 +626,8 @@ Listen for url change, only for openWebView
 
 **Since:** 0.0.1
 
----
+--------------------
+
 
 ### addListener('buttonNearDoneClick', ...)
 
@@ -628,7 +642,8 @@ addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) 
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
----
+--------------------
+
 
 ### addListener('closeEvent', ...)
 
@@ -647,7 +662,8 @@ Listen for close click only for openWebView
 
 **Since:** 0.4.0
 
----
+--------------------
+
 
 ### addListener('confirmBtnClicked', ...)
 
@@ -667,7 +683,8 @@ works with openWebView shareDisclaimer and closeModal
 
 **Since:** 0.0.1
 
----
+--------------------
+
 
 ### addListener('messageFromWebview', ...)
 
@@ -688,7 +705,8 @@ This method is inject at runtime in the webview
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
----
+--------------------
+
 
 ### addListener('screenshotTaken', ...)
 
@@ -706,7 +724,8 @@ the native screenshot button, or the injected JavaScript bridge.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
----
+--------------------
+
 
 ### addListener('browserPageLoaded', ...)
 
@@ -723,7 +742,8 @@ Will be triggered when page is loaded
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
----
+--------------------
+
 
 ### addListener('pageLoadError', ...)
 
@@ -740,7 +760,8 @@ Will be triggered when page load error
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
----
+--------------------
+
 
 ### addListener('proxyRequest', ...)
 
@@ -759,7 +780,8 @@ Listen for intercepted proxy requests matching a rule.
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### addListener('proxyResponse', ...)
 
@@ -778,7 +800,8 @@ Listen for intercepted proxy responses matching a rule.
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### addListener('proxyRequestIntercept', ...)
 
@@ -795,7 +818,8 @@ addListener(eventName: 'proxyRequestIntercept', listenerFunc: (event: ProxyReque
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### addListener('proxyResponseIntercept', ...)
 
@@ -812,7 +836,8 @@ addListener(eventName: 'proxyResponseIntercept', listenerFunc: (event: ProxyResp
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### continueProxyRequest(...)
 
@@ -829,7 +854,8 @@ Pass `null` for `request` to forward the original request unchanged.
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### continueProxyResponse(...)
 
@@ -846,7 +872,8 @@ Pass `null` for `response` to forward the original response unchanged.
 
 **Since:** 9.0.0
 
----
+--------------------
+
 
 ### removeAllListeners()
 
@@ -858,7 +885,8 @@ Remove all listeners for this plugin.
 
 **Since:** 1.0.0
 
----
+--------------------
+
 
 ### reload(...)
 
@@ -876,7 +904,8 @@ Reload the current web page.
 
 **Since:** 1.0.0
 
----
+--------------------
+
 
 ### updateDimensions(...)
 
@@ -892,7 +921,8 @@ When `id` is omitted, targets the active webview.
 | ------------- | -------------------------------------------------------------------------------- | --------------------------------------- |
 | **`options`** | <code><a href="#dimensionoptions">DimensionOptions</a> & { id?: string; }</code> | Dimension options (width, height, x, y) |
 
----
+--------------------
+
 
 ### setEnabledSafeTopMargin(...)
 
@@ -908,7 +938,8 @@ On Web, this method is a no-op and resolves without changing layout.
 | ------------- | ----------------------------------------------- |
 | **`options`** | <code>{ enabled: boolean; id?: string; }</code> |
 
----
+--------------------
+
 
 ### setEnabledSafeBottomMargin(...)
 
@@ -924,7 +955,8 @@ On Web, this method is a no-op and resolves without changing layout.
 | ------------- | ----------------------------------------------- |
 | **`options`** | <code>{ enabled: boolean; id?: string; }</code> |
 
----
+--------------------
+
 
 ### openSecureWindow(...)
 
@@ -935,17 +967,22 @@ openSecureWindow(options: OpenSecureWindowOptions) => Promise<OpenSecureWindowRe
 Opens a secured window for OAuth2 authentication.
 For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
 Something like:
-
 ```html
-&lt;html&gt; &lt;head&gt;&lt;/head&gt; &lt;body&gt; &lt;script&gt; const searchParams = new
-URLSearchParams(location.search) if (searchParams.has("code")) { new
-BroadcastChannel("my-channel-name").postMessage(location.href); window.close(); } &lt;/script&gt; &lt;/body&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;script&gt;
+  const searchParams = new URLSearchParams(location.search)
+  if (searchParams.has("code")) {
+    new BroadcastChannel("my-channel-name").postMessage(location.href);
+    window.close();
+  }
+&lt;/script&gt;
+&lt;/body&gt;
 &lt;/html&gt;
 ```
-
 For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
 And make sure to register it in the app's info.plist:
-
 ```xml
 &lt;key&gt;CFBundleURLTypes&lt;/key&gt;
 &lt;array&gt;
@@ -957,9 +994,7 @@ And make sure to register it in the app's info.plist:
    &lt;/dict&gt;
 &lt;/array&gt;
 ```
-
 And in the AndroidManifest.xml file:
-
 ```xml
 &lt;activity&gt;
    &lt;intent-filter&gt;
@@ -977,9 +1012,11 @@ And in the AndroidManifest.xml file:
 
 **Returns:** <code>Promise&lt;<a href="#opensecurewindowresponse">OpenSecureWindowResponse</a>&gt;</code>
 
----
+--------------------
+
 
 ### Interfaces
+
 
 #### OpenOptions
 
@@ -996,12 +1033,14 @@ And in the AndroidManifest.xml file:
 | **`disableBookmark`**        | <code>boolean</code> | Hide the bookmark star icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.            | <code>false</code> | 8.2.0 |
 | **`disableDownload`**        | <code>boolean</code> | Hide the download icon in the overflow menu. Uses an undocumented Chromium intent extra — may stop working on future Chrome updates. **Android only** — ignored on iOS.                 | <code>false</code> | 8.2.0 |
 
+
 #### ClearCookieOptions
 
 | Prop      | Type                | Description                                                    |
 | --------- | ------------------- | -------------------------------------------------------------- |
 | **`id`**  | <code>string</code> | Target webview id. When omitted, applies to all open webviews. |
 | **`url`** | <code>string</code> |                                                                |
+
 
 #### HttpCookie
 
@@ -1011,12 +1050,14 @@ And in the AndroidManifest.xml file:
 | **`key`**   | <code>string</code> | The key of the cookie.   |
 | **`value`** | <code>string</code> | The value of the cookie. |
 
+
 #### GetCookieOptions
 
 | Prop                  | Type                 |
 | --------------------- | -------------------- |
 | **`url`**             | <code>string</code>  |
 | **`includeHttpOnly`** | <code>boolean</code> |
+
 
 #### CloseWebviewOptions
 
@@ -1025,62 +1066,65 @@ And in the AndroidManifest.xml file:
 | **`id`**         | <code>string</code>  | Target webview id to close. If omitted, closes the active webview. |                   |
 | **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only           | <code>true</code> |
 
+
 #### OpenWebViewOptions
 
-| Prop                                   | Type                                                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Default                                                       | Since  |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------ |
-| **`url`**                              | <code>string</code>                                                                                                                                                    | Target URL to load.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                               | 0.1.0  |
-| **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                                                                                            | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                               | 0.1.0  |
-| **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>                                                                                                                    | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                               | 6.1.0  |
-| **`method`**                           | <code>string</code>                                                                                                                                                    | HTTP method to use for the initial request. **Optional parameter - defaults to GET if not specified.** Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests. When specified with 'POST', 'PUT', or 'PATCH' methods that support a body, you can also provide a `body` parameter with the request payload. **Platform Notes:** - iOS: Full support for all HTTP methods with headers - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations              | <code>"GET"</code>                                            | 8.2.0  |
-| **`body`**                             | <code>string</code>                                                                                                                                                    | HTTP body to send with the request when using POST, PUT, or other methods that support a body. Should be a string (use JSON.stringify for JSON data). **Optional parameter - only used when `method` is specified and supports a request body.** Omitting this parameter (or using GET method) results in standard behavior without a request body.                                                                                                                                                                                                        |                                                               | 8.2.0  |
-| **`materialPicker`**                   | <code>boolean</code>                                                                                                                                                   | materialPicker: if true, uses Material Design theme for date and time pickers on Android. This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 7.4.1  |
-| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                              |                                                               | 6.10.0 |
-| **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.4.0  |
-| **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
-| **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
-| **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
-| **`title`**                            | <code>string</code>                                                                                                                                                    | Title of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>"New Window"</code>                                     | 0.1.0  |
-| **`backgroundColor`**                  | <code><a href="#backgroundcolor">BackgroundColor</a></code>                                                                                                            | Background color of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>BackgroundColor.BLACK</code>                            | 0.1.0  |
-| **`activeNativeNavigationForWebview`** | <code>boolean</code>                                                                                                                                                   | If true, enables native navigation gestures within the webview. - Android: Native back button navigates within webview history - iOS: Enables swipe left/right gestures for back/forward navigation                                                                                                                                                                                                                                                                                                                                                        | <code>false (Android), true (iOS - enabled by default)</code> |        |
-| **`disableGoBackOnNativeApplication`** | <code>boolean</code>                                                                                                                                                   | Disable the possibility to go back on native application, useful to force user to stay on the webview, Android only                                                                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            |        |
-| **`isPresentAfterPageLoad`**           | <code>boolean</code>                                                                                                                                                   | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. Promise timing: on Android, `openWebView()` resolves with the webview id when the webview is ready to be controlled (immediately for hidden/immediate presentation, after the first page load when `isPresentAfterPageLoad` is `true`). On iOS, the promise resolves with the id as soon as the native webview is created, even if presentation is deferred.             | <code>false</code>                                            | 0.1.0  |
-| **`isInspectable`**                    | <code>boolean</code>                                                                                                                                                   | Whether the website in the webview is inspectable or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            |        |
-| **`isAnimated`**                       | <code>boolean</code>                                                                                                                                                   | Whether the webview opening is animated or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | <code>true</code>                                             |        |
-| **`showReloadButton`**                 | <code>boolean</code>                                                                                                                                                   | Shows a reload button that reloads the web page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>false</code>                                            | 1.0.15 |
-| **`closeModal`**                       | <code>boolean</code>                                                                                                                                                   | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            | 1.1.0  |
-| **`closeModalTitle`**                  | <code>string</code>                                                                                                                                                    | CloseModalTitle: title of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | <code>"Close"</code>                                          | 1.1.0  |
-| **`closeModalDescription`**            | <code>string</code>                                                                                                                                                    | CloseModalDescription: description of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>"Are you sure you want to close this window?"</code>    | 1.1.0  |
-| **`closeModalOk`**                     | <code>string</code>                                                                                                                                                    | CloseModalOk: text of the confirm button when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>"Close"</code>                                          | 1.1.0  |
-| **`closeModalCancel`**                 | <code>string</code>                                                                                                                                                    | CloseModalCancel: text of the cancel button when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | <code>"Cancel"</code>                                         | 1.1.0  |
-| **`closeModalURLPattern`**             | <code>string</code>                                                                                                                                                    | closeModalURLPattern: a regex pattern to match against the current URL when the close button is pressed. When provided along with closeModal: true, the close confirmation modal is only shown if the current URL matches this pattern. If the current URL does not match, the browser closes immediately without showing the modal. Requires closeModal to be true.                                                                                                                                                                                       |                                                               | 7.2.0  |
-| **`visibleTitle`**                     | <code>boolean</code>                                                                                                                                                   | visibleTitle: if true the website title would be shown else shown empty                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | <code>true</code>                                             | 1.2.5  |
-| **`toolbarColor`**                     | <code>string</code>                                                                                                                                                    | toolbarColor: color of the toolbar in hex format                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | <code>"#ffffff"</code>                                        | 1.2.5  |
-| **`toolbarTextColor`**                 | <code>string</code>                                                                                                                                                    | toolbarTextColor: color of the buttons and title in the toolbar in hex format When set, it overrides the automatic light/dark mode detection for text color                                                                                                                                                                                                                                                                                                                                                                                                | <code>calculated based on toolbarColor brightness</code>      | 6.10.0 |
-| **`showArrow`**                        | <code>boolean</code>                                                                                                                                                   | showArrow: if true an arrow would be shown instead of cross for closing the window                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            | 1.2.5  |
-| **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 6.1.0  |
-| **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
-| **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
-| **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
-| **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a native screenshot button near the done/close button. The button is hidden by default and captures the current viewport when tapped. This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it. The button is only shown when toolbarType is not "activity", "navigation", or "blank".                                                                                                                                                                                                                       | <code>false</code>                                            | 8.4.0  |
-| **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |
-| **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                             | <code>false</code>                                            | 0.1.0  |
-| **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS). - On both platforms, only HTTPS links whose host matches any entry in this list will attempt to open via the corresponding native application. - If the app is not installed or the system cannot handle the link, the URL will continue loading inside the in-app browser. - Matching is host-based (case-insensitive), ignoring the "www." prefix. - When `preventDeeplink` is enabled, all external handling is blocked regardless of this list. | <code>[]</code>                                               | 7.12.0 |
-| **`enabledSafeBottomMargin`**          | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                                    | <code>false</code>                                            | 7.13.0 |
-| **`enabledSafeTopMargin`**             | <code>boolean</code>                                                                                                                                                   | If false, the webView will extend behind the status bar for true full-screen immersive content. When true (default), respects the safe area at the top of the screen. Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.                                                                                                                                                                                                                                                                                | <code>true</code>                                             | 8.2.0  |
-| **`useTopInset`**                      | <code>boolean</code>                                                                                                                                                   | When true, applies the system status bar inset as the WebView top margin on Android. Keeps the legacy 0px margin by default for apps that handle padding themselves.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            |        |
-| **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                                | <code>false</code>                                            | 7.13.0 |
-| **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "_.example.com" to block all subdomains - "www.example._" to block wildcard domain extensions                                                                                                                                                                                                       | <code>[]</code>                                               | 7.17.0 |
-| **`width`**                            | <code>number</code>                                                                                                                                                    | Width of the webview in pixels. If not set, webview will be fullscreen width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>undefined (fullscreen)</code>                           |        |
-| **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |
-| **`x`**                                | <code>number</code>                                                                                                                                                    | X position of the webview in pixels from the left edge. Only effective when width is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
-| **`y`**                                | <code>number</code>                                                                                                                                                    | Y position of the webview in pixels from the top edge. Only effective when height is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
-| **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                             | <code>false</code>                                            | 8.0.2  |
-| **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
-| **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
-| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching `proxyRequest` and `proxyResponse` events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`. Request-stage and response-stage matching happen independently, so you can use distinct named rules for outgoing requests and incoming responses on the same URL.                                                                                                       |                                                               | 9.0.0  |
+| Prop                                   | Type                                                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Default                                                       | Since  |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------ |
+| **`url`**                              | <code>string</code>                                                                                                                                                    | Target URL to load.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |                                                               | 0.1.0  |
+| **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                                                                                            | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                               | 0.1.0  |
+| **`credentials`**                      | <code><a href="#credentials">Credentials</a></code>                                                                                                                    | <a href="#credentials">Credentials</a> to send with the request and all subsequent requests for the same host.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |                                                               | 6.1.0  |
+| **`method`**                           | <code>string</code>                                                                                                                                                    | HTTP method to use for the initial request. **Optional parameter - defaults to GET if not specified.** Existing code that doesn't provide this parameter will continue to work unchanged with standard GET requests. When specified with 'POST', 'PUT', or 'PATCH' methods that support a body, you can also provide a `body` parameter with the request payload. **Platform Notes:** - iOS: Full support for all HTTP methods with headers - Android: Custom headers may not be sent with POST/PUT/PATCH requests due to WebView limitations                                                                            | <code>"GET"</code>                                            | 8.2.0  |
+| **`body`**                             | <code>string</code>                                                                                                                                                    | HTTP body to send with the request when using POST, PUT, or other methods that support a body. Should be a string (use JSON.stringify for JSON data). **Optional parameter - only used when `method` is specified and supports a request body.** Omitting this parameter (or using GET method) results in standard behavior without a request body.                                                                                                                                                                                                                                                                      |                                                               | 8.2.0  |
+| **`materialPicker`**                   | <code>boolean</code>                                                                                                                                                   | materialPicker: if true, uses Material Design theme for date and time pickers on Android. This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.                                                                                                                                                                                                                                                                                                                                                                                                            | <code>false</code>                                            | 7.4.1  |
+| **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                                                                                            |                                                               | 6.10.0 |
+| **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            | 8.4.0  |
+| **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
+| **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                                                                                | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
+| **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                               | 0.1.0  |
+| **`title`**                            | <code>string</code>                                                                                                                                                    | Title of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | <code>"New Window"</code>                                     | 0.1.0  |
+| **`backgroundColor`**                  | <code><a href="#backgroundcolor">BackgroundColor</a></code>                                                                                                            | Background color of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | <code>BackgroundColor.BLACK</code>                            | 0.1.0  |
+| **`activeNativeNavigationForWebview`** | <code>boolean</code>                                                                                                                                                   | If true, enables native navigation gestures within the webview. - Android: Native back button navigates within webview history - iOS: Enables swipe left/right gestures for back/forward navigation                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false (Android), true (iOS - enabled by default)</code> |        |
+| **`disableGoBackOnNativeApplication`** | <code>boolean</code>                                                                                                                                                   | Disable the possibility to go back on native application, useful to force user to stay on the webview, Android only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | <code>false</code>                                            |        |
+| **`isPresentAfterPageLoad`**           | <code>boolean</code>                                                                                                                                                   | Open url in a new window fullscreen isPresentAfterPageLoad: if true, the browser will be presented after the page is loaded, if false, the browser will be presented immediately. Promise timing: on Android, `openWebView()` resolves with the webview id when the webview is ready to be controlled (immediately for hidden/immediate presentation, after the first page load when `isPresentAfterPageLoad` is `true`). On iOS, the promise resolves with the id as soon as the native webview is created, even if presentation is deferred.                                                                           | <code>false</code>                                            | 0.1.0  |
+| **`isInspectable`**                    | <code>boolean</code>                                                                                                                                                   | Whether the website in the webview is inspectable or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            |        |
+| **`isAnimated`**                       | <code>boolean</code>                                                                                                                                                   | Whether the webview opening is animated or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | <code>true</code>                                             |        |
+| **`showReloadButton`**                 | <code>boolean</code>                                                                                                                                                   | Shows a reload button that reloads the web page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | <code>false</code>                                            | 1.0.15 |
+| **`closeModal`**                       | <code>boolean</code>                                                                                                                                                   | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            | 1.1.0  |
+| **`closeModalTitle`**                  | <code>string</code>                                                                                                                                                    | CloseModalTitle: title of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | <code>"Close"</code>                                          | 1.1.0  |
+| **`closeModalDescription`**            | <code>string</code>                                                                                                                                                    | CloseModalDescription: description of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>"Are you sure you want to close this window?"</code>    | 1.1.0  |
+| **`closeModalOk`**                     | <code>string</code>                                                                                                                                                    | CloseModalOk: text of the confirm button when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | <code>"Close"</code>                                          | 1.1.0  |
+| **`closeModalCancel`**                 | <code>string</code>                                                                                                                                                    | CloseModalCancel: text of the cancel button when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | <code>"Cancel"</code>                                         | 1.1.0  |
+| **`closeModalURLPattern`**             | <code>string</code>                                                                                                                                                    | closeModalURLPattern: a regex pattern to match against the current URL when the close button is pressed. When provided along with closeModal: true, the close confirmation modal is only shown if the current URL matches this pattern. If the current URL does not match, the browser closes immediately without showing the modal. Requires closeModal to be true.                                                                                                                                                                                                                                                     |                                                               | 7.2.0  |
+| **`visibleTitle`**                     | <code>boolean</code>                                                                                                                                                   | visibleTitle: if true the website title would be shown else shown empty                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>true</code>                                             | 1.2.5  |
+| **`toolbarColor`**                     | <code>string</code>                                                                                                                                                    | toolbarColor: color of the toolbar in hex format                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>"#ffffff"</code>                                        | 1.2.5  |
+| **`toolbarTextColor`**                 | <code>string</code>                                                                                                                                                    | toolbarTextColor: color of the buttons and title in the toolbar in hex format When set, it overrides the automatic light/dark mode detection for text color                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>calculated based on toolbarColor brightness</code>      | 6.10.0 |
+| **`showArrow`**                        | <code>boolean</code>                                                                                                                                                   | showArrow: if true an arrow would be shown instead of cross for closing the window                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            | 1.2.5  |
+| **`ignoreUntrustedSSLError`**          | <code>boolean</code>                                                                                                                                                   | ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | <code>false</code>                                            | 6.1.0  |
+| **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                                                                                        |                                                               | 6.6.0  |
+| **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                                                                                | <code>"pageLoad"</code>                                       | 7.26.0 |
+| **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name                                                                            |                                                               | 6.7.0  |
+| **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a native screenshot button near the done/close button. The button is hidden by default and captures the current viewport when tapped. This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it. The button is only shown when toolbarType is not "activity", "navigation", or "blank".                                                                                                                                                                                                                                                                                     | <code>false</code>                                            | 8.4.0  |
+| **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | <code>100</code>                                              | 7.6.0  |
+| **`preventDeeplink`**                  | <code>boolean</code>                                                                                                                                                   | preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.                                                                                                                                                                                                                                                                                                                                                                           | <code>false</code>                                            | 0.1.0  |
+| **`authorizedAppLinks`**               | <code>string[]</code>                                                                                                                                                  | List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS). - On both platforms, only HTTPS links whose host matches any entry in this list will attempt to open via the corresponding native application. - If the app is not installed or the system cannot handle the link, the URL will continue loading inside the in-app browser. - Matching is host-based (case-insensitive), ignoring the "www." prefix. - When `preventDeeplink` is enabled, all external handling is blocked regardless of this list.                                                               | <code>[]</code>                                               | 7.12.0 |
+| **`enabledSafeBottomMargin`**          | <code>boolean</code>                                                                                                                                                   | If true, the webView will not take the full height and will have a 20px margin at the bottom. This creates a safe margin area outside the browser view.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>false</code>                                            | 7.13.0 |
+| **`enabledSafeTopMargin`**             | <code>boolean</code>                                                                                                                                                   | If false, the webView will extend behind the status bar for true full-screen immersive content. When true (default), respects the safe area at the top of the screen. Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.                                                                                                                                                                                                                                                                                                                                              | <code>true</code>                                             | 8.2.0  |
+| **`useTopInset`**                      | <code>boolean</code>                                                                                                                                                   | When true, applies the system status bar inset as the WebView top margin on Android. Keeps the legacy 0px margin by default for apps that handle padding themselves.                                                                                                                                                                                                                                                                                                                                                                                                                                                     | <code>false</code>                                            |        |
+| **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                                                                                              | <code>false</code>                                            | 7.13.0 |
+| **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "*.example.com" to block all subdomains - "www.example.*" to block wildcard domain extensions                                                                                                                                                                                                                                                                     | <code>[]</code>                                               | 7.17.0 |
+| **`width`**                            | <code>number</code>                                                                                                                                                    | Width of the webview in pixels. If not set, webview will be fullscreen width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |
+| **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | <code>undefined (fullscreen)</code>                           |        |
+| **`x`**                                | <code>number</code>                                                                                                                                                    | X position of the webview in pixels from the left edge. Only effective when width is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | <code>0</code>                                                |        |
+| **`y`**                                | <code>number</code>                                                                                                                                                    | Y position of the webview in pixels from the top edge. Only effective when height is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | <code>0</code>                                                |        |
+| **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                                                                                           | <code>false</code>                                            | 8.0.2  |
+| **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.0.7  |
+| **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                                                                                   | <code>InvisibilityMode.AWARE</code>                           |        |
+| **`proxyRules`**                       | <code>ProxyRule[]</code>                                                                                                                                               | Proxy rules for intercepting and modifying requests/responses within the webview. JavaScript listens for matching `proxyRequest` and `proxyResponse` events and must continue the flow by calling `continueProxyRequest()` or `continueProxyResponse()` with the same `requestId`. Request-stage and response-stage matching happen independently, so you can use distinct named rules for outgoing requests and incoming responses on the same URL. Android applies the proxy override process-wide, so only one proxied webview can be active at a time and concurrent opens are rejected with `PROXY_ALREADY_ACTIVE`. |                                                               | 9.0.0  |
+
 
 #### Headers
+
 
 #### Credentials
 
@@ -1088,6 +1132,7 @@ And in the AndroidManifest.xml file:
 | -------------- | ------------------- |
 | **`username`** | <code>string</code> |
 | **`password`** | <code>string</code> |
+
 
 #### DisclaimerOptions
 
@@ -1098,6 +1143,7 @@ And in the AndroidManifest.xml file:
 | **`confirmBtn`** | <code>string</code> | Text for the confirm button            | <code>"Confirm"</code> |
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
 
+
 #### ProxyRule
 
 | Prop              | Type                                                    | Description                                                                         |
@@ -1107,6 +1153,7 @@ And in the AndroidManifest.xml file:
 | **`methods`**     | <code>string[]</code>                                   | Optional HTTP methods to match. When omitted, all methods match.                    |
 | **`includeBody`** | <code>boolean</code>                                    | Whether the request or response body should be sent to JS as base64.                |
 | **`mode`**        | <code><a href="#proxyrulemode">ProxyRuleMode</a></code> | Which stage of the proxy flow this rule should match.                               |
+
 
 #### ScreenshotResult
 
@@ -1119,11 +1166,13 @@ And in the AndroidManifest.xml file:
 | **`width`**    | <code>number</code>      | Screenshot width in pixels.                                    |
 | **`height`**   | <code>number</code>      | Screenshot height in pixels.                                   |
 
+
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
 | ------------ | ----------------------------------------- |
 | **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
 
 #### UrlEvent
 
@@ -1132,12 +1181,14 @@ And in the AndroidManifest.xml file:
 | **`id`**  | <code>string</code> | Webview instance id.      |       |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
 
+
 #### BtnEvent
 
 | Prop      | Type                | Description                    | Since |
 | --------- | ------------------- | ------------------------------ | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
 
 #### ProxyRequest
 
@@ -1153,6 +1204,7 @@ Request payload emitted when a proxy rule intercepts an outgoing HTTP request.
 | **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Request headers. Repeated headers are returned as `string[]`.                                                                                                                                  |
 | **`body`**      | <code>string</code>                                   | Optional request body encoded as base64 when `includeBody` is enabled for the rule.                                                                                                            |
 
+
 #### ProxyResponse
 
 Response payload emitted when a proxy rule intercepts an upstream HTTP response.
@@ -1167,6 +1219,7 @@ Response payload emitted when a proxy rule intercepts an upstream HTTP response.
 | **`headers`**   | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Response headers. Repeated headers are returned as `string[]`.                                                                                                      |
 | **`body`**      | <code>string</code>                                   | Optional response body encoded as base64 when `includeBody` is enabled for the rule.                                                                                |
 
+
 #### ModifiedRequest
 
 Optional request overrides returned to `continueProxyRequest()`.
@@ -1178,6 +1231,7 @@ Optional request overrides returned to `continueProxyRequest()`.
 | **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Replacement request headers. Repeated headers can be sent as `string[]`. |
 | **`body`**    | <code>string</code>                                   | Replacement request body encoded as base64.                              |
 
+
 #### ModifiedResponse
 
 Optional response overrides returned to `continueProxyResponse()`.
@@ -1188,6 +1242,7 @@ Optional response overrides returned to `continueProxyResponse()`.
 | **`headers`** | <code><a href="#proxyheaders">ProxyHeaders</a></code> | Replacement response headers. Repeated headers can be sent as `string[]`. |
 | **`body`**    | <code>string</code>                                   | Replacement response body encoded as base64.                              |
 
+
 #### DimensionOptions
 
 | Prop         | Type                | Description                             |
@@ -1197,11 +1252,13 @@ Optional response overrides returned to `continueProxyResponse()`.
 | **`x`**      | <code>number</code> | X position from the left edge in pixels |
 | **`y`**      | <code>number</code> | Y position from the top edge in pixels  |
 
+
 #### OpenSecureWindowResponse
 
 | Prop                | Type                | Description                             |
 | ------------------- | ------------------- | --------------------------------------- |
 | **`redirectedUri`** | <code>string</code> | The result of the openSecureWindow call |
+
 
 #### OpenSecureWindowOptions
 
@@ -1212,29 +1269,28 @@ Optional response overrides returned to `continueProxyResponse()`.
 | **`broadcastChannelName`**              | <code>string</code>  | The name of the broadcast channel to listen to, relevant only for web                                                                                                                                                                                                                                                 |                    |       |
 | **`prefersEphemeralWebBrowserSession`** | <code>boolean</code> | If true, the browser session will be ephemeral (no cookies or browsing data are shared with the system browser). On iOS, this sets `prefersEphemeralWebBrowserSession = true` on `ASWebAuthenticationSession`. On Android, ephemeral mode is always enabled via `FLAG_ACTIVITY_NO_HISTORY` regardless of this option. | <code>false</code> | 6.6.0 |
 
+
 ### Type Aliases
+
 
 #### ClearCookieOptions
 
-<code>
-  <a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;
-</code>
+<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
+
 
 #### Omit
 
 Construct a type with the properties of T except for those in type K.
 
-<code>
-  <a href="#pick">Pick</a>&lt;T, <a href="#exclude">Exclude</a>&lt;keyof T, K&gt;&gt;
-</code>
+<code><a href="#pick">Pick</a>&lt;T, <a href="#exclude">Exclude</a>&lt;keyof T, K&gt;&gt;</code>
+
 
 #### Pick
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{
- [P in K]: T[P];
- }</code>
+<code>{ [P in K]: T[P]; }</code>
+
 
 #### Exclude
 
@@ -1242,50 +1298,49 @@ From T, pick a set of properties whose keys are in the union K
 
 <code>T extends U ? never : T</code>
 
+
 #### Record
 
 Construct a type with a set of properties K of type T
 
-<code>{
- [P in K]: T;
- }</code>
+<code>{ [P in K]: T; }</code>
+
 
 #### GetCookieOptions
 
-<code>
-  <a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;
-</code>
+<code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
+
 
 #### ProxyRuleMode
 
 <code>'request' | 'response' | 'both'</code>
 
+
 #### UrlChangeListener
 
-<code>
-  (state: <a href="#urlevent">UrlEvent</a>): void
-</code>
+<code>(state: <a href="#urlevent">UrlEvent</a>): void</code>
+
 
 #### ButtonNearListener
 
 <code>(state: object): void</code>
 
+
 #### ConfirmBtnListener
 
-<code>
-  (state: <a href="#btnevent">BtnEvent</a>): void
-</code>
+<code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
+
 
 #### ProxyHeaders
 
 Proxy headers as exposed to and accepted from JavaScript.
 Repeated headers are represented as `string[]`.
 
-<code>
-  <a href="#record">Record</a>&lt;string, string | string[]&gt;
-</code>
+<code><a href="#record">Record</a>&lt;string, string | string[]&gt;</code>
+
 
 ### Enums
+
 
 #### ToolBarType
 
@@ -1296,12 +1351,14 @@ Repeated headers are represented as `string[]`.
 | **`NAVIGATION`** | <code>'navigation'</code> | Shows a full navigation toolbar with back/forward buttons        | 0.1.0 |
 | **`BLANK`**      | <code>'blank'</code>      | Shows no toolbar                                                 | 0.1.0 |
 
+
 #### BackgroundColor
 
 | Members     | Value                |
 | ----------- | -------------------- |
 | **`WHITE`** | <code>'white'</code> |
 | **`BLACK`** | <code>'black'</code> |
+
 
 #### InvisibilityMode
 

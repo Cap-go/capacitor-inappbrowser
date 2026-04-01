@@ -1,6 +1,8 @@
 package ee.forgr.capacitor_inappbrowser.proxy;
 
 import android.content.Context;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
 import android.util.Base64;
 import android.util.Log;
 import java.io.ByteArrayInputStream;
@@ -10,17 +12,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.math.BigInteger;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
+import java.security.KeyStore.Entry;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.net.ssl.KeyManagerFactory;
@@ -45,6 +46,9 @@ public class CertificateAuthority {
 
     private static final String TAG = "MitmCA";
     private static final String CA_FILE = "mitm_ca.bin";
+    private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
+    private static final String KEY_ALIAS = "capgo_inappbrowser_proxy_ca";
+    private static final String CA_SUBJECT_DN = "CN=MITM Proxy CA, O=PoC, L=Local";
 
     private X509Certificate caCert;
     private PrivateKey caPrivateKey;
@@ -89,24 +93,45 @@ public class CertificateAuthority {
                 throw new IllegalStateException("Stored CA certificate is truncated");
             }
 
-            byte[] keyBytes = input.readAllBytes();
-            if (keyBytes.length == 0) {
-                throw new IllegalStateException("Stored CA private key is missing");
+            int aliasLength = input.readInt();
+            if (aliasLength <= 0) {
+                throw new IllegalStateException("Stored CA key alias is missing");
+            }
+
+            byte[] aliasBytes = input.readNBytes(aliasLength);
+            if (aliasBytes.length != aliasLength) {
+                throw new IllegalStateException("Stored CA key alias is truncated");
             }
 
             CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
             caCert = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certBytes));
-            caPrivateKey = KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+            caCert.checkValidity();
+            if (caCert.getBasicConstraints() < 0) {
+                throw new IllegalStateException("Stored certificate is not a CA");
+            }
+
+            String keyAlias = new String(aliasBytes, java.nio.charset.StandardCharsets.UTF_8);
+            caPrivateKey = loadPrivateKey(keyAlias);
+            if (caPrivateKey == null) {
+                throw new IllegalStateException("Stored CA private key is missing from AndroidKeyStore");
+            }
         }
         Log.i(TAG, "Loaded existing CA from disk");
     }
 
     private void generateNewCA(File caFile) throws Exception {
-        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-        kpg.initialize(2048, new SecureRandom());
+        deletePrivateKey(KEY_ALIAS);
+
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, ANDROID_KEYSTORE);
+        KeyGenParameterSpec spec = new KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
+            .setKeySize(2048)
+            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+            .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+            .build();
+        kpg.initialize(spec);
         KeyPair caKeyPair = kpg.generateKeyPair();
 
-        X500Name issuer = new X500Name("CN=MITM Proxy CA, O=PoC, L=Local");
+        X500Name issuer = new X500Name(CA_SUBJECT_DN);
         BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
         Date notBefore = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000L);
         Date notAfter = new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L);
@@ -126,14 +151,19 @@ public class CertificateAuthority {
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(caKeyPair.getPrivate());
 
         caCert = new JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer));
-        caPrivateKey = caKeyPair.getPrivate();
+        caCert.checkValidity();
+        caPrivateKey = loadPrivateKey(KEY_ALIAS);
+        if (caPrivateKey == null) {
+            throw new IllegalStateException("Failed to load generated CA private key from AndroidKeyStore");
+        }
 
         byte[] certBytes = caCert.getEncoded();
-        byte[] keyBytes = caPrivateKey.getEncoded();
+        byte[] aliasBytes = KEY_ALIAS.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         try (DataOutputStream output = new DataOutputStream(new FileOutputStream(caFile))) {
             output.writeInt(certBytes.length);
             output.write(certBytes);
-            output.write(keyBytes);
+            output.writeInt(aliasBytes.length);
+            output.write(aliasBytes);
         }
         Log.i(TAG, "Generated new CA and saved to disk");
     }
@@ -181,7 +211,7 @@ public class CertificateAuthority {
             kpg.initialize(2048, new SecureRandom());
             KeyPair domainKeyPair = kpg.generateKeyPair();
 
-            X500Name issuer = new X500Name("CN=MITM Proxy CA, O=PoC, L=Local");
+            X500Name issuer = X500Name.getInstance(caCert.getSubjectX500Principal().getEncoded());
             X500Name subject = new X500Name("CN=" + domain);
             BigInteger serial = BigInteger.valueOf(System.currentTimeMillis());
             Date notBefore = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000L);
@@ -246,6 +276,28 @@ public class CertificateAuthority {
             return sb.toString();
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private PrivateKey loadPrivateKey(String alias) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+        keyStore.load(null);
+        Entry entry = keyStore.getEntry(alias, null);
+        if (!(entry instanceof KeyStore.PrivateKeyEntry)) {
+            return null;
+        }
+        return ((KeyStore.PrivateKeyEntry) entry).getPrivateKey();
+    }
+
+    private void deletePrivateKey(String alias) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance(ANDROID_KEYSTORE);
+            keyStore.load(null);
+            if (keyStore.containsAlias(alias)) {
+                keyStore.deleteEntry(alias);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to clear existing CA key alias", e);
         }
     }
 }
