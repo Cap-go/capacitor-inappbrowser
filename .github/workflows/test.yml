@@ -80,7 +80,9 @@ jobs:
       - name: Run Maestro proxy regression
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
         env:
+          ANDROID_PACKAGE_MANAGER_TIMEOUT_SECONDS: 180
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 180000
+          MAESTRO_TEST_TIMEOUT_SECONDS: 420
         with:
           api-level: 34
           arch: x86_64
