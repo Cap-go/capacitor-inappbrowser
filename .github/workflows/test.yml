@@ -81,6 +81,7 @@ jobs:
           api-level: 34
           arch: x86_64
           profile: pixel_7
+          disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: export PATH="$HOME/.maestro/bin:$PATH" && bun run maestro:test:android
   build_ios:
