@@ -95,7 +95,7 @@ export interface Credentials {
  *
  * Request and response bodies are base64-encoded when present.
  *
- * @since 9.0.0
+ * @since 8.6.0
  */
 export interface ProxyRequest {
   requestId: string;
@@ -115,7 +115,7 @@ export interface ProxyRequest {
  *
  * The body must be base64-encoded.
  *
- * @since 9.0.0
+ * @since 8.6.0
  */
 export interface ProxyResponse {
   body: string;
@@ -128,7 +128,7 @@ export interface ProxyResponse {
  *
  * The body must be base64-encoded when present.
  *
- * @since 9.1.0
+ * @since 8.6.0
  */
 export interface ProxyRequestOverride {
   url: string;
@@ -140,7 +140,7 @@ export interface ProxyRequestOverride {
 /**
  * Decision returned to native when handling a proxied request.
  *
- * @since 9.1.0
+ * @since 8.6.0
  */
 export interface ProxyDecision {
   request?: ProxyRequestOverride | null;
@@ -153,7 +153,7 @@ export interface ProxyDecision {
  *
  * Any regex property that is omitted is treated as a wildcard.
  *
- * @since 9.1.0
+ * @since 8.6.0
  */
 export interface NativeProxyRule {
   id?: string;
@@ -174,7 +174,7 @@ export interface NativeProxyRule {
  * Return a `Response`, `ProxyResponse`, `ProxyRequestOverride`, `ProxyDecision`,
  * or `null` to let native continue unchanged.
  *
- * @since 9.0.0
+ * @since 8.6.0
  */
 export type ProxyHandler = (
   request: ProxyRequest,
@@ -685,13 +685,13 @@ export interface OpenWebViewOptions {
   /**
    * Native-first outbound proxy rules.
    *
-   * @since 9.1.0
+   * @since 8.6.0
    */
   outboundProxyRules?: NativeProxyRule[];
   /**
    * Native-first inbound proxy rules.
    *
-   * @since 9.1.0
+   * @since 8.6.0
    */
   inboundProxyRules?: NativeProxyRule[];
   /**
@@ -1109,13 +1109,13 @@ export interface InAppBrowserPlugin {
    * Listen for proxied requests delegated by the native runtime.
    * Prefer `addProxyHandler()` instead of calling this directly.
    *
-   * @since 9.0.0
+   * @since 8.6.0
    */
   addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
   /**
    * Internal method used by `addProxyHandler()` to send a proxy decision back to native.
    *
-   * @since 9.0.0
+   * @since 8.6.0
    */
   handleProxyRequest(options: {
     requestId: string;

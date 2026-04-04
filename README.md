@@ -135,6 +135,101 @@ This option works independently of the toolbar type:
 
 Perfect for immersive experiences like video players, games, or full-screen web applications. Can be combined with any `toolbarType` setting.
 
+### Proxy examples
+
+#### Block one request natively
+
+Use a native rule when you just want to stop a request without round-tripping through JavaScript:
+
+```js
+import { InAppBrowser } from '@capgo/inappbrowser'
+
+await InAppBrowser.openWebView({
+  url: 'https://example.com',
+  outboundProxyRules: [
+    {
+      urlRegex: '^https://www\\.google-analytics\\.com/.*',
+      action: 'cancel',
+    },
+  ],
+})
+```
+
+#### Stub one script from JavaScript
+
+Use `delegateToJs` when you want native matching, but still want JavaScript to replace the response:
+
+```js
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser'
+
+const proxyHandle = await addProxyHandler(async (request) => {
+  if (request.phase === 'inbound' && request.url.includes('connect.facebook.net')) {
+    return new Response(
+      'window.FB = { init: () => {}, login: () => {}, getLoginStatus: () => {} };',
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/javascript; charset=utf-8',
+        },
+      },
+    )
+  }
+
+  return null
+})
+
+await InAppBrowser.openWebView({
+  url: 'https://www.grailed.com/users/sign_up',
+  inboundProxyRules: [
+    {
+      urlRegex: '^https://connect\\.facebook\\.net/.*',
+      action: 'delegateToJs',
+    },
+  ],
+})
+
+// Later, when you are done:
+await proxyHandle.remove()
+```
+
+#### Rewrite an outbound API request in JavaScript
+
+When a request must be modified before it leaves the webview, return a `request` override:
+
+```js
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser'
+
+const proxyHandle = await addProxyHandler(async (request) => {
+  if (request.phase === 'outbound' && request.url.includes('/api/private')) {
+    return {
+      request: {
+        url: request.url,
+        headers: {
+          ...request.headers,
+          Authorization: 'Bearer MY_TOKEN',
+          'X-Proxy-Debug': 'enabled',
+        },
+      },
+    }
+  }
+
+  return null
+})
+
+await InAppBrowser.openWebView({
+  url: 'https://example.com/dashboard',
+  outboundProxyRules: [
+    {
+      urlRegex: '^https://example\\.com/api/private.*',
+      action: 'delegateToJs',
+    },
+  ],
+})
+
+// Later, when you are done:
+await proxyHandle.remove()
+```
+
 ### Test app and code:
 
 https://github.com/Cap-go/demo-app/blob/main/src/views/plugins/Web.vue
@@ -760,7 +855,7 @@ Prefer `addProxyHandler()` instead of calling this directly.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
-**Since:** 9.0.0
+**Since:** 8.6.0
 
 --------------------
 
@@ -777,7 +872,7 @@ Internal method used by `addProxyHandler()` to send a proxy decision back to nat
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ requestId: string; decision?: <a href="#proxydecision">ProxyDecision</a> \| null; response?: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
 
-**Since:** 9.0.0
+**Since:** 8.6.0
 
 --------------------
 
@@ -1011,8 +1106,8 @@ And in the AndroidManifest.xml file:
 | **`preShowScript`**                    | <code>string</code>                                                                                                                                                    | preShowScript: if isPresentAfterPageLoad is true and this variable is set the plugin will inject a script before showing the browser. This script will be run in an async context. The plugin will wait for the script to finish (max 10 seconds)                                                                                                                                                                                                                                                                                                          |                                                               | 6.6.0  |
 | **`preShowScriptInjectionTime`**       | <code>'documentStart' \| 'pageLoad'</code>                                                                                                                             | preShowScriptInjectionTime: controls when the preShowScript is injected. - "documentStart": injects before any page JavaScript runs (good for polyfills like Firebase) - "pageLoad": injects after page load (default, original behavior)                                                                                                                                                                                                                                                                                                                  | <code>"pageLoad"</code>                                       | 7.26.0 |
 | **`proxyRequests`**                    | <code>string \| boolean</code>                                                                                                                                         | Proxy interception mode. - `true`: legacy blanket mode, delegates all HTTP/HTTPS requests to JavaScript. - `string`: Android-only regex mode kept for backward compatibility. Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.                                                                                                                                                                                                                                                                                               |                                                               | 6.9.0  |
-| **`outboundProxyRules`**               | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first outbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 9.1.0  |
-| **`inboundProxyRules`**                | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first inbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                               | 9.1.0  |
+| **`outboundProxyRules`**               | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first outbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |                                                               | 8.6.0  |
+| **`inboundProxyRules`**                | <code>NativeProxyRule[]</code>                                                                                                                                         | Native-first inbound proxy rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |                                                               | 8.6.0  |
 | **`buttonNearDone`**                   | <code>{ ios: { iconType: 'sf-symbol' \| 'asset'; icon: string; }; android: { iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }; }</code> | buttonNearDone allows for a creation of a custom button near the done/close button. The button is only shown when toolbarType is not "activity", "navigation", or "blank". For Android: - iconType must be "asset" - icon path should be in the public folder (e.g. "monkey.svg") - width and height are optional, defaults to 48dp - button is positioned at the end of toolbar with 8dp margin For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name              |                                                               | 6.7.0  |
 | **`showScreenshotButton`**             | <code>boolean</code>                                                                                                                                                   | Shows a native screenshot button near the done/close button. The button is hidden by default and captures the current viewport when tapped. This option uses the same toolbar slot as `buttonNearDone` and is therefore incompatible with it. The button is only shown when toolbarType is not "activity", "navigation", or "blank".                                                                                                                                                                                                                       | <code>false</code>                                            | 8.4.0  |
 | **`textZoom`**                         | <code>number</code>                                                                                                                                                    | textZoom: sets the text zoom of the page in percent. Allows users to increase or decrease the text size for better readability.                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>100</code>                                              | 7.6.0  |

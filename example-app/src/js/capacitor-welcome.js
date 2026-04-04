@@ -6,6 +6,7 @@ import {
   BackgroundColor,
   InvisibilityMode,
 } from "@capgo/inappbrowser";
+import { setupProxyDemoButtons } from "./proxy-demo.js";
 import { setupProxyRegression } from "./proxy-regression.js";
 
 // Default URL configuration
@@ -134,6 +135,21 @@ window.customElements.define(
           <div id="proxy-regression-details" style="margin-top: 6px;"></div>
         </div>
         <hr />
+        <h2>Proxy Demo Scenarios</h2>
+        <p>
+          Open real websites and exercise the proxy paths directly from this example app.
+        </p>
+        <p style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="button" id="proxy-demo-grailed-stub" style="background-color: #1f7a8c;">Grailed SDK Stub Proxy</button>
+          <button class="button" id="proxy-demo-grailed-google-login" style="background-color: #126b4c;">Grailed Google Login Proxy</button>
+          <button class="button" id="proxy-demo-facebook-login" style="background-color: #1877f2;">Facebook Login</button>
+          <button class="button" id="proxy-demo-facebook-script" style="background-color: #0f5dcf;">Facebook Script Proxy</button>
+        </p>
+        <div id="proxy-demo-status" style="margin-top: 10px; padding: 10px; background-color: #eefaf7; border-radius: 5px; font-size: 0.8em; color: #12372a;">
+          <strong>Status:</strong> <span id="proxy-demo-status-text">Not started</span>
+          <div id="proxy-demo-details" style="margin-top: 6px; white-space: pre-wrap; word-break: break-word;"></div>
+        </div>
+        <hr />
         <h2>In-App Browser Demo</h2>
         <p>
           Open the Capacitor InAppBrowser plugin documentation in an in-app browser.
@@ -259,6 +275,7 @@ window.customElements.define(
       }
 
       setupProxyRegression(self.shadowRoot);
+      setupProxyDemoButtons(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot
