@@ -2107,10 +2107,8 @@ extension WKWebViewController: WKNavigationDelegate {
             }
             if proxyCertificateAuthority?.isServerTrustSignedByCA(serverTrust) == true {
                 completionHandler(.useCredential, URLCredential(trust: serverTrust))
-            } else {
-                completionHandler(.performDefaultHandling, nil)
+                return
             }
-            return
         }
 
         if let credentials = credentials,

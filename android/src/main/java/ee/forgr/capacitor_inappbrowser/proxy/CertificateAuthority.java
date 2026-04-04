@@ -41,6 +41,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.util.IPAddress;
 
 public class CertificateAuthority {
 
@@ -226,8 +227,9 @@ public class CertificateAuthority {
                 domainKeyPair.getPublic()
             );
 
-            // SAN extension so the cert matches the domain
-            GeneralNames sans = new GeneralNames(new GeneralName(GeneralName.dNSName, domain));
+            // Encode literal IPs as iPAddress SANs so upstream hostname validation succeeds.
+            int sanType = IPAddress.isValid(domain) ? GeneralName.iPAddress : GeneralName.dNSName;
+            GeneralNames sans = new GeneralNames(new GeneralName(sanType, domain));
             builder.addExtension(Extension.subjectAlternativeName, false, sans);
 
             ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").build(caPrivateKey);

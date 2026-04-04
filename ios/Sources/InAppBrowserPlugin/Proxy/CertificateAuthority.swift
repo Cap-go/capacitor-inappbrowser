@@ -1,6 +1,7 @@
 #if canImport(NIO) && canImport(NIOCore) && canImport(NIOPosix) && canImport(NIOHTTP1) && canImport(NIOSSL) && canImport(X509) && canImport(SwiftASN1) && canImport(Crypto) && canImport(_CryptoExtras)
 import Foundation
 import Security
+import Network
 import CryptoKit
 import NIOSSL
 import X509
@@ -227,7 +228,7 @@ class CertificateAuthority {
         let extensions = try Certificate.Extensions {
             Critical(BasicConstraints.notCertificateAuthority)
             KeyUsage(digitalSignature: true, keyEncipherment: true)
-            SubjectAlternativeNames([.dnsName(domain)])
+            SubjectAlternativeNames([try subjectAlternativeName(for: domain)])
             SubjectKeyIdentifier(hash: leafPrivKey.publicKey)
             AuthorityKeyIdentifier(keyIdentifier: caSKI.keyIdentifier)
         }
@@ -269,6 +270,16 @@ class CertificateAuthority {
 
         print("[CertificateAuthority] Generated leaf cert for domain: \(domain)")
         return sslContext
+    }
+
+    private func subjectAlternativeName(for domain: String) throws -> GeneralName {
+        if let ipv4 = IPv4Address(domain) {
+            return .ipAddress(ASN1OctetString(contentBytes: Array(ipv4.rawValue)[...]))
+        }
+        if let ipv6 = IPv6Address(domain) {
+            return .ipAddress(ASN1OctetString(contentBytes: Array(ipv6.rawValue)[...]))
+        }
+        return .dnsName(domain)
     }
 }
 #endif
