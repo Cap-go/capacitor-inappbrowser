@@ -74,11 +74,12 @@ private func hostHeaderValue(for url: URL) -> String? {
     guard let host = url.host else {
         return nil
     }
+    let authorityHost = host.contains(":") ? "[\(host)]" : host
 
     if let port = url.port, port != defaultPort(for: url.scheme ?? "") {
-        return "\(host):\(port)"
+        return "\(authorityHost):\(port)"
     }
-    return host
+    return authorityHost
 }
 
 private func originForm(for url: URL) -> String {
@@ -927,6 +928,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
     private weak var delegate: ProxyEventDelegate?
     private let requestUrl: String
     private let requestId: String?
+    private let shouldBufferResponse: Bool
 
     private var responseHead: HTTPResponseHead?
     private var responseBody: ByteBuffer?
@@ -941,6 +943,7 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
         self.delegate = delegate
         self.requestUrl = requestUrl
         self.requestId = requestId
+        self.shouldBufferResponse = rule?.interceptsResponse == true
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -949,14 +952,30 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
         switch part {
         case .head(let head):
             responseHead = head
-            responseBody = context.channel.allocator.buffer(capacity: 0)
+            if shouldBufferResponse {
+                responseBody = context.channel.allocator.buffer(capacity: 0)
+            } else {
+                sendHeadToClient(head)
+            }
 
         case .body(var buf):
-            responseBody?.writeBuffer(&buf)
+            if shouldBufferResponse {
+                responseBody?.writeBuffer(&buf)
+            } else {
+                clientContext.write(
+                    NIOAny(HTTPServerResponsePart.body(.byteBuffer(buf))), promise: nil)
+            }
 
         case .end:
-            guard let head = responseHead else { return }
-            handleResponse(head: head, body: responseBody)
+            guard let head = responseHead else {
+                context.close(promise: nil)
+                return
+            }
+            if shouldBufferResponse {
+                handleResponse(head: head, body: responseBody)
+            } else {
+                clientContext.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            }
             context.close(promise: nil)
         }
     }
@@ -996,14 +1015,18 @@ final class UpstreamResponseHandler: ChannelInboundHandler {
     }
 
     private func sendToClient(head: HTTPResponseHead, body: ByteBuffer?) {
-        clientContext.write(
-            NIOAny(HTTPServerResponsePart.head(head)), promise: nil)
+        sendHeadToClient(head)
         if let body = body, body.readableBytes > 0 {
             clientContext.write(
                 NIOAny(HTTPServerResponsePart.body(.byteBuffer(body))), promise: nil)
         }
         clientContext.writeAndFlush(
             NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+    }
+
+    private func sendHeadToClient(_ head: HTTPResponseHead) {
+        clientContext.write(
+            NIOAny(HTTPServerResponsePart.head(head)), promise: nil)
     }
 
     func errorCaught(context: ChannelHandlerContext, error _: Error) {
