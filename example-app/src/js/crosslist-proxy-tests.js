@@ -8,19 +8,19 @@ const FACEBOOK_USER_AGENT =
 const GRAILED_RULES = [
   {
     ruleName: "grailed-google-sdk",
-    regex: "^https://accounts\\.google\\.com/.*",
+    regex: String.raw`^https://accounts\.google\.com/.*`,
     mode: "response",
     includeBody: false,
   },
   {
     ruleName: "grailed-apple-sdk",
-    regex: "^https://.*appleid.*",
+    regex: String.raw`^https://.*appleid.*`,
     mode: "response",
     includeBody: false,
   },
   {
     ruleName: "grailed-facebook-sdk",
-    regex: "^https://connect\\.facebook\\.net/.*",
+    regex: String.raw`^https://connect\.facebook\.net/.*`,
     mode: "response",
     includeBody: false,
   },
@@ -29,7 +29,7 @@ const GRAILED_RULES = [
 const FACEBOOK_PROXY_RULES = [
   {
     ruleName: "facebook-user-agent",
-    regex: "^https://([a-zA-Z0-9-]+\\.)*facebook\\.com/.*",
+    regex: String.raw`^https://([a-zA-Z0-9-]+\.)*facebook\.com/.*`,
     mode: "request",
     includeBody: false,
   },
@@ -64,7 +64,7 @@ const GRAILED_STUBS = {
   `,
 };
 
-const FACEBOOK_INJECTED_SCRIPT = `
+const FACEBOOK_INJECTED_SCRIPT = String.raw`
 ;(async () => {
   const post = (message) => {
     if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
@@ -214,8 +214,11 @@ function summarizeValue(value) {
   }
   try {
     return JSON.stringify(value, null, 2);
-  } catch (_error) {
-    return String(value);
+  } catch (error) {
+    if (error instanceof Error) {
+      return `[unserializable payload: ${error.message}]`;
+    }
+    return "[unserializable payload]";
   }
 }
 
