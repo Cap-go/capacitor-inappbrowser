@@ -6,6 +6,7 @@ import {
   BackgroundColor,
   InvisibilityMode,
 } from "@capgo/inappbrowser";
+import { setupCrosslistProxyButtons } from "./crosslist-proxy-tests.js";
 import { setupProxyRegression } from "./proxy-regression.js";
 
 // Default URL configuration
@@ -83,6 +84,20 @@ window.customElements.define(
         <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
           <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
           <div id="proxy-regression-details" style="margin-top: 6px;"></div>
+        </div>
+        <hr />
+        <h2>Crosslist Proxy Scenarios</h2>
+        <p>
+          Manual buttons ported from the Crosslist proxy repro, rebuilt on the split request/response proxy API.
+        </p>
+        <p style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="button" id="crosslist-grailed-proxy" style="background-color: #1f7a8c;">Grailed Google SDK Proxy</button>
+          <button class="button" id="crosslist-facebook-login" style="background-color: #1877f2;">Facebook Login</button>
+          <button class="button" id="crosslist-facebook-script-proxy" style="background-color: #0f5dcf;">Facebook Script Inject Proxy</button>
+        </p>
+        <div id="crosslist-proxy-status" style="margin-top: 10px; padding: 10px; background-color: #eefaf7; border-radius: 5px; font-size: 0.8em; color: #12372a;">
+          <strong>Status:</strong> <span id="crosslist-proxy-status-text">Not started</span>
+          <div id="crosslist-proxy-details" style="margin-top: 6px; white-space: pre-wrap; word-break: break-word;"></div>
         </div>
         <hr />
         <h2>Custom URL</h2>
@@ -259,6 +274,7 @@ window.customElements.define(
       }
 
       setupProxyRegression(self.shadowRoot);
+      setupCrosslistProxyButtons(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot
