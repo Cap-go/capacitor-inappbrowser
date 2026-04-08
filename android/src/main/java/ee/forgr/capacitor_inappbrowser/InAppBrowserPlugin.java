@@ -801,10 +801,13 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         options.setProxyRequests(Boolean.TRUE.equals(call.getBoolean("proxyRequests", false)));
 
-        String proxyRequestsStr = call.getString("proxyRequests");
-        if (proxyRequestsStr != null) {
+        Object rawProxyRequests = call.getData().opt("proxyRequests");
+        if (rawProxyRequests instanceof String proxyRequestsStr) {
             try {
-                options.setProxyRequestsPattern(Pattern.compile(proxyRequestsStr));
+                Pattern proxyRequestsPattern = ProxyRequestSupport.compileProxyRequestsPattern(rawProxyRequests);
+                if (proxyRequestsPattern != null) {
+                    options.setProxyRequestsPattern(proxyRequestsPattern);
+                }
             } catch (PatternSyntaxException e) {
                 Log.e("WebViewDialog", String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr));
             }

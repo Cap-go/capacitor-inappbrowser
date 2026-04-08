@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.json.JSONException;
 
 final class ProxyRequestSupport {
@@ -51,6 +52,13 @@ final class ProxyRequestSupport {
             options.getOutboundProxyRules().isEmpty() &&
             options.getInboundProxyRules().isEmpty()
         );
+    }
+
+    static Pattern compileProxyRequestsPattern(Object rawProxyRequests) {
+        if (!(rawProxyRequests instanceof String proxyRequestsPattern) || proxyRequestsPattern.isBlank()) {
+            return null;
+        }
+        return Pattern.compile(proxyRequestsPattern);
     }
 
     static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson) throws JSONException {

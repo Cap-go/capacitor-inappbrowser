@@ -97,6 +97,13 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void compileProxyRequestsPatternIgnoresNonStringValues() {
+        assertNull(ProxyRequestSupport.compileProxyRequestsPattern(Boolean.TRUE));
+        assertNull(ProxyRequestSupport.compileProxyRequestsPattern(""));
+        assertEquals("grailed", ProxyRequestSupport.compileProxyRequestsPattern("grailed").pattern());
+    }
+
+    @Test
     public void mergeRequestHeadersPreservesNativeHeaders() throws Exception {
         Map<String, String> headers = ProxyRequestSupport.mergeRequestHeaders(
             Map.of("Cookie", "session=abc", "User-Agent", "Native"),
