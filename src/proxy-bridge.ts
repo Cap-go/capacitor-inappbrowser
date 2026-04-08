@@ -293,6 +293,7 @@
     (this as any).__proxyMethod = method;
     (this as any).__proxyUrl = resolveUrl(url instanceof URL ? url.toString() : url);
     (this as any).__proxyHeaders = {};
+    (this as any).__proxyAsync = rest[0] !== false;
     return originalXhrOpen.apply(this, [method, url, ...rest] as any);
   };
 
@@ -308,10 +309,17 @@
     const method = (xhr as any).__proxyMethod || 'GET';
     const url = (xhr as any).__proxyUrl || '';
     const headers = (xhr as any).__proxyHeaders || {};
+    const isAsync = (xhr as any).__proxyAsync !== false;
 
     function completeSend(proxyUrl: string) {
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
       originalXhrSend.call(xhr, null);
+    }
+
+    if (!isAsync) {
+      console.warn('[proxy-bridge] Synchronous XMLHttpRequest cannot be proxied; falling back to the original request');
+      originalXhrSend.call(xhr, body ?? null);
+      return;
     }
 
     storeInterceptedRequest(url, method, headers, body as BodyInit | null | undefined)

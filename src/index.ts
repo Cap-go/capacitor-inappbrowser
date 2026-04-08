@@ -72,13 +72,15 @@ async function sendProxyDecision(
   requestId: string,
   webviewId: string | undefined,
   decision: ProxyDecision | null,
+  phase: 'outbound' | 'inbound',
 ): Promise<void> {
   try {
     await InAppBrowser.handleProxyRequest({
       requestId,
       webviewId,
       decision,
-    });
+      phase,
+    } as Parameters<typeof InAppBrowser.handleProxyRequest>[0]);
   } catch (error) {
     if (isStaleProxyResponseError(error)) {
       return;
@@ -116,7 +118,7 @@ const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> 
       decision = null;
     }
 
-    await sendProxyDecision(event.requestId, event.webviewId, decision);
+    await sendProxyDecision(event.requestId, event.webviewId, decision, event.phase);
   });
 };
 

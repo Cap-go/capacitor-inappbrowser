@@ -142,7 +142,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
     private var stoppedRequests: Set<String> = []
-    private var timedOutRequests: Set<String> = []
+    private var timedOutRequests: [String: String] = [:]
     private let taskLock = NSLock()
     private let webviewId: String
     private let proxyTimeoutSeconds: TimeInterval = 10
@@ -235,17 +235,25 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         taskLock.unlock()
     }
 
-    func handleResponse(requestId: String, responseData: [String: Any]?) {
+    func handleResponse(requestId: String, phase: String?, responseData: [String: Any]?) {
         taskLock.lock()
         let wasStopped = stoppedRequests.remove(requestId) != nil
-        let timedOut = timedOutRequests.remove(requestId) != nil
         guard let pendingTask = pendingTasks[requestId] else {
+            taskLock.unlock()
+            return
+        }
+        if let timedOutPhase = timedOutRequests[requestId], (phase ?? pendingTask.phase) == timedOutPhase {
+            timedOutRequests.removeValue(forKey: requestId)
+            taskLock.unlock()
+            return
+        }
+        if let phase, phase != pendingTask.phase {
             taskLock.unlock()
             return
         }
         taskLock.unlock()
 
-        if wasStopped || timedOut { return }
+        if wasStopped { return }
 
         if let responseData {
             if let cancel = responseData["cancel"] as? Bool, cancel {
@@ -276,12 +284,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
         if pendingTask.phase == "outbound" {
             executeNativePipeline(requestId: requestId)
-        } else if let responseData = pendingTask.responseData {
-            finish(task: pendingTask, with: responseData)
-            removePendingTask(requestId: requestId)
-        } else if let original = pendingTask.responseData {
-            finish(task: pendingTask, with: original)
-            removePendingTask(requestId: requestId)
         } else {
             executeInboundDecision(requestId: requestId)
         }
@@ -383,7 +385,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
             switch ProxySchemeRequestSupport.timeoutResolutionAction(phase: phase, hasCachedResponse: responseData != nil) {
             case .fallbackToNative:
-                self.timedOutRequests.insert(requestId)
+                self.timedOutRequests[requestId] = phase
                 self.taskLock.unlock()
                 self.executeNativePipeline(requestId: requestId)
                 return
@@ -419,7 +421,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         taskLock.lock()
         pendingTasks.removeValue(forKey: requestId)
         stoppedRequests.remove(requestId)
-        timedOutRequests.remove(requestId)
+        timedOutRequests.removeValue(forKey: requestId)
         taskLock.unlock()
     }
 

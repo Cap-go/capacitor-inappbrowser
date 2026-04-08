@@ -250,8 +250,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
-        try rawRules.compactMap { item in
-            guard let dictionary = item as? [String: Any] else { return nil }
+        try rawRules.enumerated().map { index, item in
+            guard let dictionary = item as? [String: Any] else {
+                throw NSError(
+                    domain: "InAppBrowserPlugin",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Proxy rule at index \(index) must be an object"]
+                )
+            }
             return try NativeProxyRule.from(dictionary: dictionary)
         }
     }
@@ -1466,6 +1472,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let webviewId = call.getString("webviewId")
+        let phase = call.getString("phase")
         let decisionObj = call.getObject("decision") ?? call.getObject("response")
 
         var handler: ProxySchemeHandler?
@@ -1536,7 +1543,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             responseDict = dict
         }
 
-        proxyHandler.handleResponse(requestId: requestId, responseData: responseDict)
+        proxyHandler.handleResponse(requestId: requestId, phase: phase, responseData: responseDict)
         call.resolve()
     }
 
