@@ -81,6 +81,18 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void mergeMissingHeadersOnlyBackfillsAbsentKeys() {
+        Map<String, String> headers = ProxyRequestSupport.mergeMissingHeaders(
+            Map.of("Accept", "application/json"),
+            Map.of("accept", "text/plain", "User-Agent", "MarkerAgent")
+        );
+
+        assertEquals("application/json", headers.get("Accept"));
+        assertEquals("MarkerAgent", headers.get("User-Agent"));
+        assertFalse(headers.containsKey("accept"));
+    }
+
+    @Test
     public void shouldLetWebViewHandleMissingBodyForOriginalMutatingRequests() {
         assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", ""));
         assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "GET", ""));

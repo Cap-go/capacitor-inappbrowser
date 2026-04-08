@@ -80,6 +80,30 @@ final class ProxyRequestSupport {
         return safeHeaders;
     }
 
+    static Map<String, String> mergeMissingHeaders(Map<String, String> primaryHeaders, Map<String, String> fallbackHeaders) {
+        Map<String, String> mergedHeaders = new LinkedHashMap<>();
+        if (primaryHeaders != null) {
+            mergedHeaders.putAll(primaryHeaders);
+        }
+        if (fallbackHeaders == null || fallbackHeaders.isEmpty()) {
+            return mergedHeaders;
+        }
+
+        for (Map.Entry<String, String> entry : fallbackHeaders.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key == null || value == null || value.isBlank()) {
+                continue;
+            }
+            if (findHeaderKeyIgnoreCase(mergedHeaders, key) != null) {
+                continue;
+            }
+            mergedHeaders.put(key, value);
+        }
+
+        return mergedHeaders;
+    }
+
     static boolean supportsNativeHttpRequest(URL url) {
         if (url == null) {
             return false;

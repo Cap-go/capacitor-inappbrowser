@@ -2822,12 +2822,13 @@ public class WebViewDialog extends Dialog {
                     }
 
                     String requestUrl = request.getUrl().toString();
+                    boolean bridgeBackedRequest = requestUrl.contains("/_capgo_proxy_?");
                     String originalUrl;
                     String method;
                     Map<String, String> requestHeaders = new HashMap<>();
                     String base64Body = "";
 
-                    if (requestUrl.contains("/_capgo_proxy_?")) {
+                    if (bridgeBackedRequest) {
                         Uri uri = request.getUrl();
                         originalUrl = uri.getQueryParameter("u");
                         String requestId = uri.getQueryParameter("rid");
@@ -2840,13 +2841,15 @@ public class WebViewDialog extends Dialog {
                             Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
                             return createCanceledResponse();
                         }
-                        requestHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(request.getRequestHeaders());
                         method = stored.method;
                         base64Body = stored.base64Body;
+                        Map<String, String> safeMarkerHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(request.getRequestHeaders());
                         try {
-                            requestHeaders = ProxyRequestSupport.mergeRequestHeaders(requestHeaders, stored.headersJson);
+                            requestHeaders = ProxyRequestSupport.mergeRequestHeaders(null, stored.headersJson);
+                            requestHeaders = ProxyRequestSupport.mergeMissingHeaders(requestHeaders, safeMarkerHeaders);
                         } catch (JSONException error) {
                             Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
+                            return createCanceledResponse();
                         }
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (targetCookies != null && !targetCookies.isBlank() && !requestHeaders.containsKey("Cookie")) {
@@ -2947,7 +2950,7 @@ public class WebViewDialog extends Dialog {
                         nativeResponse = performNativeRequest(requestContext);
                     } catch (IOException error) {
                         Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
-                        return null;
+                        return bridgeBackedRequest ? createCanceledResponse() : null;
                     }
 
                     NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
@@ -3663,7 +3666,7 @@ public class WebViewDialog extends Dialog {
             conn.setConnectTimeout(REQUEST_CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(REQUEST_READ_TIMEOUT_MS);
             conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
-            conn.setInstanceFollowRedirects(true);
+            conn.setInstanceFollowRedirects(false);
 
             for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
                 conn.setRequestProperty(entry.getKey(), entry.getValue());
