@@ -121,6 +121,7 @@ final class PendingProxyTask {
     }
 }
 
+// swiftlint:disable type_body_length
 public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
@@ -359,8 +360,22 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 self.taskLock.unlock()
                 return
             }
+            let responseData = pendingTask.responseData
+            let phase = pendingTask.phase
+
+            if phase == "outbound" {
+                self.taskLock.unlock()
+                self.executeNativePipeline(requestId: requestId)
+                return
+            }
+
             self.pendingTasks.removeValue(forKey: requestId)
             self.taskLock.unlock()
+
+            if phase == "inbound", let responseData {
+                self.finish(task: pendingTask, with: responseData)
+                return
+            }
 
             pendingTask.schemeTask.didFailWithError(
                 NSError(
@@ -386,11 +401,27 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func firstMatchingRule(for requestContext: NativeRequestContext, responseData: NativeResponseData?, phase: String) -> NativeProxyRule? {
-        let rules = phase == "outbound"
-            ? (legacyProxyRequests && outboundRules.isEmpty && inboundRules.isEmpty
-                ? [NativeProxyRule(id: nil, urlRegex: nil, methodRegex: nil, headerRegex: nil, bodyRegex: nil, statusRegex: nil, responseHeaderRegex: nil, responseBodyRegex: nil, mainFrameOnly: false, action: .delegateToJs)]
-                : outboundRules)
-            : inboundRules
+        let usesLegacyCatchAllRule = legacyProxyRequests && outboundRules.isEmpty && inboundRules.isEmpty
+        let rules: [NativeProxyRule]
+
+        if usesLegacyCatchAllRule {
+            rules = [
+                NativeProxyRule(
+                    id: nil,
+                    urlRegex: nil,
+                    methodRegex: nil,
+                    headerRegex: nil,
+                    bodyRegex: nil,
+                    statusRegex: nil,
+                    responseHeaderRegex: nil,
+                    responseBodyRegex: nil,
+                    mainFrameOnly: false,
+                    action: .delegateToJs
+                )
+            ]
+        } else {
+            rules = phase == "outbound" ? outboundRules : inboundRules
+        }
 
         let serializedHeaders = serialize(headers: requestContext.headers)
         let decodedBody = decodeBase64Body(requestContext.base64Body)
@@ -449,7 +480,12 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func finish(task: PendingProxyTask, with responseData: NativeResponseData) {
         guard let url = URL(string: task.requestContext.url),
-              let httpResponse = HTTPURLResponse(url: url, statusCode: responseData.statusCode, httpVersion: "HTTP/1.1", headerFields: responseData.headers)
+              let httpResponse = HTTPURLResponse(
+                  url: url,
+                  statusCode: responseData.statusCode,
+                  httpVersion: "HTTP/1.1",
+                  headerFields: responseData.headers
+              )
         else {
             task.schemeTask.didFailWithError(
                 NSError(
@@ -513,6 +549,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 }
+// swiftlint:enable type_body_length
 
 extension Data {
     init(reading input: InputStream) {

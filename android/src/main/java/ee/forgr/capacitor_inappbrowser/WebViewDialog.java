@@ -2832,15 +2832,14 @@ public class WebViewDialog extends Dialog {
                         }
 
                         ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
+                        if (request.getRequestHeaders() != null) {
+                            requestHeaders.putAll(request.getRequestHeaders());
+                        }
                         if (stored != null) {
                             method = stored.method;
                             base64Body = stored.base64Body;
                             try {
-                                JSONObject headers = new JSONObject(stored.headersJson);
-                                for (Iterator<String> iterator = headers.keys(); iterator.hasNext(); ) {
-                                    String key = iterator.next();
-                                    requestHeaders.put(key, headers.getString(key));
-                                }
+                                requestHeaders = ProxyRequestSupport.mergeRequestHeaders(requestHeaders, stored.headersJson);
                             } catch (JSONException error) {
                                 Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
                             }
@@ -2876,11 +2875,7 @@ public class WebViewDialog extends Dialog {
                         request.isForMainFrame()
                     );
 
-                    boolean legacyProxyMode =
-                        _options.getProxyRequests() &&
-                        _options.getProxyRequestsPattern() == null &&
-                        _options.getOutboundProxyRules().isEmpty() &&
-                        _options.getInboundProxyRules().isEmpty();
+                    boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
 
                     NativeProxyRule outboundRule = legacyProxyMode
                         ? new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.DELEGATE_TO_JS)
@@ -3644,56 +3639,61 @@ public class WebViewDialog extends Dialog {
             throw new IOException("Unsupported proxy URL: " + requestContext.url);
         }
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
-        conn.setInstanceFollowRedirects(true);
-
-        for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
-            conn.setRequestProperty(entry.getKey(), entry.getValue());
-        }
-
-        if (requestContext.base64Body != null && !requestContext.base64Body.isEmpty()) {
-            byte[] bodyBytes = Base64.decode(requestContext.base64Body, Base64.DEFAULT);
-            conn.setDoOutput(true);
-            conn.getOutputStream().write(bodyBytes);
-        }
-
-        int status = conn.getResponseCode();
-        InputStream inputStream;
         try {
-            inputStream = conn.getInputStream();
-        } catch (IOException e) {
-            inputStream = conn.getErrorStream();
-        }
+            conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
+            conn.setInstanceFollowRedirects(true);
 
-        byte[] bodyBytes = new byte[0];
-        if (inputStream != null) {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
-            int n;
-            while ((n = inputStream.read(buf)) != -1) {
-                baos.write(buf, 0, n);
+            for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
+                conn.setRequestProperty(entry.getKey(), entry.getValue());
             }
-            inputStream.close();
-            bodyBytes = baos.toByteArray();
-        }
 
-        Map<String, String> responseHeaders = new HashMap<>();
-        for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
-            if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
-                responseHeaders.put(entry.getKey(), entry.getValue().get(0));
+            if (requestContext.base64Body != null && !requestContext.base64Body.isEmpty()) {
+                byte[] bodyBytes = Base64.decode(requestContext.base64Body, Base64.DEFAULT);
+                conn.setDoOutput(true);
+                try (java.io.OutputStream outputStream = conn.getOutputStream()) {
+                    outputStream.write(bodyBytes);
+                }
             }
-        }
 
-        String contentType = responseHeaders.get("Content-Type");
-        if (contentType == null) {
-            contentType = responseHeaders.get("content-type");
-        }
-        if (contentType == null) {
-            contentType = conn.getContentType();
-        }
+            int status = conn.getResponseCode();
+            InputStream inputStream;
+            try {
+                inputStream = conn.getInputStream();
+            } catch (IOException e) {
+                inputStream = conn.getErrorStream();
+            }
 
-        conn.disconnect();
-        return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+            byte[] bodyBytes = new byte[0];
+            if (inputStream != null) {
+                try (InputStream stream = inputStream; ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = stream.read(buf)) != -1) {
+                        baos.write(buf, 0, n);
+                    }
+                    bodyBytes = baos.toByteArray();
+                }
+            }
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
+                if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    responseHeaders.put(entry.getKey(), entry.getValue().get(0));
+                }
+            }
+
+            String contentType = responseHeaders.get("Content-Type");
+            if (contentType == null) {
+                contentType = responseHeaders.get("content-type");
+            }
+            if (contentType == null) {
+                contentType = conn.getContentType();
+            }
+
+            return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+        } finally {
+            conn.disconnect();
+        }
     }
 
     public void handleProxyResponse(String requestId, JSObject response) {

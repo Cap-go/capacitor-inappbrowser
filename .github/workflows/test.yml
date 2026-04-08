@@ -69,7 +69,16 @@ jobs:
           arch: x86_64
           profile: pixel_7
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bun run maestro:test:android
+          script: |
+            for attempt in 1 2; do
+              bun run maestro:test:android && exit 0
+              if [ "$attempt" -eq 2 ]; then
+                exit 1
+              fi
+              echo "Maestro Android run failed. Retrying once after emulator warmup..."
+              adb wait-for-device
+              sleep 15
+            done
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest

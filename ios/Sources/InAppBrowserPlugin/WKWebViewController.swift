@@ -1027,6 +1027,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             userContentController.add(weakHandler, name: "consoleMessageHandler")
             addConsoleCaptureUserScript(to: userContentController)
         }
+        if let preShowScript = self.preShowScript,
+           !preShowScript.isEmpty,
+           preShowScriptInjectionTime == "documentStart" {
+            userContentController.addUserScript(
+                WKUserScript(
+                    source: preShowScript,
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: false
+                )
+            )
+            print("[InAppBrowser] Injected preShowScript at document start")
+        }
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
@@ -1223,6 +1235,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.hiddenPopupWindow = parent.hiddenPopupWindow
         self.opensHidden = parent.hiddenPopupWindow
         self.captureConsoleLogs = parent.captureConsoleLogs
+        self.allowWebViewJsVisibilityControl = parent.allowWebViewJsVisibilityControl
+        self.allowScreenshotsFromWebPage = parent.allowScreenshotsFromWebPage
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition
         self.showArrowAsClose = parent.showArrowAsClose

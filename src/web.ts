@@ -76,7 +76,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
-    void options;
+    console.log('takeScreenshot not supported on web', options);
     throw this.unimplemented('Screenshots are not supported on web.');
   }
 
@@ -95,20 +95,18 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
-  async handleProxyRequest(): Promise<void> {
-    console.log('handleProxyRequest not supported on web');
+  async handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+    console.log('handleProxyRequest not supported on web', options);
     return;
   }
 
   async setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    void options;
-    console.log('setEnabledSafeTopMargin not supported on web');
+    console.log('setEnabledSafeTopMargin not supported on web', options);
     return;
   }
 
   async setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    void options;
-    console.log('setEnabledSafeBottomMargin not supported on web');
+    console.log('setEnabledSafeBottomMargin not supported on web', options);
     return;
   }
 

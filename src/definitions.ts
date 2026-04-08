@@ -230,6 +230,8 @@ export interface NativeProxyRule {
   action: 'continue' | 'cancel' | 'delegateToJs';
 }
 
+export type ProxyHandlerResult = Response | ProxyResponse | ProxyRequestOverride | ProxyDecision | null;
+
 /**
  * JavaScript callback used to handle proxied requests.
  *
@@ -238,9 +240,7 @@ export interface NativeProxyRule {
  *
  * @since 8.6.0
  */
-export type ProxyHandler = (
-  request: ProxyRequest,
-) => Promise<Response | ProxyResponse | ProxyRequestOverride | ProxyDecision | null>;
+export type ProxyHandler = (request: ProxyRequest) => ProxyHandlerResult | Promise<ProxyHandlerResult>;
 
 export interface OpenOptions {
   /**

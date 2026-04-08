@@ -565,7 +565,10 @@ function buildGrailedSessionProbeScript() {
         loggedIn,
         url: window.location.href,
         title: document.title,
-        cookiePreview: document.cookie.slice(0, 400),
+        cookieCount: document.cookie
+          .split(";")
+          .map((cookie) => cookie.trim())
+          .filter(Boolean).length,
       });
     })();
   `;
@@ -1169,7 +1172,7 @@ export function setupProxyDemoButtons(root) {
                     loggedIn: detail.loggedIn,
                     url: detail.url,
                     title: detail.title,
-                    cookiePreview: detail.cookiePreview,
+                    cookieCount: detail.cookieCount,
                   }),
                 );
               } else {
@@ -1180,7 +1183,7 @@ export function setupProxyDemoButtons(root) {
                     loggedIn: detail.loggedIn,
                     url: detail.url,
                     title: detail.title,
-                    cookiePreview: detail.cookiePreview,
+                    cookieCount: detail.cookieCount,
                   }),
                 );
               }
