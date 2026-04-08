@@ -271,6 +271,10 @@ const FACEBOOK_SCRIPT = `;(async () => {
 
 function toBase64(value) {
   const bytes = new TextEncoder().encode(value);
+  return bytesToBase64(bytes);
+}
+
+function bytesToBase64(bytes) {
   let binary = "";
   const chunkSize = 0x8000;
   for (let index = 0; index < bytes.length; index += chunkSize) {
@@ -284,6 +288,26 @@ function fromBase64(value) {
   const binary = atob(value);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+async function toBase64Payload(value) {
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return toBase64(value);
+  }
+  if (value instanceof Blob) {
+    const buffer = await value.arrayBuffer();
+    return bytesToBase64(new Uint8Array(buffer));
+  }
+  if (value instanceof ArrayBuffer) {
+    return bytesToBase64(new Uint8Array(value));
+  }
+  if (ArrayBuffer.isView(value)) {
+    return bytesToBase64(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  }
+  return toBase64(JSON.stringify(value));
 }
 
 function normalizeError(error) {
@@ -760,7 +784,7 @@ export function setupProxyDemoButtons(root) {
         if (event?.id) {
           untrackWindow(event.id);
         }
-        await resetState();
+        await resetState({ closeBrowser: true });
         setStatus(`${name} closed`, event?.url || "Browser dismissed.");
       }),
     );
@@ -1271,22 +1295,15 @@ export function setupProxyDemoButtons(root) {
             url: request.url,
             method: request.method,
             headers,
-            data: request.body ? atob(request.body) : undefined,
+            data: request.body ? fromBase64(request.body) : undefined,
             responseType: "blob",
             webFetchExtra: { credentials: "include" },
           });
 
-          let body = "";
-          if (typeof response.data === "string") {
-            body = response.data;
-          } else if (response.data) {
-            body = btoa(unescape(encodeURIComponent(JSON.stringify(response.data))));
-          }
-
           return {
             status: response.status,
             headers: response.headers || {},
-            body,
+            body: await toBase64Payload(response.data),
           };
         } catch (error) {
           setStatus("Facebook upstream proxy failed", normalizeError(error));

@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.net.URL;
@@ -50,6 +51,17 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void mergeRequestHeadersOverridesCaseInsensitiveMatches() throws Exception {
+        Map<String, String> headers = ProxyRequestSupport.mergeRequestHeaders(
+            Map.of("User-Agent", "Native"),
+            "{\"user-agent\":\"Spoofed\"}"
+        );
+
+        assertFalse(headers.containsKey("User-Agent"));
+        assertEquals("Spoofed", headers.get("user-agent"));
+    }
+
+    @Test
     public void shouldLetWebViewHandleMissingBodyForOriginalMutatingRequests() {
         assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", ""));
         assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "GET", ""));
@@ -61,5 +73,24 @@ public class ProxyRequestSupportTest {
             )
         );
         assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", "Ym9keQ=="));
+    }
+
+    @Test
+    public void resolveWebResourceResponseMetadataSeparatesMimeTypeAndCharset() {
+        ProxyRequestSupport.WebResourceResponseMetadata htmlMetadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+            "text/html; charset=iso-8859-1",
+            Map.of()
+        );
+
+        assertEquals("text/html", htmlMetadata.mimeType());
+        assertEquals("iso-8859-1", htmlMetadata.encoding());
+
+        ProxyRequestSupport.WebResourceResponseMetadata imageMetadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+            "image/png",
+            Map.of()
+        );
+
+        assertEquals("image/png", imageMetadata.mimeType());
+        assertNull(imageMetadata.encoding());
     }
 }

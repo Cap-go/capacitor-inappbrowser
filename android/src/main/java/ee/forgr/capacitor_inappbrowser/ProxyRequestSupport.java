@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import java.net.URL;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.json.JSONException;
@@ -9,6 +10,8 @@ import org.json.JSONException;
 final class ProxyRequestSupport {
 
     private record ParsedJsonString(String value, int nextIndex) {}
+
+    record WebResourceResponseMetadata(String mimeType, String encoding) {}
 
     private ProxyRequestSupport() {}
 
@@ -28,7 +31,7 @@ final class ProxyRequestSupport {
     }
 
     static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson) throws JSONException {
-        Map<String, String> mergedHeaders = new HashMap<>();
+        Map<String, String> mergedHeaders = new LinkedHashMap<>();
         if (nativeHeaders != null) {
             mergedHeaders.putAll(nativeHeaders);
         }
@@ -57,6 +60,42 @@ final class ProxyRequestSupport {
             return false;
         }
         return base64Body == null || base64Body.isEmpty();
+    }
+
+    static WebResourceResponseMetadata resolveWebResourceResponseMetadata(String contentType, Map<String, String> responseHeaders) {
+        String resolvedContentType = firstNonEmpty(contentType, findHeaderIgnoreCase(responseHeaders, "Content-Type"));
+        if (resolvedContentType == null || resolvedContentType.isBlank()) {
+            return new WebResourceResponseMetadata("application/octet-stream", null);
+        }
+
+        String[] contentTypeParts = resolvedContentType.split(";");
+        String mimeType = contentTypeParts[0].trim();
+        if (mimeType.isEmpty()) {
+            mimeType = "application/octet-stream";
+        }
+
+        String encoding = null;
+        if (isTextLikeMimeType(mimeType)) {
+            String parsedCharset = null;
+            for (int index = 1; index < contentTypeParts.length; index++) {
+                String parameter = contentTypeParts[index].trim();
+                int separatorIndex = parameter.indexOf('=');
+                if (separatorIndex <= 0) {
+                    continue;
+                }
+                String key = parameter.substring(0, separatorIndex).trim();
+                if (!"charset".equalsIgnoreCase(key)) {
+                    continue;
+                }
+                parsedCharset = stripOptionalQuotes(parameter.substring(separatorIndex + 1).trim());
+                if (!parsedCharset.isEmpty()) {
+                    break;
+                }
+            }
+            encoding = parsedCharset != null && !parsedCharset.isEmpty() ? parsedCharset : "utf-8";
+        }
+
+        return new WebResourceResponseMetadata(mimeType, encoding);
     }
 
     private static boolean requiresCapturedRequestBody(String method) {
@@ -91,7 +130,7 @@ final class ProxyRequestSupport {
 
             index = skipWhitespace(trimmedJson, index + 1);
             ParsedJsonString value = parseJsonString(trimmedJson, index);
-            target.put(key.value(), value.value());
+            putHeaderCaseInsensitive(target, key.value(), value.value());
 
             index = skipWhitespace(trimmedJson, value.nextIndex());
             if (index >= trimmedJson.length() - 1) {
@@ -186,5 +225,69 @@ final class ProxyRequestSupport {
             currentIndex++;
         }
         return currentIndex;
+    }
+
+    private static void putHeaderCaseInsensitive(Map<String, String> target, String key, String value) {
+        String existingKey = findHeaderIgnoreCase(target, key) != null ? findHeaderKeyIgnoreCase(target, key) : null;
+        if (existingKey != null) {
+            target.remove(existingKey);
+        }
+        target.put(key, value);
+    }
+
+    private static String findHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
+        String resolvedKey = findHeaderKeyIgnoreCase(headers, expectedKey);
+        return resolvedKey != null ? headers.get(resolvedKey) : null;
+    }
+
+    private static String findHeaderKeyIgnoreCase(Map<String, String> headers, String expectedKey) {
+        if (headers == null || expectedKey == null) {
+            return null;
+        }
+        for (String key : headers.keySet()) {
+            if (key != null && key.equalsIgnoreCase(expectedKey)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    private static String firstNonEmpty(String primaryValue, String fallbackValue) {
+        if (primaryValue != null && !primaryValue.isBlank()) {
+            return primaryValue;
+        }
+        if (fallbackValue != null && !fallbackValue.isBlank()) {
+            return fallbackValue;
+        }
+        return null;
+    }
+
+    private static boolean isTextLikeMimeType(String mimeType) {
+        if (mimeType == null) {
+            return false;
+        }
+        String normalizedMimeType = mimeType.trim().toLowerCase(Locale.US);
+        return (
+            normalizedMimeType.startsWith("text/") ||
+            normalizedMimeType.equals("application/json") ||
+            normalizedMimeType.equals("application/javascript") ||
+            normalizedMimeType.equals("application/x-javascript") ||
+            normalizedMimeType.equals("application/xml") ||
+            normalizedMimeType.equals("application/xhtml+xml") ||
+            normalizedMimeType.equals("application/x-www-form-urlencoded") ||
+            normalizedMimeType.endsWith("+json") ||
+            normalizedMimeType.endsWith("+xml") ||
+            normalizedMimeType.endsWith("+javascript")
+        );
+    }
+
+    private static String stripOptionalQuotes(String value) {
+        if (value == null || value.length() < 2) {
+            return value != null ? value : "";
+        }
+        if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 }

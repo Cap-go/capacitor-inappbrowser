@@ -149,6 +149,9 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
+    private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
+
     private WebView _webView;
     private Toolbar _toolbar;
     private Options _options = null;
@@ -2832,19 +2835,19 @@ public class WebViewDialog extends Dialog {
                         }
 
                         ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
+                        if (stored == null) {
+                            Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
+                            return createCanceledResponse();
+                        }
                         if (request.getRequestHeaders() != null) {
                             requestHeaders.putAll(request.getRequestHeaders());
                         }
-                        if (stored != null) {
-                            method = stored.method;
-                            base64Body = stored.base64Body;
-                            try {
-                                requestHeaders = ProxyRequestSupport.mergeRequestHeaders(requestHeaders, stored.headersJson);
-                            } catch (JSONException error) {
-                                Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
-                            }
-                        } else {
-                            method = request.getMethod();
+                        method = stored.method;
+                        base64Body = stored.base64Body;
+                        try {
+                            requestHeaders = ProxyRequestSupport.mergeRequestHeaders(requestHeaders, stored.headersJson);
+                        } catch (JSONException error) {
+                            Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
                         }
                     } else {
                         Pattern pattern = _options.getProxyRequestsPattern();
@@ -3629,9 +3632,13 @@ public class WebViewDialog extends Dialog {
     }
 
     private WebResourceResponse buildWebResourceResponse(NativeResponseData responseData) {
-        WebResourceResponse webResourceResponse = new WebResourceResponse(
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
             responseData.contentType,
-            "utf-8",
+            responseData.headers
+        );
+        WebResourceResponse webResourceResponse = new WebResourceResponse(
+            metadata.mimeType(),
+            metadata.encoding(),
             new ByteArrayInputStream(responseData.bodyBytes)
         );
         String reasonPhrase = getReasonPhrase(responseData.statusCode);
@@ -3650,6 +3657,8 @@ public class WebViewDialog extends Dialog {
         }
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         try {
+            conn.setConnectTimeout(REQUEST_CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(REQUEST_READ_TIMEOUT_MS);
             conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
             conn.setInstanceFollowRedirects(true);
 

@@ -1003,7 +1003,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
         userContentController.removeScriptMessageHandler(forName: "magicPrint")
 
-        if initialWebConfiguration == nil, proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
+        if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
             if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
                 webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
