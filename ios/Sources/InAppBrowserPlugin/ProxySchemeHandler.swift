@@ -88,6 +88,12 @@ struct NativeResponseData {
 }
 
 enum ProxySchemeRequestSupport {
+    enum JsResponseResolutionAction {
+        case finishCachedResponse
+        case executeNativePipeline
+        case executeInboundDecision
+    }
+
     enum TimeoutResolutionAction {
         case fallbackToNative
         case finishCachedResponse
@@ -120,6 +126,20 @@ enum ProxySchemeRequestSupport {
         }
         return .failRequest
     }
+
+    static func jsResponseResolutionAction(phase: String, hasCachedResponse: Bool) -> JsResponseResolutionAction {
+        if hasCachedResponse {
+            return .finishCachedResponse
+        }
+        if phase == "outbound" {
+            return .executeNativePipeline
+        }
+        return .executeInboundDecision
+    }
+
+    static func timeoutTokenMatches(scheduledToken: UUID, currentToken: UUID?) -> Bool {
+        currentToken == scheduledToken
+    }
 }
 
 final class PendingProxyTask {
@@ -128,6 +148,7 @@ final class PendingProxyTask {
     var responseData: NativeResponseData?
     var phase: String
     var urlSessionTask: URLSessionDataTask?
+    var timeoutToken: UUID?
     var canceled = false
 
     init(schemeTask: WKURLSchemeTask, requestContext: NativeRequestContext, phase: String) {
@@ -251,6 +272,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             taskLock.unlock()
             return
         }
+        pendingTask.timeoutToken = nil
         taskLock.unlock()
 
         if wasStopped { return }
@@ -276,15 +298,17 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
-        if let responseData = pendingTask.responseData, pendingTask.phase == "outbound" || pendingTask.phase == "inbound" {
+        switch ProxySchemeRequestSupport.jsResponseResolutionAction(
+            phase: pendingTask.phase,
+            hasCachedResponse: pendingTask.responseData != nil
+        ) {
+        case .finishCachedResponse:
+            guard let responseData = pendingTask.responseData else { return }
             finish(task: pendingTask, with: responseData)
             removePendingTask(requestId: requestId)
-            return
-        }
-
-        if pendingTask.phase == "outbound" {
+        case .executeNativePipeline:
             executeNativePipeline(requestId: requestId)
-        } else {
+        case .executeInboundDecision:
             executeInboundDecision(requestId: requestId)
         }
     }
@@ -373,15 +397,31 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func scheduleTimeout(for requestId: String) {
+        let timeoutToken = UUID()
+        taskLock.lock()
+        guard let pendingTask = pendingTasks[requestId] else {
+            taskLock.unlock()
+            return
+        }
+        pendingTask.timeoutToken = timeoutToken
+        taskLock.unlock()
+
         DispatchQueue.global().asyncAfter(deadline: .now() + proxyTimeoutSeconds) { [weak self] in
             guard let self else { return }
             self.taskLock.lock()
-            guard let pendingTask = self.pendingTasks[requestId] else {
+            guard
+                let pendingTask = self.pendingTasks[requestId],
+                ProxySchemeRequestSupport.timeoutTokenMatches(
+                    scheduledToken: timeoutToken,
+                    currentToken: pendingTask.timeoutToken
+                )
+            else {
                 self.taskLock.unlock()
                 return
             }
             let responseData = pendingTask.responseData
             let phase = pendingTask.phase
+            pendingTask.timeoutToken = nil
 
             switch ProxySchemeRequestSupport.timeoutResolutionAction(phase: phase, hasCachedResponse: responseData != nil) {
             case .fallbackToNative:

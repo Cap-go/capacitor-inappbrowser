@@ -85,4 +85,46 @@ final class InAppBrowserPluginTests: XCTestCase {
             .failRequest
         )
     }
+
+    func testProxySchemeJsResponseResolutionActionFinishesCachedResponsesBeforeReentry() {
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "inbound", hasCachedResponse: true),
+            .finishCachedResponse
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "outbound", hasCachedResponse: true),
+            .finishCachedResponse
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "outbound", hasCachedResponse: false),
+            .executeNativePipeline
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "inbound", hasCachedResponse: false),
+            .executeInboundDecision
+        )
+    }
+
+    func testProxySchemeTimeoutTokenMustMatchLatestGeneration() {
+        let activeToken = UUID()
+
+        XCTAssertTrue(
+            ProxySchemeRequestSupport.timeoutTokenMatches(
+                scheduledToken: activeToken,
+                currentToken: activeToken
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.timeoutTokenMatches(
+                scheduledToken: activeToken,
+                currentToken: UUID()
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.timeoutTokenMatches(
+                scheduledToken: activeToken,
+                currentToken: nil
+            )
+        )
+    }
 }
