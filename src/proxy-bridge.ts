@@ -48,6 +48,15 @@
     return url;
   }
 
+  function shouldProxyUrl(url: string): boolean {
+    try {
+      const protocol = new URL(url, window.location.href).protocol.toLowerCase();
+      return protocol === 'http:' || protocol === 'https:';
+    } catch (_error) {
+      return false;
+    }
+  }
+
   async function bodyToBase64(body: BodyInit | null | undefined): Promise<string | null> {
     if (body === null || body === undefined) {
       return null;
@@ -233,6 +242,10 @@
       }
     }
 
+    if (!shouldProxyUrl(requestUrl)) {
+      return false;
+    }
+
     const proxyUrl = await storeInterceptedRequest(requestUrl, method, headers, body);
     navigateFormProxy(proxyUrl, target);
     return true;
@@ -281,8 +294,16 @@
       }
     }
 
+    if (!shouldProxyUrl(url)) {
+      return originalFetch.call(window, input, init);
+    }
+
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
     const proxyUrl = await storeInterceptedRequest(url, method, headers, body);
-    return originalFetch.call(window, proxyUrl, { method: 'GET' });
+    return originalFetch.call(window, proxyUrl, {
+      method: 'GET',
+      signal,
+    });
   };
 
   const originalXhrOpen = XMLHttpRequest.prototype.open;
@@ -314,6 +335,11 @@
     function completeSend(proxyUrl: string) {
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
       originalXhrSend.call(xhr, null);
+    }
+
+    if (!shouldProxyUrl(url)) {
+      originalXhrSend.call(xhr, body ?? null);
+      return;
     }
 
     if (!isAsync) {

@@ -150,8 +150,20 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private static class RedirectReplayResult {
+
+        private final NativeRequestContext requestContext;
+        private final NativeResponseData responseData;
+
+        RedirectReplayResult(NativeRequestContext requestContext, NativeResponseData responseData) {
+            this.requestContext = requestContext;
+            this.responseData = responseData;
+        }
+    }
+
     private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
     private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
+    private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
 
     private WebView _webView;
     private Toolbar _toolbar;
@@ -2941,7 +2953,7 @@ public class WebViewDialog extends Dialog {
                             removeProxiedRequest(proxyId);
                             Thread.currentThread().interrupt();
                             Log.e("InAppBrowserProxy", "Semaphore wait error", error);
-                            return null;
+                            return bridgeBackedRequest ? createCanceledResponse() : null;
                         }
                     }
 
@@ -2953,54 +2965,82 @@ public class WebViewDialog extends Dialog {
                         return bridgeBackedRequest ? createCanceledResponse() : null;
                     }
 
-                    NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
-                    if (inboundRule == null) {
-                        return buildWebResourceResponse(nativeResponse);
-                    }
-                    if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
-                        return createCanceledResponse();
-                    }
-                    if (inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
-                        return buildWebResourceResponse(nativeResponse);
-                    }
-
-                    String proxyId = UUID.randomUUID().toString();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
-                    proxiedRequest.requestContext = requestContext;
-                    proxiedRequest.nativeResponse = nativeResponse;
-                    addProxiedRequest(proxyId, proxiedRequest);
-
-                    String dialogId = instanceId != null ? instanceId : "";
-                    _options
-                        .getCallbacks()
-                        .proxyRequestEvent(
-                            proxyId,
-                            "inbound",
-                            requestContext.url,
-                            requestContext.method,
-                            serializeHeaders(requestContext.headers),
-                            requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
-                            nativeResponse.statusCode,
-                            serializeHeaders(nativeResponse.headers),
-                            Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
-                            dialogId
-                        );
-
-                    try {
-                        if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                            if (proxiedRequest.canceled) {
-                                return createCanceledResponse();
+                    int redirectsFollowed = 0;
+                    while (true) {
+                        NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
+                        if (inboundRule == null || inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
+                            RedirectReplayResult redirectReplay;
+                            try {
+                                redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+                            } catch (IOException error) {
+                                Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
+                                return bridgeBackedRequest ? createCanceledResponse() : null;
                             }
-                            if (proxiedRequest.response != null) {
-                                return proxiedRequest.response;
+                            if (redirectReplay != null) {
+                                requestContext = redirectReplay.requestContext;
+                                nativeResponse = redirectReplay.responseData;
+                                redirectsFollowed++;
+                                continue;
                             }
                             return buildWebResourceResponse(nativeResponse);
                         }
-                        removeProxiedRequest(proxyId);
-                    } catch (InterruptedException error) {
-                        Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                        if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                            return createCanceledResponse();
+                        }
+
+                        String proxyId = UUID.randomUUID().toString();
+                        ProxiedRequest proxiedRequest = new ProxiedRequest();
+                        proxiedRequest.requestContext = requestContext;
+                        proxiedRequest.nativeResponse = nativeResponse;
+                        addProxiedRequest(proxyId, proxiedRequest);
+
+                        String dialogId = instanceId != null ? instanceId : "";
+                        _options
+                            .getCallbacks()
+                            .proxyRequestEvent(
+                                proxyId,
+                                "inbound",
+                                requestContext.url,
+                                requestContext.method,
+                                serializeHeaders(requestContext.headers),
+                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                nativeResponse.statusCode,
+                                serializeHeaders(nativeResponse.headers),
+                                Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
+                                dialogId
+                            );
+
+                        try {
+                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                if (proxiedRequest.canceled) {
+                                    return createCanceledResponse();
+                                }
+                                if (proxiedRequest.response != null) {
+                                    return proxiedRequest.response;
+                                }
+                            } else {
+                                removeProxiedRequest(proxyId);
+                            }
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                        }
+
+                        RedirectReplayResult redirectReplay;
+                        try {
+                            redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+                        } catch (IOException error) {
+                            Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
+                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                        }
+                        if (redirectReplay != null) {
+                            requestContext = redirectReplay.requestContext;
+                            nativeResponse = redirectReplay.responseData;
+                            redirectsFollowed++;
+                            continue;
+                        }
+                        return buildWebResourceResponse(nativeResponse);
                     }
-                    return buildWebResourceResponse(nativeResponse);
                 }
 
                 @Override
@@ -3654,6 +3694,32 @@ public class WebViewDialog extends Dialog {
         webResourceResponse.setStatusCodeAndReasonPhrase(responseData.statusCode, reasonPhrase);
         webResourceResponse.setResponseHeaders(responseData.headers);
         return webResourceResponse;
+    }
+
+    private RedirectReplayResult followRedirectForWebView(
+        NativeRequestContext requestContext,
+        NativeResponseData responseData,
+        int redirectsFollowed
+    ) throws IOException {
+        String redirectUrl = ProxyRequestSupport.resolveRedirectUrl(requestContext.url, responseData.statusCode, responseData.headers);
+        if (redirectUrl == null) {
+            return null;
+        }
+        if (redirectsFollowed >= MAX_WEBVIEW_PROXY_REDIRECTS) {
+            throw new IOException("Too many proxy redirects for: " + requestContext.url);
+        }
+
+        NativeRequestContext redirectRequestContext = createRedirectRequestContext(requestContext, responseData.statusCode, redirectUrl);
+        NativeResponseData redirectResponse = performNativeRequest(redirectRequestContext);
+        return new RedirectReplayResult(redirectRequestContext, redirectResponse);
+    }
+
+    private NativeRequestContext createRedirectRequestContext(NativeRequestContext requestContext, int statusCode, String redirectUrl) {
+        boolean preserveRequestBody = ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect(requestContext.method, statusCode);
+        String redirectMethod = ProxyRequestSupport.resolveRedirectMethod(requestContext.method, statusCode);
+        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(requestContext.headers, preserveRequestBody);
+        String redirectBody = preserveRequestBody ? requestContext.base64Body : "";
+        return new NativeRequestContext(redirectUrl, redirectMethod, redirectHeaders, redirectBody, requestContext.mainFrame);
     }
 
     private NativeResponseData performNativeRequest(NativeRequestContext requestContext) throws IOException {

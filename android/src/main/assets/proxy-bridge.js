@@ -56,6 +56,14 @@
       }
       return url;
     }
+    function shouldProxyUrl(url) {
+      try {
+        const protocol = new URL(url, window.location.href).protocol.toLowerCase();
+        return protocol === "http:" || protocol === "https:";
+      } catch (_error) {
+        return false;
+      }
+    }
     function bodyToBase64(body) {
       return __async(this, null, function* () {
         if (body === null || body === void 0) {
@@ -210,6 +218,9 @@
             body = formDataToUrlSearchParams(formData);
           }
         }
+        if (!shouldProxyUrl(requestUrl)) {
+          return false;
+        }
         const proxyUrl = yield storeInterceptedRequest(requestUrl, method, headers, body);
         navigateFormProxy(proxyUrl, target);
         return true;
@@ -218,6 +229,7 @@
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
       return __async(this, null, function* () {
+        var _a;
         let url;
         let method = "GET";
         const headers = {};
@@ -254,8 +266,15 @@
             body = init.body;
           }
         }
+        if (!shouldProxyUrl(url)) {
+          return originalFetch.call(window, input, init);
+        }
+        const signal = (_a = init == null ? void 0 : init.signal) != null ? _a : input instanceof Request ? input.signal : void 0;
         const proxyUrl = yield storeInterceptedRequest(url, method, headers, body);
-        return originalFetch.call(window, proxyUrl, { method: "GET" });
+        return originalFetch.call(window, proxyUrl, {
+          method: "GET",
+          signal
+        });
       });
     };
     const originalXhrOpen = XMLHttpRequest.prototype.open;
@@ -283,6 +302,10 @@
       function completeSend(proxyUrl) {
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
         originalXhrSend.call(xhr, null);
+      }
+      if (!shouldProxyUrl(url)) {
+        originalXhrSend.call(xhr, body != null ? body : null);
+        return;
       }
       if (!isAsync) {
         console.warn("[proxy-bridge] Synchronous XMLHttpRequest cannot be proxied; falling back to the original request");

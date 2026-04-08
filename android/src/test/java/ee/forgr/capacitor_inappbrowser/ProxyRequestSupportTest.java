@@ -32,6 +32,34 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void resolveRedirectUrlHandlesRelativeLocations() {
+        String redirectUrl = ProxyRequestSupport.resolveRedirectUrl("https://example.com/login", 302, Map.of("Location", "/dashboard"));
+
+        assertEquals("https://example.com/dashboard", redirectUrl);
+        assertNull(ProxyRequestSupport.resolveRedirectUrl("https://example.com/login", 200, Map.of("Location", "/dashboard")));
+    }
+
+    @Test
+    public void resolveRedirectMethodDropsBodyForLegacyRedirects() {
+        assertEquals("GET", ProxyRequestSupport.resolveRedirectMethod("POST", 302));
+        assertEquals("POST", ProxyRequestSupport.resolveRedirectMethod("POST", 307));
+        assertFalse(ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect("POST", 302));
+        assertTrue(ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect("POST", 307));
+    }
+
+    @Test
+    public void prepareRedirectHeadersDropsEntityHeadersWhenBodyChanges() {
+        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
+            Map.of("Content-Type", "application/json", "Content-Length", "10", "Accept", "application/json"),
+            false
+        );
+
+        assertFalse(redirectHeaders.containsKey("Content-Type"));
+        assertFalse(redirectHeaders.containsKey("Content-Length"));
+        assertEquals("application/json", redirectHeaders.get("Accept"));
+    }
+
+    @Test
     public void usesLegacyJsProxyModeForRegexPatternWithoutNativeRules() {
         Options options = new Options();
         options.setProxyRequestsPattern(Pattern.compile("grailed"));

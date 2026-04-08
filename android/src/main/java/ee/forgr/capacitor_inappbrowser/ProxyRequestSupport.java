@@ -112,6 +112,57 @@ final class ProxyRequestSupport {
         return "http".equalsIgnoreCase(protocol) || "https".equalsIgnoreCase(protocol);
     }
 
+    static String resolveRedirectUrl(String requestUrl, int statusCode, Map<String, String> responseHeaders) {
+        if (requestUrl == null || !isFollowableRedirectStatus(statusCode)) {
+            return null;
+        }
+
+        String location = findHeaderIgnoreCase(responseHeaders, "Location");
+        if (location == null || location.isBlank()) {
+            return null;
+        }
+
+        try {
+            return new URL(new URL(requestUrl), location).toString();
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
+    static String resolveRedirectMethod(String method, int statusCode) {
+        String normalizedMethod = normalizeMethod(method);
+        if ("GET".equals(normalizedMethod) || "HEAD".equals(normalizedMethod)) {
+            return normalizedMethod;
+        }
+        return shouldPreserveRequestBodyOnRedirect(method, statusCode) ? normalizedMethod : "GET";
+    }
+
+    static boolean shouldPreserveRequestBodyOnRedirect(String method, int statusCode) {
+        String normalizedMethod = normalizeMethod(method);
+        if ("GET".equals(normalizedMethod) || "HEAD".equals(normalizedMethod)) {
+            return false;
+        }
+        return statusCode == 307 || statusCode == 308;
+    }
+
+    static Map<String, String> prepareRedirectHeaders(Map<String, String> originalHeaders, boolean preserveRequestBody) {
+        Map<String, String> redirectedHeaders = new LinkedHashMap<>();
+        if (originalHeaders != null) {
+            redirectedHeaders.putAll(originalHeaders);
+        }
+        if (preserveRequestBody) {
+            return redirectedHeaders;
+        }
+
+        dropHeaderIgnoreCase(redirectedHeaders, "Content-Encoding");
+        dropHeaderIgnoreCase(redirectedHeaders, "Content-Language");
+        dropHeaderIgnoreCase(redirectedHeaders, "Content-Length");
+        dropHeaderIgnoreCase(redirectedHeaders, "Content-Location");
+        dropHeaderIgnoreCase(redirectedHeaders, "Content-Type");
+        dropHeaderIgnoreCase(redirectedHeaders, "Transfer-Encoding");
+        return redirectedHeaders;
+    }
+
     static boolean shouldLetWebViewHandleMissingBody(String requestUrl, String method, String base64Body) {
         if (requestUrl != null && requestUrl.contains("/_capgo_proxy_?")) {
             return false;
@@ -159,11 +210,19 @@ final class ProxyRequestSupport {
     }
 
     private static boolean requiresCapturedRequestBody(String method) {
-        if (method == null) {
-            return false;
-        }
-        String normalizedMethod = method.trim().toUpperCase(Locale.US);
+        String normalizedMethod = normalizeMethod(method);
         return "POST".equals(normalizedMethod) || "PUT".equals(normalizedMethod) || "PATCH".equals(normalizedMethod);
+    }
+
+    private static String normalizeMethod(String method) {
+        if (method == null) {
+            return "GET";
+        }
+        return method.trim().toUpperCase(Locale.US);
+    }
+
+    private static boolean isFollowableRedirectStatus(int statusCode) {
+        return statusCode == 301 || statusCode == 302 || statusCode == 303 || statusCode == 307 || statusCode == 308;
     }
 
     private static void parseFlatJsonObject(String json, Map<String, String> target) throws JSONException {
@@ -293,6 +352,13 @@ final class ProxyRequestSupport {
             target.remove(existingKey);
         }
         target.put(key, value);
+    }
+
+    private static void dropHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
+        String existingKey = findHeaderKeyIgnoreCase(headers, expectedKey);
+        if (existingKey != null) {
+            headers.remove(existingKey);
+        }
     }
 
     private static String findHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
