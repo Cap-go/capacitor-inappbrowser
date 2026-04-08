@@ -39,6 +39,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -2839,15 +2840,17 @@ public class WebViewDialog extends Dialog {
                             Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
                             return createCanceledResponse();
                         }
-                        if (request.getRequestHeaders() != null) {
-                            requestHeaders.putAll(request.getRequestHeaders());
-                        }
+                        requestHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(request.getRequestHeaders());
                         method = stored.method;
                         base64Body = stored.base64Body;
                         try {
                             requestHeaders = ProxyRequestSupport.mergeRequestHeaders(requestHeaders, stored.headersJson);
                         } catch (JSONException error) {
                             Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
+                        }
+                        String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
+                        if (targetCookies != null && !targetCookies.isBlank() && !requestHeaders.containsKey("Cookie")) {
+                            requestHeaders.put("Cookie", targetCookies);
                         }
                     } else {
                         Pattern pattern = _options.getProxyRequestsPattern();

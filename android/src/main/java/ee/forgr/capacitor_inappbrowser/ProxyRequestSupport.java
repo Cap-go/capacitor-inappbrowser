@@ -13,6 +13,21 @@ final class ProxyRequestSupport {
 
     record WebResourceResponseMetadata(String mimeType, String encoding) {}
 
+    private static final String[] SAFE_MARKER_HEADER_NAMES = {
+        "Accept",
+        "Accept-Encoding",
+        "Accept-Language",
+        "Cache-Control",
+        "Pragma",
+        "If-Modified-Since",
+        "If-None-Match",
+        "If-Match",
+        "If-Unmodified-Since",
+        "If-Range",
+        "Range",
+        "User-Agent"
+    };
+
     private ProxyRequestSupport() {}
 
     static boolean shouldInjectBridge(Options options) {
@@ -42,6 +57,27 @@ final class ProxyRequestSupport {
         parseFlatJsonObject(storedHeadersJson, mergedHeaders);
 
         return mergedHeaders;
+    }
+
+    static Map<String, String> extractSafeMarkerHeaders(Map<String, String> markerHeaders) {
+        Map<String, String> safeHeaders = new LinkedHashMap<>();
+        if (markerHeaders == null || markerHeaders.isEmpty()) {
+            return safeHeaders;
+        }
+
+        for (String safeHeaderName : SAFE_MARKER_HEADER_NAMES) {
+            String existingKey = findHeaderKeyIgnoreCase(markerHeaders, safeHeaderName);
+            if (existingKey == null) {
+                continue;
+            }
+            String value = markerHeaders.get(existingKey);
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            safeHeaders.put(existingKey, value);
+        }
+
+        return safeHeaders;
     }
 
     static boolean supportsNativeHttpRequest(URL url) {

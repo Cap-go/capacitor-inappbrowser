@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.net.URL;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -59,6 +60,24 @@ public class ProxyRequestSupportTest {
 
         assertFalse(headers.containsKey("User-Agent"));
         assertEquals("Spoofed", headers.get("user-agent"));
+    }
+
+    @Test
+    public void extractSafeMarkerHeadersDropsOriginBoundHeaders() {
+        Map<String, String> markerHeaders = new LinkedHashMap<>();
+        markerHeaders.put("Accept", "application/json");
+        markerHeaders.put("Cookie", "session=marker");
+        markerHeaders.put("Origin", "https://marker.example");
+        markerHeaders.put("Referer", "https://marker.example/page");
+        markerHeaders.put("User-Agent", "MarkerAgent");
+
+        Map<String, String> headers = ProxyRequestSupport.extractSafeMarkerHeaders(markerHeaders);
+
+        assertEquals("application/json", headers.get("Accept"));
+        assertEquals("MarkerAgent", headers.get("User-Agent"));
+        assertFalse(headers.containsKey("Cookie"));
+        assertFalse(headers.containsKey("Origin"));
+        assertFalse(headers.containsKey("Referer"));
     }
 
     @Test
