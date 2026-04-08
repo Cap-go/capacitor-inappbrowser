@@ -43,4 +43,28 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertTrue(script.contains("unhandledrejection"))
         XCTAssertTrue(script.contains("console.assert"))
     }
+
+    func testProxySchemeMainFrameDetectionTracksMainDocumentURL() throws {
+        let pageURL = try XCTUnwrap(URL(string: "https://example.com/page"))
+        let scriptURL = try XCTUnwrap(URL(string: "https://example.com/app.js"))
+
+        var mainFrameRequest = URLRequest(url: pageURL)
+        mainFrameRequest.mainDocumentURL = pageURL
+        XCTAssertTrue(ProxySchemeRequestSupport.isMainFrameRequest(mainFrameRequest))
+
+        var subresourceRequest = URLRequest(url: scriptURL)
+        subresourceRequest.mainDocumentURL = pageURL
+        XCTAssertFalse(ProxySchemeRequestSupport.isMainFrameRequest(subresourceRequest))
+    }
+
+    func testProxySchemeInvalidOverrideURLFallsBackToOriginalRequest() {
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.sanitizedOverrideURL("://bad-url", fallback: "https://example.com/original"),
+            "https://example.com/original"
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.sanitizedOverrideURL("https://example.com/override", fallback: "https://example.com/original"),
+            "https://example.com/override"
+        )
+    }
 }

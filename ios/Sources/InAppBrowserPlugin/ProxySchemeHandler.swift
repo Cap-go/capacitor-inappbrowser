@@ -87,6 +87,25 @@ struct NativeResponseData {
     var contentType: String
 }
 
+enum ProxySchemeRequestSupport {
+    static func isMainFrameRequest(_ request: URLRequest) -> Bool {
+        guard let url = request.url else { return false }
+        guard let mainDocumentURL = request.mainDocumentURL else { return true }
+        return mainDocumentURL.absoluteString == url.absoluteString
+    }
+
+    static func sanitizedOverrideURL(_ rawURL: String?, fallback: String) -> String {
+        guard
+            let rawURL,
+            let url = URL(string: rawURL),
+            url.scheme?.isEmpty == false
+        else {
+            return fallback
+        }
+        return rawURL
+    }
+}
+
 final class PendingProxyTask {
     let schemeTask: WKURLSchemeTask
     var requestContext: NativeRequestContext
@@ -161,7 +180,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             method: urlSchemeTask.request.httpMethod ?? "GET",
             headers: urlSchemeTask.request.allHTTPHeaderFields ?? [:],
             base64Body: extractBody(from: urlSchemeTask.request),
-            isMainFrame: true
+            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
         )
         let pendingTask = PendingProxyTask(schemeTask: urlSchemeTask, requestContext: requestContext, phase: "outbound")
 
@@ -251,7 +270,17 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func executeNativePipeline(requestId: String) {
         guard let pendingTask = pendingTask(for: requestId) else { return }
-        let request = makeURLRequest(from: pendingTask.requestContext)
+        guard let request = makeURLRequest(from: pendingTask.requestContext) else {
+            pendingTask.schemeTask.didFailWithError(
+                NSError(
+                    domain: "ProxySchemeHandler",
+                    code: -3,
+                    userInfo: [NSLocalizedDescriptionKey: "Invalid request URL"]
+                )
+            )
+            removePendingTask(requestId: requestId)
+            return
+        }
         let task = Self.session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
             guard let pendingTask = self.pendingTask(for: requestId) else { return }
@@ -383,8 +412,11 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 
-    private func makeURLRequest(from context: NativeRequestContext) -> URLRequest {
-        var request = URLRequest(url: URL(string: context.url)!)
+    private func makeURLRequest(from context: NativeRequestContext) -> URLRequest? {
+        guard let url = URL(string: context.url) else {
+            return nil
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = context.method
         request.allHTTPHeaderFields = context.headers
         if let base64Body = context.base64Body, let bodyData = Data(base64Encoded: base64Body) {
@@ -407,7 +439,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func applyRequestOverride(_ override: [String: Any], to context: NativeRequestContext) -> NativeRequestContext {
         NativeRequestContext(
-            url: override["url"] as? String ?? context.url,
+            url: ProxySchemeRequestSupport.sanitizedOverrideURL(override["url"] as? String, fallback: context.url),
             method: override["method"] as? String ?? context.method,
             headers: override["headers"] as? [String: String] ?? context.headers,
             base64Body: override["body"] as? String ?? context.base64Body,

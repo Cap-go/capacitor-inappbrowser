@@ -3059,7 +3059,7 @@ public class WebViewDialog extends Dialog {
                     if (view == null || _webView == null) {
                         return;
                     }
-                    if (_options.getProxyRequests() && proxyBridgeScript != null && proxyAccessToken != null) {
+                    if (ProxyRequestSupport.shouldInjectBridge(_options) && proxyBridgeScript != null && proxyAccessToken != null) {
                         String scriptWithToken = proxyBridgeScript.replace("___CAPGO_PROXY_TOKEN___", proxyAccessToken);
                         view.evaluateJavascript(scriptWithToken, null);
                     }
@@ -3640,6 +3640,9 @@ public class WebViewDialog extends Dialog {
 
     private NativeResponseData performNativeRequest(NativeRequestContext requestContext) throws IOException {
         URL url = new URL(requestContext.url);
+        if (!ProxyRequestSupport.supportsNativeHttpRequest(url)) {
+            throw new IOException("Unsupported proxy URL: " + requestContext.url);
+        }
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
         conn.setInstanceFollowRedirects(true);
