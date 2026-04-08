@@ -150,6 +150,50 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void shouldInjectCookiesHonorsCredentialsMode() {
+        assertTrue(
+            ProxyRequestSupport.shouldInjectCookies(
+                "include",
+                "https://app.example.com/account",
+                "https://api.example.net/login",
+                new LinkedHashMap<>()
+            )
+        );
+        assertTrue(
+            ProxyRequestSupport.shouldInjectCookies(
+                "same-origin",
+                "https://app.example.com/account",
+                "https://app.example.com/api/me",
+                new LinkedHashMap<>()
+            )
+        );
+        assertFalse(
+            ProxyRequestSupport.shouldInjectCookies(
+                "same-origin",
+                "https://app.example.com/account",
+                "https://api.example.net/login",
+                new LinkedHashMap<>()
+            )
+        );
+        assertFalse(
+            ProxyRequestSupport.shouldInjectCookies(
+                "omit",
+                "https://app.example.com/account",
+                "https://app.example.com/api/me",
+                new LinkedHashMap<>()
+            )
+        );
+        assertFalse(
+            ProxyRequestSupport.shouldInjectCookies(
+                "include",
+                "https://app.example.com/account",
+                "https://app.example.com/api/me",
+                new LinkedHashMap<>(Map.of("Cookie", "session=existing"))
+            )
+        );
+    }
+
+    @Test
     public void shouldLetWebViewHandleMissingBodyForOriginalMutatingRequests() {
         assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", ""));
         assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "GET", ""));

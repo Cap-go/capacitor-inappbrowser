@@ -37,6 +37,13 @@
     return (method || 'GET').toUpperCase();
   }
 
+  function normalizeCredentialsMode(mode: string | null | undefined): RequestCredentials {
+    if (mode === 'omit' || mode === 'include') {
+      return mode;
+    }
+    return 'same-origin';
+  }
+
   function resolveUrl(url: string): string {
     if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//)) {
       try {
@@ -89,6 +96,7 @@
     method: string,
     headers: Record<string, string>,
     body: BodyInit | null | undefined,
+    credentialsMode: RequestCredentials,
   ): Promise<string> {
     const requestId = generateRequestId();
     let normalizedBody = body;
@@ -114,6 +122,7 @@
       normalizeMethod(method),
       JSON.stringify(headers),
       base64Body || '',
+      normalizeCredentialsMode(credentialsMode),
     );
 
     return '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
@@ -246,7 +255,7 @@
       return false;
     }
 
-    const proxyUrl = await storeInterceptedRequest(requestUrl, method, headers, body);
+    const proxyUrl = await storeInterceptedRequest(requestUrl, method, headers, body, 'include');
     navigateFormProxy(proxyUrl, target);
     return true;
   }
@@ -258,10 +267,12 @@
     const headers: Record<string, string> = {};
     let inheritedHeaders = false;
     let body: BodyInit | null | undefined = null;
+    let credentialsMode: RequestCredentials = 'same-origin';
 
     if (input instanceof Request) {
       url = input.url;
       method = input.method;
+      credentialsMode = normalizeCredentialsMode(input.credentials);
       inheritedHeaders = true;
       input.headers.forEach((value, key) => {
         headers[key] = value;
@@ -300,6 +311,9 @@
       if (init.body !== undefined) {
         body = init.body;
       }
+      if (init.credentials) {
+        credentialsMode = normalizeCredentialsMode(init.credentials);
+      }
     }
 
     if (!shouldProxyUrl(url)) {
@@ -307,7 +321,7 @@
     }
 
     const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
-    const proxyUrl = await storeInterceptedRequest(url, method, headers, body);
+    const proxyUrl = await storeInterceptedRequest(url, method, headers, body, credentialsMode);
     return originalFetch.call(window, proxyUrl, {
       method: 'GET',
       signal,
@@ -323,6 +337,7 @@
     (this as any).__proxyUrl = resolveUrl(url instanceof URL ? url.toString() : url);
     (this as any).__proxyHeaders = {};
     (this as any).__proxyAsync = rest[0] !== false;
+    (this as any).__proxyCredentials = this.withCredentials ? 'include' : 'same-origin';
     return originalXhrOpen.apply(this, [method, url, ...rest] as any);
   };
 
@@ -339,6 +354,7 @@
     const url = (xhr as any).__proxyUrl || '';
     const headers = (xhr as any).__proxyHeaders || {};
     const isAsync = (xhr as any).__proxyAsync !== false;
+    const credentialsMode = normalizeCredentialsMode((xhr as any).__proxyCredentials);
 
     function completeSend(proxyUrl: string) {
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
@@ -356,7 +372,7 @@
       return;
     }
 
-    storeInterceptedRequest(url, method, headers, body as BodyInit | null | undefined)
+    storeInterceptedRequest(url, method, headers, body as BodyInit | null | undefined, credentialsMode)
       .then((proxyUrl) => {
         completeSend(proxyUrl);
       })
@@ -367,12 +383,39 @@
   };
 
   const originalFormSubmit = HTMLFormElement.prototype.submit;
+  const nativeSubmitBypassKey = '__capgoProxyAllowNativeSubmit';
+
+  function resumeNativeFormSubmission(form: HTMLFormElement, submitter?: Element | null): void {
+    if ((form as any)[nativeSubmitBypassKey]) {
+      return;
+    }
+
+    (form as any)[nativeSubmitBypassKey] = true;
+    try {
+      if (typeof form.requestSubmit === 'function') {
+        if (submitter instanceof HTMLElement) {
+          form.requestSubmit(submitter as HTMLButtonElement | HTMLInputElement);
+        } else {
+          form.requestSubmit();
+        }
+      } else {
+        originalFormSubmit.call(form);
+      }
+    } catch (_error) {
+      originalFormSubmit.call(form);
+    } finally {
+      delete (form as any)[nativeSubmitBypassKey];
+    }
+  }
 
   document.addEventListener(
     'submit',
     (event) => {
       const form = event.target instanceof HTMLFormElement ? event.target : null;
       if (!form) {
+        return;
+      }
+      if ((form as any)[nativeSubmitBypassKey]) {
         return;
       }
 
@@ -382,10 +425,16 @@
       }
 
       event.preventDefault();
-      proxyFormSubmission(form, submitter).catch((_error) => {
-        console.error('[proxy-bridge] Failed to proxy form submission');
-        originalFormSubmit.call(form);
-      });
+      proxyFormSubmission(form, submitter)
+        .then((handled) => {
+          if (!handled) {
+            resumeNativeFormSubmission(form, submitter);
+          }
+        })
+        .catch((_error) => {
+          console.error('[proxy-bridge] Failed to proxy form submission');
+          resumeNativeFormSubmission(form, submitter);
+        });
     },
     true,
   );

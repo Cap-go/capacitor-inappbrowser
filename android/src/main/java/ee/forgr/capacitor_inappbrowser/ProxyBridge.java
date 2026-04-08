@@ -12,11 +12,13 @@ public class ProxyBridge {
         public final String method;
         public final String headersJson;
         public final String base64Body;
+        public final String credentialsMode;
 
-        public StoredRequest(String method, String headersJson, String base64Body) {
+        public StoredRequest(String method, String headersJson, String base64Body, String credentialsMode) {
             this.method = method != null ? method : "";
             this.headersJson = headersJson != null ? headersJson : "{}";
             this.base64Body = base64Body != null ? base64Body : "";
+            this.credentialsMode = credentialsMode != null ? credentialsMode : "same-origin";
         }
     }
 
@@ -28,7 +30,7 @@ public class ProxyBridge {
     }
 
     @JavascriptInterface
-    public void storeRequest(String token, String requestId, String method, String headersJson, String base64Body) {
+    public void storeRequest(String token, String requestId, String method, String headersJson, String base64Body, String credentialsMode) {
         if (token == null || !token.equals(accessToken) || requestId == null || requestId.isEmpty()) {
             return;
         }
@@ -38,7 +40,7 @@ public class ProxyBridge {
                 storedRequests.remove(iterator.next());
             }
         }
-        storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body));
+        storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body, credentialsMode));
     }
 
     public StoredRequest getAndRemove(String requestId) {

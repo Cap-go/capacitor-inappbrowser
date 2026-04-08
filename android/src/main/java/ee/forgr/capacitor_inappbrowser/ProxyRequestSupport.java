@@ -112,6 +112,26 @@ final class ProxyRequestSupport {
         return mergedHeaders;
     }
 
+    static boolean shouldInjectCookies(
+        String credentialsMode,
+        String initiatorUrl,
+        String requestUrl,
+        Map<String, String> requestHeaders
+    ) {
+        if (findHeaderKeyIgnoreCase(requestHeaders, "Cookie") != null) {
+            return false;
+        }
+
+        String normalizedCredentialsMode = normalizeCredentialsMode(credentialsMode);
+        if ("omit".equals(normalizedCredentialsMode)) {
+            return false;
+        }
+        if ("include".equals(normalizedCredentialsMode)) {
+            return true;
+        }
+        return isSameOrigin(initiatorUrl, requestUrl);
+    }
+
     static boolean supportsNativeHttpRequest(URL url) {
         if (url == null) {
             return false;
@@ -237,6 +257,17 @@ final class ProxyRequestSupport {
         return method.trim().toUpperCase(Locale.US);
     }
 
+    private static String normalizeCredentialsMode(String credentialsMode) {
+        if (credentialsMode == null) {
+            return "same-origin";
+        }
+        String normalizedCredentialsMode = credentialsMode.trim().toLowerCase(Locale.US);
+        if ("omit".equals(normalizedCredentialsMode) || "include".equals(normalizedCredentialsMode)) {
+            return normalizedCredentialsMode;
+        }
+        return "same-origin";
+    }
+
     private static boolean isFollowableRedirectStatus(int statusCode) {
         return statusCode == 301 || statusCode == 302 || statusCode == 303 || statusCode == 307 || statusCode == 308;
     }
@@ -253,6 +284,13 @@ final class ProxyRequestSupport {
         } catch (Exception error) {
             return true;
         }
+    }
+
+    private static boolean isSameOrigin(String firstUrl, String secondUrl) {
+        if (firstUrl == null || secondUrl == null || firstUrl.isBlank() || secondUrl.isBlank()) {
+            return false;
+        }
+        return !isCrossOriginRedirect(firstUrl, secondUrl);
     }
 
     private static void parseFlatJsonObject(String json, Map<String, String> target) throws JSONException {
