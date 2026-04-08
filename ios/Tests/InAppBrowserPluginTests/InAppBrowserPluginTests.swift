@@ -67,4 +67,22 @@ final class InAppBrowserPluginTests: XCTestCase {
             "https://example.com/override"
         )
     }
+
+    func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "outbound", hasCachedResponse: false),
+            .fallbackToNative
+        )
+    }
+
+    func testProxySchemeTimeoutResolutionActionFinishesCachedInboundResponses() {
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "inbound", hasCachedResponse: true),
+            .finishCachedResponse
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "inbound", hasCachedResponse: false),
+            .failRequest
+        )
+    }
 }

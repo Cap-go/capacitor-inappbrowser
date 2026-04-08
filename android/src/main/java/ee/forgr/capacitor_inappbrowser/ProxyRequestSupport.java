@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.json.JSONException;
 
@@ -46,6 +47,24 @@ final class ProxyRequestSupport {
         }
         String protocol = url.getProtocol();
         return "http".equalsIgnoreCase(protocol) || "https".equalsIgnoreCase(protocol);
+    }
+
+    static boolean shouldLetWebViewHandleMissingBody(String requestUrl, String method, String base64Body) {
+        if (requestUrl != null && requestUrl.contains("/_capgo_proxy_?")) {
+            return false;
+        }
+        if (!requiresCapturedRequestBody(method)) {
+            return false;
+        }
+        return base64Body == null || base64Body.isEmpty();
+    }
+
+    private static boolean requiresCapturedRequestBody(String method) {
+        if (method == null) {
+            return false;
+        }
+        String normalizedMethod = method.trim().toUpperCase(Locale.US);
+        return "POST".equals(normalizedMethod) || "PUT".equals(normalizedMethod) || "PATCH".equals(normalizedMethod);
     }
 
     private static void parseFlatJsonObject(String json, Map<String, String> target) throws JSONException {

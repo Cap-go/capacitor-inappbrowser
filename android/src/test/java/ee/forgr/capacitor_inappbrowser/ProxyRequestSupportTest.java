@@ -48,4 +48,18 @@ public class ProxyRequestSupportTest {
         assertEquals("Spoofed", headers.get("User-Agent"));
         assertEquals("1", headers.get("X-Test"));
     }
+
+    @Test
+    public void shouldLetWebViewHandleMissingBodyForOriginalMutatingRequests() {
+        assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", ""));
+        assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "GET", ""));
+        assertFalse(
+            ProxyRequestSupport.shouldLetWebViewHandleMissingBody(
+                "https://example.com/_capgo_proxy_?u=https%3A%2F%2Fexample.com%2Flogin&rid=1",
+                "POST",
+                ""
+            )
+        );
+        assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", "Ym9keQ=="));
+    }
 }

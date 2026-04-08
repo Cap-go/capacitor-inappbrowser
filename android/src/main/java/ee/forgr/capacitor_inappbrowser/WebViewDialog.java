@@ -2875,6 +2875,13 @@ public class WebViewDialog extends Dialog {
                         request.isForMainFrame()
                     );
 
+                    if (
+                        ProxyRequestSupport.shouldLetWebViewHandleMissingBody(requestUrl, requestContext.method, requestContext.base64Body)
+                    ) {
+                        Log.w("InAppBrowserProxy", "Allowing WebView to handle request with uncaptured body: " + requestContext.url);
+                        return null;
+                    }
+
                     boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
 
                     NativeProxyRule outboundRule = legacyProxyMode
@@ -2918,9 +2925,12 @@ public class WebViewDialog extends Dialog {
                                 requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
                             } else {
                                 removeProxiedRequest(proxyId);
-                                return null;
+                                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                                Log.w("InAppBrowserProxy", "Proxy timeout, falling back to native replay for: " + requestContext.url);
                             }
                         } catch (InterruptedException error) {
+                            removeProxiedRequest(proxyId);
+                            Thread.currentThread().interrupt();
                             Log.e("InAppBrowserProxy", "Semaphore wait error", error);
                             return null;
                         }

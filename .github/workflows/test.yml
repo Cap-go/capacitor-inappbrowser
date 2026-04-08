@@ -5,8 +5,8 @@ on:
     branches:
       - renovate/**
   pull_request:
-    branches: [ main ]
-  workflow_call:  # Allow this workflow to be called by other workflows
+    branches: [main]
+  workflow_call: # Allow this workflow to be called by other workflows
 
 jobs:
   guard_swiftpm_version:
@@ -68,6 +68,7 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_7
+          disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             for attempt in 1 2; do

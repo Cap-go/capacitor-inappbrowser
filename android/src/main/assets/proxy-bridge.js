@@ -43,6 +43,9 @@
     function stringToBase64(value) {
       return btoa(unescape(encodeURIComponent(value)));
     }
+    function normalizeMethod(method) {
+      return (method || "GET").toUpperCase();
+    }
     function resolveUrl(url) {
       if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//)) {
         try {
@@ -81,10 +84,140 @@
         return null;
       });
     }
+    function storeInterceptedRequest(url, method, headers, body) {
+      return __async(this, null, function* () {
+        const requestId = generateRequestId();
+        let normalizedBody = body;
+        if (normalizedBody instanceof FormData) {
+          const encoded = new Response(normalizedBody);
+          const contentType = encoded.headers.get("content-type");
+          if (contentType) {
+            Object.keys(headers).forEach((key) => {
+              if (key.toLowerCase() === "content-type") {
+                delete headers[key];
+              }
+            });
+            headers["content-type"] = contentType;
+          }
+          normalizedBody = yield encoded.arrayBuffer();
+        }
+        const base64Body = yield bodyToBase64(normalizedBody);
+        proxyBridge.storeRequest(
+          accessToken,
+          requestId,
+          normalizeMethod(method),
+          JSON.stringify(headers),
+          base64Body || ""
+        );
+        return "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
+      });
+    }
+    function getSubmitterAttribute(submitter, attributeName) {
+      if (!(submitter instanceof HTMLElement)) {
+        return null;
+      }
+      return submitter.getAttribute(attributeName);
+    }
+    function createFormData(form, submitter) {
+      if (submitter instanceof HTMLElement) {
+        try {
+          return new FormData(form, submitter);
+        } catch (_error) {
+        }
+      }
+      return new FormData(form);
+    }
+    function appendFormDataToUrl(url, formData) {
+      const resolvedUrl = new URL(url, window.location.href);
+      const searchParams = new URLSearchParams(resolvedUrl.search);
+      formData.forEach((value, key) => {
+        searchParams.append(key, typeof value === "string" ? value : value.name);
+      });
+      resolvedUrl.search = searchParams.toString();
+      return resolvedUrl.toString();
+    }
+    function formDataToUrlSearchParams(formData) {
+      const searchParams = new URLSearchParams();
+      formData.forEach((value, key) => {
+        searchParams.append(key, typeof value === "string" ? value : value.name);
+      });
+      return searchParams;
+    }
+    function formDataToPlainText(formData) {
+      const lines = [];
+      formData.forEach((value, key) => {
+        lines.push(key + "=" + (typeof value === "string" ? value : value.name));
+      });
+      return lines.join("\r\n");
+    }
+    function resolveFormMethod(form, submitter) {
+      return normalizeMethod(getSubmitterAttribute(submitter, "formmethod") || form.getAttribute("method"));
+    }
+    function resolveFormAction(form, submitter) {
+      return resolveUrl(
+        getSubmitterAttribute(submitter, "formaction") || form.getAttribute("action") || window.location.href
+      );
+    }
+    function resolveFormTarget(form, submitter) {
+      return (getSubmitterAttribute(submitter, "formtarget") || form.getAttribute("target") || "").trim();
+    }
+    function resolveFormEnctype(form, submitter) {
+      return (getSubmitterAttribute(submitter, "formenctype") || form.getAttribute("enctype") || "application/x-www-form-urlencoded").toLowerCase();
+    }
+    function canProxyFormTarget(target) {
+      const normalizedTarget = target.toLowerCase();
+      return normalizedTarget === "" || normalizedTarget === "_self" || normalizedTarget === "_top" || normalizedTarget === "_parent";
+    }
+    function navigateFormProxy(proxyUrl, target) {
+      const normalizedTarget = target.toLowerCase();
+      if (!normalizedTarget || normalizedTarget === "_self") {
+        window.location.assign(proxyUrl);
+        return;
+      }
+      if (normalizedTarget === "_top" && window.top) {
+        window.top.location.assign(proxyUrl);
+        return;
+      }
+      if (normalizedTarget === "_parent" && window.parent) {
+        window.parent.location.assign(proxyUrl);
+        return;
+      }
+      window.location.assign(proxyUrl);
+    }
+    function proxyFormSubmission(form, submitter) {
+      return __async(this, null, function* () {
+        const target = resolveFormTarget(form, submitter);
+        if (!canProxyFormTarget(target)) {
+          return false;
+        }
+        const method = resolveFormMethod(form, submitter);
+        const actionUrl = resolveFormAction(form, submitter);
+        const formData = createFormData(form, submitter);
+        const headers = {};
+        let requestUrl = actionUrl;
+        let body = null;
+        if (method === "GET" || method === "HEAD") {
+          requestUrl = appendFormDataToUrl(actionUrl, formData);
+        } else {
+          const enctype = resolveFormEnctype(form, submitter);
+          if (enctype === "text/plain") {
+            headers["content-type"] = "text/plain;charset=UTF-8";
+            body = formDataToPlainText(formData);
+          } else if (enctype === "multipart/form-data") {
+            body = formData;
+          } else {
+            headers["content-type"] = "application/x-www-form-urlencoded;charset=UTF-8";
+            body = formDataToUrlSearchParams(formData);
+          }
+        }
+        const proxyUrl = yield storeInterceptedRequest(requestUrl, method, headers, body);
+        navigateFormProxy(proxyUrl, target);
+        return true;
+      });
+    }
     const originalFetch = window.fetch;
     window.fetch = function(input, init) {
       return __async(this, null, function* () {
-        const requestId = generateRequestId();
         let url;
         let method = "GET";
         const headers = {};
@@ -121,22 +254,7 @@
             body = init.body;
           }
         }
-        if (body instanceof FormData) {
-          const encoded = new Response(body);
-          const contentType = encoded.headers.get("content-type");
-          if (contentType) {
-            Object.keys(headers).forEach((key) => {
-              if (key.toLowerCase() === "content-type") {
-                delete headers[key];
-              }
-            });
-            headers["content-type"] = contentType;
-          }
-          body = yield encoded.arrayBuffer();
-        }
-        const base64Body = yield bodyToBase64(body);
-        proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body || "");
-        const proxyUrl = "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
+        const proxyUrl = yield storeInterceptedRequest(url, method, headers, body);
         return originalFetch.call(window, proxyUrl, { method: "GET" });
       });
     };
@@ -157,58 +275,50 @@
     };
     XMLHttpRequest.prototype.send = function(body) {
       const xhr = this;
-      const requestId = generateRequestId();
       const method = xhr.__proxyMethod || "GET";
       const url = xhr.__proxyUrl || "";
       const headers = xhr.__proxyHeaders || {};
-      function completeSend(base64Body) {
-        proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body);
-        const proxyUrl = "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
+      function completeSend(proxyUrl) {
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
         originalXhrSend.call(xhr, null);
       }
-      if (body === null || body === void 0) {
-        completeSend("");
-        return;
-      }
-      if (typeof body === "string") {
-        completeSend(stringToBase64(body));
-        return;
-      }
-      if (body instanceof ArrayBuffer) {
-        completeSend(arrayBufferToBase64(body));
-        return;
-      }
-      if (ArrayBuffer.isView(body)) {
-        completeSend(arrayBufferToBase64(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength)));
-        return;
-      }
-      if (body instanceof URLSearchParams) {
-        completeSend(stringToBase64(body.toString()));
-        return;
-      }
-      if (body instanceof Blob || body instanceof FormData) {
-        const encoded = new Response(body);
-        if (body instanceof FormData) {
-          const contentType = encoded.headers.get("content-type");
-          if (contentType) {
-            Object.keys(headers).forEach((key) => {
-              if (key.toLowerCase() === "content-type") {
-                delete headers[key];
-              }
-            });
-            headers["content-type"] = contentType;
-          }
+      storeInterceptedRequest(url, method, headers, body).then((proxyUrl) => {
+        completeSend(proxyUrl);
+      }).catch((_error) => {
+        console.error("[proxy-bridge] Failed to encode XMLHttpRequest body");
+        originalXhrSend.call(xhr, body != null ? body : null);
+      });
+    };
+    const originalFormSubmit = HTMLFormElement.prototype.submit;
+    document.addEventListener(
+      "submit",
+      (event) => {
+        const form = event.target instanceof HTMLFormElement ? event.target : null;
+        if (!form) {
+          return;
         }
-        encoded.arrayBuffer().then((buffer) => {
-          completeSend(arrayBufferToBase64(buffer));
-        }).catch((_error) => {
-          console.error("[proxy-bridge] Failed to encode Blob/FormData body");
-          completeSend("");
+        const submitter = event instanceof SubmitEvent ? event.submitter : null;
+        if (!canProxyFormTarget(resolveFormTarget(form, submitter))) {
+          return;
+        }
+        event.preventDefault();
+        proxyFormSubmission(form, submitter).catch((_error) => {
+          console.error("[proxy-bridge] Failed to proxy form submission");
+          originalFormSubmit.call(form);
         });
-        return;
-      }
-      completeSend("");
+      },
+      true
+    );
+    HTMLFormElement.prototype.submit = function() {
+      const form = this;
+      proxyFormSubmission(form).then((handled) => {
+        if (!handled) {
+          originalFormSubmit.call(form);
+        }
+      }).catch((_error) => {
+        console.error("[proxy-bridge] Failed to proxy programmatic form submission");
+        originalFormSubmit.call(form);
+      });
     };
   })();
 })();
