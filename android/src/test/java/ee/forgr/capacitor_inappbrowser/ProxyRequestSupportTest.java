@@ -51,11 +51,40 @@ public class ProxyRequestSupportTest {
     public void prepareRedirectHeadersDropsEntityHeadersWhenBodyChanges() {
         Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
             Map.of("Content-Type", "application/json", "Content-Length", "10", "Accept", "application/json"),
-            false
+            false,
+            "https://example.com/login",
+            "https://example.com/dashboard"
         );
 
         assertFalse(redirectHeaders.containsKey("Content-Type"));
         assertFalse(redirectHeaders.containsKey("Content-Length"));
+        assertEquals("application/json", redirectHeaders.get("Accept"));
+    }
+
+    @Test
+    public void prepareRedirectHeadersDropsOriginBoundHeadersAcrossOrigins() {
+        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
+            Map.of(
+                "Authorization",
+                "Bearer abc",
+                "Cookie",
+                "session=123",
+                "Origin",
+                "https://example.com",
+                "Referer",
+                "https://example.com/login",
+                "Accept",
+                "application/json"
+            ),
+            true,
+            "https://example.com/login",
+            "https://accounts.example.net/oauth"
+        );
+
+        assertFalse(redirectHeaders.containsKey("Authorization"));
+        assertFalse(redirectHeaders.containsKey("Cookie"));
+        assertFalse(redirectHeaders.containsKey("Origin"));
+        assertFalse(redirectHeaders.containsKey("Referer"));
         assertEquals("application/json", redirectHeaders.get("Accept"));
     }
 

@@ -256,11 +256,13 @@
     let url: string;
     let method = 'GET';
     const headers: Record<string, string> = {};
+    let inheritedHeaders = false;
     let body: BodyInit | null | undefined = null;
 
     if (input instanceof Request) {
       url = input.url;
       method = input.method;
+      inheritedHeaders = true;
       input.headers.forEach((value, key) => {
         headers[key] = value;
       });
@@ -284,6 +286,12 @@
         method = init.method;
       }
       if (init.headers) {
+        if (inheritedHeaders) {
+          Object.keys(headers).forEach((key) => {
+            delete headers[key];
+          });
+          inheritedHeaders = false;
+        }
         const normalized = new Headers(init.headers);
         normalized.forEach((value, key) => {
           headers[key] = value;

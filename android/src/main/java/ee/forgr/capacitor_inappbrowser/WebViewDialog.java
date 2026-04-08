@@ -3717,7 +3717,16 @@ public class WebViewDialog extends Dialog {
     private NativeRequestContext createRedirectRequestContext(NativeRequestContext requestContext, int statusCode, String redirectUrl) {
         boolean preserveRequestBody = ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect(requestContext.method, statusCode);
         String redirectMethod = ProxyRequestSupport.resolveRedirectMethod(requestContext.method, statusCode);
-        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(requestContext.headers, preserveRequestBody);
+        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
+            requestContext.headers,
+            preserveRequestBody,
+            requestContext.url,
+            redirectUrl
+        );
+        String redirectCookies = CookieManager.getInstance().getCookie(redirectUrl);
+        if (redirectCookies != null && !redirectCookies.isBlank() && !redirectHeaders.containsKey("Cookie")) {
+            redirectHeaders.put("Cookie", redirectCookies);
+        }
         String redirectBody = preserveRequestBody ? requestContext.base64Body : "";
         return new NativeRequestContext(redirectUrl, redirectMethod, redirectHeaders, redirectBody, requestContext.mainFrame);
     }

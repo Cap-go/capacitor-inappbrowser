@@ -27,6 +27,14 @@ final class ProxyRequestSupport {
         "Range",
         "User-Agent"
     };
+    private static final String[] CROSS_ORIGIN_REDIRECT_HEADER_NAMES = {
+        "Authorization",
+        "Cookie",
+        "Cookie2",
+        "Origin",
+        "Proxy-Authorization",
+        "Referer"
+    };
 
     private ProxyRequestSupport() {}
 
@@ -145,10 +153,18 @@ final class ProxyRequestSupport {
         return statusCode == 307 || statusCode == 308;
     }
 
-    static Map<String, String> prepareRedirectHeaders(Map<String, String> originalHeaders, boolean preserveRequestBody) {
+    static Map<String, String> prepareRedirectHeaders(
+        Map<String, String> originalHeaders,
+        boolean preserveRequestBody,
+        String requestUrl,
+        String redirectUrl
+    ) {
         Map<String, String> redirectedHeaders = new LinkedHashMap<>();
         if (originalHeaders != null) {
             redirectedHeaders.putAll(originalHeaders);
+        }
+        if (isCrossOriginRedirect(requestUrl, redirectUrl)) {
+            dropHeadersIgnoreCase(redirectedHeaders, CROSS_ORIGIN_REDIRECT_HEADER_NAMES);
         }
         if (preserveRequestBody) {
             return redirectedHeaders;
@@ -223,6 +239,20 @@ final class ProxyRequestSupport {
 
     private static boolean isFollowableRedirectStatus(int statusCode) {
         return statusCode == 301 || statusCode == 302 || statusCode == 303 || statusCode == 307 || statusCode == 308;
+    }
+
+    private static boolean isCrossOriginRedirect(String requestUrl, String redirectUrl) {
+        try {
+            URL request = new URL(requestUrl);
+            URL redirect = new URL(redirectUrl);
+            return (
+                !request.getProtocol().equalsIgnoreCase(redirect.getProtocol()) ||
+                !request.getHost().equalsIgnoreCase(redirect.getHost()) ||
+                effectivePort(request) != effectivePort(redirect)
+            );
+        } catch (Exception error) {
+            return true;
+        }
     }
 
     private static void parseFlatJsonObject(String json, Map<String, String> target) throws JSONException {
@@ -361,6 +391,12 @@ final class ProxyRequestSupport {
         }
     }
 
+    private static void dropHeadersIgnoreCase(Map<String, String> headers, String[] expectedKeys) {
+        for (String expectedKey : expectedKeys) {
+            dropHeaderIgnoreCase(headers, expectedKey);
+        }
+    }
+
     private static String findHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
         String resolvedKey = findHeaderKeyIgnoreCase(headers, expectedKey);
         return resolvedKey != null ? headers.get(resolvedKey) : null;
@@ -415,5 +451,13 @@ final class ProxyRequestSupport {
             return value.substring(1, value.length() - 1);
         }
         return value;
+    }
+
+    private static int effectivePort(URL url) {
+        int port = url.getPort();
+        if (port != -1) {
+            return port;
+        }
+        return url.getDefaultPort();
     }
 }
