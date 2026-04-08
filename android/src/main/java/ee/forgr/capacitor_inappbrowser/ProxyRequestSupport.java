@@ -120,12 +120,7 @@ final class ProxyRequestSupport {
         return mergedHeaders;
     }
 
-    static boolean shouldInjectCookies(
-        String credentialsMode,
-        String initiatorUrl,
-        String requestUrl,
-        Map<String, String> requestHeaders
-    ) {
+    static boolean shouldInjectCookies(String credentialsMode, String initiatorUrl, String requestUrl, Map<String, String> requestHeaders) {
         if (findHeaderKeyIgnoreCase(requestHeaders, "Cookie") != null) {
             return false;
         }
