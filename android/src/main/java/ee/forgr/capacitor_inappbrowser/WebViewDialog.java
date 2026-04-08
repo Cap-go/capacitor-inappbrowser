@@ -38,6 +38,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -192,6 +193,8 @@ public class WebViewDialog extends Dialog {
         void handleMicrophonePermissionRequest(PermissionRequest request);
 
         void clearPendingPermissionRequest(PermissionRequest request);
+
+        boolean createManagedPopupWindow(WebViewDialog parentDialog, android.os.Message resultMsg, boolean isUserGesture, String popupUrl);
     }
 
     private final PermissionHandler permissionHandler;
@@ -213,6 +216,14 @@ public class WebViewDialog extends Dialog {
 
     public String getInstanceId() {
         return instanceId;
+    }
+
+    public Options getOptions() {
+        return _options;
+    }
+
+    public WebView getManagedWebView() {
+        return _webView;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -566,10 +577,7 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
-        // Open links in external browser for target="_blank" if preventDeepLink is false
-        if (!_options.getPreventDeeplink()) {
-            _webView.getSettings().setSupportMultipleWindows(true);
-        }
+        _webView.getSettings().setSupportMultipleWindows(true);
 
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
@@ -603,6 +611,22 @@ public class WebViewDialog extends Dialog {
 
         _webView.setWebChromeClient(
             new WebChromeClient() {
+                @Override
+                public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                    if (consoleMessage != null && _options != null && _options.getCaptureConsoleLogs() && _options.getCallbacks() != null) {
+                        _options
+                            .getCallbacks()
+                            .consoleMessage(
+                                consoleMessage.messageLevel().name(),
+                                consoleMessage.message(),
+                                consoleMessage.sourceId(),
+                                consoleMessage.lineNumber(),
+                                null
+                            );
+                    }
+                    return super.onConsoleMessage(consoleMessage);
+                }
+
                 // Enable file open dialog
                 @Override
                 public boolean onShowFileChooser(
@@ -971,7 +995,6 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
-                // Support for Google Pay and popup windows (critical for OR_BIBED_15 fix)
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
                     Log.d(
@@ -984,69 +1007,51 @@ public class WebViewDialog extends Dialog {
                             _options.getPreventDeeplink()
                     );
 
-                    // When preventDeeplink is false, open target="_blank" links externally
+                    String popupUrl = null;
+                    try {
+                        WebView.HitTestResult hitTestResult = view.getHitTestResult();
+                        popupUrl = hitTestResult != null ? hitTestResult.getExtra() : null;
+                    } catch (Exception ignored) {}
+
+                    if (
+                        permissionHandler != null &&
+                        permissionHandler.createManagedPopupWindow(WebViewDialog.this, resultMsg, isUserGesture, popupUrl)
+                    ) {
+                        Log.d("InAppBrowser", "Created managed popup window");
+                        return true;
+                    }
+
                     if (!_options.getPreventDeeplink() && isUserGesture) {
                         try {
                             WebView.HitTestResult result = view.getHitTestResult();
                             String data = result.getExtra();
                             if (data != null && !data.isEmpty()) {
-                                Log.d("InAppBrowser", "Opening target=_blank link externally: " + data);
+                                Log.d("InAppBrowser", "Falling back to external browser for popup URL: " + data);
                                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
                                 browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 _webView.getContext().startActivity(browserIntent);
                                 return false;
                             }
                         } catch (Exception e) {
-                            Log.e("InAppBrowser", "Error opening external link: " + e.getMessage());
+                            Log.e("InAppBrowser", "Error opening external popup fallback: " + e.getMessage());
                         }
                     }
 
-                    // Only handle popup windows if Google Pay support is enabled
-                    if (_options.getEnableGooglePaySupport() && isUserGesture) {
-                        // Create a new WebView for the popup
-                        WebView popupWebView = new WebView(activity);
-                        popupWebView.getSettings().setJavaScriptEnabled(true);
-                        popupWebView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-                        popupWebView.getSettings().setSupportMultipleWindows(true);
-
-                        // Set WebViewClient to handle URL loading and closing
-                        popupWebView.setWebViewClient(
-                            new WebViewClient() {
-                                @Override
-                                public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                                    Log.d("InAppBrowser", "Popup WebView loading URL: " + url);
-
-                                    // Handle Google Pay result URLs or close conditions
-                                    if (url.contains("google.com/pay") || url.contains("close") || url.contains("cancel")) {
-                                        Log.d("InAppBrowser", "Closing popup for Google Pay result");
-                                        // Notify the parent WebView and close popup
-                                        activity.runOnUiThread(() -> {
-                                            try {
-                                                if (popupWebView.getParent() != null) {
-                                                    ((ViewGroup) popupWebView.getParent()).removeView(popupWebView);
-                                                }
-                                                popupWebView.destroy();
-                                            } catch (Exception e) {
-                                                Log.e("InAppBrowser", "Error closing popup: " + e.getMessage());
-                                            }
-                                        });
-                                        return true;
-                                    }
-                                    return false;
-                                }
-                            }
-                        );
-
-                        // Set up the popup WebView transport
-                        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                        transport.setWebView(popupWebView);
-                        resultMsg.sendToTarget();
-
-                        Log.d("InAppBrowser", "Created popup window for Google Pay");
-                        return true;
-                    }
-
                     return false;
+                }
+
+                @Override
+                public void onCloseWindow(WebView window) {
+                    Log.d("InAppBrowser", "onCloseWindow called");
+                    if (window == _webView) {
+                        String currentUrl = getUrl();
+                        dismiss();
+                        if (_options != null && _options.getCallbacks() != null) {
+                            _options.getCallbacks().closeEvent(currentUrl);
+                        }
+                    } else {
+                        super.onCloseWindow(window);
+                    }
                 }
             }
         );
@@ -1068,48 +1073,52 @@ public class WebViewDialog extends Dialog {
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
 
-        if (supportsRequestBody(httpMethod) && httpBody != null) {
-            // For POST/PUT/PATCH requests with body
-            // Note: Android WebView has limitations with custom headers on POST
-            // Headers may not be sent with the initial request when using postUrl
-            byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
-            _webView.postUrl(this._options.getUrl(), postData);
+        if (!_options.isPopupWindowMode()) {
+            if (supportsRequestBody(httpMethod) && httpBody != null) {
+                // For POST/PUT/PATCH requests with body
+                // Note: Android WebView has limitations with custom headers on POST
+                // Headers may not be sent with the initial request when using postUrl
+                byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
+                _webView.postUrl(this._options.getUrl(), postData);
 
-            // Log a warning if headers were provided, as they won't be sent with postUrl
-            if (!requestHeaders.isEmpty()) {
-                Log.w(
-                    "InAppBrowser",
-                    "Custom headers were provided but may not be sent with POST request. " +
-                        "Android WebView's postUrl method has limited header support."
-                );
-            }
-        } else {
-            // For GET and other methods, use loadUrl with headers
-            _webView.loadUrl(this._options.getUrl(), requestHeaders);
-        }
-
-        _webView.requestFocus();
-        _webView.requestFocusFromTouch();
-
-        // Inject JavaScript interface early to ensure it's available immediately
-        // This complements the injection in onPageFinished and doUpdateVisitedHistory
-        _webView.post(() -> {
-            if (_webView != null) {
-                injectJavaScriptInterface();
-
-                // Inject Google Pay support enhancements if enabled
-                if (_options.getEnableGooglePaySupport()) {
-                    injectGooglePayPolyfills();
+                // Log a warning if headers were provided, as they won't be sent with postUrl
+                if (!requestHeaders.isEmpty()) {
+                    Log.w(
+                        "InAppBrowser",
+                        "Custom headers were provided but may not be sent with POST request. " +
+                            "Android WebView's postUrl method has limited header support."
+                    );
                 }
-
-                Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+            } else {
+                // For GET and other methods, use loadUrl with headers
+                _webView.loadUrl(this._options.getUrl(), requestHeaders);
             }
-        });
+
+            _webView.requestFocus();
+            _webView.requestFocusFromTouch();
+
+            // Inject JavaScript interface early to ensure it's available immediately
+            // This complements the injection in onPageFinished and doUpdateVisitedHistory
+            _webView.post(() -> {
+                if (_webView != null) {
+                    injectJavaScriptInterface();
+
+                    // Inject Google Pay support enhancements if enabled
+                    if (_options.getEnableGooglePaySupport()) {
+                        injectGooglePayPolyfills();
+                    }
+
+                    Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+                }
+            });
+        }
 
         setupToolbar();
         setWebViewClient();
 
-        if (this._options.isHidden()) {
+        if (_options.isPopupWindowMode()) {
+            show();
+        } else if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
                 show();
                 applyHiddenMode();

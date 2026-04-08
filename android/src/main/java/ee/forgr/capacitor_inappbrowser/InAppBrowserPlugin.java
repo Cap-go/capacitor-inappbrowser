@@ -13,10 +13,12 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import android.webkit.WebView;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -62,7 +64,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String pluginVersion = "8.5.1";
+    private final String pluginVersion = "8.5.3";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -119,6 +121,184 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         }
 
         return parsed;
+    }
+
+    private WebViewCallbacks buildCallbacks(String webViewId) {
+        return new WebViewCallbacks() {
+            @Override
+            public void urlChangeEvent(String url) {
+                notifyListeners("urlChangeEvent", new JSObject().put("id", webViewId).put("url", url));
+                if (webViewId.equals(activeWebViewId)) {
+                    currentUrl = url;
+                }
+            }
+
+            @Override
+            public void closeEvent(String url) {
+                notifyListeners("closeEvent", new JSObject().put("id", webViewId).put("url", url));
+                unregisterWebView(webViewId);
+            }
+
+            @Override
+            public void pageLoaded() {
+                notifyListeners("browserPageLoaded", new JSObject().put("id", webViewId));
+            }
+
+            @Override
+            public void pageLoadError() {
+                notifyListeners("pageLoadError", new JSObject().put("id", webViewId));
+            }
+
+            @Override
+            public void buttonNearDoneClicked() {
+                notifyListeners("buttonNearDoneClick", new JSObject().put("id", webViewId));
+            }
+
+            @Override
+            public void confirmBtnClicked(String url) {
+                notifyListeners("confirmBtnClicked", new JSObject().put("id", webViewId).put("url", url));
+            }
+
+            @Override
+            public void screenshotTaken(JSObject screenshot) {
+                JSObject event = new JSObject();
+                Iterator<String> keys = screenshot.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    event.put(key, screenshot.opt(key));
+                }
+                event.put("id", webViewId);
+                notifyListeners("screenshotTaken", event);
+            }
+
+            @Override
+            public void proxyRequestEvent(
+                String requestId,
+                String phase,
+                String url,
+                String method,
+                String headersJson,
+                String body,
+                Integer status,
+                String responseHeadersJson,
+                String responseBody,
+                String dialogWebViewId
+            ) {
+                JSObject event = new JSObject();
+                event.put("requestId", requestId);
+                event.put("phase", phase);
+                event.put("url", url);
+                event.put("method", method);
+                try {
+                    event.put("headers", new JSObject(headersJson));
+                } catch (Exception ignored) {
+                    event.put("headers", new JSObject());
+                }
+                event.put("body", body);
+                if (status != null) {
+                    event.put("status", status);
+                }
+                if (responseHeadersJson != null) {
+                    try {
+                        event.put("responseHeaders", new JSObject(responseHeadersJson));
+                    } catch (Exception ignored) {
+                        event.put("responseHeaders", new JSObject());
+                    }
+                }
+                event.put("responseBody", responseBody);
+                event.put("webviewId", dialogWebViewId);
+                notifyListeners("proxyRequest", event);
+            }
+
+            @Override
+            public void javascriptCallback(String message) {
+                Log.d("WebViewDialog", "Received message from JavaScript: " + message);
+                try {
+                    JSONObject jsonMessage = new JSONObject(message);
+                    JSObject jsObject = new JSObject();
+                    Iterator<String> keys = jsonMessage.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        jsObject.put(key, jsonMessage.get(key));
+                    }
+                    jsObject.put("id", webViewId);
+                    notifyListeners("messageFromWebview", jsObject);
+                } catch (JSONException e) {
+                    Log.e("WebViewDialog", "Error parsing JSON message: " + e.getMessage());
+                    JSObject jsObject = new JSObject();
+                    jsObject.put("rawMessage", message);
+                    jsObject.put("id", webViewId);
+                    notifyListeners("messageFromWebview", jsObject);
+                }
+            }
+
+            @Override
+            public void consoleMessage(String level, String message, String source, Integer line, Integer column) {
+                notifyListeners("consoleMessage", ConsoleMessageEventHelper.create(webViewId, level, message, source, line, column));
+            }
+        };
+    }
+
+    private WebViewDialog createManagedDialog(String webViewId, Options options) {
+        WebViewDialog dialog = new WebViewDialog(
+            getContext(),
+            android.R.style.Theme_NoTitleBar,
+            options,
+            InAppBrowserPlugin.this,
+            getBridge().getWebView()
+        );
+        dialog.setInstanceId(webViewId);
+        dialog.activity = InAppBrowserPlugin.this.getActivity();
+        registerWebView(webViewId, dialog);
+        return dialog;
+    }
+
+    private void notifyPopupWindowOpened(String popupId, String parentId, String popupUrl, boolean visible) {
+        JSObject event = new JSObject();
+        event.put("id", popupId);
+        if (parentId != null && !parentId.isEmpty()) {
+            event.put("parentId", parentId);
+        }
+        if (popupUrl != null && !popupUrl.isEmpty()) {
+            event.put("url", popupUrl);
+        }
+        event.put("visible", visible);
+        notifyListeners("popupWindowOpened", event);
+    }
+
+    @Override
+    public boolean createManagedPopupWindow(WebViewDialog parentDialog, Message resultMsg, boolean isUserGesture, String popupUrl) {
+        if (resultMsg == null || !(resultMsg.obj instanceof WebView.WebViewTransport) || parentDialog == null) {
+            return false;
+        }
+
+        Options parentOptions = parentDialog.getOptions();
+        if (parentOptions == null) {
+            return false;
+        }
+
+        String popupWebViewId = UUID.randomUUID().toString();
+        Options popupOptions = parentOptions.copyForPopup();
+        popupOptions.setCallbacks(buildCallbacks(popupWebViewId));
+        popupOptions.setPluginCall(null);
+
+        WebViewDialog popupDialog = createManagedDialog(popupWebViewId, popupOptions);
+        popupDialog.presentWebView();
+        if (popupOptions.isHidden()) {
+            popupDialog.setHidden(true);
+        }
+
+        WebView popupWebView = popupDialog.getManagedWebView();
+        if (popupWebView == null) {
+            unregisterWebView(popupWebViewId);
+            return false;
+        }
+
+        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+        transport.setWebView(popupWebView);
+        resultMsg.sendToTarget();
+        notifyPopupWindowOpened(popupWebViewId, parentDialog.getInstanceId(), popupUrl, !popupOptions.isHidden());
+        return true;
     }
 
     private void registerWebView(String id, WebViewDialog dialog) {
@@ -611,6 +791,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setIgnoreUntrustedSSLError(Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false)));
         options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
         options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
+        options.setCaptureConsoleLogs(Boolean.TRUE.equals(call.getBoolean("captureConsoleLogs", false)));
 
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");
@@ -767,127 +948,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setUseTopInset(Boolean.TRUE.equals(call.getBoolean("useTopInset", false)));
 
         //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
-        options.setCallbacks(
-            new WebViewCallbacks() {
-                @Override
-                public void urlChangeEvent(String url) {
-                    notifyListeners("urlChangeEvent", new JSObject().put("id", webViewId).put("url", url));
-                    if (webViewId.equals(activeWebViewId)) {
-                        currentUrl = url;
-                    }
-                }
-
-                @Override
-                public void closeEvent(String url) {
-                    notifyListeners("closeEvent", new JSObject().put("id", webViewId).put("url", url));
-                    unregisterWebView(webViewId);
-                }
-
-                @Override
-                public void pageLoaded() {
-                    notifyListeners("browserPageLoaded", new JSObject().put("id", webViewId));
-                }
-
-                @Override
-                public void pageLoadError() {
-                    notifyListeners("pageLoadError", new JSObject().put("id", webViewId));
-                }
-
-                @Override
-                public void buttonNearDoneClicked() {
-                    notifyListeners("buttonNearDoneClick", new JSObject().put("id", webViewId));
-                }
-
-                @Override
-                public void confirmBtnClicked(String url) {
-                    notifyListeners("confirmBtnClicked", new JSObject().put("id", webViewId).put("url", url));
-                }
-
-                @Override
-                public void screenshotTaken(JSObject screenshot) {
-                    JSObject event = new JSObject();
-                    Iterator<String> keys = screenshot.keys();
-                    while (keys.hasNext()) {
-                        String key = keys.next();
-                        event.put(key, screenshot.opt(key));
-                    }
-                    event.put("id", webViewId);
-                    notifyListeners("screenshotTaken", event);
-                }
-
-                @Override
-                public void proxyRequestEvent(
-                    String requestId,
-                    String phase,
-                    String url,
-                    String method,
-                    String headersJson,
-                    String body,
-                    Integer status,
-                    String responseHeadersJson,
-                    String responseBody,
-                    String dialogWebViewId
-                ) {
-                    JSObject event = new JSObject();
-                    event.put("requestId", requestId);
-                    event.put("phase", phase);
-                    event.put("url", url);
-                    event.put("method", method);
-                    try {
-                        event.put("headers", new JSObject(headersJson));
-                    } catch (Exception ignored) {
-                        event.put("headers", new JSObject());
-                    }
-                    event.put("body", body);
-                    if (status != null) {
-                        event.put("status", status);
-                    }
-                    if (responseHeadersJson != null) {
-                        try {
-                            event.put("responseHeaders", new JSObject(responseHeadersJson));
-                        } catch (Exception ignored) {
-                            event.put("responseHeaders", new JSObject());
-                        }
-                    }
-                    event.put("responseBody", responseBody);
-                    event.put("webviewId", dialogWebViewId);
-                    notifyListeners("proxyRequest", event);
-                }
-
-                @Override
-                public void javascriptCallback(String message) {
-                    // Handle the message received from JavaScript
-                    Log.d("WebViewDialog", "Received message from JavaScript: " + message);
-                    // Process the message as needed
-                    try {
-                        // Parse the received message as a JSON object
-                        JSONObject jsonMessage = new JSONObject(message);
-
-                        // Create a new JSObject to send to the Capacitor plugin
-                        JSObject jsObject = new JSObject();
-
-                        // Iterate through the keys in the JSON object and add them to the JSObject
-                        Iterator<String> keys = jsonMessage.keys();
-                        while (keys.hasNext()) {
-                            String key = keys.next();
-                            jsObject.put(key, jsonMessage.get(key));
-                        }
-                        jsObject.put("id", webViewId);
-
-                        // Notify listeners with the parsed message
-                        notifyListeners("messageFromWebview", jsObject);
-                    } catch (JSONException e) {
-                        Log.e("WebViewDialog", "Error parsing JSON message: " + e.getMessage());
-
-                        // If JSON parsing fails, send the raw message as a string
-                        JSObject jsObject = new JSObject();
-                        jsObject.put("rawMessage", message);
-                        jsObject.put("id", webViewId);
-                        notifyListeners("messageFromWebview", jsObject);
-                    }
-                }
-            }
-        );
+        options.setCallbacks(buildCallbacks(webViewId));
 
         JSArray jsAuthorizedLinks = call.getArray("authorizedAppLinks");
         if (jsAuthorizedLinks != null && jsAuthorizedLinks.length() > 0) {
@@ -929,6 +990,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         // Set Google Pay support option
         options.setEnableGooglePaySupport(Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false)));
+        options.setHiddenPopupWindow(Boolean.TRUE.equals(call.getBoolean("hiddenPopupWindow", false)));
 
         // Set dimensions if provided
         Integer width = call.getInt("width");
@@ -974,17 +1036,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
-                    WebViewDialog dialog = new WebViewDialog(
-                        getContext(),
-                        android.R.style.Theme_NoTitleBar,
-                        options,
-                        InAppBrowserPlugin.this,
-                        getBridge().getWebView()
-                    );
-                    dialog.setInstanceId(webViewId);
-                    dialog.activity = InAppBrowserPlugin.this.getActivity();
-                    registerWebView(webViewId, dialog);
+                    WebViewDialog dialog = createManagedDialog(webViewId, options);
                     dialog.presentWebView();
+                    if (options.isHidden()) {
+                        dialog.setHidden(true);
+                    }
                 }
             }
         );
@@ -1051,7 +1107,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void hide(PluginCall call) {
-        if (webViewDialog == null) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
             call.reject("WebView is not initialized");
             return;
         }
@@ -1060,11 +1118,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
-                    if (webViewDialog == null) {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
                         call.reject("WebView is not initialized");
                         return;
                     }
-                    webViewDialog.setHidden(true);
+                    dialog.setHidden(true);
                     call.resolve();
                 }
             }
@@ -1073,7 +1132,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void show(PluginCall call) {
-        if (webViewDialog == null) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
             call.reject("WebView is not initialized");
             return;
         }
@@ -1082,14 +1143,15 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             new Runnable() {
                 @Override
                 public void run() {
-                    if (webViewDialog == null) {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
                         call.reject("WebView is not initialized");
                         return;
                     }
-                    if (!webViewDialog.isShowing()) {
-                        webViewDialog.show();
+                    if (!dialog.isShowing()) {
+                        dialog.show();
                     }
-                    webViewDialog.setHidden(false);
+                    dialog.setHidden(false);
                     call.resolve();
                 }
             }
@@ -1562,5 +1624,50 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                 openSecureWindowSavedCall = null;
             }
         }
+    }
+}
+
+final class ConsoleMessageEventHelper {
+
+    private ConsoleMessageEventHelper() {}
+
+    static JSObject create(String webViewId, String level, String message, String source, Integer line, Integer column) {
+        Map<String, Object> data = createData(webViewId, level, message, source, line, column);
+        JSObject event = new JSObject();
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            event.put(entry.getKey(), entry.getValue());
+        }
+        return event;
+    }
+
+    static Map<String, Object> createData(String webViewId, String level, String message, String source, Integer line, Integer column) {
+        Map<String, Object> event = new HashMap<>();
+        if (webViewId != null && !webViewId.isEmpty()) {
+            event.put("id", webViewId);
+        }
+        event.put("level", normalizeLevel(level));
+        event.put("message", message != null ? message : "");
+        if (source != null && !source.isEmpty()) {
+            event.put("source", source);
+        }
+        if (line != null) {
+            event.put("line", line);
+        }
+        if (column != null) {
+            event.put("column", column);
+        }
+        return event;
+    }
+
+    static String normalizeLevel(String level) {
+        if (level == null) {
+            return "log";
+        }
+
+        String normalized = level.trim().toLowerCase();
+        return switch (normalized) {
+            case "log", "info", "warn", "error", "debug", "assert" -> normalized;
+            default -> "log";
+        };
     }
 }

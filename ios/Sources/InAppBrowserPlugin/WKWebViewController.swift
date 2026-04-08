@@ -43,6 +43,166 @@ extension Dictionary {
     }
 }
 
+enum ConsoleMessageSupport {
+    static func normalizePayload(from data: [String: Any]) -> [String: Any] {
+        var payload: [String: Any] = [
+            "level": normalizedLevel(data["level"] as? String),
+            "message": normalizedMessage(data["message"])
+        ]
+
+        if let source = data["source"] as? String, !source.isEmpty {
+            payload["source"] = source
+        }
+
+        if let line = integerValue(from: data["line"]) {
+            payload["line"] = line
+        }
+
+        if let column = integerValue(from: data["column"]) {
+            payload["column"] = column
+        }
+
+        if let kind = data["kind"] as? String, !kind.isEmpty {
+            payload["kind"] = kind
+        }
+
+        return payload
+    }
+
+    static func captureScriptSource() -> String {
+        return """
+        (function() {
+          if (window.__capgoInAppBrowserConsoleCaptureInstalled) {
+            return;
+          }
+          window.__capgoInAppBrowserConsoleCaptureInstalled = true;
+
+          var nativeHandler =
+            window.webkit &&
+            window.webkit.messageHandlers &&
+            window.webkit.messageHandlers.consoleMessageHandler;
+
+          if (!nativeHandler) {
+            return;
+          }
+
+          var serialize = function(value) {
+            if (value instanceof Error) {
+              return value.stack || value.message || String(value);
+            }
+            if (typeof value === 'string') {
+              return value;
+            }
+            try {
+              return JSON.stringify(value);
+            } catch (_error) {
+              try {
+                return String(value);
+              } catch (_error2) {
+                return '[unserializable]';
+              }
+            }
+          };
+
+          var post = function(level, values, metadata) {
+            try {
+              var parts = Array.prototype.slice.call(values || []).map(serialize);
+              nativeHandler.postMessage({
+                level: level,
+                message: parts.join(' '),
+                source: metadata && metadata.source ? metadata.source : window.location.href,
+                line: metadata && typeof metadata.line === 'number' ? metadata.line : null,
+                column: metadata && typeof metadata.column === 'number' ? metadata.column : null,
+                kind: metadata && metadata.kind ? metadata.kind : 'console',
+              });
+            } catch (_error) {}
+          };
+
+          ['log', 'info', 'warn', 'error', 'debug'].forEach(function(level) {
+            var original = console[level] ? console[level].bind(console) : null;
+            console[level] = function() {
+              post(level, arguments, null);
+              if (original) {
+                return original.apply(console, arguments);
+              }
+            };
+          });
+
+          var originalAssert = console.assert ? console.assert.bind(console) : null;
+          console.assert = function(condition) {
+            if (!condition) {
+              var args = Array.prototype.slice.call(arguments, 1);
+              post('assert', args.length ? args : ['console.assert'], null);
+            }
+            if (originalAssert) {
+              return originalAssert.apply(console, arguments);
+            }
+          };
+
+          window.addEventListener('error', function(event) {
+            post(
+              'error',
+              [event && event.message ? event.message : 'Uncaught error'],
+              {
+                source: event && event.filename ? event.filename : window.location.href,
+                line: event && typeof event.lineno === 'number' ? event.lineno : null,
+                column: event && typeof event.colno === 'number' ? event.colno : null,
+                kind: 'error',
+              }
+            );
+          });
+
+          window.addEventListener('unhandledrejection', function(event) {
+            var reason = event ? event.reason : null;
+            var message =
+              reason && reason.message
+                ? reason.message
+                : reason
+                  ? serialize(reason)
+                  : 'Unhandled promise rejection';
+            post('error', [message], { source: window.location.href, kind: 'unhandledrejection' });
+          });
+        })();
+        """
+    }
+
+    private static func normalizedLevel(_ value: String?) -> String {
+        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch normalized {
+        case "log", "info", "warn", "error", "debug", "assert":
+            return normalized ?? "log"
+        default:
+            return "log"
+        }
+    }
+
+    private static func normalizedMessage(_ value: Any?) -> String {
+        switch value {
+        case let text as String:
+            return text
+        case let number as NSNumber:
+            return number.stringValue
+        case nil:
+            return ""
+        default:
+            return String(describing: value!)
+        }
+    }
+
+    private static func integerValue(from value: Any?) -> Int? {
+        switch value {
+        case let int as Int:
+            return int
+        case let number as NSNumber:
+            return number.intValue
+        case let text as String:
+            return Int(text)
+        default:
+            return nil
+        }
+    }
+}
+
 open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     public init() {
@@ -53,36 +213,39 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         super.init(coder: aDecoder)
     }
 
-    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(source: WKWebSource?, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = source
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.initWebview()
     }
 
-    public init(url: URL, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, credentials: WKWebViewCredentials? = nil, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.initWebview()
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.source = .remote(url)
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -91,12 +254,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -105,13 +269,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -120,6 +285,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.credentials = credentials
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+        self.captureConsoleLogs = captureConsoleLogs
         self.proxyRequests = proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
         self.setHeaders(headers: headers)
@@ -137,6 +303,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var allowsFileURL = true
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
+    open var captureConsoleLogs = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
@@ -176,6 +343,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
     var proxySchemeHandler: ProxySchemeHandler?
+    var initialWebConfiguration: WKWebViewConfiguration?
+    var waitsForPopupNavigation = false
+    var hiddenPopupWindow = false
+    var opensHidden = false
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -645,6 +816,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 print("Received non-dictionary message from JavaScript:", message.body)
                 emit("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
             }
+        } else if message.name == "consoleMessageHandler" {
+            if let messageBody = message.body as? [String: Any] {
+                emit("consoleMessage", data: ConsoleMessageSupport.normalizePayload(from: messageBody))
+            } else {
+                emit(
+                    "consoleMessage",
+                    data: ConsoleMessageSupport.normalizePayload(
+                        from: [
+                            "level": "log",
+                            "message": String(describing: message.body)
+                        ]
+                    )
+                )
+            }
         } else if message.name == "preShowScriptSuccess" {
             guard let semaphore = preShowSemaphore else {
                 print("[InAppBrowser - preShowScriptSuccess]: Semaphore not found")
@@ -771,6 +956,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.addUserScript(script)
     }
 
+    private func addConsoleCaptureUserScript(to userContentController: WKUserContentController) {
+        let script = WKUserScript(
+            source: ConsoleMessageSupport.captureScriptSource(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(script)
+    }
+
     func injectJavaScriptInterface() {
         let script = mobileAppScriptSource()
         DispatchQueue.main.async {
@@ -796,10 +990,20 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.extendedLayoutIncludesOpaqueBars = true
         self.edgesForExtendedLayout = [.bottom]
 
-        let webConfiguration = WKWebViewConfiguration()
-        let userContentController = WKUserContentController()
+        let webConfiguration = initialWebConfiguration ?? WKWebViewConfiguration()
+        let userContentController = webConfiguration.userContentController
+        userContentController.removeAllUserScripts()
+        userContentController.removeScriptMessageHandler(forName: "messageHandler")
+        userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
+        userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
+        userContentController.removeScriptMessageHandler(forName: "close")
+        userContentController.removeScriptMessageHandler(forName: "hide")
+        userContentController.removeScriptMessageHandler(forName: "show")
+        userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
+        userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
+        userContentController.removeScriptMessageHandler(forName: "magicPrint")
 
-        if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
+        if initialWebConfiguration == nil, proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
             if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
                 webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
@@ -818,6 +1022,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "show")
         if allowScreenshotsFromWebPage {
             userContentController.add(weakHandler, name: "takeScreenshot")
+        }
+        if captureConsoleLogs {
+            userContentController.add(weakHandler, name: "consoleMessageHandler")
+            addConsoleCaptureUserScript(to: userContentController)
         }
         userContentController.add(weakHandler, name: "magicPrint")
 
@@ -840,7 +1048,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
         // Enable background task processing
-        webConfiguration.processPool = WKProcessPool()
+        if initialWebConfiguration == nil {
+            webConfiguration.processPool = WKProcessPool()
+        }
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -848,9 +1058,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         // Enhanced configuration for Google Pay support (only when enabled)
         if enableGooglePaySupport {
             print("[InAppBrowser] Enabling Google Pay support features for iOS")
-
-            // Allow arbitrary loads in web views for Payment Request API
-            webConfiguration.setValue(true, forKey: "allowsArbitraryLoads")
 
             // Inject Google Pay support script
             let googlePayScript = WKUserScript(
@@ -959,9 +1166,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             self.previousToolbarState = (navigation.toolbar.tintColor, navigation.toolbar.isHidden)
         }
 
-        if let sourceValue = self.source {
+        if let sourceValue = self.source, !waitsForPopupNavigation {
             self.load(source: sourceValue)
-        } else {
+        } else if self.source == nil {
             print("[\(type(of: self))][Error] Invalid url")
         }
     }
@@ -972,6 +1179,76 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setUpNavigationBarAppearance()
         self.addBarButtonItems()
         self.updateBarButtonItems()
+    }
+
+    @discardableResult
+    func inheritPopupPresentation(
+        from parent: WKWebViewController,
+        request: URLRequest,
+        configuration: WKWebViewConfiguration,
+        instanceId: String,
+        proxySchemeHandler: ProxySchemeHandler?
+    ) -> WKWebView? {
+        self.instanceId = instanceId
+        self.source = request.url.map { .remote($0) }
+        self.url = request.url
+        self.credentials = parent.credentials
+        self.headers = parent.headers
+        self.customUserAgent = parent.customUserAgent
+        self.userAgent = parent.userAgent
+        self.pureUserAgent = parent.pureUserAgent
+        self.capBrowserPlugin = parent.capBrowserPlugin
+        self.shareDisclaimer = parent.shareDisclaimer
+        self.shareSubject = parent.shareSubject
+        self.closeModal = parent.closeModal
+        self.closeModalTitle = parent.closeModalTitle
+        self.closeModalDescription = parent.closeModalDescription
+        self.closeModalOk = parent.closeModalOk
+        self.closeModalCancel = parent.closeModalCancel
+        self.closeModalURLPattern = parent.closeModalURLPattern
+        self.ignoreUntrustedSSLError = parent.ignoreUntrustedSSLError
+        self.enableGooglePaySupport = parent.enableGooglePaySupport
+        self.preventDeeplink = parent.preventDeeplink
+        self.blankNavigationTab = false
+        self.enabledSafeBottomMargin = parent.enabledSafeBottomMargin
+        self.enabledSafeTopMargin = parent.enabledSafeTopMargin
+        self.blockedHosts = parent.blockedHosts
+        self.authorizedAppLinks = parent.authorizedAppLinks
+        self.activeNativeNavigationForWebview = parent.activeNativeNavigationForWebview
+        self.disableOverscroll = parent.disableOverscroll
+        self.proxyRequests = parent.proxyRequests
+        self.proxySchemeHandler = proxySchemeHandler
+        self.initialWebConfiguration = configuration
+        self.waitsForPopupNavigation = true
+        self.hiddenPopupWindow = parent.hiddenPopupWindow
+        self.opensHidden = parent.hiddenPopupWindow
+        self.captureConsoleLogs = parent.captureConsoleLogs
+        self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
+        self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition
+        self.showArrowAsClose = parent.showArrowAsClose
+        self.preShowScript = parent.preShowScript
+        self.preShowScriptInjectionTime = parent.preShowScriptInjectionTime
+        self.leftNavigationBarItemTypes = parent.leftNavigationBarItemTypes
+        self.rightNavigaionBarItemTypes = parent.rightNavigaionBarItemTypes
+        self.statusBarStyle = parent.statusBarStyle
+        self.tintColor = parent.tintColor
+        self.backBarButtonItemImage = parent.backBarButtonItemImage
+        self.forwardBarButtonItemImage = parent.forwardBarButtonItemImage
+        self.reloadBarButtonItemImage = parent.reloadBarButtonItemImage
+        self.stopBarButtonItemImage = parent.stopBarButtonItemImage
+        self.activityBarButtonItemImage = parent.activityBarButtonItemImage
+        self.buttonNearDoneIcon = parent.buttonNearDoneIcon
+        self.showScreenshotButton = parent.showScreenshotButton
+        self.textZoom = parent.textZoom
+        self.customWidth = parent.customWidth
+        self.customHeight = parent.customHeight
+        self.customX = parent.customX
+        self.customY = parent.customY
+        self.view.backgroundColor = parent.view.backgroundColor
+        self.title = parent.title ?? request.url?.host ?? "Popup Window"
+        self.navigationItem.title = self.title
+        self.initWebview()
+        return self.capableWebView
     }
 
     @objc func restateViewHeight() {
@@ -1236,6 +1513,9 @@ public extension WKWebViewController {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "show")
         if allowScreenshotsFromWebPage {
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
+        }
+        if captureConsoleLogs {
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
         }
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
@@ -1861,26 +2141,22 @@ extension WKWebViewController: WKUIDelegate {
     }
 
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        // Handle target="_blank" links and popup windows
-        // When preventDeeplink is true, we should load these in the same webview instead of opening externally
-        if let url = navigationAction.request.url {
-            print("[InAppBrowser] Handling popup/new window request for URL: \(url.absoluteString)")
-
-            // If preventDeeplink is true, load the URL in the current webview
-            if preventDeeplink {
-                print("[InAppBrowser] preventDeeplink is true, loading popup URL in current webview")
-                DispatchQueue.main.async { [weak self] in
-                    self?.load(remote: url)
-                }
-                return nil
-            }
-
-            // Otherwise, check if we should handle it externally
-            // But since preventDeeplink is false here, we won't block it
+        guard let url = navigationAction.request.url else {
             return nil
         }
 
-        return nil
+        print("[InAppBrowser] Handling popup/new window request for URL: \(url.absoluteString)")
+        return capBrowserPlugin?.createManagedPopupWebView(
+            from: self,
+            configuration: configuration,
+            navigationAction: navigationAction
+        )
+    }
+
+    public func webViewDidClose(_ webView: WKWebView) {
+        if webView == self.webView {
+            closeView()
+        }
     }
 
     @available(iOS 15.0, *)
@@ -2036,14 +2312,20 @@ extension WKWebViewController: WKNavigationDelegate {
                 self.preShowScriptInjectionTime != "documentStart"
 
             if shouldInjectScript {
-                // injectPreShowScript will block, don't execute on the main thread
-                DispatchQueue.global(qos: .userInitiated).async {
-                    self.injectPreShowScript()
-                    DispatchQueue.main.async { [weak self] in
-                        self?.capBrowserPlugin?.presentView(webViewId: self?.instanceId)
+                if self.opensHidden {
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self.injectPreShowScript()
+                    }
+                } else {
+                    // injectPreShowScript will block, don't execute on the main thread
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self.injectPreShowScript()
+                        DispatchQueue.main.async { [weak self] in
+                            self?.capBrowserPlugin?.presentView(webViewId: self?.instanceId)
+                        }
                     }
                 }
-            } else {
+            } else if !self.opensHidden {
                 self.capBrowserPlugin?.presentView(webViewId: instanceId)
             }
         } else if self.preShowScript != nil &&

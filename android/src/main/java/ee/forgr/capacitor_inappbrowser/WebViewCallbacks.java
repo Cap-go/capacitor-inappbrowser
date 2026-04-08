@@ -13,6 +13,8 @@ public interface WebViewCallbacks {
 
     public void javascriptCallback(String message);
 
+    public void consoleMessage(String level, String message, String source, Integer line, Integer column);
+
     public void buttonNearDoneClicked();
 
     public void confirmBtnClicked(String url);

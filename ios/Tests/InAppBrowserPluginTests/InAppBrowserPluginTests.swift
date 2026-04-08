@@ -1,16 +1,46 @@
 import XCTest
-@testable import Plugin
+@testable import InappbrowserPlugin
 
-class InAppBrowserTests: XCTestCase {
+final class InAppBrowserPluginTests: XCTestCase {
+    func testConsoleMessagePayloadNormalizesFields() {
+        let payload = ConsoleMessageSupport.normalizePayload(
+            from: [
+                "level": "WARN",
+                "message": "popup blocked",
+                "source": "https://example.com/app.js",
+                "line": NSNumber(value: 42),
+                "column": "7",
+                "kind": "console"
+            ]
+        )
 
-    func testEcho() {
-        // This is an example of a functional test case for a plugin.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertEqual(payload["level"] as? String, "warn")
+        XCTAssertEqual(payload["message"] as? String, "popup blocked")
+        XCTAssertEqual(payload["source"] as? String, "https://example.com/app.js")
+        XCTAssertEqual(payload["line"] as? Int, 42)
+        XCTAssertEqual(payload["column"] as? Int, 7)
+        XCTAssertEqual(payload["kind"] as? String, "console")
+    }
 
-        let implementation = InAppBrowser()
-        let value = "Hello, World!"
-        let result = implementation.echo(value)
+    func testConsoleMessagePayloadDefaultsInvalidValues() {
+        let payload = ConsoleMessageSupport.normalizePayload(
+            from: [
+                "level": "unexpected",
+                "message": NSNumber(value: 15)
+            ]
+        )
 
-        XCTAssertEqual(value, result)
+        XCTAssertEqual(payload["level"] as? String, "log")
+        XCTAssertEqual(payload["message"] as? String, "15")
+        XCTAssertNil(payload["source"])
+        XCTAssertNil(payload["line"])
+    }
+
+    func testConsoleCaptureScriptContainsExpectedHooks() {
+        let script = ConsoleMessageSupport.captureScriptSource()
+
+        XCTAssertTrue(script.contains("consoleMessageHandler"))
+        XCTAssertTrue(script.contains("unhandledrejection"))
+        XCTAssertTrue(script.contains("console.assert"))
     }
 }

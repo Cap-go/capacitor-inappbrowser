@@ -395,8 +395,8 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`clearCache(...)`](#clearcache)
 * [`getCookies(...)`](#getcookies)
 * [`close(...)`](#close)
-* [`hide()`](#hide)
-* [`show()`](#show)
+* [`hide(...)`](#hide)
+* [`show(...)`](#show)
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
 * [`postMessage(...)`](#postmessage)
@@ -410,7 +410,9 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('popupWindowOpened', ...)`](#addlistenerpopupwindowopened-)
 * [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
+* [`addListener('consoleMessage', ...)`](#addlistenerconsolemessage-)
 * [`handleProxyRequest(...)`](#handleproxyrequest)
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
@@ -560,27 +562,37 @@ When `id` is omitted, closes the active webview.
 --------------------
 
 
-### hide()
+### hide(...)
 
 ```typescript
-hide() => Promise<void>
+hide(options?: { id?: string | undefined; } | undefined) => Promise<void>
 ```
 
 Hide the webview without closing it.
 Use show() to bring it back.
+When `id` is omitted, targets the active webview.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Since:** 8.0.8
 
 --------------------
 
 
-### show()
+### show(...)
 
 ```typescript
-show() => Promise<void>
+show(options?: { id?: string | undefined; } | undefined) => Promise<void>
 ```
 
 Show a previously hidden webview.
+When `id` is omitted, targets the active webview.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
 
 **Since:** 8.0.8
 
@@ -839,6 +851,27 @@ Will be triggered when page load error
 --------------------
 
 
+### addListener('popupWindowOpened', ...)
+
+```typescript
+addListener(eventName: 'popupWindowOpened', listenerFunc: (event: PopupWindowEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered whenever a page opens a popup/new window.
+Use the returned popup id with `executeScript`, `postMessage`, `show`, `hide`, and `close`.
+
+| Param              | Type                                                                              |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'popupWindowOpened'</code>                                                  |
+| **`listenerFunc`** | <code>(event: <a href="#popupwindowevent">PopupWindowEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.0
+
+--------------------
+
+
 ### addListener('proxyRequest', ...)
 
 ```typescript
@@ -852,6 +885,27 @@ Prefer `addProxyHandler()` instead of calling this directly.
 | ------------------ | ------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'proxyRequest'</code>                                               |
 | **`listenerFunc`** | <code>(event: <a href="#proxyrequest">ProxyRequest</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.0
+
+--------------------
+
+
+### addListener('consoleMessage', ...)
+
+```typescript
+addListener(eventName: 'consoleMessage', listenerFunc: (event: ConsoleMessageEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for JavaScript console output emitted by the managed page.
+Enable this with `captureConsoleLogs: true` when opening the webview.
+
+| Param              | Type                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'consoleMessage'</code>                                                           |
+| **`listenerFunc`** | <code>(event: <a href="#consolemessageevent">ConsoleMessageEvent</a>) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -1081,6 +1135,7 @@ And in the AndroidManifest.xml file:
 | **`materialPicker`**                   | <code>boolean</code>                                                                                                                                                   | materialPicker: if true, uses Material Design theme for date and time pickers on Android. This improves the appearance of HTML date inputs to use modern Material Design UI instead of the old style pickers.                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 7.4.1  |
 | **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                              |                                                               | 6.10.0 |
 | **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.4.0  |
+| **`captureConsoleLogs`**               | <code>boolean</code>                                                                                                                                                   | Emits `consoleMessage` events for JavaScript `console.*` output coming from the managed page. Useful when the webview stays hidden and you still need page-level diagnostics.                                                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 8.6.0  |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
@@ -1117,6 +1172,7 @@ And in the AndroidManifest.xml file:
 | **`enabledSafeTopMargin`**             | <code>boolean</code>                                                                                                                                                   | If false, the webView will extend behind the status bar for true full-screen immersive content. When true (default), respects the safe area at the top of the screen. Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.                                                                                                                                                                                                                                                                                | <code>true</code>                                             | 8.2.0  |
 | **`useTopInset`**                      | <code>boolean</code>                                                                                                                                                   | When true, applies the system status bar inset as the WebView top margin on Android. Keeps the legacy 0px margin by default for apps that handle padding themselves.                                                                                                                                                                                                                                                                                                                                                                                       | <code>false</code>                                            |        |
 | **`enableGooglePaySupport`**           | <code>boolean</code>                                                                                                                                                   | enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API. This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy. Only enable this if you need Google Pay functionality as it allows popup windows. When enabled: - Allows popup windows for Google Pay authentication - Sets proper CORS headers for Payment Request API - Enables multiple window support in WebView - Configures secure context for payment processing                                                | <code>false</code>                                            | 7.13.0 |
+| **`hiddenPopupWindow`**                | <code>boolean</code>                                                                                                                                                   | Opens popup windows created by the page in hidden mode. Hidden popup windows can still be controlled with `executeScript`, `postMessage`, `show`, and `close`. Listen to `popupWindowOpened` to capture the popup id, then call `show({ id })` only if you want to reveal it.                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 8.6.0  |
 | **`blockedHosts`**                     | <code>string[]</code>                                                                                                                                                  | blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations. Any request inside WebView to a URL with a host matching any of these patterns will be blocked. Supports wildcard patterns like: - "*.example.com" to block all subdomains - "www.example.*" to block wildcard domain extensions                                                                                                                                                                                                       | <code>[]</code>                                               | 7.17.0 |
 | **`width`**                            | <code>number</code>                                                                                                                                                    | Width of the webview in pixels. If not set, webview will be fullscreen width.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>undefined (fullscreen)</code>                           |        |
 | **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |
@@ -1203,6 +1259,18 @@ Any regex property that is omitted is treated as a wildcard.
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
 
 
+#### PopupWindowEvent
+
+Event emitted when a web page opens a popup/new window.
+
+| Prop           | Type                 | Description                                  |
+| -------------- | -------------------- | -------------------------------------------- |
+| **`id`**       | <code>string</code>  | Popup webview instance id.                   |
+| **`parentId`** | <code>string</code>  | Parent webview instance id.                  |
+| **`url`**      | <code>string</code>  | Requested popup URL when available.          |
+| **`visible`**  | <code>boolean</code> | Whether the popup was presented immediately. |
+
+
 #### ProxyRequest
 
 Represents an intercepted HTTP request from the in-app browser webview.
@@ -1221,6 +1289,23 @@ Request and response bodies are base64-encoded when present.
 | **`responseHeaders`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> |
 | **`responseBody`**    | <code>string \| null</code>                                     |
 | **`webviewId`**       | <code>string</code>                                             |
+
+
+#### ConsoleMessageEvent
+
+Event emitted when JavaScript running inside the managed webview writes to the console.
+
+Enable this with `captureConsoleLogs: true` when opening the webview.
+
+| Prop          | Type                | Description                                                            |
+| ------------- | ------------------- | ---------------------------------------------------------------------- |
+| **`id`**      | <code>string</code> | Source webview instance id.                                            |
+| **`level`**   | <code>string</code> | Console method or normalized severity.                                 |
+| **`message`** | <code>string</code> | Joined string representation of the console arguments.                 |
+| **`source`**  | <code>string</code> | Script URL or page URL when available.                                 |
+| **`line`**    | <code>number</code> | 1-based line number when available.                                    |
+| **`column`**  | <code>number</code> | 1-based column number when available.                                  |
+| **`kind`**    | <code>string</code> | Optional subtype for runtime-originated errors on supported platforms. |
 
 
 #### ProxyDecision

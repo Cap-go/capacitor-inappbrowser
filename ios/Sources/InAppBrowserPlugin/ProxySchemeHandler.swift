@@ -132,6 +132,17 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         super.init()
     }
 
+    func duplicate(for webviewId: String) -> ProxySchemeHandler? {
+        guard let plugin else { return nil }
+        return ProxySchemeHandler(
+            plugin: plugin,
+            webviewId: webviewId,
+            legacyProxyRequests: legacyProxyRequests,
+            outboundRules: outboundRules,
+            inboundRules: inboundRules
+        )
+    }
+
     public func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         guard let url = urlSchemeTask.request.url else {
             urlSchemeTask.didFailWithError(

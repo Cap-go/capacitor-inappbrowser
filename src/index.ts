@@ -30,6 +30,24 @@ function headersToRecord(headers: Headers): Record<string, string> {
   return result;
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isStaleProxyResponseError(error: unknown): boolean {
+  const message = errorMessage(error);
+  return message.includes('No proxy handler found') || message.includes('Target WebView not found for proxy request');
+}
+
 function isProxyResponse(value: unknown): value is ProxyResponse {
   return (
     value !== null &&
@@ -50,56 +68,55 @@ function isProxyDecision(value: unknown): value is ProxyDecision {
   );
 }
 
+async function sendProxyDecision(
+  requestId: string,
+  webviewId: string | undefined,
+  decision: ProxyDecision | null,
+): Promise<void> {
+  try {
+    await InAppBrowser.handleProxyRequest({
+      requestId,
+      webviewId,
+      decision,
+    });
+  } catch (error) {
+    if (isStaleProxyResponseError(error)) {
+      return;
+    }
+    throw error;
+  }
+}
+
 const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> => {
   return InAppBrowser.addListener('proxyRequest', async (event) => {
+    let decision: ProxyDecision | null = null;
+
     try {
       const result = await callback(event);
       if (result === null) {
-        await InAppBrowser.handleProxyRequest({
-          requestId: event.requestId,
-          webviewId: event.webviewId,
-          decision: null,
-        });
+        decision = null;
       } else if (isProxyDecision(result)) {
-        await InAppBrowser.handleProxyRequest({
-          requestId: event.requestId,
-          webviewId: event.webviewId,
-          decision: result,
-        });
+        decision = result;
       } else if (isProxyRequestOverride(result)) {
-        await InAppBrowser.handleProxyRequest({
-          requestId: event.requestId,
-          webviewId: event.webviewId,
-          decision: { request: result },
-        });
+        decision = { request: result };
       } else if (isProxyResponse(result)) {
-        await InAppBrowser.handleProxyRequest({
-          requestId: event.requestId,
-          webviewId: event.webviewId,
-          decision: { response: result },
-        });
+        decision = { response: result };
       } else {
         const cloned = result.clone();
         const buffer = await cloned.arrayBuffer();
-        await InAppBrowser.handleProxyRequest({
-          requestId: event.requestId,
-          webviewId: event.webviewId,
-          decision: {
-            response: {
-              body: arrayBufferToBase64(buffer),
-              status: result.status,
-              headers: headersToRecord(result.headers),
-            },
+        decision = {
+          response: {
+            body: arrayBufferToBase64(buffer),
+            status: result.status,
+            headers: headersToRecord(result.headers),
           },
-        });
+        };
       }
     } catch (_error) {
-      await InAppBrowser.handleProxyRequest({
-        requestId: event.requestId,
-        webviewId: event.webviewId,
-        decision: null,
-      });
+      decision = null;
     }
+
+    await sendProxyDecision(event.requestId, event.webviewId, decision);
   });
 };
 

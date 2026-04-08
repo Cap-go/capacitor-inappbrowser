@@ -1,5 +1,5 @@
 import { CapacitorHttp } from "@capacitor/core";
-import { InAppBrowser, ToolBarType, addProxyHandler } from "@capgo/inappbrowser";
+import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@capgo/inappbrowser";
 
 const GRAILED_URL = "https://www.grailed.com/users/sign_up";
 const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";
@@ -301,6 +301,17 @@ function summarize(value) {
   }
 }
 
+function formatConsoleMessage(event) {
+  const level = String(event?.level || "log").toUpperCase();
+  const location = [event?.source, Number.isFinite(event?.line) ? event.line : null]
+    .filter(Boolean)
+    .join(":");
+  return {
+    title: `Hidden webview JS ${level}`,
+    details: [event?.message, location].filter(Boolean).join("\n"),
+  };
+}
+
 function hostnameMatches(hostname, domain) {
   return hostname === domain || hostname.endsWith(`.${domain}`);
 }
@@ -329,29 +340,285 @@ function injectHtmlSnippet(html, snippet) {
   return `${html}${snippet}`;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function buildGrailedGoogleClickScript() {
+  return `
+    (() => {
+      const post = (payload) => {
+        if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
+          window.mobileApp.postMessage(payload);
+        }
+      };
+
+      const describe = (element) =>
+        [
+          element?.innerText,
+          element?.textContent,
+          element?.getAttribute?.("aria-label"),
+          element?.getAttribute?.("data-testid"),
+          element?.getAttribute?.("title"),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\\s+/g, " ")
+          .trim();
+
+      const selectors = ["button", "a", "[role='button']", "[data-testid]", "[aria-label]"];
+      let attempts = 0;
+      const timer = window.setInterval(() => {
+        attempts += 1;
+        const candidates = Array.from(document.querySelectorAll(selectors.join(",")));
+        const button = candidates.find((element) => /google/i.test(describe(element)));
+
+        if (button) {
+          window.clearInterval(timer);
+          button.click();
+          post({
+            type: "proxy-demo-grailed-clicked-google",
+            href: window.location.href,
+            title: document.title,
+          });
+          return;
+        }
+
+        if (attempts >= 30) {
+          window.clearInterval(timer);
+          post({
+            type: "proxy-demo-grailed-google-button-missing",
+            href: window.location.href,
+            title: document.title,
+          });
+        }
+      }, 400);
+    })();
+  `;
+}
+
+function buildGoogleAutomationScript({ email, password, twoFactorCode }) {
+  return `
+    (() => {
+      const EMAIL = ${JSON.stringify(email)};
+      const PASSWORD = ${JSON.stringify(password)};
+      const OTP = ${JSON.stringify(twoFactorCode || "")};
+
+      const post = (payload) => {
+        if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
+          window.mobileApp.postMessage(payload);
+        }
+      };
+
+      const elements = (selector) => Array.from(document.querySelectorAll(selector));
+      const textOf = (element) =>
+        [
+          element?.innerText,
+          element?.textContent,
+          element?.getAttribute?.("aria-label"),
+          element?.getAttribute?.("title"),
+          element?.getAttribute?.("data-testid"),
+          element?.getAttribute?.("name"),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\\s+/g, " ")
+          .trim();
+
+      const clickMatching = (patterns) => {
+        const candidates = elements("button, a, div[role='button'], [role='link'], span[role='button']");
+        const button = candidates.find((candidate) =>
+          patterns.some((pattern) => pattern.test(textOf(candidate))),
+        );
+        if (button) {
+          button.click();
+          return true;
+        }
+        return false;
+      };
+
+      const setInputValue = (input, value) => {
+        const descriptor =
+          Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value") ||
+          Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value");
+        input.focus();
+        if (descriptor && descriptor.set) {
+          descriptor.set.call(input, value);
+        } else {
+          input.value = value;
+        }
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        input.blur();
+      };
+
+      if (clickMatching([/use another account/i, /add another account/i])) {
+        post({
+          type: "proxy-demo-google-account-chooser",
+          url: window.location.href,
+        });
+        return;
+      }
+
+      const emailInput =
+        document.querySelector("input[type='email']") ||
+        document.querySelector("input[name='identifier']") ||
+        document.querySelector("input[autocomplete='username']");
+      if (emailInput && EMAIL) {
+        setInputValue(emailInput, EMAIL);
+        clickMatching([/next/i, /continue/i]);
+        post({
+          type: "proxy-demo-google-email-submitted",
+          url: window.location.href,
+        });
+        return;
+      }
+
+      const passwordInput =
+        document.querySelector("input[type='password']") ||
+        document.querySelector("input[name='Passwd']") ||
+        document.querySelector("input[autocomplete='current-password']");
+      if (passwordInput && PASSWORD) {
+        setInputValue(passwordInput, PASSWORD);
+        clickMatching([/next/i, /continue/i]);
+        post({
+          type: "proxy-demo-google-password-submitted",
+          url: window.location.href,
+        });
+        return;
+      }
+
+      const otpInput =
+        document.querySelector("input[autocomplete='one-time-code']") ||
+        document.querySelector("input[type='tel']") ||
+        document.querySelector("input[type='number']") ||
+        elements("input").find((input) => /code|otp|verification/i.test(textOf(input)));
+      if (otpInput) {
+        if (OTP) {
+          setInputValue(otpInput, OTP);
+          clickMatching([/next/i, /continue/i, /verify/i, /done/i]);
+          post({
+            type: "proxy-demo-google-otp-submitted",
+            url: window.location.href,
+          });
+        } else {
+          post({
+            type: "proxy-demo-google-otp-required",
+            url: window.location.href,
+          });
+        }
+        return;
+      }
+
+      if (window.location.hostname.includes("grailed.com") || window.location.href.includes("gis_transform")) {
+        post({
+          type: "proxy-demo-google-login-complete",
+          url: window.location.href,
+        });
+        return;
+      }
+
+      if (/challenge|chooser|consent|signin/i.test(window.location.href)) {
+        post({
+          type: "proxy-demo-google-manual-step",
+          url: window.location.href,
+          title: document.title,
+        });
+        return;
+      }
+
+      post({
+        type: "proxy-demo-google-noop",
+        url: window.location.href,
+        title: document.title,
+      });
+    })();
+  `;
+}
+
+function buildGrailedSessionProbeScript() {
+  return `
+    (() => {
+      const post = (payload) => {
+        if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
+          window.mobileApp.postMessage(payload);
+        }
+      };
+
+      const bodyText = (document.body?.innerText || "").replace(/\\s+/g, " ").toLowerCase();
+      const loggedInMarkers = [
+        "sell",
+        "wardrobe",
+        "closet",
+        "messages",
+        "favorites",
+        "logout",
+        "settings",
+        "my account",
+      ];
+      const loggedIn = loggedInMarkers.some((marker) => bodyText.includes(marker)) && !bodyText.includes("sign up");
+
+      post({
+        type: "proxy-demo-grailed-session-probe",
+        loggedIn,
+        url: window.location.href,
+        title: document.title,
+        cookiePreview: document.cookie.slice(0, 400),
+      });
+    })();
+  `;
+}
+
 export function setupProxyDemoButtons(root) {
   const grailedStubButton = root.querySelector("#proxy-demo-grailed-stub");
   const grailedGoogleButton = root.querySelector("#proxy-demo-grailed-google-login");
+  const grailedBackgroundLoginButton = root.querySelector("#proxy-demo-grailed-background-login");
   const facebookButton = root.querySelector("#proxy-demo-facebook-login");
   const facebookProxyButton = root.querySelector("#proxy-demo-facebook-script");
+  const googleEmailInput = root.querySelector("#proxy-demo-google-email");
+  const googlePasswordInput = root.querySelector("#proxy-demo-google-password");
+  const googleOtpInput = root.querySelector("#proxy-demo-google-otp");
+  const showPrimaryButton = root.querySelector("#proxy-demo-show-primary");
+  const showPopupButton = root.querySelector("#proxy-demo-show-popup");
   const statusText = root.querySelector("#proxy-demo-status-text");
   const detailsText = root.querySelector("#proxy-demo-details");
+  const historyText = root.querySelector("#proxy-demo-history");
 
   if (
     !grailedStubButton ||
     !grailedGoogleButton ||
+    !grailedBackgroundLoginButton ||
     !facebookButton ||
     !facebookProxyButton ||
+    !googleEmailInput ||
+    !googlePasswordInput ||
+    !googleOtpInput ||
+    !showPrimaryButton ||
+    !showPopupButton ||
     !statusText ||
-    !detailsText
+    !detailsText ||
+    !historyText
   ) {
     return;
   }
 
-  const buttons = [grailedStubButton, grailedGoogleButton, facebookButton, facebookProxyButton];
+  const buttons = [
+    grailedStubButton,
+    grailedGoogleButton,
+    grailedBackgroundLoginButton,
+    facebookButton,
+    facebookProxyButton,
+  ];
   let proxyHandle = null;
   let listenerHandles = [];
-  let browserOpened = false;
+  let primaryWebViewId = null;
+  let popupWindowIds = new Set();
+  let knownWindowIds = new Set();
+  let closeEventInterceptor = null;
+  let statusHistory = [];
+  let popupOpenTimeout = null;
 
   const setButtonsDisabled = (disabled) => {
     buttons.forEach((button) => {
@@ -359,14 +626,95 @@ export function setupProxyDemoButtons(root) {
     });
   };
 
+  const updateDebugButtons = () => {
+    showPrimaryButton.disabled = !primaryWebViewId;
+    showPopupButton.disabled = popupWindowIds.size === 0;
+  };
+
+  const clearStatusHistory = () => {
+    statusHistory = [];
+    historyText.textContent = "No events yet.";
+  };
+
+  const pushHistory = (message, details = "") => {
+    const now = new Date();
+    const stamp = now.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const entry = [`[${stamp}] ${message}`, details].filter(Boolean).join("\n");
+    statusHistory = [entry, ...statusHistory].slice(0, 20);
+    historyText.textContent = statusHistory.join("\n\n");
+  };
+
   const setStatus = (message, details = "") => {
     statusText.textContent = message;
     detailsText.textContent = details;
+    pushHistory(message, details);
+  };
+
+  const clearPopupOpenTimeout = () => {
+    if (popupOpenTimeout) {
+      window.clearTimeout(popupOpenTimeout);
+      popupOpenTimeout = null;
+    }
+  };
+
+  const schedulePopupOpenTimeout = () => {
+    clearPopupOpenTimeout();
+    popupOpenTimeout = window.setTimeout(() => {
+      setStatus(
+        "Grailed click ran, but no popup opened",
+        "The injected script clicked a Google-related element on the hidden Grailed page, but iOS has not emitted popupWindowOpened. Use the reveal buttons to inspect the hidden Grailed window or popup state.",
+      );
+    }, 7000);
+  };
+
+  const trackWindow = (id, { primary = false, popup = false } = {}) => {
+    if (!id) {
+      return;
+    }
+    knownWindowIds.add(id);
+    if (primary) {
+      primaryWebViewId = id;
+    }
+    if (popup) {
+      popupWindowIds.add(id);
+    }
+    updateDebugButtons();
+  };
+
+  const untrackWindow = (id) => {
+    if (!id) {
+      return;
+    }
+    knownWindowIds.delete(id);
+    popupWindowIds.delete(id);
+    if (primaryWebViewId === id) {
+      primaryWebViewId = null;
+    }
+    updateDebugButtons();
+  };
+
+  const closeTrackedWindows = async () => {
+    const ids = [...knownWindowIds].reverse();
+    knownWindowIds = new Set();
+    popupWindowIds = new Set();
+    primaryWebViewId = null;
+    updateDebugButtons();
+    for (const id of ids) {
+      try {
+        await InAppBrowser.close({ id });
+      } catch (_error) {}
+    }
   };
 
   const resetState = async ({ closeBrowser = false } = {}) => {
     const handles = listenerHandles;
     listenerHandles = [];
+    closeEventInterceptor = null;
+    clearPopupOpenTimeout();
     for (const handle of handles) {
       try {
         await handle.remove();
@@ -378,33 +726,45 @@ export function setupProxyDemoButtons(root) {
       } catch (_error) {}
       proxyHandle = null;
     }
-    const shouldClose = closeBrowser && browserOpened;
-    browserOpened = false;
-    if (shouldClose) {
-      try {
-        await InAppBrowser.close();
-      } catch (_error) {}
+    if (closeBrowser) {
+      await closeTrackedWindows();
+    } else {
+      knownWindowIds = new Set();
+      popupWindowIds = new Set();
+      primaryWebViewId = null;
+      updateDebugButtons();
     }
     setButtonsDisabled(false);
   };
 
   const installCommonListeners = async (name) => {
     listenerHandles.push(
-      await InAppBrowser.addListener("pageLoadError", async () => {
-        await resetState();
-        setStatus(`${name} failed`, "pageLoadError");
+      await InAppBrowser.addListener("pageLoadError", async (event) => {
+        const idSuffix = event?.id ? ` (${event.id})` : "";
+        await resetState({ closeBrowser: true });
+        setStatus(`${name} failed`, `pageLoadError${idSuffix}`);
       }),
     );
 
     listenerHandles.push(
-      await InAppBrowser.addListener("closeEvent", async () => {
+      await InAppBrowser.addListener("closeEvent", async (event) => {
+        if (closeEventInterceptor) {
+          const handled = await closeEventInterceptor(event);
+          if (handled) {
+            return;
+          }
+        }
+        if (event?.id) {
+          untrackWindow(event.id);
+        }
         await resetState();
-        setStatus(`${name} closed`, "Browser dismissed.");
+        setStatus(`${name} closed`, event?.url || "Browser dismissed.");
       }),
     );
   };
 
   const startScenario = async (name, runner) => {
+    clearStatusHistory();
     setButtonsDisabled(true);
     setStatus(`${name} starting...`);
     await resetState({ closeBrowser: true });
@@ -413,13 +773,52 @@ export function setupProxyDemoButtons(root) {
     try {
       await installCommonListeners(name);
       await runner();
-      browserOpened = true;
       setButtonsDisabled(false);
     } catch (error) {
-      await resetState();
+      await resetState({ closeBrowser: true });
       setStatus(`${name} failed`, normalizeError(error));
     }
   };
+
+  const readGoogleCredentials = () => ({
+    email: googleEmailInput.value.trim(),
+    password: googlePasswordInput.value,
+    twoFactorCode: googleOtpInput.value.trim(),
+  });
+
+  const attachManualPopupStatus = async (label) => {
+    listenerHandles.push(
+      await InAppBrowser.addListener("popupWindowOpened", async (event) => {
+        clearPopupOpenTimeout();
+        trackWindow(event.id, { popup: true });
+        setStatus(
+          `${label} popup opened`,
+          event.visible
+            ? event.url || "Popup opened in a managed child window."
+            : "Popup opened hidden in the background.",
+        );
+      }),
+    );
+  };
+
+  showPrimaryButton.addEventListener("click", async () => {
+    if (!primaryWebViewId) {
+      setStatus("No hidden Grailed window to show", "Start the background flow first.");
+      return;
+    }
+    await InAppBrowser.show({ id: primaryWebViewId });
+    setStatus("Revealed hidden Grailed window", primaryWebViewId);
+  });
+
+  showPopupButton.addEventListener("click", async () => {
+    const popupId = [...popupWindowIds].at(-1);
+    if (!popupId) {
+      setStatus("No popup window to show", "No managed popup is currently tracked.");
+      return;
+    }
+    await InAppBrowser.show({ id: popupId });
+    setStatus("Revealed hidden popup window", popupId);
+  });
 
   grailedStubButton.addEventListener("click", async () => {
     await startScenario("Grailed SDK Stub Proxy", async () => {
@@ -446,18 +845,21 @@ export function setupProxyDemoButtons(root) {
         }),
       );
 
-      await InAppBrowser.openWebView({
+      const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
         proxyRequests: true,
         toolbarType: ToolBarType.NAVIGATION,
         title: "Grailed stub proxy demo",
       });
+      trackWindow(result.id, { primary: true });
     });
   });
 
   grailedGoogleButton.addEventListener("click", async () => {
     await startScenario("Grailed Google Login Proxy", async () => {
       let googleHtmlInjected = false;
+
+      await attachManualPopupStatus("Grailed Google login");
 
       proxyHandle = await addProxyHandler(async (request) => {
         const requestUrl = new URL(request.url);
@@ -499,8 +901,9 @@ export function setupProxyDemoButtons(root) {
       });
 
       listenerHandles.push(
-        await InAppBrowser.addListener("browserPageLoaded", async () => {
+        await InAppBrowser.addListener("browserPageLoaded", async (event) => {
           await InAppBrowser.executeScript({
+            id: event?.id,
             code: GRAILED_GOOGLE_BROWSER_SPOOF,
           });
           setStatus(
@@ -512,16 +915,304 @@ export function setupProxyDemoButtons(root) {
         }),
       );
 
-      await InAppBrowser.openWebView({
+      const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
         proxyRequests: true,
         headers: DESKTOP_CHROME_HEADERS,
         isPresentAfterPageLoad: true,
         preShowScript: GRAILED_GOOGLE_BROWSER_SPOOF,
         preShowScriptInjectionTime: "documentStart",
+        enableGooglePaySupport: true,
         toolbarType: ToolBarType.NAVIGATION,
         title: "Grailed Google login proxy demo",
       });
+      trackWindow(result.id, { primary: true });
+    });
+  });
+
+  grailedBackgroundLoginButton.addEventListener("click", async () => {
+    const credentials = readGoogleCredentials();
+    if (!credentials.email || !credentials.password) {
+      setStatus(
+        "Grailed background login blocked",
+        "Enter the Google email and password fields first.",
+      );
+      return;
+    }
+
+    await startScenario("Grailed Background Login", async () => {
+      let googlePopupId = null;
+      let popupFlowCompleted = false;
+      let probingSession = false;
+      let googleHtmlInjected = false;
+
+      proxyHandle = await addProxyHandler(async (request) => {
+        const requestUrl = new URL(request.url);
+
+        if (request.phase === "outbound" && shouldSpoofGrailedHeaders(requestUrl.hostname)) {
+          return {
+            request: {
+              url: request.url,
+              headers: {
+                ...(request.headers || {}),
+                ...DESKTOP_CHROME_HEADERS,
+              },
+              body: request.body,
+            },
+          };
+        }
+
+        if (
+          request.phase === "inbound" &&
+          hostnameMatches(requestUrl.hostname, "google.com") &&
+          request.responseBody &&
+          isHtmlResponse(request.responseHeaders)
+        ) {
+          googleHtmlInjected = true;
+          setStatus("Injected browser spoof into hidden Google HTML", request.url);
+          return {
+            status: request.status || 200,
+            headers: request.responseHeaders || {},
+            body: toBase64(
+              injectHtmlSnippet(
+                fromBase64(request.responseBody),
+                `<script>${GRAILED_GOOGLE_BROWSER_SPOOF}</script>`,
+              ),
+            ),
+          };
+        }
+
+        return null;
+      });
+
+      const runGrailedSessionProbe = async (reason) => {
+        if (!primaryWebViewId || probingSession) {
+          return;
+        }
+        probingSession = true;
+        await sleep(1500);
+        await InAppBrowser.executeScript({
+          id: primaryWebViewId,
+          code: buildGrailedSessionProbeScript(),
+        });
+        setStatus("Checking Grailed session", `Probe reason: ${reason}`);
+      };
+
+      const runGoogleAutomationStep = async (reason) => {
+        if (!googlePopupId) {
+          return;
+        }
+        await sleep(700);
+        await InAppBrowser.executeScript({
+          id: googlePopupId,
+          code: buildGoogleAutomationScript(credentials),
+        });
+        setStatus("Driving Google popup in background", `Automation trigger: ${reason}`);
+      };
+
+      closeEventInterceptor = async (event) => {
+        if (event?.id && popupWindowIds.has(event.id)) {
+          const closedPopupId = event.id;
+          untrackWindow(closedPopupId);
+          if (googlePopupId === closedPopupId) {
+            googlePopupId = null;
+            popupFlowCompleted = true;
+            setStatus(
+              "Google popup closed",
+              "Popup finished or redirected away. Checking Grailed session next.",
+            );
+            await runGrailedSessionProbe("popup-closed");
+          }
+          return true;
+        }
+        return false;
+      };
+
+      listenerHandles.push(
+        await InAppBrowser.addListener("popupWindowOpened", async (event) => {
+          if (event.parentId !== primaryWebViewId) {
+            return;
+          }
+          googlePopupId = event.id;
+          trackWindow(event.id, { popup: true });
+          setStatus(
+            "Captured Google popup in background",
+            event.url || "Popup window opened hidden and is ready for automation.",
+          );
+          await runGoogleAutomationStep("popup-opened");
+        }),
+      );
+
+      listenerHandles.push(
+        await InAppBrowser.addListener("browserPageLoaded", async (event) => {
+          if (!event?.id) {
+            return;
+          }
+
+          await InAppBrowser.executeScript({
+            id: event.id,
+            code: GRAILED_GOOGLE_BROWSER_SPOOF,
+          });
+
+          if (event.id === primaryWebViewId) {
+            if (!googlePopupId && !popupFlowCompleted) {
+              await sleep(1200);
+              await InAppBrowser.executeScript({
+                id: primaryWebViewId,
+                code: buildGrailedGoogleClickScript(),
+              });
+              setStatus(
+                "Clicked Grailed Google button in background",
+                "Waiting for the managed Google popup to be created.",
+              );
+              return;
+            }
+
+            if (popupFlowCompleted) {
+              await runGrailedSessionProbe("grailed-reloaded");
+            }
+            return;
+          }
+
+          if (event.id === googlePopupId) {
+            await runGoogleAutomationStep("google-page-loaded");
+          }
+        }),
+      );
+
+      listenerHandles.push(
+        await InAppBrowser.addListener("consoleMessage", async (event) => {
+          if (!event?.id || !knownWindowIds.has(event.id)) {
+            return;
+          }
+
+          const level = String(event.level || "log").toLowerCase();
+          if (!["log", "info", "warn", "error", "debug", "assert"].includes(level)) {
+            return;
+          }
+
+          const { title, details } = formatConsoleMessage(event);
+          pushHistory(title, details);
+        }),
+      );
+
+      listenerHandles.push(
+        await InAppBrowser.addListener("messageFromWebview", async (event) => {
+          const detail =
+            event?.detail && typeof event.detail === "object"
+              ? { ...event.detail, id: event.id }
+              : event;
+
+          switch (detail?.type) {
+            case "proxy-demo-grailed-clicked-google":
+              setStatus(
+                "Grailed click script fired",
+                "The hidden Grailed page received the injected click. This does not mean iOS opened a popup yet. Waiting for popupWindowOpened next.",
+              );
+              schedulePopupOpenTimeout();
+              break;
+            case "proxy-demo-grailed-google-button-missing":
+              setStatus(
+                "Grailed Google button not found",
+                summarize({ url: detail.href, title: detail.title }),
+              );
+              break;
+            case "proxy-demo-google-account-chooser":
+              setStatus("Google account chooser detected", detail.url || "");
+              break;
+            case "proxy-demo-google-email-submitted":
+              setStatus("Submitted Google email", detail.url || "");
+              break;
+            case "proxy-demo-google-password-submitted":
+              setStatus("Submitted Google password", detail.url || "");
+              break;
+            case "proxy-demo-google-otp-required":
+              setStatus(
+                "Google 2FA code required",
+                "Fill the optional 2FA field in the example app and try again.",
+              );
+              break;
+            case "proxy-demo-google-otp-submitted":
+              setStatus("Submitted Google 2FA code", detail.url || "");
+              break;
+            case "proxy-demo-google-manual-step":
+              setStatus(
+                "Google presented an extra step",
+                summarize({ url: detail.url, title: detail.title }),
+              );
+              break;
+            case "proxy-demo-google-noop":
+              setStatus(
+                "Google popup waiting on another page",
+                summarize({ url: detail.url, title: detail.title }),
+              );
+              break;
+            case "proxy-demo-google-login-complete":
+              popupFlowCompleted = true;
+              setStatus("Google login flow completed", detail.url || "Checking Grailed session.");
+              if (googlePopupId) {
+                const popupIdToClose = googlePopupId;
+                googlePopupId = null;
+                untrackWindow(popupIdToClose);
+                try {
+                  await InAppBrowser.close({ id: popupIdToClose });
+                } catch (_error) {}
+              }
+              await runGrailedSessionProbe("google-login-complete");
+              break;
+            case "proxy-demo-grailed-session-probe":
+              if (detail.loggedIn) {
+                await resetState({ closeBrowser: true });
+                setStatus(
+                  "Grailed background login finished",
+                  summarize({
+                    loggedIn: detail.loggedIn,
+                    url: detail.url,
+                    title: detail.title,
+                    cookiePreview: detail.cookiePreview,
+                  }),
+                );
+              } else {
+                probingSession = false;
+                setStatus(
+                  popupFlowCompleted ? "Grailed session not confirmed yet" : "Grailed page still loading",
+                  summarize({
+                    loggedIn: detail.loggedIn,
+                    url: detail.url,
+                    title: detail.title,
+                    cookiePreview: detail.cookiePreview,
+                  }),
+                );
+              }
+              break;
+            default:
+              break;
+          }
+        }),
+      );
+
+      const result = await InAppBrowser.openWebView({
+        url: GRAILED_URL,
+        proxyRequests: true,
+        headers: DESKTOP_CHROME_HEADERS,
+        hidden: true,
+        hiddenPopupWindow: true,
+        invisibilityMode: InvisibilityMode.FAKE_VISIBLE,
+        isPresentAfterPageLoad: true,
+        captureConsoleLogs: true,
+        enableGooglePaySupport: true,
+        preShowScript: GRAILED_GOOGLE_BROWSER_SPOOF,
+        preShowScriptInjectionTime: "documentStart",
+        toolbarType: ToolBarType.NAVIGATION,
+        title: "Grailed background login demo",
+      });
+      trackWindow(result.id, { primary: true });
+      setStatus(
+        "Grailed background login started",
+        googleHtmlInjected
+          ? `Hidden Grailed window created: ${result.id}. Google HTML rewrites are active.`
+          : `Hidden Grailed window created: ${result.id}. Waiting for the first page load.`,
+      );
     });
   });
 
@@ -536,7 +1227,7 @@ export function setupProxyDemoButtons(root) {
         }),
       );
 
-      await InAppBrowser.openWebView({
+      const result = await InAppBrowser.openWebView({
         url: FACEBOOK_URL,
         headers: {
           "user-agent": DESKTOP_CHROME_USER_AGENT,
@@ -544,6 +1235,7 @@ export function setupProxyDemoButtons(root) {
         toolbarType: ToolBarType.NAVIGATION,
         title: "Facebook login demo",
       });
+      trackWindow(result.id, { primary: true });
     });
   });
 
@@ -607,7 +1299,7 @@ export function setupProxyDemoButtons(root) {
           injected = true;
           await InAppBrowser.executeScript({
             code: `
-              (function() {
+              (() => {
                 const script = document.createElement("script");
                 script.type = "module";
                 script.src = "/assets/facebook-script.js";
@@ -624,7 +1316,7 @@ export function setupProxyDemoButtons(root) {
 
       listenerHandles.push(
         await InAppBrowser.addListener("messageFromWebview", async (event) => {
-          const detail = event.detail ?? {};
+          const detail = event.detail ?? event ?? {};
           if (detail.type === "facebook-script-error") {
             setStatus("Facebook script error", detail.message ?? "Unknown error");
             return;
@@ -638,7 +1330,7 @@ export function setupProxyDemoButtons(root) {
         }),
       );
 
-      await InAppBrowser.openWebView({
+      const result = await InAppBrowser.openWebView({
         url: FACEBOOK_URL,
         proxyRequests: true,
         headers: {
@@ -647,6 +1339,7 @@ export function setupProxyDemoButtons(root) {
         toolbarType: ToolBarType.NAVIGATION,
         title: "Facebook script proxy demo",
       });
+      trackWindow(result.id, { primary: true });
     });
   });
 }
