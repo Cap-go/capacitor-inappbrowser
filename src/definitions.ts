@@ -649,6 +649,16 @@ export interface OpenWebViewOptions {
    */
   textZoom?: number;
   /**
+   * enableZoom: enables pinch-to-zoom gestures in the Android WebView.
+   * When true, built-in zoom controls are enabled and the zoom buttons are hidden.
+   * **Android only** — ignored on iOS where zoom is enabled by default.
+   * @since 8.5.0
+   * @default false
+   * @example
+   * enableZoom: true
+   */
+  enableZoom?: boolean;
+  /**
    * preventDeeplink: if true, the deeplink will not be opened, if false the deeplink will be opened when clicked on the link. on IOS each schema need to be added to info.plist file under LSApplicationQueriesSchemes when false to make it work.
    * @since 0.1.0
    * @default false

@@ -844,6 +844,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         // Set Google Pay support option
         options.setEnableGooglePaySupport(Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false)));
+        options.setEnableZoom(Boolean.TRUE.equals(call.getBoolean("enableZoom", false)));
 
         // Set dimensions if provided
         Integer width = call.getInt("width");
