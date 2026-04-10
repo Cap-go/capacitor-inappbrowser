@@ -40,11 +40,23 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
-    public void resolveRedirectMethodDropsBodyForLegacyRedirects() {
+    public void resolveRedirectMethodPreservesNonPostMethodsOnLegacyRedirects() {
         assertEquals("GET", ProxyRequestSupport.resolveRedirectMethod("POST", 302));
+        assertEquals("PUT", ProxyRequestSupport.resolveRedirectMethod("PUT", 302));
+        assertEquals("DELETE", ProxyRequestSupport.resolveRedirectMethod("DELETE", 301));
         assertEquals("POST", ProxyRequestSupport.resolveRedirectMethod("POST", 307));
         assertFalse(ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect("POST", 302));
+        assertTrue(ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect("PUT", 302));
         assertTrue(ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect("POST", 307));
+    }
+
+    @Test
+    public void resolveOverrideUrlHandlesRelativeUrls() {
+        assertEquals("https://example.com/api/v2", ProxyRequestSupport.resolveOverrideUrl("https://example.com/api/v1", "/api/v2"));
+        assertEquals(
+            "https://cdn.example.net/file.js",
+            ProxyRequestSupport.resolveOverrideUrl("https://example.com/api/v1", "https://cdn.example.net/file.js")
+        );
     }
 
     @Test

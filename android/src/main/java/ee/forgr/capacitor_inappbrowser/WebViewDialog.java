@@ -173,6 +173,17 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private static class LegacyInitialProxyResult {
+
+        private final boolean canceled;
+        private final NativeResponseData responseData;
+
+        LegacyInitialProxyResult(boolean canceled, NativeResponseData responseData) {
+            this.canceled = canceled;
+            this.responseData = responseData;
+        }
+    }
+
     private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
     private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
     private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
@@ -3678,7 +3689,13 @@ public class WebViewDialog extends Dialog {
             );
 
             try {
-                NativeResponseData responseData = resolveLegacyInitialProxyResponse(requestContext);
+                LegacyInitialProxyResult proxyResult = resolveLegacyInitialProxyResponse(requestContext);
+                if (proxyResult.canceled) {
+                    rejectOpenWebViewIfNeeded("Initial legacy proxy request canceled");
+                    return;
+                }
+
+                NativeResponseData responseData = proxyResult.responseData;
                 if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
                     postInitialLegacyProxyFallback(initialUrl, initialHeaders, initialMethod, httpBody);
                     return;
@@ -3730,7 +3747,7 @@ public class WebViewDialog extends Dialog {
         });
     }
 
-    private NativeResponseData resolveLegacyInitialProxyResponse(NativeRequestContext requestContext) throws IOException {
+    private LegacyInitialProxyResult resolveLegacyInitialProxyResponse(NativeRequestContext requestContext) throws IOException {
         String proxyId = UUID.randomUUID().toString();
         ProxiedRequest proxiedRequest = new ProxiedRequest();
         proxiedRequest.requestContext = requestContext;
@@ -3755,10 +3772,10 @@ public class WebViewDialog extends Dialog {
         try {
             if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
                 if (proxiedRequest.canceled) {
-                    return null;
+                    return new LegacyInitialProxyResult(true, null);
                 }
                 if (proxiedRequest.nativeResponse != null) {
-                    return proxiedRequest.nativeResponse;
+                    return new LegacyInitialProxyResult(false, proxiedRequest.nativeResponse);
                 }
                 requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
             } else {
@@ -3778,7 +3795,7 @@ public class WebViewDialog extends Dialog {
         while (true) {
             RedirectReplayResult redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
             if (redirectReplay == null) {
-                return nativeResponse;
+                return new LegacyInitialProxyResult(false, nativeResponse);
             }
             requestContext = redirectReplay.requestContext;
             nativeResponse = redirectReplay.responseData;
@@ -4050,7 +4067,10 @@ public class WebViewDialog extends Dialog {
 
                 JSObject requestOverride = response.getJSObject("request");
                 if (requestOverride != null && proxiedRequest.requestContext != null) {
-                    String url = requestOverride.getString("url", proxiedRequest.requestContext.url);
+                    String url = ProxyRequestSupport.resolveOverrideUrl(
+                        proxiedRequest.requestContext.url,
+                        requestOverride.getString("url", proxiedRequest.requestContext.url)
+                    );
                     String method = requestOverride.getString("method", proxiedRequest.requestContext.method);
                     JSObject headersObject = requestOverride.getJSObject("headers");
                     Map<String, String> headers = ProxyRequestSupport.prepareOverrideHeaders(

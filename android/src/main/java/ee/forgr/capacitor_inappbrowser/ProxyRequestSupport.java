@@ -206,10 +206,19 @@ final class ProxyRequestSupport {
 
     static String resolveRedirectMethod(String method, int statusCode) {
         String normalizedMethod = normalizeMethod(method);
-        if ("GET".equals(normalizedMethod) || "HEAD".equals(normalizedMethod)) {
+        if ("HEAD".equals(normalizedMethod)) {
             return normalizedMethod;
         }
-        return shouldPreserveRequestBodyOnRedirect(method, statusCode) ? normalizedMethod : "GET";
+        if (statusCode == 303) {
+            return "GET";
+        }
+        if ("GET".equals(normalizedMethod)) {
+            return normalizedMethod;
+        }
+        if ((statusCode == 301 || statusCode == 302) && "POST".equals(normalizedMethod)) {
+            return "GET";
+        }
+        return normalizedMethod;
     }
 
     static boolean shouldPreserveRequestBodyOnRedirect(String method, int statusCode) {
@@ -217,7 +226,22 @@ final class ProxyRequestSupport {
         if ("GET".equals(normalizedMethod) || "HEAD".equals(normalizedMethod)) {
             return false;
         }
+        if (statusCode == 301 || statusCode == 302) {
+            return !"POST".equals(normalizedMethod);
+        }
         return statusCode == 307 || statusCode == 308;
+    }
+
+    static String resolveOverrideUrl(String requestUrl, String overrideUrl) {
+        if (overrideUrl == null || overrideUrl.isBlank()) {
+            return requestUrl;
+        }
+
+        try {
+            return new URL(new URL(requestUrl), overrideUrl).toString();
+        } catch (Exception error) {
+            return overrideUrl;
+        }
     }
 
     static Map<String, String> prepareRedirectHeaders(
