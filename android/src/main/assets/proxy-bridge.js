@@ -320,7 +320,7 @@
       const url = xhr.__proxyUrl || "";
       const headers = xhr.__proxyHeaders || {};
       const isAsync = xhr.__proxyAsync !== false;
-      const credentialsMode = normalizeCredentialsMode(xhr.__proxyCredentials);
+      const credentialsMode = xhr.withCredentials ? "include" : "same-origin";
       function completeSend(proxyUrl) {
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
         originalXhrSend.call(xhr, null);

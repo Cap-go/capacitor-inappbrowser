@@ -354,7 +354,7 @@
     const url = (xhr as any).__proxyUrl || '';
     const headers = (xhr as any).__proxyHeaders || {};
     const isAsync = (xhr as any).__proxyAsync !== false;
-    const credentialsMode = normalizeCredentialsMode((xhr as any).__proxyCredentials);
+    const credentialsMode = xhr.withCredentials ? 'include' : 'same-origin';
 
     function completeSend(proxyUrl: string) {
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
