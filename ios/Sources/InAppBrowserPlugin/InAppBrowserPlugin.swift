@@ -768,7 +768,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
-        let proxyRequests = call.getBool("proxyRequests") ?? false
+        let legacyProxyRequests: LegacyProxyRequestsConfiguration
+        do {
+            legacyProxyRequests = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: call.options["proxyRequests"])
+        } catch {
+            call.reject("Invalid proxyRequests regex: \(error.localizedDescription)")
+            return
+        }
         let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
         let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
         let outboundProxyRules: [NativeProxyRule]
@@ -794,11 +800,12 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             var proxyHandler: ProxySchemeHandler?
-            if proxyRequests || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+            if legacyProxyRequests.isEnabled || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
                 proxyHandler = ProxySchemeHandler(
                     plugin: self,
                     webviewId: webViewId,
-                    legacyProxyRequests: proxyRequests,
+                    legacyProxyRequests: legacyProxyRequests.isEnabled,
+                    legacyProxyRequestURLRegex: legacyProxyRequests.urlRegex,
                     outboundRules: outboundProxyRules,
                     inboundRules: inboundProxyRules
                 )
@@ -819,7 +826,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
                 captureConsoleLogs: captureConsoleLogs,
-                proxyRequests: proxyRequests,
+                proxyRequests: legacyProxyRequests.isEnabled,
                 proxySchemeHandler: proxyHandler
             )
 

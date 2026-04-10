@@ -2889,7 +2889,7 @@ public class WebViewDialog extends Dialog {
                         }
                     } else {
                         Pattern pattern = _options.getProxyRequestsPattern();
-                        if (pattern != null && !pattern.matcher(requestUrl).find()) {
+                        if (!ProxyRequestSupport.matchesProxyRequestsPattern(pattern, requestUrl)) {
                             return null;
                         }
                         if (
@@ -2925,10 +2925,26 @@ public class WebViewDialog extends Dialog {
                     }
 
                     boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
+                    boolean shouldDelegateLegacyRequest = ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(
+                        _options,
+                        requestContext.url
+                    );
 
-                    NativeProxyRule outboundRule = legacyProxyMode
-                        ? new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.DELEGATE_TO_JS)
-                        : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
+                    NativeProxyRule outboundRule =
+                        legacyProxyMode && shouldDelegateLegacyRequest
+                            ? new NativeProxyRule(
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  false,
+                                  NativeProxyRule.Action.DELEGATE_TO_JS
+                              )
+                            : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
 
                     if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
                         return createCanceledResponse();

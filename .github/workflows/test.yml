@@ -73,6 +73,49 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bun run maestro:test:android || (echo "Maestro Android run failed. Retrying once after emulator warmup..." && timeout 30s adb wait-for-device && sleep 15 && bun run maestro:test:android)
+  maestro_ios_proxy_regression:
+    timeout-minutes: 45
+    runs-on: macos-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: bun i
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Build example app for iOS regression flow
+        run: bun run example-app:prepare:ios
+      - name: Select iOS Simulator
+        run: |
+          xcrun simctl shutdown all || true
+          IOS_SIMULATOR_UDID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')
+          if [ -z "$IOS_SIMULATOR_UDID" ]; then
+            echo "No available iPhone simulator found"
+            exit 1
+          fi
+          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+      - name: Build and install iOS example app
+        run: |
+          xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+          xcodebuild \
+            -project example-app/ios/App/App.xcodeproj \
+            -scheme App \
+            -destination "id=$IOS_SIMULATOR_UDID" \
+            -derivedDataPath example-app/ios/DerivedData \
+            build
+          xcrun simctl install "$IOS_SIMULATOR_UDID" example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+      - name: Run Maestro proxy regression
+        run: |
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
+          $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest

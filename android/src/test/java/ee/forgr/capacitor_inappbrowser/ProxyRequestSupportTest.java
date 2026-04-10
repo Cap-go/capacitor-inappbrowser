@@ -104,6 +104,26 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void shouldDelegateLegacyJsProxyRequestHonorsRegexMatches() {
+        Options options = new Options();
+        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
+
+        assertTrue(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://api.example.com/login"));
+        assertFalse(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://cdn.example.com/script.js"));
+    }
+
+    @Test
+    public void shouldDelegateLegacyJsProxyRequestDisablesLegacyModeWhenNativeRulesExist() {
+        Options options = new Options();
+        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
+        options.setOutboundProxyRules(
+            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CONTINUE))
+        );
+
+        assertFalse(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://api.example.com/login"));
+    }
+
+    @Test
     public void mergeRequestHeadersPreservesNativeHeaders() throws Exception {
         Map<String, String> headers = ProxyRequestSupport.mergeRequestHeaders(
             Map.of("Cookie", "session=abc", "User-Agent", "Native"),

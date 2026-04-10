@@ -87,6 +87,11 @@ struct NativeResponseData {
     var contentType: String
 }
 
+struct LegacyProxyRequestsConfiguration {
+    let isEnabled: Bool
+    let urlRegex: NSRegularExpression?
+}
+
 enum ProxySchemeRequestSupport {
     enum JsResponseResolutionAction {
         case finishCachedResponse
@@ -140,6 +145,26 @@ enum ProxySchemeRequestSupport {
     static func timeoutTokenMatches(scheduledToken: UUID, currentToken: UUID?) -> Bool {
         currentToken == scheduledToken
     }
+
+    static func legacyProxyRequestsConfiguration(from rawValue: Any?) throws -> LegacyProxyRequestsConfiguration {
+        if let enabled = rawValue as? Bool {
+            return LegacyProxyRequestsConfiguration(isEnabled: enabled, urlRegex: nil)
+        }
+
+        guard let rawPattern = rawValue as? String else {
+            return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
+        }
+
+        let pattern = rawPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !pattern.isEmpty else {
+            return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
+        }
+
+        return LegacyProxyRequestsConfiguration(
+            isEnabled: true,
+            urlRegex: try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+        )
+    }
 }
 
 final class PendingProxyTask {
@@ -168,6 +193,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     private let webviewId: String
     private let proxyTimeoutSeconds: TimeInterval = 10
     private let legacyProxyRequests: Bool
+    private let legacyProxyRequestURLRegex: NSRegularExpression?
     private let outboundRules: [NativeProxyRule]
     private let inboundRules: [NativeProxyRule]
 
@@ -179,12 +205,14 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         plugin: InAppBrowserPlugin,
         webviewId: String,
         legacyProxyRequests: Bool,
+        legacyProxyRequestURLRegex: NSRegularExpression?,
         outboundRules: [NativeProxyRule],
         inboundRules: [NativeProxyRule]
     ) {
         self.plugin = plugin
         self.webviewId = webviewId
         self.legacyProxyRequests = legacyProxyRequests
+        self.legacyProxyRequestURLRegex = legacyProxyRequestURLRegex
         self.outboundRules = outboundRules
         self.inboundRules = inboundRules
         super.init()
@@ -196,6 +224,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             plugin: plugin,
             webviewId: webviewId,
             legacyProxyRequests: legacyProxyRequests,
+            legacyProxyRequestURLRegex: legacyProxyRequestURLRegex,
             outboundRules: outboundRules,
             inboundRules: inboundRules
         )
@@ -473,7 +502,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             rules = [
                 NativeProxyRule(
                     id: nil,
-                    urlRegex: nil,
+                    urlRegex: legacyProxyRequestURLRegex,
                     methodRegex: nil,
                     headerRegex: nil,
                     bodyRegex: nil,

@@ -61,6 +61,20 @@ final class ProxyRequestSupport {
         return Pattern.compile(proxyRequestsPattern);
     }
 
+    static boolean matchesProxyRequestsPattern(Pattern pattern, String requestUrl) {
+        if (pattern == null) {
+            return true;
+        }
+        if (requestUrl == null || requestUrl.isBlank()) {
+            return false;
+        }
+        return pattern.matcher(requestUrl).find();
+    }
+
+    static boolean shouldDelegateLegacyJsProxyRequest(Options options, String requestUrl) {
+        return usesLegacyJsProxyMode(options) && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+    }
+
     static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson) throws JSONException {
         Map<String, String> mergedHeaders = new LinkedHashMap<>();
         if (nativeHeaders != null) {
