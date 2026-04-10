@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.webkit.JavascriptInterface;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ProxyBridge {
 
@@ -23,6 +24,7 @@ public class ProxyBridge {
     }
 
     private final ConcurrentHashMap<String, StoredRequest> storedRequests = new ConcurrentHashMap<>();
+    private final ConcurrentLinkedQueue<String> storedRequestOrder = new ConcurrentLinkedQueue<>();
     private final String accessToken;
 
     public ProxyBridge(String accessToken) {
@@ -34,13 +36,15 @@ public class ProxyBridge {
         if (token == null || !token.equals(accessToken) || requestId == null || requestId.isEmpty()) {
             return;
         }
-        if (storedRequests.size() >= MAX_STORED_REQUESTS) {
-            var iterator = storedRequests.keys().asIterator();
-            if (iterator.hasNext()) {
-                storedRequests.remove(iterator.next());
+        while (storedRequests.size() >= MAX_STORED_REQUESTS) {
+            String oldestRequestId = storedRequestOrder.poll();
+            if (oldestRequestId == null) {
+                return;
             }
+            storedRequests.remove(oldestRequestId);
         }
         storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body, credentialsMode));
+        storedRequestOrder.add(requestId);
     }
 
     public StoredRequest getAndRemove(String requestId) {
