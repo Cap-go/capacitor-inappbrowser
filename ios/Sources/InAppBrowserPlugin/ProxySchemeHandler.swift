@@ -132,6 +132,24 @@ enum ProxySchemeRequestSupport {
         return responseURL
     }
 
+    static func responseCookieURL(_ response: URLResponse?, fallback: String) -> URL? {
+        if let responseURL = response?.url {
+            return responseURL
+        }
+        return URL(string: fallback)
+    }
+
+    static func responseCookies(
+        from storage: HTTPCookieStorage = .shared,
+        response: URLResponse?,
+        fallback: String
+    ) -> [HTTPCookie] {
+        guard let cookieURL = responseCookieURL(response, fallback: fallback) else {
+            return []
+        }
+        return storage.cookies(for: cookieURL) ?? []
+    }
+
     static func timeoutResolutionAction(phase: String, hasCachedResponse: Bool) -> TimeoutResolutionAction {
         if phase == "outbound" {
             return .fallbackToNative
@@ -389,8 +407,14 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 body: data ?? Data(),
                 contentType: responseHeaders["Content-Type"] ?? responseHeaders["content-type"] ?? "application/octet-stream"
             )
-            pendingTask.responseData = nativeResponse
-            self.executeInboundDecision(requestId: requestId)
+            self.syncResponseCookies(
+                from: response,
+                fallbackURL: pendingTask.requestContext.url
+            ) {
+                guard let pendingTask = self.pendingTask(for: requestId) else { return }
+                pendingTask.responseData = nativeResponse
+                self.executeInboundDecision(requestId: requestId)
+            }
         }
 
         taskLock.lock()
@@ -589,10 +613,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     private func finish(task: PendingProxyTask, with responseData: NativeResponseData) {
         guard let url = URL(string: task.requestContext.url),
               let httpResponse = HTTPURLResponse(
-                  url: url,
-                  statusCode: responseData.statusCode,
-                  httpVersion: "HTTP/1.1",
-                  headerFields: responseData.headers
+                url: url,
+                statusCode: responseData.statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: responseData.headers
               )
         else {
             task.schemeTask.didFailWithError(
@@ -612,6 +636,37 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     private func finishWithCanceledResponse(task: PendingProxyTask) {
         let responseData = NativeResponseData(statusCode: 204, headers: [:], body: Data(), contentType: "text/plain")
         finish(task: task, with: responseData)
+    }
+
+    private func syncResponseCookies(from response: URLResponse?, fallbackURL: String, completion: @escaping () -> Void) {
+        guard
+            let plugin,
+            let cookieStore = plugin.cookieStore(for: webviewId),
+            !fallbackURL.isEmpty
+        else {
+            completion()
+            return
+        }
+
+        let cookies = ProxySchemeRequestSupport.responseCookies(
+            response: response,
+            fallback: fallbackURL
+        )
+        guard !cookies.isEmpty else {
+            completion()
+            return
+        }
+
+        let group = DispatchGroup()
+        for cookie in cookies {
+            group.enter()
+            cookieStore.setCookie(cookie) {
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion()
+        }
     }
 
     private func extractBody(from request: URLRequest) -> String? {

@@ -105,14 +105,23 @@ function jsonResponse(payload) {
   return textResponse(JSON.stringify(payload), "application/json");
 }
 
-export function setupProxyRegression(root) {
+export function setupProxyRegression(root, options = {}) {
   const runButton = root.querySelector("#run-proxy-regression");
   const statusText = root.querySelector("#proxy-regression-status-text");
   const detailsText = root.querySelector("#proxy-regression-details");
 
   if (!runButton || !statusText || !detailsText) {
-    return;
+    return null;
   }
+
+  const notifyStatusChange =
+    typeof options.onStatusChange === "function"
+      ? options.onStatusChange
+      : () => {};
+  const notifyRunningChange =
+    typeof options.onRunningChange === "function"
+      ? options.onRunningChange
+      : () => {};
 
   let proxyHandle = null;
   let listenerHandles = [];
@@ -138,12 +147,14 @@ export function setupProxyRegression(root) {
   const setStatus = (message, details = "") => {
     statusText.textContent = message;
     detailsText.textContent = details;
+    notifyStatusChange(message, details);
   };
 
   const finish = async (message, details = "") => {
     completed = true;
     setStatus(message, details);
     runButton.disabled = false;
+    notifyRunningChange(false);
     const shouldClose = browserOpened;
     browserOpened = false;
     await resetState();
@@ -154,8 +165,13 @@ export function setupProxyRegression(root) {
     }
   };
 
-  runButton.addEventListener("click", async () => {
+  const runRegression = async () => {
+    if (runButton.disabled) {
+      return;
+    }
+
     runButton.disabled = true;
+    notifyRunningChange(true);
     browserOpened = false;
     completed = false;
     setStatus("Proxy regression running...", "");
@@ -237,5 +253,13 @@ export function setupProxyRegression(root) {
       const reason = error && error.message ? error.message : String(error);
       await finish("Proxy regression failed", reason);
     }
-  });
+  };
+
+  runButton.addEventListener("click", runRegression);
+  notifyStatusChange(statusText.textContent, detailsText.textContent);
+  notifyRunningChange(false);
+
+  return {
+    run: runRegression,
+  };
 }

@@ -291,7 +291,43 @@ window.customElements.define(
         }
       }
 
-      setupProxyRegression(self.shadowRoot);
+      const maestroReadyBanner = document.getElementById("maestro-ready-banner");
+      const maestroRunProxyButton = document.getElementById("maestro-run-proxy");
+      const maestroProxyStatus = document.getElementById("maestro-proxy-status");
+      const maestroProxyDetails = document.getElementById("maestro-proxy-details");
+
+      const updateMaestroStatus = (message, details = "") => {
+        if (maestroProxyStatus) {
+          maestroProxyStatus.textContent = message;
+        }
+        if (maestroProxyDetails) {
+          maestroProxyDetails.textContent = details;
+        }
+      };
+
+      const updateMaestroRunning = (running) => {
+        if (maestroRunProxyButton) {
+          maestroRunProxyButton.disabled = running;
+        }
+      };
+
+      const proxyRegressionControls = setupProxyRegression(self.shadowRoot, {
+        onStatusChange: updateMaestroStatus,
+        onRunningChange: updateMaestroRunning,
+      });
+
+      if (proxyRegressionControls?.run && maestroRunProxyButton) {
+        maestroRunProxyButton.addEventListener("click", () => {
+          proxyRegressionControls.run();
+        });
+        maestroRunProxyButton.disabled = false;
+        if (maestroReadyBanner) {
+          maestroReadyBanner.textContent = "Maestro Ready";
+        }
+      } else if (maestroReadyBanner) {
+        maestroReadyBanner.textContent = "Maestro Unavailable";
+      }
+
       setupProxyDemoButtons(self.shadowRoot);
 
       // Custom URL handler

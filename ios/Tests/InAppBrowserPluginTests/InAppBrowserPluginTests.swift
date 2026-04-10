@@ -121,6 +121,70 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testProxySchemeResponseCookieURLFallsBackToOriginalURL() throws {
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: XCTUnwrap(URL(string: "https://example.com/final")),
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.responseCookieURL(response, fallback: "https://example.com/original")?.absoluteString,
+            "https://example.com/final"
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.responseCookieURL(nil, fallback: "https://example.com/original")?.absoluteString,
+            "https://example.com/original"
+        )
+    }
+
+    func testProxySchemeResponseCookiesCollectsAllCookiesForResolvedURL() throws {
+        let cookieURL = try XCTUnwrap(URL(string: "https://proxy-cookie-tests.example/path"))
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: cookieURL,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        let cookieOne = try XCTUnwrap(
+            HTTPCookie(properties: [
+                .domain: cookieURL.host as Any,
+                .path: "/",
+                .name: "session_cookie",
+                .value: "abc123",
+                .secure: "TRUE"
+            ])
+        )
+        let cookieTwo = try XCTUnwrap(
+            HTTPCookie(properties: [
+                .domain: cookieURL.host as Any,
+                .path: "/",
+                .name: "csrf_cookie",
+                .value: "def456",
+                .secure: "TRUE"
+            ])
+        )
+
+        HTTPCookieStorage.shared.setCookie(cookieOne)
+        HTTPCookieStorage.shared.setCookie(cookieTwo)
+        defer {
+            HTTPCookieStorage.shared.deleteCookie(cookieOne)
+            HTTPCookieStorage.shared.deleteCookie(cookieTwo)
+        }
+
+        let cookies = ProxySchemeRequestSupport.responseCookies(response: response, fallback: "https://example.com/original")
+        let cookieNames = Set(cookies.map(\.name))
+
+        XCTAssertTrue(cookieNames.contains("session_cookie"))
+        XCTAssertTrue(cookieNames.contains("csrf_cookie"))
+    }
+
     func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
         XCTAssertEqual(
             ProxySchemeRequestSupport.timeoutResolutionAction(phase: "outbound", hasCachedResponse: false),

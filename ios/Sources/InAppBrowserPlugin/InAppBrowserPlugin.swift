@@ -222,6 +222,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         return webViewController
     }
 
+    func cookieStore(for id: String) -> WKHTTPCookieStore? {
+        resolveWebViewController(for: id)?.websiteDataStore()?.httpCookieStore
+    }
+
     private func dataStores(for targetId: String?) -> [WKWebsiteDataStore] {
         if let targetId {
             guard let controller = webViewControllers[targetId],

@@ -25,6 +25,23 @@
     <meta name="theme-color" content="#31d53d" />
   </head>
   <body>
+    <div
+      id="maestro-controls"
+      style="padding: 12px; border-bottom: 1px solid #d8e1ff; background: #f4f7ff; color: #1b1f3b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"
+    >
+      <div id="maestro-ready-banner" style="font-weight: 700;">Maestro Booting</div>
+      <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button
+          id="maestro-run-proxy"
+          disabled
+          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #5b39f7; color: #fff; font-size: 14px;"
+        >
+          Run Proxy Regression (Maestro)
+        </button>
+      </div>
+      <div id="maestro-proxy-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
+      <div id="maestro-proxy-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
+    </div>
     <capacitor-welcome></capacitor-welcome>
 
     <script src="./js/capacitor-welcome.js" type="module"></script>
