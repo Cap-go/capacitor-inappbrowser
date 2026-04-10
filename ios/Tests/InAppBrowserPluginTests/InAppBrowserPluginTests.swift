@@ -101,6 +101,26 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testProxySchemeResolvedResponseURLPrefersFinalURL() throws {
+        let response = try XCTUnwrap(
+            HTTPURLResponse(
+                url: XCTUnwrap(URL(string: "https://example.com/final")),
+                statusCode: 302,
+                httpVersion: nil,
+                headerFields: nil
+            )
+        )
+
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.resolvedResponseURL(response, fallback: "https://example.com/original"),
+            "https://example.com/final"
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.resolvedResponseURL(nil, fallback: "https://example.com/original"),
+            "https://example.com/original"
+        )
+    }
+
     func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
         XCTAssertEqual(
             ProxySchemeRequestSupport.timeoutResolutionAction(phase: "outbound", hasCachedResponse: false),

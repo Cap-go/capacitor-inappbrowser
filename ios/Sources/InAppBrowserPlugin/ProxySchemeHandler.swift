@@ -122,6 +122,16 @@ enum ProxySchemeRequestSupport {
         return rawURL
     }
 
+    static func resolvedResponseURL(_ response: URLResponse?, fallback: String) -> String {
+        guard
+            let responseURL = response?.url?.absoluteString,
+            !responseURL.isEmpty
+        else {
+            return fallback
+        }
+        return responseURL
+    }
+
     static func timeoutResolutionAction(phase: String, hasCachedResponse: Bool) -> TimeoutResolutionAction {
         if phase == "outbound" {
             return .fallbackToNative
@@ -369,6 +379,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
             let httpResponse = response as? HTTPURLResponse
             let responseHeaders = (httpResponse?.allHeaderFields as? [String: String]) ?? [:]
+            pendingTask.requestContext.url = ProxySchemeRequestSupport.resolvedResponseURL(
+                response,
+                fallback: pendingTask.requestContext.url
+            )
             let nativeResponse = NativeResponseData(
                 statusCode: httpResponse?.statusCode ?? 200,
                 headers: responseHeaders,

@@ -246,6 +246,17 @@ final class ProxyRequestSupport {
         return redirectedHeaders;
     }
 
+    static Map<String, String> prepareOverrideHeaders(Map<String, String> originalHeaders, String requestUrl, String overrideUrl) {
+        Map<String, String> overrideHeaders = new LinkedHashMap<>();
+        if (originalHeaders != null) {
+            overrideHeaders.putAll(originalHeaders);
+        }
+        if (isCrossOriginRedirect(requestUrl, overrideUrl)) {
+            dropHeadersIgnoreCase(overrideHeaders, CROSS_ORIGIN_REDIRECT_HEADER_NAMES);
+        }
+        return overrideHeaders;
+    }
+
     static boolean shouldLetWebViewHandleMissingBody(String requestUrl, String method, String base64Body) {
         if (isBridgeMarkerRequestUrl(requestUrl)) {
             return false;

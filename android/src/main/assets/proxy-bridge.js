@@ -258,6 +258,7 @@
         let inheritedHeaders = false;
         let body = null;
         let credentialsMode = "same-origin";
+        let requestCloneError = null;
         if (input instanceof Request) {
           url = input.url;
           method = input.method;
@@ -272,7 +273,8 @@
             if (buffer.byteLength > 0) {
               body = buffer;
             }
-          } catch (_error) {
+          } catch (error) {
+            requestCloneError = error;
           }
         } else {
           url = input instanceof URL ? input.toString() : input;
@@ -300,6 +302,9 @@
           if (init.credentials) {
             credentialsMode = normalizeCredentialsMode(init.credentials);
           }
+        }
+        if (requestCloneError != null) {
+          return originalFetch.call(window, input, init);
         }
         if (!shouldProxyUrl(url)) {
           return originalFetch.call(window, input, init);

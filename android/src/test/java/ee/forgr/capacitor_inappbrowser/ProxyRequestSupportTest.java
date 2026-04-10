@@ -89,6 +89,32 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void prepareOverrideHeadersDropsOriginBoundHeadersAcrossOrigins() {
+        Map<String, String> overrideHeaders = ProxyRequestSupport.prepareOverrideHeaders(
+            Map.of(
+                "Authorization",
+                "Bearer abc",
+                "Cookie",
+                "session=123",
+                "Origin",
+                "https://example.com",
+                "Referer",
+                "https://example.com/login",
+                "Accept",
+                "application/json"
+            ),
+            "https://example.com/login",
+            "https://accounts.example.net/oauth"
+        );
+
+        assertFalse(overrideHeaders.containsKey("Authorization"));
+        assertFalse(overrideHeaders.containsKey("Cookie"));
+        assertFalse(overrideHeaders.containsKey("Origin"));
+        assertFalse(overrideHeaders.containsKey("Referer"));
+        assertEquals("application/json", overrideHeaders.get("Accept"));
+    }
+
+    @Test
     public void usesLegacyJsProxyModeForRegexPatternWithoutNativeRules() {
         Options options = new Options();
         options.setProxyRequestsPattern(Pattern.compile("grailed"));
