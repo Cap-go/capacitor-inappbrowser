@@ -124,6 +124,9 @@
           }
           normalizedBody = yield encoded.arrayBuffer();
         }
+        if (!methodSupportsRequestBody(normalizedMethod)) {
+          normalizedBody = null;
+        }
         const base64Body = yield bodyToBase64(normalizedBody);
         if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody(normalizedMethod)) {
           throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);

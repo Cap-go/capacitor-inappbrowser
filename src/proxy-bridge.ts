@@ -126,6 +126,10 @@
       normalizedBody = await encoded.arrayBuffer();
     }
 
+    if (!methodSupportsRequestBody(normalizedMethod)) {
+      normalizedBody = null;
+    }
+
     const base64Body = await bodyToBase64(normalizedBody);
     if (
       normalizedBody !== null &&

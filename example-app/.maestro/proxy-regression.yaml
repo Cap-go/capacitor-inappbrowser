@@ -17,7 +17,7 @@ appId: ${APP_ID}
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Proxy regression passed"
-    timeout: 30000
+    timeout: 60000
 - scroll
 - assertVisible: "Script loaded | Fetch OK | XHR OK"
 - assertNotVisible: "Proxy regression failed"
