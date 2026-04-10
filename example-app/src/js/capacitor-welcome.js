@@ -296,6 +296,40 @@ window.customElements.define(
       const maestroProxyStatus = document.getElementById("maestro-proxy-status");
       const maestroProxyDetails = document.getElementById("maestro-proxy-details");
 
+      const withMaestroNativeHarness = (callback) => {
+        const harness = window.MaestroNativeHarness;
+        if (!harness || typeof callback !== "function") {
+          return;
+        }
+        try {
+          callback(harness);
+        } catch (_error) {}
+      };
+
+      const syncMaestroNativeReady = (ready) => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setReady === "function") {
+            harness.setReady(Boolean(ready));
+          }
+        });
+      };
+
+      const syncMaestroNativeRunning = (running) => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setRunning === "function") {
+            harness.setRunning(Boolean(running));
+          }
+        });
+      };
+
+      const syncMaestroNativeStatus = (message, details = "") => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setStatus === "function") {
+            harness.setStatus(message, details);
+          }
+        });
+      };
+
       const updateMaestroStatus = (message, details = "") => {
         if (maestroProxyStatus) {
           maestroProxyStatus.textContent = message;
@@ -303,12 +337,14 @@ window.customElements.define(
         if (maestroProxyDetails) {
           maestroProxyDetails.textContent = details;
         }
+        syncMaestroNativeStatus(message, details);
       };
 
       const updateMaestroRunning = (running) => {
         if (maestroRunProxyButton) {
           maestroRunProxyButton.disabled = running;
         }
+        syncMaestroNativeRunning(running);
       };
 
       const proxyRegressionControls = setupProxyRegression(self.shadowRoot, {
@@ -317,6 +353,9 @@ window.customElements.define(
       });
 
       if (proxyRegressionControls?.run && maestroRunProxyButton) {
+        window.__capgoRunMaestroProxy = () => {
+          proxyRegressionControls.run();
+        };
         maestroRunProxyButton.addEventListener("click", () => {
           proxyRegressionControls.run();
         });
@@ -324,8 +363,11 @@ window.customElements.define(
         if (maestroReadyBanner) {
           maestroReadyBanner.textContent = "Maestro Ready";
         }
+        syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
         maestroReadyBanner.textContent = "Maestro Unavailable";
+        window.__capgoRunMaestroProxy = undefined;
+        syncMaestroNativeReady(false);
       }
 
       setupProxyDemoButtons(self.shadowRoot);
