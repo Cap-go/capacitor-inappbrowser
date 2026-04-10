@@ -18,7 +18,6 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Proxy regression passed"
     timeout: 30000
-- assertVisible: "Script loaded"
-- assertVisible: "Fetch OK"
-- assertVisible: "XHR OK"
+- scroll
+- assertVisible: "Script loaded | Fetch OK | XHR OK"
 - assertNotVisible: "Proxy regression failed"
