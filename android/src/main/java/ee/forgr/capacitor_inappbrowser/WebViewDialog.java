@@ -2844,7 +2844,7 @@ public class WebViewDialog extends Dialog {
                     }
 
                     String requestUrl = request.getUrl().toString();
-                    boolean bridgeBackedRequest = requestUrl.contains("/_capgo_proxy_?");
+                    boolean bridgeBackedRequest = ProxyRequestSupport.isBridgeMarkerRequestUrl(requestUrl);
                     String originalUrl;
                     String method;
                     Map<String, String> requestHeaders = new HashMap<>();

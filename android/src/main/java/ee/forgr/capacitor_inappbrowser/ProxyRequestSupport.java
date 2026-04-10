@@ -75,6 +75,18 @@ final class ProxyRequestSupport {
         return usesLegacyJsProxyMode(options) && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
     }
 
+    static boolean isBridgeMarkerRequestUrl(String requestUrl) {
+        if (requestUrl == null || requestUrl.isBlank()) {
+            return false;
+        }
+        try {
+            URL parsedUrl = new URL(requestUrl);
+            return "/_capgo_proxy_".equals(parsedUrl.getPath()) && parsedUrl.getQuery() != null && !parsedUrl.getQuery().isBlank();
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
     static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson) throws JSONException {
         Map<String, String> mergedHeaders = new LinkedHashMap<>();
         if (nativeHeaders != null) {
@@ -217,7 +229,7 @@ final class ProxyRequestSupport {
     }
 
     static boolean shouldLetWebViewHandleMissingBody(String requestUrl, String method, String base64Body) {
-        if (requestUrl != null && requestUrl.contains("/_capgo_proxy_?")) {
+        if (isBridgeMarkerRequestUrl(requestUrl)) {
             return false;
         }
         if (!requiresCapturedRequestBody(method)) {

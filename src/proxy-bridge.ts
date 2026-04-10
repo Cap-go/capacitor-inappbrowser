@@ -33,6 +33,11 @@
     return btoa(unescape(encodeURIComponent(value)));
   }
 
+  function hasHeader(headers: Record<string, string>, headerName: string): boolean {
+    const normalizedHeaderName = headerName.toLowerCase();
+    return Object.keys(headers).some((key) => key.toLowerCase() === normalizedHeaderName);
+  }
+
   function normalizeMethod(method: string | null | undefined): string {
     return (method || 'GET').toUpperCase();
   }
@@ -338,6 +343,8 @@
     (this as any).__proxyHeaders = {};
     (this as any).__proxyAsync = rest[0] !== false;
     (this as any).__proxyCredentials = this.withCredentials ? 'include' : 'same-origin';
+    (this as any).__proxyUsername = typeof rest[1] === 'string' ? rest[1] : null;
+    (this as any).__proxyPassword = typeof rest[2] === 'string' ? rest[2] : '';
     return originalXhrOpen.apply(this, [method, url, ...rest] as any);
   };
 
@@ -355,6 +362,12 @@
     const headers = (xhr as any).__proxyHeaders || {};
     const isAsync = (xhr as any).__proxyAsync !== false;
     const credentialsMode = xhr.withCredentials ? 'include' : 'same-origin';
+    const username = (xhr as any).__proxyUsername;
+    const password = (xhr as any).__proxyPassword;
+
+    if (typeof username === 'string' && username.length > 0 && !hasHeader(headers, 'Authorization')) {
+      headers['Authorization'] = 'Basic ' + stringToBase64(username + ':' + (typeof password === 'string' ? password : ''));
+    }
 
     function completeSend(proxyUrl: string) {
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);

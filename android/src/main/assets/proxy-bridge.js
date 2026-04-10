@@ -43,6 +43,10 @@
     function stringToBase64(value) {
       return btoa(unescape(encodeURIComponent(value)));
     }
+    function hasHeader(headers, headerName) {
+      const normalizedHeaderName = headerName.toLowerCase();
+      return Object.keys(headers).some((key) => key.toLowerCase() === normalizedHeaderName);
+    }
     function normalizeMethod(method) {
       return (method || "GET").toUpperCase();
     }
@@ -306,6 +310,8 @@
       this.__proxyHeaders = {};
       this.__proxyAsync = rest[0] !== false;
       this.__proxyCredentials = this.withCredentials ? "include" : "same-origin";
+      this.__proxyUsername = typeof rest[1] === "string" ? rest[1] : null;
+      this.__proxyPassword = typeof rest[2] === "string" ? rest[2] : "";
       return originalXhrOpen.apply(this, [method, url, ...rest]);
     };
     XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
@@ -321,6 +327,11 @@
       const headers = xhr.__proxyHeaders || {};
       const isAsync = xhr.__proxyAsync !== false;
       const credentialsMode = xhr.withCredentials ? "include" : "same-origin";
+      const username = xhr.__proxyUsername;
+      const password = xhr.__proxyPassword;
+      if (typeof username === "string" && username.length > 0 && !hasHeader(headers, "Authorization")) {
+        headers["Authorization"] = "Basic " + stringToBase64(username + ":" + (typeof password === "string" ? password : ""));
+      }
       function completeSend(proxyUrl) {
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
         originalXhrSend.call(xhr, null);
