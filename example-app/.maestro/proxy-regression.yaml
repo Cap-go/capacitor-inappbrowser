@@ -3,8 +3,8 @@ appId: ${APP_ID}
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: "InAppBrowser Test App"
-    timeout: 30000
+    visible: "CUSTOM URL"
+    timeout: 60000
 - scrollUntilVisible:
     element:
       text: "Run Proxy Regression Test"
