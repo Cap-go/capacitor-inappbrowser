@@ -366,7 +366,8 @@
     const password = (xhr as any).__proxyPassword;
 
     if (typeof username === 'string' && username.length > 0 && !hasHeader(headers, 'Authorization')) {
-      headers['Authorization'] = 'Basic ' + stringToBase64(username + ':' + (typeof password === 'string' ? password : ''));
+      headers['Authorization'] =
+        'Basic ' + stringToBase64(username + ':' + (typeof password === 'string' ? password : ''));
     }
 
     function completeSend(proxyUrl: string) {

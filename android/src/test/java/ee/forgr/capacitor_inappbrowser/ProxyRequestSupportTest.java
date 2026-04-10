@@ -126,9 +126,7 @@ public class ProxyRequestSupportTest {
     @Test
     public void isBridgeMarkerRequestUrlMatchesOnlyDedicatedRoute() {
         assertTrue(
-            ProxyRequestSupport.isBridgeMarkerRequestUrl(
-                "https://example.com/_capgo_proxy_?u=https%3A%2F%2Fapi.example.com%2Flogin&rid=1"
-            )
+            ProxyRequestSupport.isBridgeMarkerRequestUrl("https://example.com/_capgo_proxy_?u=https%3A%2F%2Fapi.example.com%2Flogin&rid=1")
         );
         assertFalse(ProxyRequestSupport.isBridgeMarkerRequestUrl("https://example.com/api/_capgo_proxy_?foo=bar"));
         assertFalse(ProxyRequestSupport.isBridgeMarkerRequestUrl("https://example.com/_capgo_proxy_"));
