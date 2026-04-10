@@ -521,6 +521,12 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+        if (_options.getEnableZoom()) {
+            _webView.getSettings().setSupportZoom(true);
+            _webView.getSettings().setBuiltInZoomControls(true);
+            _webView.getSettings().setDisplayZoomControls(false);
+        }
+
         // Open links in external browser for target="_blank" if preventDeepLink is false
         if (!_options.getPreventDeeplink()) {
             _webView.getSettings().setSupportMultipleWindows(true);
