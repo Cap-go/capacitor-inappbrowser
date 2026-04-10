@@ -67,6 +67,20 @@
       headers["content-type"] = inferredContentType;
     }
   }
+  function getSubmitEventSubmitter(event, submitEventCtor) {
+    var _a, _b;
+    const resolvedSubmitEventCtor = submitEventCtor != null ? submitEventCtor : typeof SubmitEvent !== "undefined" ? SubmitEvent : void 0;
+    if (resolvedSubmitEventCtor && event instanceof resolvedSubmitEventCtor) {
+      return (_a = event.submitter) != null ? _a : null;
+    }
+    if ("submitter" in event) {
+      return (_b = event.submitter) != null ? _b : null;
+    }
+    return null;
+  }
+  function shouldProxySubmitEvent(defaultPrevented, canProxyTarget) {
+    return !defaultPrevented && canProxyTarget;
+  }
 
   // src/proxy-bridge.ts
   (function() {
@@ -451,32 +465,28 @@
         delete form[nativeSubmitBypassKey];
       }
     }
-    document.addEventListener(
-      "submit",
-      (event) => {
-        const form = event.target instanceof HTMLFormElement ? event.target : null;
-        if (!form) {
-          return;
-        }
-        if (form[nativeSubmitBypassKey]) {
-          return;
-        }
-        const submitter = event instanceof SubmitEvent ? event.submitter : null;
-        if (!canProxyFormTarget(resolveFormTarget(form, submitter))) {
-          return;
-        }
-        event.preventDefault();
-        proxyFormSubmission(form, submitter).then((handled) => {
-          if (!handled) {
-            resumeNativeFormSubmission(form, submitter);
-          }
-        }).catch((_error) => {
-          console.error("[proxy-bridge] Failed to proxy form submission");
+    document.addEventListener("submit", (event) => {
+      const form = event.target instanceof HTMLFormElement ? event.target : null;
+      if (!form) {
+        return;
+      }
+      if (form[nativeSubmitBypassKey]) {
+        return;
+      }
+      const submitter = getSubmitEventSubmitter(event);
+      if (!shouldProxySubmitEvent(event.defaultPrevented, canProxyFormTarget(resolveFormTarget(form, submitter)))) {
+        return;
+      }
+      event.preventDefault();
+      proxyFormSubmission(form, submitter).then((handled) => {
+        if (!handled) {
           resumeNativeFormSubmission(form, submitter);
-        });
-      },
-      true
-    );
+        }
+      }).catch((_error) => {
+        console.error("[proxy-bridge] Failed to proxy form submission");
+        resumeNativeFormSubmission(form, submitter);
+      });
+    });
     HTMLFormElement.prototype.submit = function() {
       const form = this;
       proxyFormSubmission(form).then((handled) => {

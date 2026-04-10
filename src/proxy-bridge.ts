@@ -1,4 +1,10 @@
-import { appendCapturedHeader, ensureInferredContentType, replaceCapturedHeader } from './proxy-bridge-support';
+import {
+  appendCapturedHeader,
+  ensureInferredContentType,
+  getSubmitEventSubmitter,
+  replaceCapturedHeader,
+  shouldProxySubmitEvent,
+} from './proxy-bridge-support';
 
 /* eslint-disable */
 /**
@@ -461,36 +467,32 @@ import { appendCapturedHeader, ensureInferredContentType, replaceCapturedHeader 
     }
   }
 
-  document.addEventListener(
-    'submit',
-    (event) => {
-      const form = event.target instanceof HTMLFormElement ? event.target : null;
-      if (!form) {
-        return;
-      }
-      if ((form as any)[nativeSubmitBypassKey]) {
-        return;
-      }
+  document.addEventListener('submit', (event) => {
+    const form = event.target instanceof HTMLFormElement ? event.target : null;
+    if (!form) {
+      return;
+    }
+    if ((form as any)[nativeSubmitBypassKey]) {
+      return;
+    }
 
-      const submitter = event instanceof SubmitEvent ? event.submitter : null;
-      if (!canProxyFormTarget(resolveFormTarget(form, submitter))) {
-        return;
-      }
+    const submitter = getSubmitEventSubmitter(event as Event & { submitter?: Element | null }) as Element | null;
+    if (!shouldProxySubmitEvent(event.defaultPrevented, canProxyFormTarget(resolveFormTarget(form, submitter)))) {
+      return;
+    }
 
-      event.preventDefault();
-      proxyFormSubmission(form, submitter)
-        .then((handled) => {
-          if (!handled) {
-            resumeNativeFormSubmission(form, submitter);
-          }
-        })
-        .catch((_error) => {
-          console.error('[proxy-bridge] Failed to proxy form submission');
+    event.preventDefault();
+    proxyFormSubmission(form, submitter)
+      .then((handled) => {
+        if (!handled) {
           resumeNativeFormSubmission(form, submitter);
-        });
-    },
-    true,
-  );
+        }
+      })
+      .catch((_error) => {
+        console.error('[proxy-bridge] Failed to proxy form submission');
+        resumeNativeFormSubmission(form, submitter);
+      });
+  });
 
   HTMLFormElement.prototype.submit = function () {
     const form = this;

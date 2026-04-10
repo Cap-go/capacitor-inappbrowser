@@ -47,3 +47,30 @@ export function ensureInferredContentType(headers: Record<string, string>, body:
     headers['content-type'] = inferredContentType;
   }
 }
+
+type SubmitEventLike = Event & { submitter?: unknown };
+
+export function getSubmitEventSubmitter(
+  event: SubmitEventLike,
+  submitEventCtor?: { prototype: Event; new (...args: any[]): Event },
+): unknown | null {
+  const resolvedSubmitEventCtor =
+    submitEventCtor ??
+    (typeof SubmitEvent !== 'undefined'
+      ? (SubmitEvent as unknown as { prototype: Event; new (...args: any[]): Event })
+      : undefined);
+
+  if (resolvedSubmitEventCtor && event instanceof resolvedSubmitEventCtor) {
+    return event.submitter ?? null;
+  }
+
+  if ('submitter' in event) {
+    return event.submitter ?? null;
+  }
+
+  return null;
+}
+
+export function shouldProxySubmitEvent(defaultPrevented: boolean, canProxyTarget: boolean): boolean {
+  return !defaultPrevented && canProxyTarget;
+}

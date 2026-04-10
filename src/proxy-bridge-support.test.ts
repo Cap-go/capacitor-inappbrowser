@@ -3,8 +3,10 @@ import { describe, expect, it } from 'bun:test';
 import {
   appendCapturedHeader,
   ensureInferredContentType,
+  getSubmitEventSubmitter,
   inferContentTypeFromBody,
   replaceCapturedHeader,
+  shouldProxySubmitEvent,
 } from './proxy-bridge-support';
 
 describe('proxy bridge header helpers', () => {
@@ -47,5 +49,35 @@ describe('proxy bridge content type inference', () => {
 
   it('returns null for bodies without implicit content types', () => {
     expect(inferContentTypeFromBody(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+});
+
+describe('proxy bridge submit helpers', () => {
+  it('reads the submitter without requiring SubmitEvent support', () => {
+    const submitter = { id: 'submit-button' };
+    const event = { submitter } as Event & { submitter: { id: string } };
+
+    expect(getSubmitEventSubmitter(event)).toBe(submitter);
+  });
+
+  it('reads the submitter from a submit event instance when a constructor is available', () => {
+    const submitter = { id: 'submit-button' };
+
+    class FakeSubmitEvent extends Event {
+      submitter: unknown;
+
+      constructor(currentSubmitter: unknown) {
+        super('submit');
+        this.submitter = currentSubmitter;
+      }
+    }
+
+    expect(getSubmitEventSubmitter(new FakeSubmitEvent(submitter), FakeSubmitEvent)).toBe(submitter);
+  });
+
+  it('skips proxy interception when the page already canceled submission', () => {
+    expect(shouldProxySubmitEvent(false, true)).toBe(true);
+    expect(shouldProxySubmitEvent(true, true)).toBe(false);
+    expect(shouldProxySubmitEvent(false, false)).toBe(false);
   });
 });
