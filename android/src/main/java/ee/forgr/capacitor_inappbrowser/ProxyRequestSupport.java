@@ -3,6 +3,7 @@ package ee.forgr.capacitor_inappbrowser;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -13,6 +14,8 @@ final class ProxyRequestSupport {
     private record ParsedJsonString(String value, int nextIndex) {}
 
     record WebResourceResponseMetadata(String mimeType, String encoding) {}
+
+    record ParsedResponseHeaders(Map<String, String> responseHeaders, List<String> cookieHeaders) {}
 
     private static final String[] SAFE_MARKER_HEADER_NAMES = {
         "Accept",
@@ -73,6 +76,21 @@ final class ProxyRequestSupport {
 
     static boolean shouldDelegateLegacyJsProxyRequest(Options options, String requestUrl) {
         return usesLegacyJsProxyMode(options) && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+    }
+
+    static boolean shouldHandleNonBridgeRequest(Options options, String requestUrl) {
+        if (options == null) {
+            return false;
+        }
+        if (
+            !options.getProxyRequests() &&
+            options.getProxyRequestsPattern() == null &&
+            options.getOutboundProxyRules().isEmpty() &&
+            options.getInboundProxyRules().isEmpty()
+        ) {
+            return false;
+        }
+        return !usesLegacyJsProxyMode(options) || matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
     }
 
     static boolean isBridgeMarkerRequestUrl(String requestUrl) {
@@ -272,6 +290,39 @@ final class ProxyRequestSupport {
         }
 
         return new WebResourceResponseMetadata(mimeType, encoding);
+    }
+
+    static ParsedResponseHeaders splitResponseHeaders(Map<String, List<String>> rawHeaders) {
+        Map<String, String> responseHeaders = new HashMap<>();
+        List<String> cookieHeaders = new java.util.ArrayList<>();
+        if (rawHeaders == null || rawHeaders.isEmpty()) {
+            return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
+        }
+
+        for (Map.Entry<String, List<String>> entry : rawHeaders.entrySet()) {
+            String headerName = entry.getKey();
+            List<String> headerValues = entry.getValue();
+            if (headerName == null || headerValues == null || headerValues.isEmpty()) {
+                continue;
+            }
+
+            if (isCookieResponseHeader(headerName)) {
+                for (String headerValue : headerValues) {
+                    if (headerValue != null && !headerValue.isBlank()) {
+                        cookieHeaders.add(headerValue);
+                    }
+                }
+                continue;
+            }
+
+            String headerValue = headerValues.get(0);
+            if (headerValue == null || headerValue.isBlank()) {
+                continue;
+            }
+            responseHeaders.put(headerName, headerValue);
+        }
+
+        return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
     }
 
     private static boolean requiresCapturedRequestBody(String method) {
@@ -508,6 +559,10 @@ final class ProxyRequestSupport {
             normalizedMimeType.endsWith("+xml") ||
             normalizedMimeType.endsWith("+javascript")
         );
+    }
+
+    private static boolean isCookieResponseHeader(String headerName) {
+        return "Set-Cookie".equalsIgnoreCase(headerName) || "Set-Cookie2".equalsIgnoreCase(headerName);
     }
 
     private static String stripOptionalQuotes(String value) {

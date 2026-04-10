@@ -124,6 +124,18 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void shouldHandleNonBridgeRequestKeepsNativeRulesActiveWhenLegacyRegexMisses() {
+        Options options = new Options();
+        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
+        options.setOutboundProxyRules(
+            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CANCEL))
+        );
+
+        assertTrue(ProxyRequestSupport.shouldHandleNonBridgeRequest(options, "https://cdn.example.com/script.js"));
+        assertFalse(ProxyRequestSupport.shouldHandleNonBridgeRequest(new Options(), "https://cdn.example.com/script.js"));
+    }
+
+    @Test
     public void isBridgeMarkerRequestUrlMatchesOnlyDedicatedRoute() {
         assertTrue(
             ProxyRequestSupport.isBridgeMarkerRequestUrl("https://example.com/_capgo_proxy_?u=https%3A%2F%2Fapi.example.com%2Flogin&rid=1")
@@ -260,5 +272,24 @@ public class ProxyRequestSupportTest {
 
         assertEquals("image/png", imageMetadata.mimeType());
         assertNull(imageMetadata.encoding());
+    }
+
+    @Test
+    public void splitResponseHeadersPreservesAllCookieValuesSeparately() {
+        ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(
+            Map.of(
+                "Content-Type",
+                List.of("text/html; charset=utf-8"),
+                "Set-Cookie",
+                List.of("session=abc; Path=/", "csrf=def; Path=/"),
+                "Cache-Control",
+                List.of("no-store")
+            )
+        );
+
+        assertEquals("text/html; charset=utf-8", parsedHeaders.responseHeaders().get("Content-Type"));
+        assertEquals("no-store", parsedHeaders.responseHeaders().get("Cache-Control"));
+        assertFalse(parsedHeaders.responseHeaders().containsKey("Set-Cookie"));
+        assertEquals(List.of("session=abc; Path=/", "csrf=def; Path=/"), parsedHeaders.cookieHeaders());
     }
 }

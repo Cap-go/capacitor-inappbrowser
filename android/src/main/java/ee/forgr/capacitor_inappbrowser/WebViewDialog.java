@@ -2888,16 +2888,7 @@ public class WebViewDialog extends Dialog {
                             requestHeaders.put("Cookie", targetCookies);
                         }
                     } else {
-                        Pattern pattern = _options.getProxyRequestsPattern();
-                        if (!ProxyRequestSupport.matchesProxyRequestsPattern(pattern, requestUrl)) {
-                            return null;
-                        }
-                        if (
-                            !_options.getProxyRequests() &&
-                            pattern == null &&
-                            _options.getOutboundProxyRules().isEmpty() &&
-                            _options.getInboundProxyRules().isEmpty()
-                        ) {
+                        if (!ProxyRequestSupport.shouldHandleNonBridgeRequest(_options, requestUrl)) {
                             return null;
                         }
 
@@ -3828,12 +3819,9 @@ public class WebViewDialog extends Dialog {
                 }
             }
 
-            Map<String, String> responseHeaders = new HashMap<>();
-            for (Map.Entry<String, java.util.List<String>> entry : conn.getHeaderFields().entrySet()) {
-                if (entry.getKey() != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
-                    responseHeaders.put(entry.getKey(), entry.getValue().get(0));
-                }
-            }
+            ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(conn.getHeaderFields());
+            applyResponseCookies(requestContext.url, parsedHeaders.cookieHeaders());
+            Map<String, String> responseHeaders = parsedHeaders.responseHeaders();
 
             String contentType = responseHeaders.get("Content-Type");
             if (contentType == null) {
@@ -3846,6 +3834,24 @@ public class WebViewDialog extends Dialog {
             return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
         } finally {
             conn.disconnect();
+        }
+    }
+
+    private void applyResponseCookies(String requestUrl, java.util.List<String> cookieHeaders) {
+        if (requestUrl == null || requestUrl.isBlank() || cookieHeaders == null || cookieHeaders.isEmpty()) {
+            return;
+        }
+        CookieManager cookieManager = CookieManager.getInstance();
+        boolean wroteCookie = false;
+        for (String cookieHeader : cookieHeaders) {
+            if (cookieHeader == null || cookieHeader.isBlank()) {
+                continue;
+            }
+            cookieManager.setCookie(requestUrl, cookieHeader);
+            wroteCookie = true;
+        }
+        if (wroteCookie) {
+            cookieManager.flush();
         }
     }
 
