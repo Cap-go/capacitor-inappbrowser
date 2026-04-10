@@ -51,6 +51,10 @@ public class ProxyBridge {
         if (requestId == null) {
             return null;
         }
-        return storedRequests.remove(requestId);
+        StoredRequest storedRequest = storedRequests.remove(requestId);
+        if (storedRequest != null) {
+            storedRequestOrder.remove(requestId);
+        }
+        return storedRequest;
     }
 }
