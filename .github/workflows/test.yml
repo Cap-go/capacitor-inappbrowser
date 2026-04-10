@@ -73,7 +73,18 @@ jobs:
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: bun run maestro:test:android || (echo "Maestro Android run failed. Retrying once after emulator warmup..." && timeout 30s adb wait-for-device && sleep 15 && bun run maestro:test:android)
+          script: |
+            set +e
+            timeout 12m bun run maestro:test:android
+            first_status=$?
+            set -e
+            if [ "$first_status" -eq 0 ]; then
+              exit 0
+            fi
+            echo "Maestro Android run failed or timed out (exit $first_status). Retrying once after emulator warmup..."
+            timeout 30s adb wait-for-device
+            sh ./scripts/wait-android-system-ready.sh
+            timeout 12m bun run maestro:test:android
   maestro_ios_proxy_regression:
     timeout-minutes: 45
     runs-on: macos-latest
