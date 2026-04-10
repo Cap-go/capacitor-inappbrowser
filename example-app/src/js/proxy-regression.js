@@ -11,6 +11,7 @@ const ENTRY_HTML = `<!doctype html>
     <meta charset="UTF-8" />
     <title>Proxy Regression Entry</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
   </head>
   <body>
     <main>

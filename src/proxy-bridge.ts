@@ -363,6 +363,7 @@
 
   const originalXhrOpen = XMLHttpRequest.prototype.open;
   const originalXhrSend = XMLHttpRequest.prototype.send;
+  const originalXhrAbort = XMLHttpRequest.prototype.abort;
   const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
   XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
@@ -373,6 +374,7 @@
     (this as any).__proxyCredentials = this.withCredentials ? 'include' : 'same-origin';
     (this as any).__proxyUsername = typeof rest[1] === 'string' ? rest[1] : null;
     (this as any).__proxyPassword = typeof rest[2] === 'string' ? rest[2] : '';
+    (this as any).__proxyAborted = false;
     return originalXhrOpen.apply(this, [method, url, ...rest] as any);
   };
 
@@ -381,6 +383,11 @@
       (this as any).__proxyHeaders[name] = value;
     }
     return originalXhrSetRequestHeader.call(this, name, value);
+  };
+
+  XMLHttpRequest.prototype.abort = function () {
+    (this as any).__proxyAborted = true;
+    return originalXhrAbort.call(this);
   };
 
   XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
@@ -399,6 +406,9 @@
     }
 
     function completeSend(proxyUrl: string) {
+      if ((xhr as any).__proxyAborted) {
+        return;
+      }
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
       originalXhrSend.call(xhr, null);
     }
@@ -419,6 +429,9 @@
         completeSend(proxyUrl);
       })
       .catch((_error) => {
+        if ((xhr as any).__proxyAborted) {
+          return;
+        }
         console.error('[proxy-bridge] Failed to encode XMLHttpRequest body');
         originalXhrSend.call(xhr, body ?? null);
       });

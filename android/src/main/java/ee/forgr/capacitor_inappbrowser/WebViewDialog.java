@@ -79,6 +79,7 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
@@ -86,6 +87,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -1100,7 +1102,9 @@ public class WebViewDialog extends Dialog {
         String httpBody = _options.getHttpBody();
 
         if (!_options.isPopupWindowMode()) {
-            if (supportsRequestBody(httpMethod) && httpBody != null) {
+            if (shouldBootstrapInitialLegacyProxyLoad()) {
+                loadInitialLegacyProxyContent(requestHeaders, httpMethod, httpBody);
+            } else if (supportsRequestBody(httpMethod) && httpBody != null) {
                 // For POST/PUT/PATCH requests with body
                 // Note: Android WebView has limitations with custom headers on POST
                 // Headers may not be sent with the initial request when using postUrl
@@ -3645,6 +3649,164 @@ public class WebViewDialog extends Dialog {
 
     private boolean shouldUseNativeProxy() {
         return _options != null && _options.shouldEnableNativeProxy();
+    }
+
+    private boolean shouldBootstrapInitialLegacyProxyLoad() {
+        if (_options == null || _options.isPopupWindowMode()) {
+            return false;
+        }
+        return ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, _options.getUrl());
+    }
+
+    private void loadInitialLegacyProxyContent(Map<String, String> requestHeaders, String httpMethod, String httpBody) {
+        final String initialUrl = _options.getUrl();
+        final Map<String, String> initialHeaders = requestHeaders != null ? new HashMap<>(requestHeaders) : new HashMap<>();
+        final String initialMethod = httpMethod != null && !httpMethod.isBlank() ? httpMethod : "GET";
+        final String initialBody =
+            supportsRequestBody(initialMethod) && httpBody != null
+                ? Base64.encodeToString(httpBody.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP)
+                : "";
+
+        executorService.execute(() -> {
+            NativeRequestContext requestContext = new NativeRequestContext(
+                initialUrl,
+                initialMethod,
+                initialHeaders,
+                initialBody,
+                true,
+                "same-origin"
+            );
+
+            try {
+                NativeResponseData responseData = resolveLegacyInitialProxyResponse(requestContext);
+                if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
+                    postInitialLegacyProxyFallback(initialUrl, initialHeaders, initialMethod, httpBody);
+                    return;
+                }
+
+                ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+                    responseData.contentType,
+                    responseData.headers
+                );
+                String encoding = metadata.encoding() != null && !metadata.encoding().isBlank() ? metadata.encoding() : "utf-8";
+                String body = decodeResponseBody(responseData.bodyBytes, encoding);
+
+                if (_webView == null) {
+                    return;
+                }
+
+                _webView.post(() -> {
+                    if (_webView == null) {
+                        return;
+                    }
+                    _webView.loadDataWithBaseURL(initialUrl, body, metadata.mimeType(), encoding, initialUrl);
+                });
+            } catch (IOException error) {
+                Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
+                postInitialLegacyProxyFallback(initialUrl, initialHeaders, initialMethod, httpBody);
+            }
+        });
+    }
+
+    private void postInitialLegacyProxyFallback(String url, Map<String, String> headers, String method, String httpBody) {
+        if (_webView == null) {
+            return;
+        }
+
+        final Map<String, String> fallbackHeaders = headers != null ? new HashMap<>(headers) : new HashMap<>();
+        final String fallbackMethod = method != null ? method : "GET";
+        final String fallbackBody = httpBody;
+
+        _webView.post(() -> {
+            if (_webView == null) {
+                return;
+            }
+            if (supportsRequestBody(fallbackMethod) && fallbackBody != null) {
+                byte[] postData = fallbackBody.getBytes(StandardCharsets.UTF_8);
+                _webView.postUrl(url, postData);
+                return;
+            }
+            _webView.loadUrl(url, fallbackHeaders);
+        });
+    }
+
+    private NativeResponseData resolveLegacyInitialProxyResponse(NativeRequestContext requestContext) throws IOException {
+        String proxyId = UUID.randomUUID().toString();
+        ProxiedRequest proxiedRequest = new ProxiedRequest();
+        proxiedRequest.requestContext = requestContext;
+        addProxiedRequest(proxyId, proxiedRequest);
+
+        String dialogId = instanceId != null ? instanceId : "";
+        _options
+            .getCallbacks()
+            .proxyRequestEvent(
+                proxyId,
+                "outbound",
+                requestContext.url,
+                requestContext.method,
+                serializeHeaders(requestContext.headers),
+                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                null,
+                null,
+                null,
+                dialogId
+            );
+
+        try {
+            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                if (proxiedRequest.canceled) {
+                    return null;
+                }
+                if (proxiedRequest.nativeResponse != null) {
+                    return proxiedRequest.nativeResponse;
+                }
+                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+            } else {
+                synchronized (proxiedRequest) {
+                    proxiedRequest.timedOut = true;
+                }
+                removeProxiedRequest(proxyId);
+            }
+        } catch (InterruptedException error) {
+            removeProxiedRequest(proxyId);
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for initial proxy response", error);
+        }
+
+        NativeResponseData nativeResponse = performNativeRequest(requestContext);
+        int redirectsFollowed = 0;
+        while (true) {
+            RedirectReplayResult redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+            if (redirectReplay == null) {
+                return nativeResponse;
+            }
+            requestContext = redirectReplay.requestContext;
+            nativeResponse = redirectReplay.responseData;
+            redirectsFollowed++;
+        }
+    }
+
+    private boolean canBootstrapHtmlResponse(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return false;
+        }
+        String normalizedContentType = contentType.toLowerCase(Locale.US);
+        return (
+            normalizedContentType.startsWith("text/html") ||
+            normalizedContentType.startsWith("application/xhtml+xml") ||
+            normalizedContentType.startsWith("text/plain")
+        );
+    }
+
+    private String decodeResponseBody(byte[] bodyBytes, String encoding) {
+        if (bodyBytes == null || bodyBytes.length == 0) {
+            return "";
+        }
+        try {
+            return new String(bodyBytes, Charset.forName(encoding));
+        } catch (Exception _error) {
+            return new String(bodyBytes, StandardCharsets.UTF_8);
+        }
     }
 
     private String decodeBase64Body(String base64Body) {
