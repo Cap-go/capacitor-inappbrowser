@@ -25,6 +25,7 @@ public class MainActivity extends BridgeActivity {
     private TextView maestroProxyDetails;
     private boolean maestroReady;
     private boolean maestroRunning;
+    private boolean maestroPendingRun;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -50,26 +51,32 @@ public class MainActivity extends BridgeActivity {
         overlay.setBackgroundColor(Color.parseColor("#F4F7FF"));
         overlay.setPadding(dp(12), dp(12), dp(12), dp(12));
         ViewCompat.setElevation(overlay, dp(12));
+        overlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        overlay.setClickable(false);
+        overlay.setFocusable(false);
 
         maestroReadyBanner = new TextView(this);
         maestroReadyBanner.setText("Maestro Booting");
+        maestroReadyBanner.setContentDescription("Maestro Booting");
         maestroReadyBanner.setTextColor(Color.parseColor("#1B1F3B"));
         maestroReadyBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         maestroReadyBanner.setTypeface(maestroReadyBanner.getTypeface(), Typeface.BOLD);
 
         maestroRunButton = new Button(this);
         maestroRunButton.setText("Run Proxy Regression (Maestro)");
+        maestroRunButton.setContentDescription("Run Proxy Regression (Maestro)");
         maestroRunButton.setAllCaps(false);
-        maestroRunButton.setVisibility(View.GONE);
         maestroRunButton.setOnClickListener(view -> triggerMaestroProxyRegression());
 
         maestroProxyStatus = new TextView(this);
         maestroProxyStatus.setText("Not started");
+        maestroProxyStatus.setContentDescription("Not started");
         maestroProxyStatus.setTextColor(Color.parseColor("#1B1F3B"));
         maestroProxyStatus.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
 
         maestroProxyDetails = new TextView(this);
         maestroProxyDetails.setText("");
+        maestroProxyDetails.setContentDescription("");
         maestroProxyDetails.setTextColor(Color.parseColor("#334155"));
         maestroProxyDetails.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
 
@@ -110,10 +117,17 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void triggerMaestroProxyRegression() {
+        if (!maestroReady) {
+            maestroPendingRun = true;
+            updateMaestroStatus("Waiting for Maestro readiness", "Queued proxy regression run");
+            return;
+        }
+
         if (bridge == null || bridge.getWebView() == null) {
             return;
         }
 
+        maestroPendingRun = false;
         updateMaestroRunning(true);
         bridge
             .getWebView()
@@ -130,27 +144,37 @@ public class MainActivity extends BridgeActivity {
     private void updateMaestroReady(boolean ready) {
         maestroReady = ready;
         if (maestroReadyBanner != null) {
-            maestroReadyBanner.setText(ready ? "Maestro Ready" : "Maestro Booting");
+            String bannerText = ready ? "Maestro Ready" : "Maestro Booting";
+            maestroReadyBanner.setText(bannerText);
+            maestroReadyBanner.setContentDescription(bannerText);
         }
         if (maestroRunButton != null) {
-            maestroRunButton.setVisibility(ready ? View.VISIBLE : View.GONE);
-            maestroRunButton.setEnabled(ready && !maestroRunning);
+            maestroRunButton.setVisibility(View.VISIBLE);
+            maestroRunButton.setEnabled(!maestroRunning);
+            maestroRunButton.setAlpha(ready ? 1f : 0.92f);
+        }
+        if (ready && maestroPendingRun && !maestroRunning) {
+            triggerMaestroProxyRegression();
         }
     }
 
     private void updateMaestroRunning(boolean running) {
         maestroRunning = running;
         if (maestroRunButton != null) {
-            maestroRunButton.setEnabled(maestroReady && !running);
+            maestroRunButton.setEnabled(!running);
         }
     }
 
     private void updateMaestroStatus(String status, String details) {
         if (maestroProxyStatus != null) {
-            maestroProxyStatus.setText(status == null || status.isEmpty() ? "Not started" : status);
+            String safeStatus = status == null || status.isEmpty() ? "Not started" : status;
+            maestroProxyStatus.setText(safeStatus);
+            maestroProxyStatus.setContentDescription(safeStatus);
         }
         if (maestroProxyDetails != null) {
-            maestroProxyDetails.setText(details == null ? "" : details);
+            String safeDetails = details == null ? "" : details;
+            maestroProxyDetails.setText(safeDetails);
+            maestroProxyDetails.setContentDescription(safeDetails);
         }
     }
 

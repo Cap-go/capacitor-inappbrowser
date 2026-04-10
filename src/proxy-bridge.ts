@@ -1,3 +1,5 @@
+import { appendCapturedHeader, ensureInferredContentType, replaceCapturedHeader } from './proxy-bridge-support';
+
 /* eslint-disable */
 /**
  * Proxy bridge script injected into the Android webview.
@@ -116,12 +118,7 @@
       const encoded = new Response(normalizedBody);
       const contentType = encoded.headers.get('content-type');
       if (contentType) {
-        Object.keys(headers).forEach((key) => {
-          if (key.toLowerCase() === 'content-type') {
-            delete headers[key];
-          }
-        });
-        headers['content-type'] = contentType;
+        replaceCapturedHeader(headers, 'content-type', contentType);
       }
       normalizedBody = await encoded.arrayBuffer();
     }
@@ -130,6 +127,7 @@
       normalizedBody = null;
     }
 
+    ensureInferredContentType(headers, normalizedBody);
     const base64Body = await bodyToBase64(normalizedBody);
     if (
       normalizedBody !== null &&
@@ -380,7 +378,7 @@
 
   XMLHttpRequest.prototype.setRequestHeader = function (name: string, value: string) {
     if ((this as any).__proxyHeaders) {
-      (this as any).__proxyHeaders[name] = value;
+      appendCapturedHeader((this as any).__proxyHeaders, name, value);
     }
     return originalXhrSetRequestHeader.call(this, name, value);
   };

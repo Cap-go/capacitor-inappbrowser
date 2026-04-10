@@ -21,6 +21,53 @@
     });
   };
 
+  // src/proxy-bridge-support.ts
+  function findCapturedHeaderKey(headers, headerName) {
+    const normalizedHeaderName = headerName.toLowerCase();
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === normalizedHeaderName) {
+        return key;
+      }
+    }
+    return null;
+  }
+  function replaceCapturedHeader(headers, name, value) {
+    const existingKey = findCapturedHeaderKey(headers, name);
+    if (existingKey && existingKey !== name) {
+      delete headers[existingKey];
+    }
+    headers[name] = value;
+  }
+  function appendCapturedHeader(headers, name, value) {
+    const existingKey = findCapturedHeaderKey(headers, name);
+    if (!existingKey) {
+      headers[name] = value;
+      return;
+    }
+    headers[existingKey] = headers[existingKey] ? `${headers[existingKey]}, ${value}` : value;
+  }
+  function inferContentTypeFromBody(body) {
+    if (typeof body === "string") {
+      return "text/plain;charset=UTF-8";
+    }
+    if (body instanceof URLSearchParams) {
+      return "application/x-www-form-urlencoded;charset=UTF-8";
+    }
+    if (typeof Blob !== "undefined" && body instanceof Blob) {
+      return body.type || null;
+    }
+    return null;
+  }
+  function ensureInferredContentType(headers, body) {
+    if (findCapturedHeaderKey(headers, "content-type")) {
+      return;
+    }
+    const inferredContentType = inferContentTypeFromBody(body);
+    if (inferredContentType) {
+      headers["content-type"] = inferredContentType;
+    }
+  }
+
   // src/proxy-bridge.ts
   (function() {
     const proxyBridge = window.__capgoProxy;
@@ -115,18 +162,14 @@
           const encoded = new Response(normalizedBody);
           const contentType = encoded.headers.get("content-type");
           if (contentType) {
-            Object.keys(headers).forEach((key) => {
-              if (key.toLowerCase() === "content-type") {
-                delete headers[key];
-              }
-            });
-            headers["content-type"] = contentType;
+            replaceCapturedHeader(headers, "content-type", contentType);
           }
           normalizedBody = yield encoded.arrayBuffer();
         }
         if (!methodSupportsRequestBody(normalizedMethod)) {
           normalizedBody = null;
         }
+        ensureInferredContentType(headers, normalizedBody);
         const base64Body = yield bodyToBase64(normalizedBody);
         if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody(normalizedMethod)) {
           throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
@@ -339,7 +382,7 @@
     };
     XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
       if (this.__proxyHeaders) {
-        this.__proxyHeaders[name] = value;
+        appendCapturedHeader(this.__proxyHeaders, name, value);
       }
       return originalXhrSetRequestHeader.call(this, name, value);
     };
