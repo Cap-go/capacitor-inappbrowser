@@ -114,6 +114,20 @@ enum ProxySchemeRequestSupport {
         case failRequest
     }
 
+    enum RequestBuildError: LocalizedError, Equatable {
+        case invalidURL
+        case invalidBase64Body
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidURL:
+                return "Invalid request URL"
+            case .invalidBase64Body:
+                return "Invalid base64 request body"
+            }
+        }
+    }
+
     static func isMainFrameRequest(_ request: URLRequest) -> Bool {
         guard let url = request.url else { return false }
         guard let mainDocumentURL = request.mainDocumentURL else { return true }
@@ -121,14 +135,23 @@ enum ProxySchemeRequestSupport {
     }
 
     static func sanitizedOverrideURL(_ rawURL: String?, fallback: String) -> String {
+        guard let rawURL = rawURL?.trimmingCharacters(in: .whitespacesAndNewlines), !rawURL.isEmpty else {
+            return fallback
+        }
+
+        if let absoluteURL = URL(string: rawURL), absoluteURL.scheme?.isEmpty == false {
+            return absoluteURL.absoluteString
+        }
+
         guard
-            let rawURL,
-            let url = URL(string: rawURL),
-            url.scheme?.isEmpty == false
+            let fallbackURL = URL(string: fallback),
+            let resolvedURL = URL(string: rawURL, relativeTo: fallbackURL)?.absoluteURL,
+            resolvedURL.scheme?.isEmpty == false
         else {
             return fallback
         }
-        return rawURL
+
+        return resolvedURL.absoluteString
     }
 
     static func resolvedResponseURL(_ response: URLResponse?, fallback: String) -> String {
@@ -215,6 +238,19 @@ enum ProxySchemeRequestSupport {
             isEnabled: true,
             urlRegex: try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
         )
+    }
+
+    static func decodedRequestBody(from base64Body: String?) throws -> Data? {
+        guard let base64Body else {
+            return nil
+        }
+        guard !base64Body.isEmpty else {
+            return nil
+        }
+        guard let bodyData = Data(base64Encoded: base64Body) else {
+            throw RequestBuildError.invalidBase64Body
+        }
+        return bodyData
     }
 
     private static func isCrossOriginRequest(_ firstURL: String, _ secondURL: String) -> Bool {
@@ -423,12 +459,15 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func executeNativePipeline(requestId: String) {
         guard let pendingTask = pendingTask(for: requestId) else { return }
-        guard let request = makeURLRequest(from: pendingTask.requestContext) else {
+        let request: URLRequest
+        do {
+            request = try makeURLRequest(from: pendingTask.requestContext)
+        } catch {
             pendingTask.schemeTask.didFailWithError(
                 NSError(
                     domain: "ProxySchemeHandler",
                     code: -3,
-                    userInfo: [NSLocalizedDescriptionKey: "Invalid request URL"]
+                    userInfo: [NSLocalizedDescriptionKey: error.localizedDescription]
                 )
             )
             removePendingTask(requestId: requestId)
@@ -626,14 +665,14 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 
-    private func makeURLRequest(from context: NativeRequestContext) -> URLRequest? {
+    private func makeURLRequest(from context: NativeRequestContext) throws -> URLRequest {
         guard let url = URL(string: context.url) else {
-            return nil
+            throw ProxySchemeRequestSupport.RequestBuildError.invalidURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = context.method
         request.allHTTPHeaderFields = context.headers
-        if let base64Body = context.base64Body, let bodyData = Data(base64Encoded: base64Body) {
+        if let bodyData = try ProxySchemeRequestSupport.decodedRequestBody(from: context.base64Body) {
             request.httpBody = bodyData
         }
         return request

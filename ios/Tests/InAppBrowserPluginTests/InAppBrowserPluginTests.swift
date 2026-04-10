@@ -101,6 +101,17 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testProxySchemeRelativeOverrideURLResolvesAgainstOriginalRequest() {
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.sanitizedOverrideURL("/api/v2", fallback: "https://example.com/users/sign_in"),
+            "https://example.com/api/v2"
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.sanitizedOverrideURL("oauth/start", fallback: "https://example.com/users/sign_in"),
+            "https://example.com/users/oauth/start"
+        )
+    }
+
     func testProxySchemePrepareOverrideHeadersDropsOriginBoundHeadersAcrossOrigins() {
         let overrideHeaders = ProxySchemeRequestSupport.prepareOverrideHeaders(
             originalHeaders: [
@@ -119,6 +130,20 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertNil(overrideHeaders["Origin"])
         XCTAssertNil(overrideHeaders["Referer"])
         XCTAssertEqual(overrideHeaders["Accept"], "application/json")
+    }
+
+    func testProxySchemeDecodedRequestBodyAcceptsValidBase64() throws {
+        let decodedBody = try ProxySchemeRequestSupport.decodedRequestBody(
+            from: Data("hello".utf8).base64EncodedString()
+        )
+
+        XCTAssertEqual(decodedBody, Data("hello".utf8))
+    }
+
+    func testProxySchemeDecodedRequestBodyRejectsInvalidBase64() {
+        XCTAssertThrowsError(try ProxySchemeRequestSupport.decodedRequestBody(from: "%%%")) { error in
+            XCTAssertEqual(error as? ProxySchemeRequestSupport.RequestBuildError, .invalidBase64Body)
+        }
     }
 
     func testProxySchemeResolvedResponseURLPrefersFinalURL() throws {
