@@ -93,6 +93,15 @@ struct LegacyProxyRequestsConfiguration {
 }
 
 enum ProxySchemeRequestSupport {
+    private static let crossOriginOverrideHeaderNames = [
+        "Authorization",
+        "Cookie",
+        "Cookie2",
+        "Origin",
+        "Proxy-Authorization",
+        "Referer"
+    ]
+
     enum JsResponseResolutionAction {
         case finishCachedResponse
         case executeNativePipeline
@@ -130,6 +139,20 @@ enum ProxySchemeRequestSupport {
             return fallback
         }
         return responseURL
+    }
+
+    static func prepareOverrideHeaders(
+        originalHeaders: [String: String],
+        requestURL: String,
+        overrideURL: String
+    ) -> [String: String] {
+        guard isCrossOriginRequest(requestURL, overrideURL) else {
+            return originalHeaders
+        }
+
+        return originalHeaders.filter { header, _ in
+            !crossOriginOverrideHeaderNames.contains { $0.caseInsensitiveCompare(header) == .orderedSame }
+        }
     }
 
     static func responseCookieURL(_ response: URLResponse?, fallback: String) -> URL? {
@@ -192,6 +215,34 @@ enum ProxySchemeRequestSupport {
             isEnabled: true,
             urlRegex: try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
         )
+    }
+
+    private static func isCrossOriginRequest(_ firstURL: String, _ secondURL: String) -> Bool {
+        guard
+            let first = URL(string: firstURL),
+            let second = URL(string: secondURL)
+        else {
+            return true
+        }
+
+        return
+            first.scheme?.caseInsensitiveCompare(second.scheme ?? "") != .orderedSame ||
+            first.host?.caseInsensitiveCompare(second.host ?? "") != .orderedSame ||
+            effectivePort(first) != effectivePort(second)
+    }
+
+    private static func effectivePort(_ url: URL) -> Int {
+        if let port = url.port {
+            return port
+        }
+        switch url.scheme?.lowercased() {
+        case "http":
+            return 80
+        case "https":
+            return 443
+        default:
+            return -1
+        }
     }
 }
 
@@ -601,10 +652,18 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func applyRequestOverride(_ override: [String: Any], to context: NativeRequestContext) -> NativeRequestContext {
-        NativeRequestContext(
-            url: ProxySchemeRequestSupport.sanitizedOverrideURL(override["url"] as? String, fallback: context.url),
+        let resolvedURL = ProxySchemeRequestSupport.sanitizedOverrideURL(override["url"] as? String, fallback: context.url)
+        let resolvedHeaders = (override["headers"] as? [String: String]) ??
+            ProxySchemeRequestSupport.prepareOverrideHeaders(
+                originalHeaders: context.headers,
+                requestURL: context.url,
+                overrideURL: resolvedURL
+            )
+
+        return NativeRequestContext(
+            url: resolvedURL,
             method: override["method"] as? String ?? context.method,
-            headers: override["headers"] as? [String: String] ?? context.headers,
+            headers: resolvedHeaders,
             base64Body: override["body"] as? String ?? context.base64Body,
             isMainFrame: context.isMainFrame
         )

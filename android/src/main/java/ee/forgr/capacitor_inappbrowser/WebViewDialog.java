@@ -3971,7 +3971,7 @@ public class WebViewDialog extends Dialog {
             }
 
             if (requestContext.base64Body != null && !requestContext.base64Body.isEmpty()) {
-                byte[] bodyBytes = Base64.decode(requestContext.base64Body, Base64.DEFAULT);
+                byte[] bodyBytes = ProxyRequestSupport.decodeBase64Body(requestContext.base64Body);
                 conn.setDoOutput(true);
                 try (java.io.OutputStream outputStream = conn.getOutputStream()) {
                     outputStream.write(bodyBytes);

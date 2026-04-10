@@ -1,11 +1,15 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +128,22 @@ public class ProxyRequestSupportTest {
         assertFalse(overrideHeaders.containsKey("Origin"));
         assertFalse(overrideHeaders.containsKey("Referer"));
         assertEquals("application/json", overrideHeaders.get("Accept"));
+    }
+
+    @Test
+    public void decodeBase64BodyDecodesValidPayloads() throws Exception {
+        assertArrayEquals("hello".getBytes(StandardCharsets.UTF_8), ProxyRequestSupport.decodeBase64Body("aGVsbG8="));
+        assertArrayEquals(new byte[0], ProxyRequestSupport.decodeBase64Body(""));
+    }
+
+    @Test
+    public void decodeBase64BodyRejectsInvalidPayloads() {
+        try {
+            ProxyRequestSupport.decodeBase64Body("%not-base64%");
+            fail("Expected IOException for invalid base64 request body");
+        } catch (IOException error) {
+            assertTrue(error.getCause() instanceof IllegalArgumentException);
+        }
     }
 
     @Test

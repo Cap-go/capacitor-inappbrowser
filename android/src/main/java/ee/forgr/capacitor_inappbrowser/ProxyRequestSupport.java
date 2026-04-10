@@ -1,6 +1,8 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import java.io.IOException;
 import java.net.URL;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -279,6 +281,18 @@ final class ProxyRequestSupport {
             dropHeadersIgnoreCase(overrideHeaders, CROSS_ORIGIN_REDIRECT_HEADER_NAMES);
         }
         return overrideHeaders;
+    }
+
+    static byte[] decodeBase64Body(String base64Body) throws IOException {
+        if (base64Body == null || base64Body.isEmpty()) {
+            return new byte[0];
+        }
+
+        try {
+            return Base64.getMimeDecoder().decode(base64Body);
+        } catch (IllegalArgumentException error) {
+            throw new IOException("Invalid base64 request body", error);
+        }
     }
 
     static boolean shouldLetWebViewHandleMissingBody(String requestUrl, String method, String base64Body) {
