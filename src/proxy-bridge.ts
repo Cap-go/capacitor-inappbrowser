@@ -69,6 +69,11 @@
     }
   }
 
+  function methodSupportsRequestBody(method: string): boolean {
+    const normalizedMethod = normalizeMethod(method);
+    return normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';
+  }
+
   async function bodyToBase64(body: BodyInit | null | undefined): Promise<string | null> {
     if (body === null || body === undefined) {
       return null;
@@ -104,6 +109,7 @@
     credentialsMode: RequestCredentials,
   ): Promise<string> {
     const requestId = generateRequestId();
+    const normalizedMethod = normalizeMethod(method);
     let normalizedBody = body;
 
     if (normalizedBody instanceof FormData) {
@@ -121,10 +127,18 @@
     }
 
     const base64Body = await bodyToBase64(normalizedBody);
+    if (
+      normalizedBody !== null &&
+      normalizedBody !== undefined &&
+      base64Body === null &&
+      methodSupportsRequestBody(normalizedMethod)
+    ) {
+      throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
+    }
     proxyBridge.storeRequest(
       accessToken,
       requestId,
-      normalizeMethod(method),
+      normalizedMethod,
       JSON.stringify(headers),
       base64Body || '',
       normalizeCredentialsMode(credentialsMode),
@@ -326,7 +340,12 @@
     }
 
     const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
-    const proxyUrl = await storeInterceptedRequest(url, method, headers, body, credentialsMode);
+    let proxyUrl: string;
+    try {
+      proxyUrl = await storeInterceptedRequest(url, method, headers, body, credentialsMode);
+    } catch (_error) {
+      return originalFetch.call(window, input, init);
+    }
     return originalFetch.call(window, proxyUrl, {
       method: 'GET',
       signal,

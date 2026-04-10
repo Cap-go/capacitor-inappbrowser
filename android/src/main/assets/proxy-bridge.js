@@ -74,6 +74,10 @@
         return false;
       }
     }
+    function methodSupportsRequestBody(method) {
+      const normalizedMethod = normalizeMethod(method);
+      return normalizedMethod !== "GET" && normalizedMethod !== "HEAD";
+    }
     function bodyToBase64(body) {
       return __async(this, null, function* () {
         if (body === null || body === void 0) {
@@ -105,6 +109,7 @@
     function storeInterceptedRequest(url, method, headers, body, credentialsMode) {
       return __async(this, null, function* () {
         const requestId = generateRequestId();
+        const normalizedMethod = normalizeMethod(method);
         let normalizedBody = body;
         if (normalizedBody instanceof FormData) {
           const encoded = new Response(normalizedBody);
@@ -120,10 +125,13 @@
           normalizedBody = yield encoded.arrayBuffer();
         }
         const base64Body = yield bodyToBase64(normalizedBody);
+        if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody(normalizedMethod)) {
+          throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
+        }
         proxyBridge.storeRequest(
           accessToken,
           requestId,
-          normalizeMethod(method),
+          normalizedMethod,
           JSON.stringify(headers),
           base64Body || "",
           normalizeCredentialsMode(credentialsMode)
@@ -294,7 +302,12 @@
           return originalFetch.call(window, input, init);
         }
         const signal = (_a = init == null ? void 0 : init.signal) != null ? _a : input instanceof Request ? input.signal : void 0;
-        const proxyUrl = yield storeInterceptedRequest(url, method, headers, body, credentialsMode);
+        let proxyUrl;
+        try {
+          proxyUrl = yield storeInterceptedRequest(url, method, headers, body, credentialsMode);
+        } catch (_error) {
+          return originalFetch.call(window, input, init);
+        }
         return originalFetch.call(window, proxyUrl, {
           method: "GET",
           signal
