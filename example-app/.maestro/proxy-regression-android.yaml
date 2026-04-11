@@ -1,0 +1,10 @@
+appId: ${APP_ID}
+---
+- tapOn:
+    text: "Run Proxy Regression (Maestro)"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Proxy regression passed"
+    timeout: 180000
+- assertVisible: "Script loaded | Fetch OK | XHR OK"
+- assertNotVisible: "Proxy regression failed"
