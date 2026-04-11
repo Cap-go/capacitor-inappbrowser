@@ -253,6 +253,64 @@ enum ProxySchemeRequestSupport {
         return bodyData
     }
 
+    static func supportsRequestBody(method: String) -> Bool {
+        let uppercasedMethod = method.uppercased()
+        return uppercasedMethod != "GET" && uppercasedMethod != "HEAD"
+    }
+
+    static func resolvedOverrideBody(
+        from override: [String: Any],
+        method: String,
+        fallback: String?
+    ) -> String? {
+        guard supportsRequestBody(method: method) else {
+            return nil
+        }
+
+        guard override.keys.contains("body") else {
+            return fallback
+        }
+
+        if override["body"] is NSNull {
+            return nil
+        }
+
+        return override["body"] as? String ?? fallback
+    }
+
+    static func normalizedResponseHeaders(from response: HTTPURLResponse?) -> [String: String] {
+        normalizedResponseHeaders(from: response?.allHeaderFields ?? [:])
+    }
+
+    static func normalizedResponseHeaders(from headerFields: [AnyHashable: Any]) -> [String: String] {
+        var headers: [String: String] = [:]
+        for (key, value) in headerFields {
+            guard let headerName = key as? String else {
+                continue
+            }
+
+            if let headerValue = value as? String {
+                headers[headerName] = headerValue
+                continue
+            }
+
+            if let headerValues = value as? [String] {
+                headers[headerName] = headerValues.joined(separator: ", ")
+                continue
+            }
+
+            if let headerValues = value as? [Any] {
+                let stringValues = headerValues.map { String(describing: $0) }
+                headers[headerName] = stringValues.joined(separator: ", ")
+                continue
+            }
+
+            headers[headerName] = String(describing: value)
+        }
+
+        return headers
+    }
+
     private static func isCrossOriginRequest(_ firstURL: String, _ secondURL: String) -> Bool {
         guard
             let first = URL(string: firstURL),
@@ -486,7 +544,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             }
 
             let httpResponse = response as? HTTPURLResponse
-            let responseHeaders = (httpResponse?.allHeaderFields as? [String: String]) ?? [:]
+            let responseHeaders = ProxySchemeRequestSupport.normalizedResponseHeaders(from: httpResponse)
             pendingTask.requestContext.url = ProxySchemeRequestSupport.resolvedResponseURL(
                 response,
                 fallback: pendingTask.requestContext.url
@@ -672,7 +730,9 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         var request = URLRequest(url: url)
         request.httpMethod = context.method
         request.allHTTPHeaderFields = context.headers
-        if let bodyData = try ProxySchemeRequestSupport.decodedRequestBody(from: context.base64Body) {
+        if
+            ProxySchemeRequestSupport.supportsRequestBody(method: context.method),
+            let bodyData = try ProxySchemeRequestSupport.decodedRequestBody(from: context.base64Body) {
             request.httpBody = bodyData
         }
         return request
@@ -692,18 +752,24 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func applyRequestOverride(_ override: [String: Any], to context: NativeRequestContext) -> NativeRequestContext {
         let resolvedURL = ProxySchemeRequestSupport.sanitizedOverrideURL(override["url"] as? String, fallback: context.url)
+        let resolvedMethod = override["method"] as? String ?? context.method
         let resolvedHeaders = (override["headers"] as? [String: String]) ??
             ProxySchemeRequestSupport.prepareOverrideHeaders(
                 originalHeaders: context.headers,
                 requestURL: context.url,
                 overrideURL: resolvedURL
             )
+        let resolvedBody = ProxySchemeRequestSupport.resolvedOverrideBody(
+            from: override,
+            method: resolvedMethod,
+            fallback: context.base64Body
+        )
 
         return NativeRequestContext(
             url: resolvedURL,
-            method: override["method"] as? String ?? context.method,
+            method: resolvedMethod,
             headers: resolvedHeaders,
-            base64Body: override["body"] as? String ?? context.base64Body,
+            base64Body: resolvedBody,
             isMainFrame: context.isMainFrame
         )
     }

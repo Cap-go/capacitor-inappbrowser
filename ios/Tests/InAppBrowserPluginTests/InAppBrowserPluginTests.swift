@@ -146,6 +146,53 @@ final class InAppBrowserPluginTests: XCTestCase {
         }
     }
 
+    func testProxySchemeResolvedOverrideBodyClearsNullAndBodylessGetOverrides() {
+        let existingBody = Data("secret".utf8).base64EncodedString()
+
+        XCTAssertNil(
+            ProxySchemeRequestSupport.resolvedOverrideBody(
+                from: ["body": NSNull()],
+                method: "POST",
+                fallback: existingBody
+            )
+        )
+        XCTAssertNil(
+            ProxySchemeRequestSupport.resolvedOverrideBody(
+                from: [:],
+                method: "GET",
+                fallback: existingBody
+            )
+        )
+        XCTAssertNil(
+            ProxySchemeRequestSupport.resolvedOverrideBody(
+                from: ["body": existingBody],
+                method: "HEAD",
+                fallback: existingBody
+            )
+        )
+    }
+
+    func testProxySchemeResolvedOverrideBodyPreservesFallbackForBodyMethodsWithoutOverride() {
+        let existingBody = Data("kept".utf8).base64EncodedString()
+
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.resolvedOverrideBody(
+                from: [:],
+                method: "POST",
+                fallback: existingBody
+            ),
+            existingBody
+        )
+        XCTAssertEqual(
+            ProxySchemeRequestSupport.resolvedOverrideBody(
+                from: ["body": Data("next".utf8).base64EncodedString()],
+                method: "PUT",
+                fallback: existingBody
+            ),
+            Data("next".utf8).base64EncodedString()
+        )
+    }
+
     func testProxySchemeResolvedResponseURLPrefersFinalURL() throws {
         let response = try XCTUnwrap(
             HTTPURLResponse(
@@ -228,6 +275,18 @@ final class InAppBrowserPluginTests: XCTestCase {
 
         XCTAssertTrue(cookieNames.contains("session_cookie"))
         XCTAssertTrue(cookieNames.contains("csrf_cookie"))
+    }
+
+    func testProxySchemeNormalizedResponseHeadersCombinesRepeatedValues() {
+        let headers = ProxySchemeRequestSupport.normalizedResponseHeaders(
+            from: [
+                "WWW-Authenticate": ["Bearer realm=one", "Basic realm=two"],
+                "Cache-Control": "no-cache"
+            ]
+        )
+
+        XCTAssertEqual(headers["WWW-Authenticate"], "Bearer realm=one, Basic realm=two")
+        XCTAssertEqual(headers["Cache-Control"], "no-cache")
     }
 
     func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
