@@ -4086,7 +4086,14 @@ public class WebViewDialog extends Dialog {
                             headers.put(key, headersObject.getString(key));
                         }
                     }
-                    String body = requestOverride.getString("body", proxiedRequest.requestContext.base64Body);
+                    boolean hasBodyOverride = requestOverride.has("body");
+                    Object rawOverrideBody = hasBodyOverride ? requestOverride.opt("body") : null;
+                    String body = ProxyRequestSupport.resolveOverrideBody(
+                        proxiedRequest.requestContext.base64Body,
+                        method,
+                        hasBodyOverride,
+                        rawOverrideBody == null || rawOverrideBody == JSONObject.NULL ? null : String.valueOf(rawOverrideBody)
+                    );
                     proxiedRequest.requestContext = new NativeRequestContext(
                         url,
                         method,

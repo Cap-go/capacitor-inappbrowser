@@ -283,6 +283,16 @@ final class ProxyRequestSupport {
         return overrideHeaders;
     }
 
+    static String resolveOverrideBody(String currentBase64Body, String method, boolean hasBodyOverride, String overrideBody) {
+        if (shouldDropRequestBody(method)) {
+            return "";
+        }
+        if (!hasBodyOverride) {
+            return currentBase64Body != null ? currentBase64Body : "";
+        }
+        return overrideBody != null ? overrideBody : "";
+    }
+
     static byte[] decodeBase64Body(String base64Body) throws IOException {
         if (base64Body == null || base64Body.isEmpty()) {
             return new byte[0];
@@ -377,6 +387,11 @@ final class ProxyRequestSupport {
     private static boolean requiresCapturedRequestBody(String method) {
         String normalizedMethod = normalizeMethod(method);
         return "POST".equals(normalizedMethod) || "PUT".equals(normalizedMethod) || "PATCH".equals(normalizedMethod);
+    }
+
+    private static boolean shouldDropRequestBody(String method) {
+        String normalizedMethod = normalizeMethod(method);
+        return "GET".equals(normalizedMethod) || "HEAD".equals(normalizedMethod);
     }
 
     private static String normalizeMethod(String method) {

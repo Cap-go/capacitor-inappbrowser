@@ -131,6 +131,22 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void resolveOverrideBodyClearsExplicitNullOverride() {
+        assertEquals("", ProxyRequestSupport.resolveOverrideBody("aGVsbG8=", "POST", true, null));
+    }
+
+    @Test
+    public void resolveOverrideBodyClearsBodyForGetAndHeadOverrides() {
+        assertEquals("", ProxyRequestSupport.resolveOverrideBody("cHJldmlvdXM=", "GET", true, "aGVsbG8="));
+        assertEquals("", ProxyRequestSupport.resolveOverrideBody("cHJldmlvdXM=", "HEAD", true, "aGVsbG8="));
+    }
+
+    @Test
+    public void resolveOverrideBodyPreservesExistingPayloadWhenMissing() {
+        assertEquals("cHJldmlvdXM=", ProxyRequestSupport.resolveOverrideBody("cHJldmlvdXM=", "POST", false, null));
+    }
+
+    @Test
     public void decodeBase64BodyDecodesValidPayloads() throws Exception {
         assertArrayEquals("hello".getBytes(StandardCharsets.UTF_8), ProxyRequestSupport.decodeBase64Body("aGVsbG8="));
         assertArrayEquals(new byte[0], ProxyRequestSupport.decodeBase64Body(""));
