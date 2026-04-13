@@ -240,6 +240,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     private WebViewDialog createManagedDialog(String webViewId, Options options) {
+        return createManagedDialog(webViewId, options, true);
+    }
+
+    private WebViewDialog createManagedDialog(String webViewId, Options options, boolean makeActive) {
         WebViewDialog dialog = new WebViewDialog(
             getContext(),
             android.R.style.Theme_NoTitleBar,
@@ -249,7 +253,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         );
         dialog.setInstanceId(webViewId);
         dialog.activity = InAppBrowserPlugin.this.getActivity();
-        registerWebView(webViewId, dialog);
+        registerWebView(webViewId, dialog, makeActive);
         return dialog;
     }
 
@@ -282,7 +286,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         popupOptions.setCallbacks(buildCallbacks(popupWebViewId));
         popupOptions.setPluginCall(null);
 
-        WebViewDialog popupDialog = createManagedDialog(popupWebViewId, popupOptions);
+        boolean shouldActivatePopup = ActiveWebViewSupport.shouldActivateNewWebView(popupOptions.isHidden(), activeWebViewId != null);
+        WebViewDialog popupDialog = createManagedDialog(popupWebViewId, popupOptions, shouldActivatePopup);
         if (popupOptions.isHidden()) {
             popupDialog.setHidden(true);
         }
@@ -301,10 +306,16 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         return true;
     }
 
-    private void registerWebView(String id, WebViewDialog dialog) {
+    private void registerWebView(String id, WebViewDialog dialog, boolean makeActive) {
         webViewDialogs.put(id, dialog);
         webViewStack.remove(id);
         webViewStack.addLast(id);
+        if (makeActive || activeWebViewId == null || webViewDialog == null) {
+            setActiveWebView(id, dialog);
+        }
+    }
+
+    private void setActiveWebView(String id, WebViewDialog dialog) {
         activeWebViewId = id;
         webViewDialog = dialog;
     }
@@ -1157,6 +1168,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
                         dialog.show();
                     }
                     dialog.setHidden(false);
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
                     call.resolve();
                 }
             }

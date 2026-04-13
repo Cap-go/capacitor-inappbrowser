@@ -3,6 +3,12 @@ import Capacitor
 import WebKit
 import AuthenticationServices
 
+enum ActiveWebViewSupport {
+    static func shouldActivateNewWebView(isHidden: Bool, hasActiveWebView: Bool) -> Bool {
+        !isHidden || !hasActiveWebView
+    }
+}
+
 extension UIColor {
 
     convenience init(hexString: String) {
@@ -90,14 +96,25 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         #endif
     }
 
-    private func registerWebView(id: String, webView: WKWebViewController, navigationController: UINavigationController) {
+    private func setActiveWebView(id: String, webView: WKWebViewController, navigationController: UINavigationController) {
+        activeWebViewId = id
+        self.webViewController = webView
+        self.navigationWebViewController = navigationController
+    }
+
+    private func registerWebView(
+        id: String,
+        webView: WKWebViewController,
+        navigationController: UINavigationController,
+        makeActive: Bool = true
+    ) {
         webViewControllers[id] = webView
         navigationControllers[id] = navigationController
         webViewStack.removeAll { $0 == id }
         webViewStack.append(id)
-        activeWebViewId = id
-        self.webViewController = webView
-        self.navigationWebViewController = navigationController
+        if makeActive || activeWebViewId == nil || self.webViewController == nil || self.navigationWebViewController == nil {
+            setActiveWebView(id: id, webView: webView, navigationController: navigationController)
+        }
     }
 
     private func unregisterWebView(id: String) {
@@ -196,7 +213,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let navigationController = UINavigationController(rootViewController: popupController)
         cloneNavigationAppearance(from: parentController.navigationController, to: navigationController)
-        registerWebView(id: popupId, webView: popupController, navigationController: navigationController)
+        let shouldActivatePopup = ActiveWebViewSupport.shouldActivateNewWebView(
+            isHidden: shouldHidePopup,
+            hasActiveWebView: activeWebViewId != nil
+        )
+        registerWebView(
+            id: popupId,
+            webView: popupController,
+            navigationController: navigationController,
+            makeActive: shouldActivatePopup
+        )
         if shouldHidePopup {
             guard attachWebViewToWindow(popupWebView) else {
                 unregisterWebView(id: popupId)
@@ -1251,6 +1277,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 if let navController = navigationController {
+                    if let resolvedId {
+                        self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
+                    }
                     navController.view.isHidden = false
                     navController.view.isUserInteractionEnabled = true
                     if let containerView = self.presentationContainerView {
