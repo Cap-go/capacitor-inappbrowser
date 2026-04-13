@@ -1,5 +1,6 @@
 package app.capgo.inappbrowser;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -23,9 +24,11 @@ public class MainActivity extends BridgeActivity {
     private static final String TAG = "MaestroHarness";
     private static final int MAESTRO_HARNESS_MAX_RETRIES = 1200;
     private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 250L;
+    private static final long MAESTRO_AUTORUN_RETRY_DELAY_MS = 250L;
     private static final String MAESTRO_BOOTING_TEXT = "Maestro Booting";
     private static final String MAESTRO_READY_TEXT = "Maestro Ready";
     private static final String MAESTRO_RUN_PROXY_TEXT = "Run Proxy Regression (Maestro)";
+    private static final String EXTRA_MAESTRO_AUTORUN_PROXY_REGRESSION = "capgo_maestro_autorun_proxy_regression";
 
     private LinearLayout maestroOverlay;
     private Button maestroRunButton;
@@ -42,6 +45,15 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        handleMaestroLaunchIntent(getIntent());
+        installMaestroHarness();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleMaestroLaunchIntent(intent);
         installMaestroHarness();
     }
 
@@ -49,6 +61,15 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         installMaestroHarness();
+    }
+
+    private void handleMaestroLaunchIntent(@Nullable Intent intent) {
+        if (intent == null || !intent.getBooleanExtra(EXTRA_MAESTRO_AUTORUN_PROXY_REGRESSION, false)) {
+            return;
+        }
+
+        maestroPendingRun = true;
+        maybeRunQueuedMaestroProxyRegression();
     }
 
     private void installMaestroHarness() {
@@ -251,6 +272,27 @@ public class MainActivity extends BridgeActivity {
             );
     }
 
+    private void maybeRunQueuedMaestroProxyRegression() {
+        if (!maestroPendingRun || maestroRunning || bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+
+        WebView webView = bridge.getWebView();
+        webView.post(() ->
+            webView.evaluateJavascript(
+                "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return 'started';}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
+                value -> {
+                    if ("\"started\"".equals(value)) {
+                        maestroPendingRun = false;
+                        updateMaestroRunning(true);
+                        return;
+                    }
+                    webView.postDelayed(this::maybeRunQueuedMaestroProxyRegression, MAESTRO_AUTORUN_RETRY_DELAY_MS);
+                }
+            )
+        );
+    }
+
     private void updateMaestroReady(boolean ready) {
         maestroReady = ready;
         if (maestroReadyBanner != null) {
@@ -265,7 +307,7 @@ public class MainActivity extends BridgeActivity {
         }
         bringMaestroOverlayToFront(null);
         if (ready && maestroPendingRun && !maestroRunning) {
-            triggerMaestroProxyRegression();
+            maybeRunQueuedMaestroProxyRegression();
         }
     }
 
