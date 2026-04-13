@@ -49,7 +49,7 @@
     "prepublishOnly": "bun run build",
     "example-app:prepare:android": "bun run build && cd example-app && bun install && bun run build && bunx cap sync android && cd android && ./gradlew app:assembleDebug",
     "example-app:prepare:ios": "bun run build && cd example-app && bun install && bun run build && bunx cap sync ios",
-    "maestro:test:android": "export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 && adb wait-for-device && sh ./scripts/install-android-apk-with-retry.sh example-app/android/app/build/outputs/apk/debug/app-debug.apk && $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression-android.yaml"
+    "maestro:test:android": "export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 && sh ./scripts/prepare-android-maestro-device.sh && sh ./scripts/install-android-apk-with-retry.sh example-app/android/app/build/outputs/apk/debug/app-debug.apk && $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression-android.yaml"
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.0",

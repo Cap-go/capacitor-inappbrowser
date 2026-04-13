@@ -3746,7 +3746,7 @@ public class WebViewDialog extends Dialog {
 
                 NativeResponseData responseData = proxyResult.responseData;
                 if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
-                    postInitialLegacyProxyFallback(initialUrl, initialHeaders, initialMethod, httpBody);
+                    rejectOpenWebViewIfNeeded("Initial legacy proxy request did not return bootstrap HTML");
                     return;
                 }
 
@@ -3769,30 +3769,8 @@ public class WebViewDialog extends Dialog {
                 });
             } catch (IOException error) {
                 Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
-                postInitialLegacyProxyFallback(initialUrl, initialHeaders, initialMethod, httpBody);
+                rejectOpenWebViewIfNeeded("Initial legacy proxy bootstrap failed: " + error.getMessage());
             }
-        });
-    }
-
-    private void postInitialLegacyProxyFallback(String url, Map<String, String> headers, String method, String httpBody) {
-        if (_webView == null) {
-            return;
-        }
-
-        final Map<String, String> fallbackHeaders = headers != null ? new HashMap<>(headers) : new HashMap<>();
-        final String fallbackMethod = method != null ? method : "GET";
-        final String fallbackBody = httpBody;
-
-        _webView.post(() -> {
-            if (_webView == null) {
-                return;
-            }
-            if (supportsRequestBody(fallbackMethod) && fallbackBody != null) {
-                byte[] postData = fallbackBody.getBytes(StandardCharsets.UTF_8);
-                _webView.postUrl(url, postData);
-                return;
-            }
-            _webView.loadUrl(url, fallbackHeaders);
         });
     }
 
