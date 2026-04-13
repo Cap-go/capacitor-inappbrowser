@@ -339,38 +339,31 @@ final class InAppBrowserPluginTests: XCTestCase {
 
     func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
         XCTAssertEqual(
-            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "outbound", hasCachedResponse: false),
+            ProxySchemeRequestSupport.timeoutResolutionAction(
+                phase: "outbound",
+                hasCachedResponse: false,
+                hasPendingRedirect: false
+            ),
             .fallbackToNative
         )
     }
 
     func testProxySchemeTimeoutResolutionActionFinishesCachedInboundResponses() {
         XCTAssertEqual(
-            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "inbound", hasCachedResponse: true),
+            ProxySchemeRequestSupport.timeoutResolutionAction(
+                phase: "inbound",
+                hasCachedResponse: true,
+                hasPendingRedirect: false
+            ),
             .finishCachedResponse
         )
         XCTAssertEqual(
-            ProxySchemeRequestSupport.timeoutResolutionAction(phase: "inbound", hasCachedResponse: false),
+            ProxySchemeRequestSupport.timeoutResolutionAction(
+                phase: "inbound",
+                hasCachedResponse: false,
+                hasPendingRedirect: false
+            ),
             .failRequest
-        )
-    }
-
-    func testProxySchemeJsResponseResolutionActionFinishesCachedResponsesBeforeReentry() {
-        XCTAssertEqual(
-            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "inbound", hasCachedResponse: true),
-            .finishCachedResponse
-        )
-        XCTAssertEqual(
-            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "outbound", hasCachedResponse: true),
-            .finishCachedResponse
-        )
-        XCTAssertEqual(
-            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "outbound", hasCachedResponse: false),
-            .executeNativePipeline
-        )
-        XCTAssertEqual(
-            ProxySchemeRequestSupport.jsResponseResolutionAction(phase: "inbound", hasCachedResponse: false),
-            .executeInboundDecision
         )
     }
 

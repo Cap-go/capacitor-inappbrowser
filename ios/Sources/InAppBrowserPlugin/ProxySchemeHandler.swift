@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import WebKit
 import Capacitor
@@ -216,8 +217,8 @@ enum ProxySchemeRequestSupport {
         return HTTPCookie.cookies(withResponseHeaderFields: cookieHeaders, for: cookieURL)
     }
 
-    static func timeoutResolutionAction(phase: String, hasCachedResponse: Bool) -> TimeoutResolutionAction {
-        if phase == "outbound" {
+    static func timeoutResolutionAction(phase: String, hasCachedResponse: Bool, hasPendingRedirect: Bool) -> TimeoutResolutionAction {
+        if phase == "outbound" || hasPendingRedirect {
             return .fallbackToNative
         }
         if phase == "inbound", hasCachedResponse {
@@ -395,6 +396,7 @@ final class PendingProxyTask {
     var responseData: NativeResponseData?
     var phase: String
     var urlSessionTask: URLSessionDataTask?
+    var redirectRequest: URLRequest?
     var timeoutToken: UUID?
     var canceled = false
 
@@ -406,7 +408,7 @@ final class PendingProxyTask {
 }
 
 // swiftlint:disable type_body_length
-public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
+public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDelegate {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
     private var stoppedRequests: [String: UUID] = [:]
@@ -419,9 +421,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     private let outboundRules: [NativeProxyRule]
     private let inboundRules: [NativeProxyRule]
 
-    private static var session: URLSession = {
-        URLSession(configuration: .default)
-    }()
+    private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
 
     init(
         plugin: InAppBrowserPlugin,
@@ -478,20 +478,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         pendingTasks[requestId] = pendingTask
         taskLock.unlock()
 
-        if let outboundRule = firstMatchingRule(for: requestContext, responseData: nil, phase: "outbound") {
-            switch outboundRule.action {
-            case .cancel:
-                finishWithCanceledResponse(task: pendingTask)
-                removePendingTask(requestId: requestId)
-            case .continue:
-                executeNativePipeline(requestId: requestId)
-            case .delegateToJs:
-                emitProxyEvent(requestId: requestId, pendingTask: pendingTask)
-                scheduleTimeout(for: requestId)
-            }
-        } else {
-            executeNativePipeline(requestId: requestId)
-        }
+        routeCurrentRequest(requestId: requestId)
     }
 
     public func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
@@ -535,17 +522,28 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 pendingTask.canceled = true
             }
 
-            if let requestOverride = responseData["request"] as? [String: Any] {
-                pendingTask.requestContext = applyRequestOverride(requestOverride, to: pendingTask.requestContext)
-            }
-
             let directResponse = (responseData["response"] as? [String: Any]) ?? responseData
+            let hasDirectResponse = directResponse["status"] != nil
             if directResponse["status"] != nil {
                 do {
                     pendingTask.responseData = try makeNativeResponse(from: directResponse)
+                    pendingTask.redirectRequest = nil
                 } catch {
                     pendingTask.canceled = true
                 }
+            }
+
+            if pendingTask.phase == "inbound", pendingTask.redirectRequest != nil, !hasDirectResponse {
+                if let requestOverride = responseData["request"] as? [String: Any] {
+                    followPendingRedirect(requestId: requestId, requestOverride: requestOverride)
+                } else {
+                    followPendingRedirect(requestId: requestId)
+                }
+                return
+            }
+
+            if let requestOverride = responseData["request"] as? [String: Any] {
+                pendingTask.requestContext = applyRequestOverride(requestOverride, to: pendingTask.requestContext)
             }
         }
 
@@ -588,11 +586,14 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             removePendingTask(requestId: requestId)
             return
         }
-        let task = Self.session.dataTask(with: request) { [weak self] data, response, error in
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
             guard let pendingTask = self.pendingTask(for: requestId) else { return }
 
             if let error {
+                if (error as NSError).code == NSURLErrorCancelled, pendingTask.redirectRequest != nil {
+                    return
+                }
                 if (error as NSError).code != NSURLErrorCancelled {
                     pendingTask.schemeTask.didFailWithError(error)
                 }
@@ -638,15 +639,23 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 finishWithCanceledResponse(task: pendingTask)
                 removePendingTask(requestId: requestId)
             case .continue:
-                finish(task: pendingTask, with: responseData)
-                removePendingTask(requestId: requestId)
+                if pendingTask.redirectRequest != nil {
+                    followPendingRedirect(requestId: requestId)
+                } else {
+                    finish(task: pendingTask, with: responseData)
+                    removePendingTask(requestId: requestId)
+                }
             case .delegateToJs:
                 emitProxyEvent(requestId: requestId, pendingTask: pendingTask)
                 scheduleTimeout(for: requestId)
             }
         } else {
-            finish(task: pendingTask, with: responseData)
-            removePendingTask(requestId: requestId)
+            if pendingTask.redirectRequest != nil {
+                followPendingRedirect(requestId: requestId)
+            } else {
+                finish(task: pendingTask, with: responseData)
+                removePendingTask(requestId: requestId)
+            }
         }
     }
 
@@ -693,13 +702,18 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             }
             let responseData = pendingTask.responseData
             let phase = pendingTask.phase
+            let hasPendingRedirect = pendingTask.redirectRequest != nil
             pendingTask.timeoutToken = nil
 
-            switch ProxySchemeRequestSupport.timeoutResolutionAction(phase: phase, hasCachedResponse: responseData != nil) {
+            switch ProxySchemeRequestSupport.timeoutResolutionAction(
+                phase: phase,
+                hasCachedResponse: responseData != nil,
+                hasPendingRedirect: hasPendingRedirect
+            ) {
             case .fallbackToNative:
                 self.timedOutRequests[requestId] = phase
                 self.taskLock.unlock()
-                self.executeNativePipeline(requestId: requestId)
+                self.fallbackToNativePipeline(requestId: requestId)
                 return
             case .finishCachedResponse:
                 self.pendingTasks.removeValue(forKey: requestId)
@@ -724,6 +738,43 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         }
     }
 
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let requestId = requestId(for: task) else {
+            completionHandler(request)
+            return
+        }
+
+        guard let pendingTask = pendingTask(for: requestId) else {
+            completionHandler(nil)
+            return
+        }
+
+        let redirectResponse = NativeResponseData(
+            statusCode: response.statusCode,
+            headers: ProxySchemeRequestSupport.normalizedResponseHeaders(from: response),
+            body: Data(),
+            contentType: response.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+        )
+
+        pendingTask.requestContext.url = ProxySchemeRequestSupport.resolvedResponseURL(
+            response,
+            fallback: pendingTask.requestContext.url
+        )
+        pendingTask.responseData = redirectResponse
+        pendingTask.redirectRequest = request
+        completionHandler(nil)
+
+        syncResponseCookies(from: response, fallbackURL: pendingTask.requestContext.url) { [weak self] in
+            self?.executeInboundDecision(requestId: requestId)
+        }
+    }
+
     private func pendingTask(for requestId: String) -> PendingProxyTask? {
         taskLock.lock()
         let task = pendingTasks[requestId]
@@ -737,6 +788,60 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         stoppedRequests.removeValue(forKey: requestId)
         timedOutRequests.removeValue(forKey: requestId)
         taskLock.unlock()
+    }
+
+    private func routeCurrentRequest(requestId: String) {
+        guard let pendingTask = pendingTask(for: requestId) else { return }
+        pendingTask.phase = "outbound"
+        pendingTask.responseData = nil
+
+        if let outboundRule = firstMatchingRule(for: pendingTask.requestContext, responseData: nil, phase: "outbound") {
+            switch outboundRule.action {
+            case .cancel:
+                finishWithCanceledResponse(task: pendingTask)
+                removePendingTask(requestId: requestId)
+            case .continue:
+                executeNativePipeline(requestId: requestId)
+            case .delegateToJs:
+                emitProxyEvent(requestId: requestId, pendingTask: pendingTask)
+                scheduleTimeout(for: requestId)
+            }
+        } else {
+            executeNativePipeline(requestId: requestId)
+        }
+    }
+
+    private func followPendingRedirect(requestId: String, requestOverride: [String: Any]? = nil) {
+        guard let pendingTask = pendingTask(for: requestId), let redirectRequest = pendingTask.redirectRequest else {
+            executeNativePipeline(requestId: requestId)
+            return
+        }
+
+        var redirectContext = makeRequestContext(from: redirectRequest, fallback: pendingTask.requestContext)
+        if let requestOverride {
+            redirectContext = applyRequestOverride(requestOverride, to: redirectContext)
+        }
+
+        pendingTask.requestContext = redirectContext
+        pendingTask.responseData = nil
+        pendingTask.redirectRequest = nil
+        pendingTask.urlSessionTask = nil
+        routeCurrentRequest(requestId: requestId)
+    }
+
+    private func fallbackToNativePipeline(requestId: String) {
+        guard let pendingTask = pendingTask(for: requestId) else { return }
+        if pendingTask.phase == "inbound", pendingTask.redirectRequest != nil {
+            followPendingRedirect(requestId: requestId)
+            return
+        }
+        executeNativePipeline(requestId: requestId)
+    }
+
+    private func requestId(for task: URLSessionTask) -> String? {
+        taskLock.lock()
+        defer { taskLock.unlock() }
+        return pendingTasks.first(where: { $0.value.urlSessionTask?.taskIdentifier == task.taskIdentifier })?.key
     }
 
     private func scheduleStoppedRequestCleanup(requestId: String, token: UUID) {
@@ -810,6 +915,16 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             request.httpBody = bodyData
         }
         return request
+    }
+
+    private func makeRequestContext(from request: URLRequest, fallback: NativeRequestContext) -> NativeRequestContext {
+        NativeRequestContext(
+            url: request.url?.absoluteString ?? fallback.url,
+            method: ProxySchemeRequestSupport.normalizedRequestMethod(request.httpMethod),
+            headers: request.allHTTPHeaderFields ?? fallback.headers,
+            base64Body: extractBody(from: request),
+            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(request)
+        )
     }
 
     private func makeNativeResponse(from responseData: [String: Any]) throws -> NativeResponseData {
@@ -965,6 +1080,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         pendingTasks.removeAll()
         stoppedRequests.removeAll()
         taskLock.unlock()
+        session.invalidateAndCancel()
 
         for (_, task) in pending {
             task.urlSessionTask?.cancel()
@@ -997,3 +1113,4 @@ extension Data {
         input.close()
     }
 }
+// swiftlint:enable file_length
