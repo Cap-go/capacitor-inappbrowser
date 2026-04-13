@@ -18,8 +18,8 @@ import androidx.core.view.ViewCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    private static final int MAESTRO_HARNESS_MAX_RETRIES = 50;
-    private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 100L;
+    private static final int MAESTRO_HARNESS_MAX_RETRIES = 300;
+    private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 250L;
 
     private Button maestroRunButton;
     private TextView maestroReadyBanner;
@@ -35,6 +35,12 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        installMaestroHarness();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
         installMaestroHarness();
     }
 
