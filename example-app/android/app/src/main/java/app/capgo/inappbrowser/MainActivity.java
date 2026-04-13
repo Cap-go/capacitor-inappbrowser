@@ -23,7 +23,11 @@ public class MainActivity extends BridgeActivity {
     private static final String TAG = "MaestroHarness";
     private static final int MAESTRO_HARNESS_MAX_RETRIES = 1200;
     private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 250L;
+    private static final String MAESTRO_BOOTING_TEXT = "Maestro Booting";
+    private static final String MAESTRO_READY_TEXT = "Maestro Ready";
+    private static final String MAESTRO_RUN_PROXY_TEXT = "Run Proxy Regression (Maestro)";
 
+    private LinearLayout maestroOverlay;
     private Button maestroRunButton;
     private TextView maestroReadyBanner;
     private TextView maestroProxyStatus;
@@ -57,14 +61,16 @@ public class MainActivity extends BridgeActivity {
     }
 
     private boolean installMaestroOverlay() {
-        if (maestroHarnessInstalled) {
-            return true;
-        }
-
         View rootView = findViewById(android.R.id.content);
         if (!(rootView instanceof ViewGroup root)) {
             Log.d(TAG, "Content root not ready yet");
             return false;
+        }
+
+        if (maestroOverlay != null) {
+            bringMaestroOverlayToFront(root);
+            maestroHarnessInstalled = true;
+            return true;
         }
 
         final int horizontalPadding = dp(12);
@@ -87,15 +93,15 @@ public class MainActivity extends BridgeActivity {
         );
 
         maestroReadyBanner = new TextView(this);
-        maestroReadyBanner.setText("Maestro Booting");
-        maestroReadyBanner.setContentDescription("Maestro Booting");
+        maestroReadyBanner.setText(MAESTRO_BOOTING_TEXT);
+        maestroReadyBanner.setContentDescription(MAESTRO_BOOTING_TEXT);
         maestroReadyBanner.setTextColor(Color.parseColor("#1B1F3B"));
         maestroReadyBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         maestroReadyBanner.setTypeface(maestroReadyBanner.getTypeface(), Typeface.BOLD);
 
         maestroRunButton = new Button(this);
-        maestroRunButton.setText("Run Maestro Proxy");
-        maestroRunButton.setContentDescription("Run Maestro Proxy");
+        maestroRunButton.setText(MAESTRO_RUN_PROXY_TEXT);
+        maestroRunButton.setContentDescription(MAESTRO_RUN_PROXY_TEXT);
         maestroRunButton.setAllCaps(false);
         maestroRunButton.setOnClickListener(view -> triggerMaestroProxyRegression());
 
@@ -136,6 +142,7 @@ public class MainActivity extends BridgeActivity {
         overlay.addView(buttonRow);
         overlay.addView(maestroProxyStatus, statusParams);
         overlay.addView(maestroProxyDetails, detailsParams);
+        maestroOverlay = overlay;
 
         CoordinatorLayout.LayoutParams overlayParams = new CoordinatorLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -144,11 +151,43 @@ public class MainActivity extends BridgeActivity {
         overlayParams.gravity = Gravity.TOP;
 
         root.addView(overlay, overlayParams);
-        root.bringChildToFront(overlay);
-        ViewCompat.requestApplyInsets(overlay);
+        bringMaestroOverlayToFront(root);
         maestroHarnessInstalled = true;
         Log.d(TAG, "Installed native Maestro overlay");
         return true;
+    }
+
+    private void bringMaestroOverlayToFront(@Nullable ViewGroup root) {
+        if (maestroOverlay == null) {
+            return;
+        }
+
+        ViewGroup parentRoot = root;
+        if (parentRoot == null) {
+            View rootView = findViewById(android.R.id.content);
+            if (rootView instanceof ViewGroup viewGroup) {
+                parentRoot = viewGroup;
+            }
+        }
+
+        if (parentRoot == null) {
+            return;
+        }
+
+        parentRoot.bringChildToFront(maestroOverlay);
+        maestroOverlay.bringToFront();
+        ViewCompat.setElevation(maestroOverlay, dp(12));
+        ViewCompat.requestApplyInsets(maestroOverlay);
+        parentRoot.invalidate();
+        final ViewGroup finalParentRoot = parentRoot;
+        maestroOverlay.post(() -> {
+            if (maestroOverlay == null || maestroOverlay.getParent() != finalParentRoot) {
+                return;
+            }
+            finalParentRoot.bringChildToFront(maestroOverlay);
+            maestroOverlay.bringToFront();
+            finalParentRoot.invalidate();
+        });
     }
 
     private boolean ensureMaestroHarnessBridge() {
@@ -215,7 +254,7 @@ public class MainActivity extends BridgeActivity {
     private void updateMaestroReady(boolean ready) {
         maestroReady = ready;
         if (maestroReadyBanner != null) {
-            String bannerText = ready ? "Maestro Ready" : "Maestro Booting";
+            String bannerText = ready ? MAESTRO_READY_TEXT : MAESTRO_BOOTING_TEXT;
             maestroReadyBanner.setText(bannerText);
             maestroReadyBanner.setContentDescription(bannerText);
         }
@@ -224,6 +263,7 @@ public class MainActivity extends BridgeActivity {
             maestroRunButton.setEnabled(!maestroRunning);
             maestroRunButton.setAlpha(ready ? 1f : 0.92f);
         }
+        bringMaestroOverlayToFront(null);
         if (ready && maestroPendingRun && !maestroRunning) {
             triggerMaestroProxyRegression();
         }
@@ -234,6 +274,7 @@ public class MainActivity extends BridgeActivity {
         if (maestroRunButton != null) {
             maestroRunButton.setEnabled(!running);
         }
+        bringMaestroOverlayToFront(null);
     }
 
     private void updateMaestroStatus(String status, String details) {
@@ -247,6 +288,7 @@ public class MainActivity extends BridgeActivity {
             maestroProxyDetails.setText(safeDetails);
             maestroProxyDetails.setContentDescription(safeDetails);
         }
+        bringMaestroOverlayToFront(null);
     }
 
     private int dp(int value) {
