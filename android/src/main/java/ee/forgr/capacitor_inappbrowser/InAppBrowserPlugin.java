@@ -1321,8 +1321,12 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
     }
 
     private void handleProxyRequestInternal(String webviewId, String requestId, JSObject decision, PluginCall call) {
-        WebViewDialog dialog = webviewId != null ? webViewDialogs.get(webviewId) : resolveDialog(null);
+        WebViewDialog dialog = ProxyResponseRouting.resolveTargetDialog(webviewId, requestId, webViewDialogs);
         if (dialog == null) {
+            if (webviewId == null || webviewId.isBlank()) {
+                call.reject("webviewId is required when the proxy request cannot be mapped to a unique WebView");
+                return;
+            }
             call.reject("Target WebView not found for proxy request");
             return;
         }

@@ -96,3 +96,13 @@ export function getSubmitEventSubmitter(
 export function shouldProxySubmitEvent(defaultPrevented: boolean, canProxyTarget: boolean): boolean {
   return !defaultPrevented && canProxyTarget;
 }
+
+export function shouldProxySubmitRequest(
+  defaultPrevented: boolean,
+  canProxyTarget: boolean,
+  rawUrl: string,
+  baseUrl: string,
+  urlRegex?: RegExp | null,
+): boolean {
+  return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
+}

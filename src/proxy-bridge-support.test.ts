@@ -9,6 +9,7 @@ import {
   resolveProxyBridgeUrl,
   shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
+  shouldProxySubmitRequest,
 } from './proxy-bridge-support';
 
 describe('proxy bridge header helpers', () => {
@@ -81,6 +82,27 @@ describe('proxy bridge submit helpers', () => {
     expect(shouldProxySubmitEvent(false, true)).toBe(true);
     expect(shouldProxySubmitEvent(true, true)).toBe(false);
     expect(shouldProxySubmitEvent(false, false)).toBe(false);
+  });
+
+  it('skips proxy interception before preventDefault when the target url misses the regex', () => {
+    expect(
+      shouldProxySubmitRequest(
+        false,
+        true,
+        'https://cdn.example.com/login',
+        'https://www.grailed.com/users/sign_up',
+        /accounts\.example\.com/,
+      ),
+    ).toBe(false);
+    expect(
+      shouldProxySubmitRequest(
+        false,
+        true,
+        'https://accounts.example.com/login',
+        'https://www.grailed.com/users/sign_up',
+        /accounts\.example\.com/,
+      ),
+    ).toBe(true);
   });
 });
 

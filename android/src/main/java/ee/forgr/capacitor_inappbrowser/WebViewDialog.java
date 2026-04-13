@@ -100,7 +100,7 @@ import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class WebViewDialog extends Dialog {
+public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyRequestLocator {
 
     private static class ProxiedRequest {
 
@@ -4185,6 +4185,13 @@ public class WebViewDialog extends Dialog {
             proxiedRequestsHashmap.remove(requestId);
         }
         proxiedRequest.semaphore.release();
+    }
+
+    @Override
+    public boolean hasPendingProxyRequest(String requestId) {
+        synchronized (proxiedRequestsHashmap) {
+            return proxiedRequestsHashmap.containsKey(requestId);
+        }
     }
 
     private void shareUrl() {
