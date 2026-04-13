@@ -262,6 +262,19 @@ enum ProxySchemeRequestSupport {
         return bodyData
     }
 
+    static func decodedResponseBody(from base64Body: String?) throws -> Data {
+        guard let base64Body else {
+            return Data()
+        }
+        guard !base64Body.isEmpty else {
+            return Data()
+        }
+        guard let bodyData = Data(base64Encoded: base64Body) else {
+            throw RequestBuildError.invalidBase64Body
+        }
+        return bodyData
+    }
+
     static func supportsRequestBody(method: String) -> Bool {
         let uppercasedMethod = method.uppercased()
         return uppercasedMethod != "GET" && uppercasedMethod != "HEAD"
@@ -501,7 +514,11 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
             let directResponse = (responseData["response"] as? [String: Any]) ?? responseData
             if directResponse["status"] != nil {
-                pendingTask.responseData = makeNativeResponse(from: directResponse)
+                do {
+                    pendingTask.responseData = try makeNativeResponse(from: directResponse)
+                } catch {
+                    pendingTask.canceled = true
+                }
             }
         }
 
@@ -764,10 +781,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         return request
     }
 
-    private func makeNativeResponse(from responseData: [String: Any]) -> NativeResponseData {
+    private func makeNativeResponse(from responseData: [String: Any]) throws -> NativeResponseData {
         let status = responseData["status"] as? Int ?? 200
         let headers = responseData["headers"] as? [String: String] ?? [:]
-        let body = Data(base64Encoded: responseData["body"] as? String ?? "") ?? Data()
+        let body = try ProxySchemeRequestSupport.decodedResponseBody(from: responseData["body"] as? String)
         return NativeResponseData(
             statusCode: status,
             headers: headers,

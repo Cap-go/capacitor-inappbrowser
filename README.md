@@ -139,12 +139,13 @@ Perfect for immersive experiences like video players, games, or full-screen web 
 
 > [!IMPORTANT]
 > Proxy handling changed substantially in `8.6.0`.
-> If you already rely on the older proxy flow, treat this as a migration and retest your handlers.
+> If you already rely on the older proxy flow, treat this as a breaking migration and retest your handlers before shipping.
 >
 > - Native-first matching now uses `outboundProxyRules` and `inboundProxyRules`.
 > - JavaScript proxy handlers now receive a `phase` (`outbound` or `inbound`).
 > - If you respond manually with `handleProxyRequest(...)`, pass the same `phase` back to native.
 > - `proxyRequests: true` and `proxyRequests: "<regex>"` remain legacy compatibility modes. Do not mix legacy mode with the new rule-based flow without retesting.
+> - Existing proxy listeners that only key on URL/method and do not preserve `phase` are not drop-in compatible with the new flow.
 
 #### Block one request natively
 

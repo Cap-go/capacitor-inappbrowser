@@ -4120,7 +4120,9 @@ public class WebViewDialog extends Dialog {
                         proxiedRequest.requestContext.url,
                         requestOverride.getString("url", proxiedRequest.requestContext.url)
                     );
-                    String method = requestOverride.getString("method", proxiedRequest.requestContext.method);
+                    String method = ProxyRequestSupport.normalizeOverrideMethod(
+                        requestOverride.getString("method", proxiedRequest.requestContext.method)
+                    );
                     JSObject headersObject = requestOverride.getJSObject("headers");
                     Map<String, String> headers = ProxyRequestSupport.prepareOverrideHeaders(
                         proxiedRequest.requestContext.headers,

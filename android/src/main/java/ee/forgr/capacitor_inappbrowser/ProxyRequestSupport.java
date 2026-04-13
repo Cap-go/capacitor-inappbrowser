@@ -246,6 +246,10 @@ final class ProxyRequestSupport {
         }
     }
 
+    static String normalizeOverrideMethod(String method) {
+        return normalizeMethod(method);
+    }
+
     static Map<String, String> prepareRedirectHeaders(
         Map<String, String> originalHeaders,
         boolean preserveRequestBody,

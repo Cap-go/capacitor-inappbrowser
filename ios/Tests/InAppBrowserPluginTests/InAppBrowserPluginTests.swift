@@ -165,6 +165,12 @@ final class InAppBrowserPluginTests: XCTestCase {
         }
     }
 
+    func testProxySchemeDecodedResponseBodyRejectsInvalidBase64() {
+        XCTAssertThrowsError(try ProxySchemeRequestSupport.decodedResponseBody(from: "%%%")) { error in
+            XCTAssertEqual(error as? ProxySchemeRequestSupport.RequestBuildError, .invalidBase64Body)
+        }
+    }
+
     func testProxySchemeResolvedOverrideBodyClearsNullAndBodylessGetOverrides() {
         let existingBody = Data("secret".utf8).base64EncodedString()
 

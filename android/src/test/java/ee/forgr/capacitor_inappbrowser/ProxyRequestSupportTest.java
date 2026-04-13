@@ -147,6 +147,13 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void normalizeOverrideMethodUppercasesValidMethods() {
+        assertEquals("POST", ProxyRequestSupport.normalizeOverrideMethod("post"));
+        assertEquals("PATCH", ProxyRequestSupport.normalizeOverrideMethod(" patch "));
+        assertEquals("GET", ProxyRequestSupport.normalizeOverrideMethod(null));
+    }
+
+    @Test
     public void decodeBase64BodyDecodesValidPayloads() throws Exception {
         assertArrayEquals("hello".getBytes(StandardCharsets.UTF_8), ProxyRequestSupport.decodeBase64Body("aGVsbG8="));
         assertArrayEquals(new byte[0], ProxyRequestSupport.decodeBase64Body(""));
