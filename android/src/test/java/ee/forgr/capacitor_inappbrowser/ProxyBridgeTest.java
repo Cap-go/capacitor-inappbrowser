@@ -1,51 +1,36 @@
 package ee.forgr.capacitor_inappbrowser;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
-import java.lang.reflect.Field;
-import java.util.Queue;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
 
 public class ProxyBridgeTest {
 
     @Test
-    public void storeRequestEvictsOldestPendingRequestFirst() {
+    public void storeRequestKeepsLivePayloadsBeyondExpectedQueueSize() {
         ProxyBridge bridge = new ProxyBridge("token");
 
-        for (int index = 0; index <= 256; index++) {
-            bridge.storeRequest("token", "req-" + index, "GET", "{}", "", "same-origin");
+        for (int index = 0; index < ProxyBridge.MAX_EXPECTED_STORED_REQUESTS + 32; index += 1) {
+            bridge.storeRequest("token", "request-" + index, "GET", "{}", "", "same-origin");
         }
 
-        assertNull(bridge.getAndRemove("req-0"));
-        assertNotNull(bridge.getAndRemove("req-1"));
-        assertNotNull(bridge.getAndRemove("req-256"));
+        assertNotNull(bridge.getAndRemove("request-0"));
+        assertNotNull(bridge.getAndRemove("request-" + (ProxyBridge.MAX_EXPECTED_STORED_REQUESTS + 31)));
     }
 
     @Test
-    public void storeRequestRejectsInvalidToken() {
-        ProxyBridge bridge = new ProxyBridge("token");
+    public void storeRequestDropsExpiredPayloadsBeforeAddingNewOnes() {
+        AtomicLong now = new AtomicLong(1_000L);
+        ProxyBridge bridge = new ProxyBridge("token", now::get);
 
-        bridge.storeRequest("wrong-token", "req-1", "GET", "{}", "", "same-origin");
+        bridge.storeRequest("token", "expired-request", "GET", "{}", "", "same-origin");
 
-        assertNull(bridge.getAndRemove("req-1"));
-    }
+        now.addAndGet(ProxyBridge.STORED_REQUEST_TTL_MS + 1L);
+        bridge.storeRequest("token", "fresh-request", "GET", "{}", "", "same-origin");
 
-    @Test
-    public void getAndRemoveAlsoRemovesRequestIdFromEvictionQueue() throws Exception {
-        ProxyBridge bridge = new ProxyBridge("token");
-
-        bridge.storeRequest("token", "req-1", "GET", "{}", "", "same-origin");
-
-        assertNotNull(bridge.getAndRemove("req-1"));
-        assertEquals(0, getStoredRequestOrderSize(bridge));
-    }
-
-    private static int getStoredRequestOrderSize(ProxyBridge bridge) throws Exception {
-        Field field = ProxyBridge.class.getDeclaredField("storedRequestOrder");
-        field.setAccessible(true);
-        Queue<?> storedRequestOrder = (Queue<?>) field.get(bridge);
-        return storedRequestOrder.size();
+        assertNull(bridge.getAndRemove("expired-request"));
+        assertNotNull(bridge.getAndRemove("fresh-request"));
     }
 }

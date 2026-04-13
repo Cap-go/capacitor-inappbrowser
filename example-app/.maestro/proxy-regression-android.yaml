@@ -1,9 +1,13 @@
 appId: ${APP_ID}
 ---
+- launchApp:
+    clearState: true
 - extendedWaitUntil:
-    visible: "Maestro Ready"
+    visible: "Run Proxy Regression (Maestro)"
     timeout: 240000
-- tapOn: "Run Proxy Regression (Maestro)"
+- tapOn:
+    text: "Run Proxy Regression (Maestro)"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Proxy Regression Entry"
     timeout: 60000
