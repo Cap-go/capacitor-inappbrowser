@@ -2,10 +2,12 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   appendCapturedHeader,
+  captureXhrReplayState,
   ensureInferredContentType,
   getSubmitEventSubmitter,
   inferContentTypeFromBody,
   replaceCapturedHeader,
+  restoreXhrReplayState,
   resolveProxyBridgeUrl,
   shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
@@ -52,6 +54,42 @@ describe('proxy bridge content type inference', () => {
 
   it('returns null for bodies without implicit content types', () => {
     expect(inferContentTypeFromBody(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+});
+
+describe('proxy bridge xhr replay helpers', () => {
+  it('captures xhr request settings before the proxy replay reopens the request', () => {
+    expect(
+      captureXhrReplayState({
+        responseType: 'arraybuffer',
+        timeout: 4500,
+        withCredentials: true,
+      }),
+    ).toEqual({
+      responseType: 'arraybuffer',
+      timeout: 4500,
+      withCredentials: true,
+    });
+  });
+
+  it('restores xhr request settings after the proxy replay reopens the request', () => {
+    const xhr = {
+      responseType: '',
+      timeout: 0,
+      withCredentials: false,
+    };
+
+    restoreXhrReplayState(xhr, {
+      responseType: 'blob',
+      timeout: 9000,
+      withCredentials: true,
+    });
+
+    expect(xhr).toEqual({
+      responseType: 'blob',
+      timeout: 9000,
+      withCredentials: true,
+    });
   });
 });
 

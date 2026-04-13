@@ -1,8 +1,10 @@
 import {
   appendCapturedHeader,
+  captureXhrReplayState,
   ensureInferredContentType,
   getSubmitEventSubmitter,
   replaceCapturedHeader,
+  restoreXhrReplayState,
   shouldProxyBridgeUrl,
   shouldProxySubmitRequest,
 } from './proxy-bridge-support';
@@ -415,7 +417,9 @@ import {
       if ((xhr as any).__proxyAborted) {
         return;
       }
+      const replayState = captureXhrReplayState(xhr);
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
+      restoreXhrReplayState(xhr, replayState);
       originalXhrSend.call(xhr, null);
     }
 

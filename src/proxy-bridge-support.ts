@@ -106,3 +106,29 @@ export function shouldProxySubmitRequest(
 ): boolean {
   return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
 }
+
+type XhrReplayStateSource = {
+  responseType?: string;
+  timeout?: number;
+  withCredentials?: boolean;
+};
+
+export type XhrReplayState = {
+  responseType: string;
+  timeout: number;
+  withCredentials: boolean;
+};
+
+export function captureXhrReplayState(xhr: XhrReplayStateSource): XhrReplayState {
+  return {
+    responseType: xhr.responseType ?? '',
+    timeout: xhr.timeout ?? 0,
+    withCredentials: xhr.withCredentials ?? false,
+  };
+}
+
+export function restoreXhrReplayState(xhr: XhrReplayStateSource, state: XhrReplayState): void {
+  xhr.responseType = state.responseType;
+  xhr.timeout = state.timeout;
+  xhr.withCredentials = state.withCredentials;
+}

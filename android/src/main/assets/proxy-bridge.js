@@ -102,6 +102,19 @@
   function shouldProxySubmitRequest(defaultPrevented, canProxyTarget, rawUrl, baseUrl, urlRegex) {
     return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
   }
+  function captureXhrReplayState(xhr) {
+    var _a, _b, _c;
+    return {
+      responseType: (_a = xhr.responseType) != null ? _a : "",
+      timeout: (_b = xhr.timeout) != null ? _b : 0,
+      withCredentials: (_c = xhr.withCredentials) != null ? _c : false
+    };
+  }
+  function restoreXhrReplayState(xhr, state) {
+    xhr.responseType = state.responseType;
+    xhr.timeout = state.timeout;
+    xhr.withCredentials = state.withCredentials;
+  }
 
   // src/proxy-bridge.ts
   (function() {
@@ -442,7 +455,9 @@
         if (xhr.__proxyAborted) {
           return;
         }
+        const replayState = captureXhrReplayState(xhr);
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
+        restoreXhrReplayState(xhr, replayState);
         originalXhrSend.call(xhr, null);
       }
       if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
