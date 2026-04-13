@@ -10,14 +10,19 @@
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
 
-    <script
-      type="module"
-      src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js"
-    ></script>
-    <script
-      nomodule
-      src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js"
-    ></script>
+    <script>
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        const moduleScript = document.createElement("script");
+        moduleScript.type = "module";
+        moduleScript.src = "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js";
+        document.head.appendChild(moduleScript);
+
+        const legacyScript = document.createElement("script");
+        legacyScript.setAttribute("nomodule", "");
+        legacyScript.src = "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js";
+        document.head.appendChild(legacyScript);
+      }
+    </script>
 
     <link rel="icon" type="image/x-icon" href="./assets/icon/favicon.ico" />
     <link rel="manifest" href="./manifest.json" />
