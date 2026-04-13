@@ -283,10 +283,10 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         popupOptions.setPluginCall(null);
 
         WebViewDialog popupDialog = createManagedDialog(popupWebViewId, popupOptions);
-        popupDialog.presentWebView();
         if (popupOptions.isHidden()) {
             popupDialog.setHidden(true);
         }
+        popupDialog.presentWebView();
 
         WebView popupWebView = popupDialog.getManagedWebView();
         if (popupWebView == null) {

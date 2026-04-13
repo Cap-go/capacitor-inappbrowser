@@ -369,7 +369,7 @@ final class PendingProxyTask {
 public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
-    private var stoppedRequests: Set<String> = []
+    private var stoppedRequests: [String: UUID] = [:]
     private var timedOutRequests: [String: String] = [:]
     private let taskLock = NSLock()
     private let webviewId: String
@@ -458,10 +458,12 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         taskLock.lock()
         if let entry = pendingTasks.first(where: { $0.value.schemeTask === urlSchemeTask }) {
             pendingTasks.removeValue(forKey: entry.key)
-            stoppedRequests.insert(entry.key)
+            let cleanupToken = UUID()
+            stoppedRequests[entry.key] = cleanupToken
             let sessionTask = entry.value.urlSessionTask
             taskLock.unlock()
             sessionTask?.cancel()
+            scheduleStoppedRequestCleanup(requestId: entry.key, token: cleanupToken)
             return
         }
         taskLock.unlock()
@@ -469,7 +471,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     func handleResponse(requestId: String, phase: String?, responseData: [String: Any]?) {
         taskLock.lock()
-        let wasStopped = stoppedRequests.remove(requestId) != nil
+        let wasStopped = stoppedRequests.removeValue(forKey: requestId) != nil
         guard let pendingTask = pendingTasks[requestId] else {
             taskLock.unlock()
             return
@@ -684,9 +686,19 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     private func removePendingTask(requestId: String) {
         taskLock.lock()
         pendingTasks.removeValue(forKey: requestId)
-        stoppedRequests.remove(requestId)
+        stoppedRequests.removeValue(forKey: requestId)
         timedOutRequests.removeValue(forKey: requestId)
         taskLock.unlock()
+    }
+
+    private func scheduleStoppedRequestCleanup(requestId: String, token: UUID) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + proxyTimeoutSeconds) { [weak self] in
+            guard let self else { return }
+            self.taskLock.lock()
+            defer { self.taskLock.unlock() }
+            guard self.stoppedRequests[requestId] == token else { return }
+            self.stoppedRequests.removeValue(forKey: requestId)
+        }
     }
 
     private func firstMatchingRule(for requestContext: NativeRequestContext, responseData: NativeResponseData?, phase: String) -> NativeProxyRule? {

@@ -18,6 +18,8 @@ import androidx.core.view.ViewCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final int MAESTRO_HARNESS_MAX_RETRIES = 50;
+    private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 100L;
 
     private Button maestroRunButton;
     private TextView maestroReadyBanner;
@@ -26,6 +28,9 @@ public class MainActivity extends BridgeActivity {
     private boolean maestroReady;
     private boolean maestroRunning;
     private boolean maestroPendingRun;
+    private boolean maestroHarnessInstalled;
+    private boolean maestroHarnessBridgeInjected;
+    private int maestroHarnessRetryCount;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -34,15 +39,24 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void installMaestroHarness() {
+        if (maestroHarnessInstalled) {
+            return;
+        }
+
         if (bridge == null || bridge.getWebView() == null) {
+            scheduleMaestroHarnessRetry(null);
             return;
         }
 
         WebView webView = bridge.getWebView();
-        webView.addJavascriptInterface(new MaestroHarnessBridge(), "MaestroNativeHarness");
+        if (!maestroHarnessBridgeInjected) {
+            webView.addJavascriptInterface(new MaestroHarnessBridge(), "MaestroNativeHarness");
+            maestroHarnessBridgeInjected = true;
+        }
 
         ViewGroup root = (ViewGroup) webView.getParent();
         if (root == null) {
+            scheduleMaestroHarnessRetry(webView);
             return;
         }
 
@@ -114,6 +128,24 @@ public class MainActivity extends BridgeActivity {
 
         root.addView(overlay, overlayParams);
         root.bringChildToFront(overlay);
+        maestroHarnessInstalled = true;
+    }
+
+    private void scheduleMaestroHarnessRetry(@Nullable View retryView) {
+        if (maestroHarnessInstalled || maestroHarnessRetryCount >= MAESTRO_HARNESS_MAX_RETRIES) {
+            return;
+        }
+
+        maestroHarnessRetryCount += 1;
+
+        View targetView = retryView;
+        if (targetView == null && getWindow() != null) {
+            targetView = getWindow().getDecorView();
+        }
+
+        if (targetView != null) {
+            targetView.postDelayed(this::installMaestroHarness, MAESTRO_HARNESS_RETRY_DELAY_MS);
+        }
     }
 
     private void triggerMaestroProxyRegression() {

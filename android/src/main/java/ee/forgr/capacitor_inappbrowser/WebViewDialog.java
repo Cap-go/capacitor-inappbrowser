@@ -1163,14 +1163,16 @@ public class WebViewDialog extends Dialog {
         setupToolbar();
         setWebViewClient();
 
-        if (_options.isPopupWindowMode()) {
-            show();
-        } else if (this._options.isHidden()) {
-            if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
+        if (this._options.isHidden()) {
+            if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
                 show();
-                applyHiddenMode();
+                if (!isHiddenModeActive) {
+                    applyHiddenMode();
+                }
             }
             resolveOpenWebViewIfNeeded();
+        } else if (_options.isPopupWindowMode()) {
+            show();
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
             resolveOpenWebViewIfNeeded();
