@@ -1,7 +1,18 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
-    visible: "Proxy regression passed"
+    visible: "Maestro Ready"
     timeout: 240000
-- assertVisible: "Script loaded | Fetch OK | XHR OK"
-- assertNotVisible: "Proxy regression failed"
+- tapOn: "Run Proxy Regression (Maestro)"
+- extendedWaitUntil:
+    visible: "Proxy Regression Entry"
+    timeout: 60000
+- extendedWaitUntil:
+    visible: "Script loaded"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Fetch OK"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "XHR OK"
+    timeout: 120000

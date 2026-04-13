@@ -127,6 +127,7 @@ export function setupProxyRegression(root, options = {}) {
   let listenerHandles = [];
   let browserOpened = false;
   let completed = false;
+  let keepBrowserOpenOnFinish = false;
 
   const resetState = async () => {
     const handles = listenerHandles;
@@ -150,12 +151,12 @@ export function setupProxyRegression(root, options = {}) {
     notifyStatusChange(message, details);
   };
 
-  const finish = async (message, details = "") => {
+  const finish = async (message, details = "", shouldCloseBrowser = true) => {
     completed = true;
     setStatus(message, details);
     runButton.disabled = false;
     notifyRunningChange(false);
-    const shouldClose = browserOpened;
+    const shouldClose = browserOpened && shouldCloseBrowser && !keepBrowserOpenOnFinish;
     browserOpened = false;
     await resetState();
     if (shouldClose) {
@@ -165,11 +166,12 @@ export function setupProxyRegression(root, options = {}) {
     }
   };
 
-  const runRegression = async () => {
+  const runRegression = async (runOptions = {}) => {
     if (runButton.disabled) {
       return;
     }
 
+    keepBrowserOpenOnFinish = Boolean(runOptions.keepBrowserOpenOnFinish);
     runButton.disabled = true;
     notifyRunningChange(true);
     browserOpened = false;
@@ -215,11 +217,12 @@ export function setupProxyRegression(root, options = {}) {
           await finish(
             "Proxy regression passed",
             `${detail.scriptMessage} | ${detail.fetchMessage} | ${detail.xhrMessage}`,
+            false,
           );
           return;
         }
 
-        await finish("Proxy regression failed", detail.reason ?? "Unknown proxy error");
+        await finish("Proxy regression failed", detail.reason ?? "Unknown proxy error", false);
       }),
     );
 

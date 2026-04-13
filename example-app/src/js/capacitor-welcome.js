@@ -354,10 +354,10 @@ window.customElements.define(
 
       if (proxyRegressionControls?.run && maestroRunProxyButton) {
         window.__capgoRunMaestroProxy = () => {
-          proxyRegressionControls.run();
+          proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
         };
         maestroRunProxyButton.addEventListener("click", () => {
-          proxyRegressionControls.run();
+          proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
         });
         maestroRunProxyButton.disabled = false;
         if (maestroReadyBanner) {
