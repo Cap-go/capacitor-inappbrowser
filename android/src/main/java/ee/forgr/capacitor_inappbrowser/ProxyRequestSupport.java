@@ -392,6 +392,31 @@ final class ProxyRequestSupport {
         return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
     }
 
+    static ParsedResponseHeaders splitSyntheticResponseHeaders(Map<String, String> rawHeaders) {
+        Map<String, String> responseHeaders = new HashMap<>();
+        List<String> cookieHeaders = new java.util.ArrayList<>();
+        if (rawHeaders == null || rawHeaders.isEmpty()) {
+            return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
+        }
+
+        for (Map.Entry<String, String> entry : rawHeaders.entrySet()) {
+            String headerName = entry.getKey();
+            String headerValue = entry.getValue();
+            if (headerName == null || headerValue == null || headerValue.isBlank()) {
+                continue;
+            }
+
+            if (isCookieResponseHeader(headerName)) {
+                cookieHeaders.add(headerValue);
+                continue;
+            }
+
+            responseHeaders.put(headerName, headerValue);
+        }
+
+        return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
+    }
+
     private static boolean requiresCapturedRequestBody(String method) {
         String normalizedMethod = normalizeMethod(method);
         return "POST".equals(normalizedMethod) || "PUT".equals(normalizedMethod) || "PATCH".equals(normalizedMethod);

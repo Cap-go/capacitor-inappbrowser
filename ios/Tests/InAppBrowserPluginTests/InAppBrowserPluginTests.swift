@@ -302,6 +302,19 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertTrue(cookieNames.contains("csrf_cookie"))
     }
 
+    func testProxySchemeResponseCookiesParsesSetCookieHeadersFromSyntheticResponse() {
+        let cookies = ProxySchemeRequestSupport.responseCookies(
+            from: [
+                "Set-Cookie": "session_cookie=abc123; Path=/; Secure",
+                "Content-Type": "application/json"
+            ],
+            fallback: "https://proxy-cookie-tests.example/path"
+        )
+
+        XCTAssertEqual(cookies.map(\.name), ["session_cookie"])
+        XCTAssertEqual(cookies.first?.value, "abc123")
+    }
+
     func testProxySchemeNormalizedResponseHeadersCombinesRepeatedValues() {
         let headers = ProxySchemeRequestSupport.normalizedResponseHeaders(
             from: [

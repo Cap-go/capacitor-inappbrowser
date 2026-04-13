@@ -1,9 +1,22 @@
 # @capgo/inappbrowser
- <a href="https://capgo.app/"><img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/></a>
+
+<a href="https://capgo.app/">
+  <img
+    src="https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png"
+    alt="Capgo - Instant updates for capacitor"
+  />
+</a>
 
 <div align="center">
-  <h2><a href="https://capgo.app/?ref=plugin_inappbrowser"> ➡️ Get Instant updates for your App with Capgo</a></h2>
-  <h2><a href="https://capgo.app/consulting/?ref=plugin_inappbrowser"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
+  <h2>
+    <a href="https://capgo.app/?ref=plugin_inappbrowser"> ➡️ Get Instant updates for your App with Capgo</a>
+  </h2>
+  <h2>
+    <a href="https://capgo.app/consulting/?ref=plugin_inappbrowser">
+      {' '}
+      Missing a feature? We’ll build the plugin for you 💪
+    </a>
+  </h2>
 </div>
 
 Capacitor plugin in app browser with urlChangeEvent, two way communication, camera and microphone usage, etc.
@@ -30,10 +43,10 @@ The most complete doc is available here: https://capgo.app/docs/plugins/inappbro
 
 | Plugin version | Capacitor compatibility | Maintained |
 | -------------- | ----------------------- | ---------- |
-| v8.\*.\*       | v8.\*.\*                | ✅          |
-| v7.\*.\*       | v7.\*.\*                | On demand   |
-| v6.\*.\*       | v6.\*.\*                | ❌          |
-| v5.\*.\*       | v5.\*.\*                | ❌          |
+| v8.\*.\*       | v8.\*.\*                | ✅         |
+| v7.\*.\*       | v7.\*.\*                | On demand  |
+| v6.\*.\*       | v6.\*.\*                | ❌         |
+| v5.\*.\*       | v5.\*.\*                | ❌         |
 
 > **Note:** The major version of this plugin follows the major version of Capacitor. Use the version that matches your Capacitor installation (e.g., plugin v8 for Capacitor 8). Only the latest major version is actively maintained.
 
@@ -43,12 +56,13 @@ The most complete doc is available here: https://capgo.app/docs/plugins/inappbro
 npm install @capgo/inappbrowser
 npx cap sync
 ```
+
 ## Usage
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
-InAppBrowser.open({ url: "YOUR_URL" });
+InAppBrowser.open({ url: 'YOUR_URL' });
 ```
 
 ### Customize Chrome Custom Tab Appearance (Android)
@@ -56,17 +70,17 @@ InAppBrowser.open({ url: "YOUR_URL" });
 The `open()` method launches a Chrome Custom Tab on Android. You can customize its appearance to blend with your app:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 InAppBrowser.open({
-  url: "https://example.com",
-  toolbarColor: "#1A1A2E",      // Match your app's theme
-  showTitle: true,               // Show page title instead of raw URL
-  showArrow: true,               // Back arrow instead of X close icon
-  urlBarHidingEnabled: true,     // Auto-hide URL bar on scroll
-  disableShare: true,            // Remove share from overflow menu
-  disableBookmark: true,         // Hide bookmark icon (undocumented, may break)
-  disableDownload: true,         // Hide download icon (undocumented, may break)
+  url: 'https://example.com',
+  toolbarColor: '#1A1A2E', // Match your app's theme
+  showTitle: true, // Show page title instead of raw URL
+  showArrow: true, // Back arrow instead of X close icon
+  urlBarHidingEnabled: true, // Auto-hide URL bar on scroll
+  disableShare: true, // Remove share from overflow menu
+  disableBookmark: true, // Hide bookmark icon (undocumented, may break)
+  disableDownload: true, // Hide download icon (undocumented, may break)
 });
 ```
 
@@ -77,15 +91,15 @@ All CCT options are Android-only and safely ignored on iOS. See [`OpenOptions`](
 By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 // Open with custom dimensions (400x600 at position 50,100)
 const { id } = await InAppBrowser.openWebView({
-  url: "YOUR_URL",
+  url: 'YOUR_URL',
   width: 400,
   height: 600,
   x: 50,
-  y: 100
+  y: 100,
 });
 
 // Update dimensions at runtime
@@ -94,11 +108,11 @@ InAppBrowser.updateDimensions({
   width: 500,
   height: 700,
   x: 100,
-  y: 150
+  y: 150,
 });
 ```
 
-**Touch Passthrough**: When custom dimensions are set (not fullscreen), touches outside the webview bounds will pass through to the underlying Capacitor webview, allowing the user to interact with your app in the exposed areas. 
+**Touch Passthrough**: When custom dimensions are set (not fullscreen), touches outside the webview bounds will pass through to the underlying Capacitor webview, allowing the user to interact with your app in the exposed areas.
 This enables picture-in-picture style experiences where the InAppBrowser floats above your content.
 
 ### Open WebView with Safe Margin
@@ -106,11 +120,11 @@ This enables picture-in-picture style experiences where the InAppBrowser floats 
 To create a webView with a 20px bottom margin (safe margin area outside the browser):
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 InAppBrowser.openWebView({
-  url: "YOUR_URL",
-  enabledSafeBottomMargin: true
+  url: 'YOUR_URL',
+  enabledSafeBottomMargin: true,
 });
 ```
 
@@ -121,15 +135,16 @@ Web platform is not supported. Use `window.open` instead.
 To open the webview in true full screen mode (content extends behind the status bar), set `enabledSafeTopMargin` to `false`:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 InAppBrowser.openWebView({
-  url: "YOUR_URL",
-  enabledSafeTopMargin: false  // Disables safe area at top, allows full screen
+  url: 'YOUR_URL',
+  enabledSafeTopMargin: false, // Disables safe area at top, allows full screen
 });
 ```
 
 This option works independently of the toolbar type:
+
 - **iOS**: The webview extends behind the status bar, providing true edge-to-edge content
 - **Android**: The top margin is disabled, allowing content to fill the entire screen
 
@@ -140,10 +155,12 @@ Perfect for immersive experiences like video players, games, or full-screen web 
 > [!IMPORTANT]
 > Proxy handling changed substantially in `8.6.0`.
 > If you already rely on the older proxy flow, treat this as a breaking migration and retest your handlers before shipping.
+> Existing proxy handlers are not assumed to be drop-in compatible just because the API name stayed the same.
 >
 > - Native-first matching now uses `outboundProxyRules` and `inboundProxyRules`.
 > - JavaScript proxy handlers now receive a `phase` (`outbound` or `inbound`).
 > - If you respond manually with `handleProxyRequest(...)`, pass the same `phase` back to native.
+> - Late replies without the original `phase` can now be ignored instead of mutating the wrong request stage.
 > - `proxyRequests: true` and `proxyRequests: "<regex>"` remain legacy compatibility modes. Do not mix legacy mode with the new rule-based flow without retesting.
 > - Existing proxy listeners that only key on URL/method and do not preserve `phase` are not drop-in compatible with the new flow.
 
@@ -152,7 +169,7 @@ Perfect for immersive experiences like video players, games, or full-screen web 
 Use a native rule when you just want to stop a request without round-tripping through JavaScript:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser'
+import { InAppBrowser } from '@capgo/inappbrowser';
 
 await InAppBrowser.openWebView({
   url: 'https://example.com',
@@ -162,7 +179,7 @@ await InAppBrowser.openWebView({
       action: 'cancel',
     },
   ],
-})
+});
 ```
 
 #### Stub one script from JavaScript
@@ -170,23 +187,20 @@ await InAppBrowser.openWebView({
 Use `delegateToJs` when you want native matching, but still want JavaScript to replace the response:
 
 ```js
-import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser'
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
 
 const proxyHandle = await addProxyHandler(async (request) => {
   if (request.phase === 'inbound' && request.url.includes('connect.facebook.net')) {
-    return new Response(
-      'window.FB = { init: () => {}, login: () => {}, getLoginStatus: () => {} };',
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/javascript; charset=utf-8',
-        },
+    return new Response('window.FB = { init: () => {}, login: () => {}, getLoginStatus: () => {} };', {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/javascript; charset=utf-8',
       },
-    )
+    });
   }
 
-  return null
-})
+  return null;
+});
 
 await InAppBrowser.openWebView({
   url: 'https://www.grailed.com/users/sign_up',
@@ -196,10 +210,10 @@ await InAppBrowser.openWebView({
       action: 'delegateToJs',
     },
   ],
-})
+});
 
 // Later, when you are done:
-await proxyHandle.remove()
+await proxyHandle.remove();
 ```
 
 #### Rewrite an outbound API request in JavaScript
@@ -207,7 +221,7 @@ await proxyHandle.remove()
 When a request must be modified before it leaves the webview, return a `request` override:
 
 ```js
-import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser'
+import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
 
 const proxyHandle = await addProxyHandler(async (request) => {
   if (request.phase === 'outbound' && request.url.includes('/api/private')) {
@@ -220,11 +234,11 @@ const proxyHandle = await addProxyHandler(async (request) => {
           'X-Proxy-Debug': 'enabled',
         },
       },
-    }
+    };
   }
 
-  return null
-})
+  return null;
+});
 
 await InAppBrowser.openWebView({
   url: 'https://example.com/dashboard',
@@ -234,10 +248,10 @@ await InAppBrowser.openWebView({
       action: 'delegateToJs',
     },
   ],
-})
+});
 
 // Later, when you are done:
-await proxyHandle.remove()
+await proxyHandle.remove();
 ```
 
 ### Test app and code:
@@ -320,16 +334,16 @@ With this plugin you can send events from the main app to the inappbrowser and v
 #### Main app to inappbrowser, detail object is mendatory
 
 ```js
-const { id } = await InAppBrowser.openWebView({ url: "YOUR_URL" });
-InAppBrowser.postMessage({ id, detail: { message: "myMessage" } });
+const { id } = await InAppBrowser.openWebView({ url: 'YOUR_URL' });
+InAppBrowser.postMessage({ id, detail: { message: 'myMessage' } });
 // Or broadcast to all open webviews
-InAppBrowser.postMessage({ detail: { message: "broadcast" } });
+InAppBrowser.postMessage({ detail: { message: 'broadcast' } });
 ```
 
 #### Receive event from native in the inappbrowser
 
 ```js
-window.addEventListener("messageFromNative", (event) => {
+window.addEventListener('messageFromNative', (event) => {
   console.log(event);
 });
 ```
@@ -337,13 +351,13 @@ window.addEventListener("messageFromNative", (event) => {
 #### Send event from inappbrowser to main app, detail object is mendatory
 
 ```js
-window.mobileApp.postMessage({ detail: { message: "myMessage" } });
+window.mobileApp.postMessage({ detail: { message: 'myMessage' } });
 ```
 
 #### Receive event from inappbrowser in the main app
 
 ```js
-InAppBrowser.addListener("messageFromWebview", (event) => {
+InAppBrowser.addListener('messageFromWebview', (event) => {
   console.log(event.id, event.detail);
 });
 ```
@@ -1472,5 +1486,6 @@ Construct a type with a set of properties K of type T
 </docgen-api>
 
 **Credits**
- - [WKWebViewController](https://github.com/Meniny/WKWebViewController) - for iOS
- - [CapBrowser](https://github.com/gadapa-rakesh/CapBrowser) - For the base in capacitor v2
+
+- [WKWebViewController](https://github.com/Meniny/WKWebViewController) - for iOS
+- [CapBrowser](https://github.com/gadapa-rakesh/CapBrowser) - For the base in capacitor v2

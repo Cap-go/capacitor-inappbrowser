@@ -383,4 +383,16 @@ public class ProxyRequestSupportTest {
         assertEquals("Bearer realm=one, Basic realm=two", parsedHeaders.responseHeaders().get("WWW-Authenticate"));
         assertEquals("no-cache, no-store", parsedHeaders.responseHeaders().get("Cache-Control"));
     }
+
+    @Test
+    public void splitSyntheticResponseHeadersSeparatesCookieHeaders() {
+        ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitSyntheticResponseHeaders(
+            Map.of("Content-Type", "application/json", "Set-Cookie", "session=abc; Path=/; Secure", "Cache-Control", "no-store")
+        );
+
+        assertEquals("application/json", parsedHeaders.responseHeaders().get("Content-Type"));
+        assertEquals("no-store", parsedHeaders.responseHeaders().get("Cache-Control"));
+        assertFalse(parsedHeaders.responseHeaders().containsKey("Set-Cookie"));
+        assertEquals(List.of("session=abc; Path=/; Secure"), parsedHeaders.cookieHeaders());
+    }
 }

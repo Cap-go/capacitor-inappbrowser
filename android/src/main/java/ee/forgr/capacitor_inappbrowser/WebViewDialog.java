@@ -4175,6 +4175,11 @@ public class WebViewDialog extends Dialog {
                     }
 
                     byte[] bodyBytes = ProxyRequestSupport.decodeBase64Body(base64Body);
+                    ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitSyntheticResponseHeaders(
+                        responseHeaders
+                    );
+                    applyResponseCookies(proxiedRequest.requestContext.url, parsedHeaders.cookieHeaders());
+                    responseHeaders = parsedHeaders.responseHeaders();
 
                     String contentType = responseHeaders.get("content-type");
                     if (contentType == null) {

@@ -196,6 +196,25 @@ enum ProxySchemeRequestSupport {
         return storage.cookies(for: cookieURL) ?? []
     }
 
+    static func responseCookies(from headers: [String: String], fallback: String) -> [HTTPCookie] {
+        guard let cookieURL = URL(string: fallback) else {
+            return []
+        }
+
+        let cookieHeaders = headers.reduce(into: [String: String]()) { result, entry in
+            if entry.key.caseInsensitiveCompare("Set-Cookie") == .orderedSame ||
+                entry.key.caseInsensitiveCompare("Set-Cookie2") == .orderedSame {
+                result[entry.key] = entry.value
+            }
+        }
+
+        guard !cookieHeaders.isEmpty else {
+            return []
+        }
+
+        return HTTPCookie.cookies(withResponseHeaderFields: cookieHeaders, for: cookieURL)
+    }
+
     static func timeoutResolutionAction(phase: String, hasCachedResponse: Bool) -> TimeoutResolutionAction {
         if phase == "outbound" {
             return .fallbackToNative
@@ -534,8 +553,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         ) {
         case .finishCachedResponse:
             guard let responseData = pendingTask.responseData else { return }
-            finish(task: pendingTask, with: responseData)
             removePendingTask(requestId: requestId)
+            syncResponseCookies(from: responseData, fallbackURL: pendingTask.requestContext.url) {
+                self.finish(task: pendingTask, with: responseData)
+            }
         case .executeNativePipeline:
             executeNativePipeline(requestId: requestId)
         case .executeInboundDecision:
@@ -676,7 +697,9 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
                 self.pendingTasks.removeValue(forKey: requestId)
                 self.taskLock.unlock()
                 guard let responseData else { return }
-                self.finish(task: pendingTask, with: responseData)
+                self.syncResponseCookies(from: responseData, fallbackURL: pendingTask.requestContext.url) {
+                    self.finish(task: pendingTask, with: responseData)
+                }
                 return
             case .failRequest:
                 self.pendingTasks.removeValue(forKey: requestId)
@@ -859,6 +882,34 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
             response: response,
             fallback: fallbackURL
         )
+        guard !cookies.isEmpty else {
+            completion()
+            return
+        }
+
+        let group = DispatchGroup()
+        for cookie in cookies {
+            group.enter()
+            cookieStore.setCookie(cookie) {
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion()
+        }
+    }
+
+    private func syncResponseCookies(from responseData: NativeResponseData, fallbackURL: String, completion: @escaping () -> Void) {
+        guard
+            let plugin,
+            let cookieStore = plugin.cookieStore(for: webviewId),
+            !fallbackURL.isEmpty
+        else {
+            completion()
+            return
+        }
+
+        let cookies = ProxySchemeRequestSupport.responseCookies(from: responseData.headers, fallback: fallbackURL)
         guard !cookies.isEmpty else {
             completion()
             return
