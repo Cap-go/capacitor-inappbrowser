@@ -250,6 +250,13 @@ final class ProxyRequestSupport {
         return normalizeMethod(method);
     }
 
+    static String resolveBootstrapBaseUrl(String initialUrl, String effectiveUrl) {
+        if (effectiveUrl == null || effectiveUrl.isBlank()) {
+            return initialUrl;
+        }
+        return effectiveUrl;
+    }
+
     static Map<String, String> prepareRedirectHeaders(
         Map<String, String> originalHeaders,
         boolean preserveRequestBody,

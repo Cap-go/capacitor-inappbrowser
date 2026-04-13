@@ -177,10 +177,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         private final boolean canceled;
         private final NativeResponseData responseData;
+        private final String requestUrl;
 
-        LegacyInitialProxyResult(boolean canceled, NativeResponseData responseData) {
+        LegacyInitialProxyResult(boolean canceled, NativeResponseData responseData, String requestUrl) {
             this.canceled = canceled;
             this.responseData = responseData;
+            this.requestUrl = requestUrl;
         }
     }
 
@@ -3756,6 +3758,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 );
                 String encoding = metadata.encoding() != null && !metadata.encoding().isBlank() ? metadata.encoding() : "utf-8";
                 String body = decodeResponseBody(responseData.bodyBytes, encoding);
+                String bootstrapUrl = ProxyRequestSupport.resolveBootstrapBaseUrl(initialUrl, proxyResult.requestUrl);
 
                 if (_webView == null) {
                     return;
@@ -3765,7 +3768,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (_webView == null) {
                         return;
                     }
-                    _webView.loadDataWithBaseURL(initialUrl, body, metadata.mimeType(), encoding, initialUrl);
+                    _webView.loadDataWithBaseURL(bootstrapUrl, body, metadata.mimeType(), encoding, bootstrapUrl);
                 });
             } catch (IOException error) {
                 Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
@@ -3799,10 +3802,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         try {
             if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
                 if (proxiedRequest.canceled) {
-                    return new LegacyInitialProxyResult(true, null);
+                    return new LegacyInitialProxyResult(true, null, requestContext.url);
                 }
                 if (proxiedRequest.nativeResponse != null) {
-                    return new LegacyInitialProxyResult(false, proxiedRequest.nativeResponse);
+                    return new LegacyInitialProxyResult(false, proxiedRequest.nativeResponse, requestContext.url);
                 }
                 requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
             } else {
@@ -3822,7 +3825,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         while (true) {
             RedirectReplayResult redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
             if (redirectReplay == null) {
-                return new LegacyInitialProxyResult(false, nativeResponse);
+                return new LegacyInitialProxyResult(false, nativeResponse, requestContext.url);
             }
             requestContext = redirectReplay.requestContext;
             nativeResponse = redirectReplay.responseData;

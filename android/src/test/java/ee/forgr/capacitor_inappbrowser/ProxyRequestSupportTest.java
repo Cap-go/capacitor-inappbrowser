@@ -64,6 +64,16 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void resolveBootstrapBaseUrlPrefersEffectiveReplayUrl() {
+        assertEquals(
+            "https://accounts.example.com/consent",
+            ProxyRequestSupport.resolveBootstrapBaseUrl("https://example.com/login", "https://accounts.example.com/consent")
+        );
+        assertEquals("https://example.com/login", ProxyRequestSupport.resolveBootstrapBaseUrl("https://example.com/login", ""));
+        assertEquals("https://example.com/login", ProxyRequestSupport.resolveBootstrapBaseUrl("https://example.com/login", null));
+    }
+
+    @Test
     public void prepareRedirectHeadersDropsEntityHeadersWhenBodyChanges() {
         Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
             Map.of("Content-Type", "application/json", "Content-Length", "10", "Accept", "application/json"),
