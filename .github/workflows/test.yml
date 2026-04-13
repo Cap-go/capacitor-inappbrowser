@@ -115,6 +115,7 @@ jobs:
           echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Build and install iOS example app
         run: |
+          open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
           xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
           xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
           xcodebuild \
@@ -124,10 +125,26 @@ jobs:
             -derivedDataPath example-app/ios/DerivedData \
             build
           xcrun simctl install "$IOS_SIMULATOR_UDID" example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
       - name: Run Maestro proxy regression
         run: |
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
-          $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml
+          for attempt in 1 2; do
+            open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
+            xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
+            xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+            xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+            if $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              exit 1
+            fi
+            echo "Maestro iOS run failed. Restarting simulator and retrying once..."
+            xcrun simctl terminate "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+            xcrun simctl shutdown "$IOS_SIMULATOR_UDID" || true
+            sleep 5
+          done
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest
