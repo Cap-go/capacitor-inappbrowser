@@ -131,6 +131,16 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testProxySchemeNormalizedRequestMethodCanonicalizesOverrides() {
+        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod(" post "), "POST")
+        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod("head"), "HEAD")
+    }
+
+    func testProxySchemeNormalizedRequestMethodDefaultsBlankValuesToGet() {
+        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod(nil), "GET")
+        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod("   "), "GET")
+    }
+
     func testProxySchemePrepareOverrideHeadersDropsOriginBoundHeadersAcrossOrigins() {
         let overrideHeaders = ProxySchemeRequestSupport.prepareOverrideHeaders(
             originalHeaders: [

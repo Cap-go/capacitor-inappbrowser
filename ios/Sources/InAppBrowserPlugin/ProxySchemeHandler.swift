@@ -93,6 +93,7 @@ struct LegacyProxyRequestsConfiguration {
 }
 
 enum ProxySchemeRequestSupport {
+    private static let httpMethodLocale = Locale(identifier: "en_US_POSIX")
     private static let crossOriginOverrideHeaderNames = [
         "Authorization",
         "Cookie",
@@ -237,6 +238,13 @@ enum ProxySchemeRequestSupport {
 
     static func timeoutTokenMatches(scheduledToken: UUID, currentToken: UUID?) -> Bool {
         currentToken == scheduledToken
+    }
+
+    static func normalizedRequestMethod(_ method: String?) -> String {
+        guard let trimmedMethod = method?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmedMethod.isEmpty else {
+            return "GET"
+        }
+        return trimmedMethod.uppercased(with: httpMethodLocale)
     }
 
     static func legacyProxyRequestsConfiguration(from rawValue: Any?) throws -> LegacyProxyRequestsConfiguration {
@@ -459,7 +467,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
         let requestId = UUID().uuidString
         let requestContext = NativeRequestContext(
             url: url.absoluteString,
-            method: urlSchemeTask.request.httpMethod ?? "GET",
+            method: ProxySchemeRequestSupport.normalizedRequestMethod(urlSchemeTask.request.httpMethod),
             headers: urlSchemeTask.request.allHTTPHeaderFields ?? [:],
             base64Body: extractBody(from: urlSchemeTask.request),
             isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
@@ -818,7 +826,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
 
     private func applyRequestOverride(_ override: [String: Any], to context: NativeRequestContext) -> NativeRequestContext {
         let resolvedURL = ProxySchemeRequestSupport.sanitizedOverrideURL(override["url"] as? String, fallback: context.url)
-        let resolvedMethod = override["method"] as? String ?? context.method
+        let resolvedMethod = ProxySchemeRequestSupport.normalizedRequestMethod((override["method"] as? String) ?? context.method)
         let resolvedHeaders = (override["headers"] as? [String: String]) ??
             ProxySchemeRequestSupport.prepareOverrideHeaders(
                 originalHeaders: context.headers,
