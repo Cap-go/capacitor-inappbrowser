@@ -347,6 +347,8 @@ export interface OpenWebViewOptions {
    * - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig
    * - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true
    *
+   * File downloads triggered inside the webview are handled natively and will prompt to open the file once the download completes—no custom listeners required.
+   *
    * @example
    * // In your webpage loaded in the webview:
    * document.getElementById("closeBtn").addEventListener("click", () => {

@@ -3,13 +3,17 @@ package ee.forgr.capacitor_inappbrowser;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -42,6 +46,7 @@ import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -87,6 +92,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -112,6 +118,25 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private static class DownloadRequestInfo {
+
+        private final String mimeType;
+        private final String fileName;
+
+        DownloadRequestInfo(String mimeType, String fileName) {
+            this.mimeType = mimeType;
+            this.fileName = fileName;
+        }
+
+        public String getMimeType() {
+            return mimeType;
+        }
+
+        public String getFileName() {
+            return fileName;
+        }
+    }
+
     private WebView _webView;
     private Toolbar _toolbar;
     private Options _options = null;
@@ -122,6 +147,8 @@ public class WebViewDialog extends Dialog {
     private final WebView capacitorWebView;
     private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
+    private final Map<Long, DownloadRequestInfo> downloadRequests = new ConcurrentHashMap<>();
+    private BroadcastReceiver downloadReceiver;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
@@ -1069,6 +1096,7 @@ public class WebViewDialog extends Dialog {
 
         setupToolbar();
         setWebViewClient();
+        configureDownloadHandling();
 
         if (this._options.isHidden()) {
             if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
@@ -1079,6 +1107,168 @@ public class WebViewDialog extends Dialog {
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
             resolveOpenWebViewIfNeeded();
+        }
+    }
+
+    private void configureDownloadHandling() {
+        if (_webView == null) {
+            Log.w("InAppBrowser", "Cannot configure download handling - WebView is null");
+            return;
+        }
+
+        _webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) ->
+            handleDownloadRequest(url, userAgent, contentDisposition, mimeType)
+        );
+    }
+
+    private void ensureDownloadReceiverRegistered(Context context) {
+        if (downloadReceiver != null || context == null) {
+            return;
+        }
+
+        downloadReceiver =
+            new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context ctx, Intent intent) {
+                    long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+                    if (downloadId != -1L) {
+                        handleDownloadCompleted(ctx, downloadId);
+                    }
+                }
+            };
+
+        context.registerReceiver(downloadReceiver, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
+    }
+
+    private void handleDownloadRequest(String url, String userAgent, String contentDisposition, String mimeType) {
+        Context context = activity != null ? activity : _context;
+        if (context == null) {
+            Log.w("InAppBrowser", "Cannot start download - context is null");
+            return;
+        }
+
+        try {
+            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (downloadManager == null) {
+                Log.w("InAppBrowser", "DownloadManager not available, opening URL externally");
+                openDownloadExternally(url, mimeType);
+                return;
+            }
+
+            Uri uri = Uri.parse(url);
+            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            request.setTitle(fileName);
+            request.setDescription("Downloading file");
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setAllowedOverRoaming(true);
+            request.setAllowedOverMetered(true);
+            request.setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName);
+
+            if (!TextUtils.isEmpty(userAgent)) {
+                request.addRequestHeader("User-Agent", userAgent);
+            }
+            if (!TextUtils.isEmpty(mimeType)) {
+                request.setMimeType(mimeType);
+            }
+
+            ensureDownloadReceiverRegistered(context);
+            long downloadId = downloadManager.enqueue(request);
+            downloadRequests.put(downloadId, new DownloadRequestInfo(mimeType, fileName));
+
+            Toast.makeText(context, "Downloading " + fileName, Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Failed to start download: " + e.getMessage());
+            openDownloadExternally(url, mimeType);
+        }
+    }
+
+    private void handleDownloadCompleted(Context context, long downloadId) {
+        DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (downloadManager == null) {
+            return;
+        }
+
+        Cursor cursor = null;
+        try {
+            DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+            cursor = downloadManager.query(query);
+            if (cursor == null || !cursor.moveToFirst()) {
+                return;
+            }
+
+            int statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
+            if (statusIndex != -1 && cursor.getInt(statusIndex) != DownloadManager.STATUS_SUCCESSFUL) {
+                downloadRequests.remove(downloadId);
+                return;
+            }
+
+            int localUriIndex = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
+            String localUriString = localUriIndex != -1 ? cursor.getString(localUriIndex) : null;
+            int mediaTypeIndex = cursor.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE);
+            String resolvedMimeType = mediaTypeIndex != -1 ? cursor.getString(mediaTypeIndex) : null;
+            DownloadRequestInfo requestInfo = downloadRequests.remove(downloadId);
+
+            if (TextUtils.isEmpty(resolvedMimeType) && requestInfo != null) {
+                resolvedMimeType = requestInfo.getMimeType();
+            }
+
+            Uri localUri = localUriString != null ? Uri.parse(localUriString) : null;
+            String fileName = requestInfo != null ? requestInfo.getFileName() : null;
+            openDownloadedFile(context, localUri, resolvedMimeType, fileName);
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error handling completed download: " + e.getMessage());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    private void openDownloadedFile(Context context, Uri localUri, String mimeType, String fileName) {
+        if (localUri == null) {
+            Log.w("InAppBrowser", "Download completed but URI is null");
+            return;
+        }
+
+        try {
+            Uri contentUri = localUri;
+            if ("file".equalsIgnoreCase(localUri.getScheme())) {
+                File file = new File(localUri.getPath());
+                contentUri = FileProvider.getUriForFile(context, context.getPackageName() + ".fileprovider", file);
+            }
+
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(contentUri, TextUtils.isEmpty(mimeType) ? "*/*" : mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            context.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Toast
+                .makeText(
+                    context,
+                    "No application found to open " + (fileName != null ? fileName : "downloaded file"),
+                    Toast.LENGTH_LONG
+                )
+                .show();
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Failed to open downloaded file: " + e.getMessage());
+        }
+    }
+
+    private void openDownloadExternally(String url, String mimeType) {
+        Context context = activity != null ? activity : _context;
+        if (context == null) {
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(Uri.parse(url), TextUtils.isEmpty(mimeType) ? "*/*" : mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Failed to open URL externally: " + e.getMessage());
         }
     }
 
@@ -3274,6 +3464,17 @@ public class WebViewDialog extends Dialog {
 
     @Override
     public void dismiss() {
+        if (downloadReceiver != null) {
+            try {
+                getContext().unregisterReceiver(downloadReceiver);
+            } catch (Exception e) {
+                Log.w("InAppBrowser", "Error unregistering download receiver: " + e.getMessage());
+            } finally {
+                downloadReceiver = null;
+            }
+        }
+        downloadRequests.clear();
+
         // First, stop any ongoing operations and disable further interactions
         if (_webView != null) {
             try {

@@ -172,6 +172,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var disableOverscroll: Bool = false
+    @available(iOS 15.0, *)
+    private var downloadDestinations: [WKDownload: URL] = [:]
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -2126,6 +2128,19 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
+        if #available(iOS 15.0, *) {
+            if navigationAction.shouldPerformDownload {
+                decisionHandler(.download)
+                return
+            }
+        } else if #available(iOS 14.5, *) {
+            if navigationAction.shouldPerformDownload {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                decisionHandler(.cancel)
+                return
+            }
+        }
+
         // Defer the rest of the logic until the async external-app handling checks completes.
         handleURLWithApp(url, targetFrame: navigationAction.targetFrame) { [weak self] openedExternally in
             guard let self else {
@@ -2163,6 +2178,26 @@ extension WKWebViewController: WKNavigationDelegate {
             self.injectJavaScriptInterface()
             decisionHandler(actionPolicy)
         }
+    }
+
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if #available(iOS 15.0, *) {
+            if let httpResponse = navigationResponse.response as? HTTPURLResponse {
+                let headers = httpResponse.allHeaderFields
+                if let disposition = (headers["Content-Disposition"] as? String) ?? (headers["content-disposition"] as? String),
+                   disposition.lowercased().contains("attachment") {
+                    decisionHandler(.download)
+                    return
+                }
+            }
+
+            if !navigationResponse.canShowMIMEType {
+                decisionHandler(.download)
+                return
+            }
+        }
+
+        decisionHandler(.allow)
     }
 
     // MARK: - Dimension Management
@@ -2271,6 +2306,57 @@ class PassThroughView: UIView {
 
         // Otherwise, handle normally
         return super.hitTest(point, with: event)
+    }
+}
+
+@available(iOS 15.0, *)
+extension WKWebViewController: WKDownloadDelegate {
+
+    public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        download.delegate = self
+    }
+
+    public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        download.delegate = self
+    }
+
+    public func download(_ download: WKDownload, decideDestinationUsing response: WKDownloadResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        let baseDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        let destination = baseDirectory.appendingPathComponent("InAppBrowserDownloads", isDirectory: true)
+
+        do {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            let fileLocation = destination.appendingPathComponent(suggestedFilename)
+            if FileManager.default.fileExists(atPath: fileLocation.path) {
+                try FileManager.default.removeItem(at: fileLocation)
+            }
+            downloadDestinations[download] = fileLocation
+            completionHandler(fileLocation)
+        } catch {
+            print("[InAppBrowser] Could not prepare download destination: \(error.localizedDescription)")
+            completionHandler(nil)
+        }
+    }
+
+    public func download(_ download: WKDownload, didFinish navigation: WKNavigation?) {
+        guard let destination = downloadDestinations.removeValue(forKey: download) else {
+            return
+        }
+
+        presentDownload(at: destination)
+    }
+
+    public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        downloadDestinations.removeValue(forKey: download)
+        print("[InAppBrowser] Download failed: \(error.localizedDescription)")
+    }
+
+    private func presentDownload(at url: URL) {
+        DispatchQueue.main.async {
+            let activityController = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            activityController.popoverPresentationController?.sourceView = self.view
+            self.present(activityController, animated: true)
+        }
     }
 }
 
