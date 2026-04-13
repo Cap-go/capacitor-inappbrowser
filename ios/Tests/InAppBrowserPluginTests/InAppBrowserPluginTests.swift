@@ -44,37 +44,35 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertTrue(script.contains("console.assert"))
     }
 
-    func testLegacyProxyRequestsConfigurationSupportsBooleanValues() throws {
-        let enabled = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: true)
+    func testLegacyProxyRequestsConfigurationSupportsBooleanValues() {
+        let enabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: true)
         XCTAssertTrue(enabled.isEnabled)
         XCTAssertNil(enabled.urlRegex)
 
-        let disabled = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: false)
+        let disabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: false)
         XCTAssertFalse(disabled.isEnabled)
         XCTAssertNil(disabled.urlRegex)
     }
 
-    func testLegacyProxyRequestsConfigurationCompilesRegexStrings() throws {
-        let configuration = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "api\\.example\\.com")
-
-        XCTAssertTrue(configuration.isEnabled)
-        XCTAssertNotNil(configuration.urlRegex)
-        XCTAssertNotNil(configuration.urlRegex?.firstMatch(
-            in: "https://api.example.com/login",
-            options: [],
-            range: NSRange(location: 0, length: "https://api.example.com/login".utf16.count)
-        ))
-    }
-
-    func testLegacyProxyRequestsConfigurationTreatsBlankStringsAsDisabled() throws {
-        let configuration = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "   ")
+    func testLegacyProxyRequestsConfigurationIgnoresAndroidOnlyRegexStrings() {
+        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "api\\.example\\.com")
 
         XCTAssertFalse(configuration.isEnabled)
         XCTAssertNil(configuration.urlRegex)
     }
 
-    func testLegacyProxyRequestsConfigurationRejectsInvalidRegex() {
-        XCTAssertThrowsError(try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "["))
+    func testLegacyProxyRequestsConfigurationTreatsBlankStringsAsDisabled() {
+        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "   ")
+
+        XCTAssertFalse(configuration.isEnabled)
+        XCTAssertNil(configuration.urlRegex)
+    }
+
+    func testLegacyProxyRequestsConfigurationIgnoresInvalidRegexStrings() {
+        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "[")
+
+        XCTAssertFalse(configuration.isEnabled)
+        XCTAssertNil(configuration.urlRegex)
     }
 
     func testLegacyCatchAllRuleOnlyAppliesToOutboundPhase() {

@@ -248,24 +248,13 @@ enum ProxySchemeRequestSupport {
         return trimmedMethod.uppercased(with: httpMethodLocale)
     }
 
-    static func legacyProxyRequestsConfiguration(from rawValue: Any?) throws -> LegacyProxyRequestsConfiguration {
+    static func legacyProxyRequestsConfiguration(from rawValue: Any?) -> LegacyProxyRequestsConfiguration {
         if let enabled = rawValue as? Bool {
             return LegacyProxyRequestsConfiguration(isEnabled: enabled, urlRegex: nil)
         }
 
-        guard let rawPattern = rawValue as? String else {
-            return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
-        }
-
-        let pattern = rawPattern.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !pattern.isEmpty else {
-            return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
-        }
-
-        return LegacyProxyRequestsConfiguration(
-            isEnabled: true,
-            urlRegex: try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
-        )
+        // String regex mode is Android-only. iOS ignores it instead of rejecting cross-platform calls.
+        return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
     }
 
     static func shouldUseLegacyCatchAllRule(

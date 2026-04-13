@@ -798,13 +798,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
-        let legacyProxyRequests: LegacyProxyRequestsConfiguration
-        do {
-            legacyProxyRequests = try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: call.options["proxyRequests"])
-        } catch {
-            call.reject("Invalid proxyRequests regex: \(error.localizedDescription)")
-            return
-        }
+        let legacyProxyRequests = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: call.options["proxyRequests"])
         let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
         let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
         let outboundProxyRules: [NativeProxyRule]
