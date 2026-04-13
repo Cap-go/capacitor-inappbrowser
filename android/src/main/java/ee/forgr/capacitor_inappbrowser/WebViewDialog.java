@@ -4174,9 +4174,7 @@ public class WebViewDialog extends Dialog {
                         }
                     }
 
-                    byte[] bodyBytes = (base64Body != null && !base64Body.isEmpty())
-                        ? Base64.decode(base64Body, Base64.DEFAULT)
-                        : new byte[0];
+                    byte[] bodyBytes = ProxyRequestSupport.decodeBase64Body(base64Body);
 
                     String contentType = responseHeaders.get("content-type");
                     if (contentType == null) {
@@ -4192,6 +4190,9 @@ public class WebViewDialog extends Dialog {
                     proxiedRequest.nativeResponse = new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
                     proxiedRequest.response = buildWebResourceResponse(proxiedRequest.nativeResponse);
                 }
+            } catch (IOException invalidBodyError) {
+                proxiedRequest.canceled = true;
+                Log.e("InAppBrowserProxy", "Invalid proxy response body for request: " + requestId, invalidBodyError);
             } catch (Exception e) {
                 Log.e("InAppBrowserProxy", "Error building proxy response", e);
             }

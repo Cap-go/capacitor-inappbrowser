@@ -3,6 +3,7 @@ package app.capgo.inappbrowser;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -15,10 +16,12 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
-    private static final int MAESTRO_HARNESS_MAX_RETRIES = 300;
+    private static final String TAG = "MaestroHarness";
+    private static final int MAESTRO_HARNESS_MAX_RETRIES = 1200;
     private static final long MAESTRO_HARNESS_RETRY_DELAY_MS = 250L;
 
     private Button maestroRunButton;
@@ -45,35 +48,43 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void installMaestroHarness() {
+        boolean overlayInstalled = installMaestroOverlay();
+        boolean bridgeInjected = ensureMaestroHarnessBridge();
+        if (!overlayInstalled || !bridgeInjected) {
+            WebView retryView = bridge != null ? bridge.getWebView() : null;
+            scheduleMaestroHarnessRetry(retryView);
+        }
+    }
+
+    private boolean installMaestroOverlay() {
         if (maestroHarnessInstalled) {
-            return;
+            return true;
         }
 
-        if (bridge == null || bridge.getWebView() == null) {
-            scheduleMaestroHarnessRetry(null);
-            return;
+        View rootView = findViewById(android.R.id.content);
+        if (!(rootView instanceof ViewGroup root)) {
+            Log.d(TAG, "Content root not ready yet");
+            return false;
         }
 
-        WebView webView = bridge.getWebView();
-        if (!maestroHarnessBridgeInjected) {
-            webView.addJavascriptInterface(new MaestroHarnessBridge(), "MaestroNativeHarness");
-            maestroHarnessBridgeInjected = true;
-        }
-
-        ViewGroup root = (ViewGroup) webView.getParent();
-        if (root == null) {
-            scheduleMaestroHarnessRetry(webView);
-            return;
-        }
-
+        final int horizontalPadding = dp(12);
+        final int verticalPadding = dp(12);
         LinearLayout overlay = new LinearLayout(this);
         overlay.setOrientation(LinearLayout.VERTICAL);
         overlay.setBackgroundColor(Color.parseColor("#F4F7FF"));
-        overlay.setPadding(dp(12), dp(12), dp(12), dp(12));
+        overlay.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
         ViewCompat.setElevation(overlay, dp(12));
         overlay.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
         overlay.setClickable(false);
         overlay.setFocusable(false);
+        ViewCompat.setOnApplyWindowInsetsListener(
+            overlay,
+            (view, insets) -> {
+                int topInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).top;
+                view.setPadding(horizontalPadding, verticalPadding + topInset, horizontalPadding, verticalPadding);
+                return insets;
+            }
+        );
 
         maestroReadyBanner = new TextView(this);
         maestroReadyBanner.setText("Maestro Booting");
@@ -83,8 +94,8 @@ public class MainActivity extends BridgeActivity {
         maestroReadyBanner.setTypeface(maestroReadyBanner.getTypeface(), Typeface.BOLD);
 
         maestroRunButton = new Button(this);
-        maestroRunButton.setText("Run Proxy Regression (Maestro)");
-        maestroRunButton.setContentDescription("Run Proxy Regression (Maestro)");
+        maestroRunButton.setText("Run Maestro Proxy");
+        maestroRunButton.setContentDescription("Run Maestro Proxy");
         maestroRunButton.setAllCaps(false);
         maestroRunButton.setOnClickListener(view -> triggerMaestroProxyRegression());
 
@@ -134,11 +145,33 @@ public class MainActivity extends BridgeActivity {
 
         root.addView(overlay, overlayParams);
         root.bringChildToFront(overlay);
+        ViewCompat.requestApplyInsets(overlay);
         maestroHarnessInstalled = true;
+        Log.d(TAG, "Installed native Maestro overlay");
+        return true;
+    }
+
+    private boolean ensureMaestroHarnessBridge() {
+        if (maestroHarnessBridgeInjected) {
+            return true;
+        }
+
+        if (bridge == null || bridge.getWebView() == null) {
+            Log.d(TAG, "Bridge WebView not ready yet");
+            return false;
+        }
+
+        bridge.getWebView().addJavascriptInterface(new MaestroHarnessBridge(), "MaestroNativeHarness");
+        maestroHarnessBridgeInjected = true;
+        Log.d(TAG, "Injected Maestro JS bridge");
+        return true;
     }
 
     private void scheduleMaestroHarnessRetry(@Nullable View retryView) {
-        if (maestroHarnessInstalled || maestroHarnessRetryCount >= MAESTRO_HARNESS_MAX_RETRIES) {
+        if ((maestroHarnessInstalled && maestroHarnessBridgeInjected) || maestroHarnessRetryCount >= MAESTRO_HARNESS_MAX_RETRIES) {
+            if (!maestroHarnessBridgeInjected) {
+                Log.w(TAG, "Stopped retrying before Maestro bridge became ready");
+            }
             return;
         }
 
