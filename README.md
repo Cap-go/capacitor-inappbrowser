@@ -137,6 +137,15 @@ Perfect for immersive experiences like video players, games, or full-screen web 
 
 ### Proxy examples
 
+> [!IMPORTANT]
+> Proxy handling changed substantially in `8.6.0`.
+> If you already rely on the older proxy flow, treat this as a migration and retest your handlers.
+>
+> - Native-first matching now uses `outboundProxyRules` and `inboundProxyRules`.
+> - JavaScript proxy handlers now receive a `phase` (`outbound` or `inbound`).
+> - If you respond manually with `handleProxyRequest(...)`, pass the same `phase` back to native.
+> - `proxyRequests: true` and `proxyRequests: "<regex>"` remain legacy compatibility modes. Do not mix legacy mode with the new rule-based flow without retesting.
+
 #### Block one request natively
 
 Use a native rule when you just want to stop a request without round-tripping through JavaScript:
@@ -917,14 +926,15 @@ Enable this with `captureConsoleLogs: true` when opening the webview.
 ### handleProxyRequest(...)
 
 ```typescript
-handleProxyRequest(options: { requestId: string; decision?: ProxyDecision | null; response?: ProxyResponse | null; webviewId?: string; }) => Promise<void>
+handleProxyRequest(options: { requestId: string; decision?: ProxyDecision | null; response?: ProxyResponse | null; webviewId?: string; phase?: 'outbound' | 'inbound'; }) => Promise<void>
 ```
 
 Internal method used by `addProxyHandler()` to send a proxy decision back to native.
+Forward the original `phase` when replying to a manual `proxyRequest` listener.
 
-| Param         | Type                                                                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ requestId: string; decision?: <a href="#proxydecision">ProxyDecision</a> \| null; response?: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; }</code> |
+| Param         | Type                                                                                                                                                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ requestId: string; decision?: <a href="#proxydecision">ProxyDecision</a> \| null; response?: <a href="#proxyresponse">ProxyResponse</a> \| null; webviewId?: string; phase?: 'outbound' \| 'inbound'; }</code> |
 
 **Since:** 8.6.0
 

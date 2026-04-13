@@ -617,6 +617,12 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
         _webView.getSettings().setSupportMultipleWindows(true);
+        if (_options.getEnableZoom()) {
+            _webView.getSettings().setSupportZoom(true);
+            _webView.getSettings().setBuiltInZoomControls(true);
+            _webView.getSettings().setDisplayZoomControls(false);
+        }
+        _webView.getSettings().setSupportMultipleWindows(true);
 
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
@@ -2874,6 +2880,17 @@ public class WebViewDialog extends Dialog {
                             return null;
                         }
 
+                        if (
+                            ProxyRequestSupport.usesLegacyJsProxyMode(_options) &&
+                            !ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, originalUrl)
+                        ) {
+                            if (proxyBridge != null) {
+                                proxyBridge.getAndRemove(requestId);
+                            }
+                            Log.w("InAppBrowserProxy", "Ignoring legacy regex miss for bridge-backed request: " + originalUrl);
+                            return createCanceledResponse();
+                        }
+
                         ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
                         if (stored == null) {
                             Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
@@ -3162,8 +3179,10 @@ public class WebViewDialog extends Dialog {
                         return;
                     }
                     if (ProxyRequestSupport.shouldInjectBridge(_options) && proxyBridgeScript != null && proxyAccessToken != null) {
-                        String scriptWithToken = proxyBridgeScript.replace("___CAPGO_PROXY_TOKEN___", proxyAccessToken);
-                        view.evaluateJavascript(scriptWithToken, null);
+                        String preparedProxyBridgeScript = prepareProxyBridgeScript();
+                        if (preparedProxyBridgeScript != null) {
+                            view.evaluateJavascript(preparedProxyBridgeScript, null);
+                        }
                     }
                     try {
                         URI uri = new URI(url);
@@ -3656,6 +3675,34 @@ public class WebViewDialog extends Dialog {
             Log.e("InAppBrowserProxy", "Failed to load proxy-bridge.js", e);
             return null;
         }
+    }
+
+    private static String escapeJavaScriptLiteral(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return value
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029");
+    }
+
+    private String prepareProxyBridgeScript() {
+        if (proxyBridgeScript == null || proxyAccessToken == null) {
+            return null;
+        }
+
+        String proxyRegexSource = "";
+        if (ProxyRequestSupport.usesLegacyJsProxyMode(_options) && _options.getProxyRequestsPattern() != null) {
+            proxyRegexSource = _options.getProxyRequestsPattern().pattern();
+        }
+
+        return proxyBridgeScript
+            .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
+            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
     }
 
     private boolean shouldUseNativeProxy() {

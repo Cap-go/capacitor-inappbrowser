@@ -3,6 +3,7 @@ import {
   ensureInferredContentType,
   getSubmitEventSubmitter,
   replaceCapturedHeader,
+  shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
 } from './proxy-bridge-support';
 
@@ -22,7 +23,17 @@ import {
   }
 
   const accessToken = '___CAPGO_PROXY_TOKEN___';
+  const proxyRegexSource = '___CAPGO_PROXY_REGEX___';
   let requestCounter = 0;
+  let proxyRequestPattern: RegExp | null = null;
+
+  if (proxyRegexSource) {
+    try {
+      proxyRequestPattern = new RegExp(proxyRegexSource);
+    } catch (_error) {
+      proxyRequestPattern = null;
+    }
+  }
 
   function generateRequestId(): string {
     return 'pr_' + Date.now() + '_' + requestCounter++;
@@ -66,15 +77,6 @@ import {
       }
     }
     return url;
-  }
-
-  function shouldProxyUrl(url: string): boolean {
-    try {
-      const protocol = new URL(url, window.location.href).protocol.toLowerCase();
-      return protocol === 'http:' || protocol === 'https:';
-    } catch (_error) {
-      return false;
-    }
   }
 
   function methodSupportsRequestBody(method: string): boolean {
@@ -278,7 +280,7 @@ import {
       }
     }
 
-    if (!shouldProxyUrl(requestUrl)) {
+    if (!shouldProxyBridgeUrl(requestUrl, window.location.href, proxyRequestPattern)) {
       return false;
     }
 
@@ -348,7 +350,7 @@ import {
       return originalFetch.call(window, input, init);
     }
 
-    if (!shouldProxyUrl(url)) {
+    if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
       return originalFetch.call(window, input, init);
     }
 
@@ -417,7 +419,7 @@ import {
       originalXhrSend.call(xhr, null);
     }
 
-    if (!shouldProxyUrl(url)) {
+    if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
       originalXhrSend.call(xhr, body ?? null);
       return;
     }

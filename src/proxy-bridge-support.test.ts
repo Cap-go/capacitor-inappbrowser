@@ -6,6 +6,8 @@ import {
   getSubmitEventSubmitter,
   inferContentTypeFromBody,
   replaceCapturedHeader,
+  resolveProxyBridgeUrl,
+  shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
 } from './proxy-bridge-support';
 
@@ -79,5 +81,23 @@ describe('proxy bridge submit helpers', () => {
     expect(shouldProxySubmitEvent(false, true)).toBe(true);
     expect(shouldProxySubmitEvent(true, true)).toBe(false);
     expect(shouldProxySubmitEvent(false, false)).toBe(false);
+  });
+});
+
+describe('proxy bridge url helpers', () => {
+  it('resolves relative urls against the page location', () => {
+    expect(resolveProxyBridgeUrl('/api/private', 'https://www.grailed.com/users/sign_up')).toBe(
+      'https://www.grailed.com/api/private',
+    );
+  });
+
+  it('skips non-http urls and regex misses', () => {
+    expect(shouldProxyBridgeUrl('mailto:test@example.com', 'https://www.grailed.com', null)).toBe(false);
+    expect(
+      shouldProxyBridgeUrl('https://cdn.example.com/script.js', 'https://www.grailed.com', /api\.example\.com/),
+    ).toBe(false);
+    expect(shouldProxyBridgeUrl('https://api.example.com/login', 'https://www.grailed.com', /api\.example\.com/)).toBe(
+      true,
+    );
   });
 });

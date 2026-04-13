@@ -183,6 +183,7 @@ public class Options {
     private boolean enabledSafeTopMargin = true;
     private boolean useTopInset = false;
     private boolean enableGooglePaySupport = false;
+    private boolean enableZoom = false;
     private List<String> blockedHosts = new ArrayList<>();
     private Integer width = null;
     private Integer height = null;
@@ -571,6 +572,14 @@ public class Options {
 
     public void setEnableGooglePaySupport(boolean enableGooglePaySupport) {
         this.enableGooglePaySupport = enableGooglePaySupport;
+    }
+
+    public boolean getEnableZoom() {
+        return enableZoom;
+    }
+
+    public void setEnableZoom(boolean enableZoom) {
+        this.enableZoom = enableZoom;
     }
 
     public List<String> getBlockedHosts() {

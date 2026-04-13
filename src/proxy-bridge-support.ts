@@ -48,6 +48,28 @@ export function ensureInferredContentType(headers: Record<string, string>, body:
   }
 }
 
+export function resolveProxyBridgeUrl(rawUrl: string, baseUrl: string): string | null {
+  try {
+    return new URL(rawUrl, baseUrl).href;
+  } catch (_error) {
+    return null;
+  }
+}
+
+export function shouldProxyBridgeUrl(rawUrl: string, baseUrl: string, urlRegex?: RegExp | null): boolean {
+  const resolvedUrl = resolveProxyBridgeUrl(rawUrl, baseUrl);
+  if (!resolvedUrl) {
+    return false;
+  }
+
+  const protocol = new URL(resolvedUrl).protocol.toLowerCase();
+  if (protocol !== 'http:' && protocol !== 'https:') {
+    return false;
+  }
+
+  return !urlRegex || urlRegex.test(resolvedUrl);
+}
+
 type SubmitEventLike = Event & { submitter?: unknown };
 
 export function getSubmitEventSubmitter(

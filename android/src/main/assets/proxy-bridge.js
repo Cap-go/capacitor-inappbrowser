@@ -67,6 +67,24 @@
       headers["content-type"] = inferredContentType;
     }
   }
+  function resolveProxyBridgeUrl(rawUrl, baseUrl) {
+    try {
+      return new URL(rawUrl, baseUrl).href;
+    } catch (_error) {
+      return null;
+    }
+  }
+  function shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex) {
+    const resolvedUrl = resolveProxyBridgeUrl(rawUrl, baseUrl);
+    if (!resolvedUrl) {
+      return false;
+    }
+    const protocol = new URL(resolvedUrl).protocol.toLowerCase();
+    if (protocol !== "http:" && protocol !== "https:") {
+      return false;
+    }
+    return !urlRegex || urlRegex.test(resolvedUrl);
+  }
   function getSubmitEventSubmitter(event, submitEventCtor) {
     var _a, _b;
     const resolvedSubmitEventCtor = submitEventCtor != null ? submitEventCtor : typeof SubmitEvent !== "undefined" ? SubmitEvent : void 0;
@@ -89,7 +107,16 @@
       return;
     }
     const accessToken = "___CAPGO_PROXY_TOKEN___";
+    const proxyRegexSource = "___CAPGO_PROXY_REGEX___";
     let requestCounter = 0;
+    let proxyRequestPattern = null;
+    if (proxyRegexSource) {
+      try {
+        proxyRequestPattern = new RegExp(proxyRegexSource);
+      } catch (_error) {
+        proxyRequestPattern = null;
+      }
+    }
     function generateRequestId() {
       return "pr_" + Date.now() + "_" + requestCounter++;
     }
@@ -126,14 +153,6 @@
         }
       }
       return url;
-    }
-    function shouldProxyUrl(url) {
-      try {
-        const protocol = new URL(url, window.location.href).protocol.toLowerCase();
-        return protocol === "http:" || protocol === "https:";
-      } catch (_error) {
-        return false;
-      }
     }
     function methodSupportsRequestBody(method) {
       const normalizedMethod = normalizeMethod(method);
@@ -297,7 +316,7 @@
             body = formDataToUrlSearchParams(formData);
           }
         }
-        if (!shouldProxyUrl(requestUrl)) {
+        if (!shouldProxyBridgeUrl(requestUrl, window.location.href, proxyRequestPattern)) {
           return false;
         }
         const proxyUrl = yield storeInterceptedRequest(requestUrl, method, headers, body, "include");
@@ -363,7 +382,7 @@
         if (requestCloneError != null) {
           return originalFetch.call(window, input, init);
         }
-        if (!shouldProxyUrl(url)) {
+        if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
           return originalFetch.call(window, input, init);
         }
         const signal = (_a = init == null ? void 0 : init.signal) != null ? _a : input instanceof Request ? input.signal : void 0;
@@ -423,7 +442,7 @@
         originalXhrOpen.call(xhr, "GET", proxyUrl, true);
         originalXhrSend.call(xhr, null);
       }
-      if (!shouldProxyUrl(url)) {
+      if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
         originalXhrSend.call(xhr, body != null ? body : null);
         return;
       }

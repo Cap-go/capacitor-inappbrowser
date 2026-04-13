@@ -1218,6 +1218,7 @@ export interface InAppBrowserPlugin {
   ): Promise<PluginListenerHandle>;
   /**
    * Internal method used by `addProxyHandler()` to send a proxy decision back to native.
+   * Forward the original `phase` when replying to a manual `proxyRequest` listener.
    *
    * @since 8.6.0
    */
@@ -1226,6 +1227,7 @@ export interface InAppBrowserPlugin {
     decision?: ProxyDecision | null;
     response?: ProxyResponse | null;
     webviewId?: string;
+    phase?: 'outbound' | 'inbound';
   }): Promise<void>;
   /**
    * Remove all listeners for this plugin.

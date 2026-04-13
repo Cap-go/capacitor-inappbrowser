@@ -64,7 +64,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String pluginVersion = "8.5.3";
+    private final String pluginVersion = "8.5.5";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -993,6 +993,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
         // Set Google Pay support option
         options.setEnableGooglePaySupport(Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false)));
+        options.setHiddenPopupWindow(Boolean.TRUE.equals(call.getBoolean("hiddenPopupWindow", false)));
+        options.setEnableZoom(Boolean.TRUE.equals(call.getBoolean("enableZoom", false)));
         options.setHiddenPopupWindow(Boolean.TRUE.equals(call.getBoolean("hiddenPopupWindow", false)));
 
         // Set dimensions if provided

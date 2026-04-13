@@ -77,6 +77,25 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertThrowsError(try ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "["))
     }
 
+    func testLegacyCatchAllRuleOnlyAppliesToOutboundPhase() {
+        XCTAssertTrue(
+            ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
+                legacyProxyRequests: true,
+                hasOutboundRules: false,
+                hasInboundRules: false,
+                phase: "outbound"
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
+                legacyProxyRequests: true,
+                hasOutboundRules: false,
+                hasInboundRules: false,
+                phase: "inbound"
+            )
+        )
+    }
+
     func testProxySchemeMainFrameDetectionTracksMainDocumentURL() throws {
         let pageURL = try XCTUnwrap(URL(string: "https://example.com/page"))
         let scriptURL = try XCTUnwrap(URL(string: "https://example.com/app.js"))

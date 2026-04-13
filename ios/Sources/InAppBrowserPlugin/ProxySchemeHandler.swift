@@ -240,6 +240,15 @@ enum ProxySchemeRequestSupport {
         )
     }
 
+    static func shouldUseLegacyCatchAllRule(
+        legacyProxyRequests: Bool,
+        hasOutboundRules: Bool,
+        hasInboundRules: Bool,
+        phase: String
+    ) -> Bool {
+        legacyProxyRequests && phase == "outbound" && !hasOutboundRules && !hasInboundRules
+    }
+
     static func decodedRequestBody(from base64Body: String?) throws -> Data? {
         guard let base64Body else {
             return nil
@@ -681,7 +690,12 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func firstMatchingRule(for requestContext: NativeRequestContext, responseData: NativeResponseData?, phase: String) -> NativeProxyRule? {
-        let usesLegacyCatchAllRule = legacyProxyRequests && outboundRules.isEmpty && inboundRules.isEmpty
+        let usesLegacyCatchAllRule = ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
+            legacyProxyRequests: legacyProxyRequests,
+            hasOutboundRules: !outboundRules.isEmpty,
+            hasInboundRules: !inboundRules.isEmpty,
+            phase: phase
+        )
         let rules: [NativeProxyRule]
 
         if usesLegacyCatchAllRule {

@@ -374,8 +374,12 @@ final class ProxyRequestSupport {
                 continue;
             }
 
-            String headerValue = headerValues.get(0);
-            if (headerValue == null || headerValue.isBlank()) {
+            String headerValue = headerValues
+                .stream()
+                .filter((value) -> value != null && !value.isBlank())
+                .reduce((first, second) -> first + ", " + second)
+                .orElse(null);
+            if (headerValue == null) {
                 continue;
             }
             responseHeaders.put(headerName, headerValue);

@@ -366,4 +366,14 @@ public class ProxyRequestSupportTest {
         assertFalse(parsedHeaders.responseHeaders().containsKey("Set-Cookie"));
         assertEquals(List.of("session=abc; Path=/", "csrf=def; Path=/"), parsedHeaders.cookieHeaders());
     }
+
+    @Test
+    public void splitResponseHeadersCombinesRepeatedNonCookieValues() {
+        ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(
+            Map.of("WWW-Authenticate", List.of("Bearer realm=one", "Basic realm=two"), "Cache-Control", List.of("no-cache", "no-store"))
+        );
+
+        assertEquals("Bearer realm=one, Basic realm=two", parsedHeaders.responseHeaders().get("WWW-Authenticate"));
+        assertEquals("no-cache, no-store", parsedHeaders.responseHeaders().get("Cache-Control"));
+    }
 }
