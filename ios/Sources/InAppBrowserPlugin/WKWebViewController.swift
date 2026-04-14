@@ -574,7 +574,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
         DispatchQueue.main.async {
-            if self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
+            if self.allowsFileURL && self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
                 let accessURL = fileURL.deletingLastPathComponent()
                 self.source = .file(fileURL, access: accessURL)
                 self.load(file: fileURL, access: accessURL)
@@ -2626,10 +2626,7 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if handleDownloads, navigationAction.shouldPerformDownload {
-            decisionHandler(.download)
-            return
-        }
+        let shouldForceDownload = handleDownloads && navigationAction.shouldPerformDownload
 
         var actionPolicy: WKNavigationActionPolicy = self.preventDeeplink ? .preventDeeplinkActionPolicy : .allow
 
@@ -2683,6 +2680,11 @@ extension WKWebViewController: WKNavigationDelegate {
             if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue),
                let result = self.delegate?.webViewController?(self, decidePolicy: url, navigationType: navigationType) {
                 actionPolicy = result ? .allow : .cancel
+            }
+
+            if shouldForceDownload, actionPolicy != .cancel {
+                decisionHandler(.download)
+                return
             }
 
             self.injectJavaScriptInterface()

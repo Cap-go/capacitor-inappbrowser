@@ -86,6 +86,7 @@ import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -102,6 +103,10 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -453,7 +458,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     long declaredSize = jsonPayload.optLong("size", -1L);
-                    long decodedSize = declaredSize >= 0 ? declaredSize : estimateDecodedByteCount(base64);
+                    long estimatedSize = estimateDecodedByteCount(base64);
+                    long decodedSize = declaredSize >= 0 ? Math.max(declaredSize, estimatedSize) : estimatedSize;
                     if (decodedSize > MAX_LEGACY_BLOB_DOWNLOAD_BYTES) {
                         throw new IOException("Blob download is too large for the legacy bridge");
                     }
@@ -573,8 +579,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 if (session.expectedSize >= 0 && session.bytesWritten != session.expectedSize) {
-                    Log.w(
-                        "InAppBrowser",
+                    throw new IOException(
                         "Blob download size mismatch for " +
                             session.outputFile.getName() +
                             ": expected " +
@@ -880,6 +885,46 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return message + ": " + exception.getMessage();
     }
 
+    private String redactUrlForLogging(String rawUrl) {
+        if (TextUtils.isEmpty(rawUrl)) {
+            return rawUrl;
+        }
+
+        try {
+            Uri parsedUrl = Uri.parse(rawUrl);
+            return parsedUrl.buildUpon().encodedQuery(null).encodedFragment(null).build().toString();
+        } catch (Exception exception) {
+            return rawUrl;
+        }
+    }
+
+    private void configureDownloadTlsIfNeeded(HttpURLConnection connection) throws Exception {
+        if (!(connection instanceof HttpsURLConnection) || _options == null || !_options.ignoreUntrustedSSLError()) {
+            return;
+        }
+
+        TrustManager[] trustManagers = new TrustManager[] {
+            new X509TrustManager() {
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
+                    return new X509Certificate[0];
+                }
+            }
+        };
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, trustManagers, new SecureRandom());
+
+        HttpsURLConnection secureConnection = (HttpsURLConnection) connection;
+        secureConnection.setSSLSocketFactory(sslContext.getSocketFactory());
+        secureConnection.setHostnameVerifier((hostname, session) -> true);
+    }
+
     private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
         if (_webView == null) {
             return;
@@ -954,10 +999,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         executorService.execute(() -> {
             HttpURLConnection connection = null;
             InputStream inputStream = null;
+            File outputFile = null;
+            boolean downloadSucceeded = false;
 
             try {
                 URL downloadUrl = new URL(url);
                 connection = (HttpURLConnection) downloadUrl.openConnection();
+                configureDownloadTlsIfNeeded(connection);
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(30000);
                 connection.setInstanceFollowRedirects(true);
@@ -1010,7 +1058,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                 String fileName = URLUtil.guessFileName(connection.getURL().toString(), resolvedDisposition, provisionalMimeType);
                 String resolvedMimeType = normalizeMimeType(provisionalMimeType, fileName);
-                File outputFile = createDownloadFile(fileName);
+                outputFile = createDownloadFile(fileName);
 
                 inputStream = connection.getInputStream();
                 try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
@@ -1022,6 +1070,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 finalizeDownload(outputFile, resolvedMimeType, url);
+                downloadSucceeded = true;
             } catch (Exception exception) {
                 showDownloadError("Failed to download file", exception, url, null, mimeType);
             } finally {
@@ -1032,6 +1081,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
                 if (connection != null) {
                     connection.disconnect();
+                }
+                if (!downloadSucceeded && outputFile != null && outputFile.exists() && !outputFile.delete()) {
+                    outputFile.deleteOnExit();
                 }
             }
         });
@@ -1830,7 +1882,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         if (_options.getHandleDownloads()) {
             _webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
-                Log.d("InAppBrowser", "Handling WebView download: " + url + ", mimeType=" + mimeType + ", bytes=" + contentLength);
+                Log.d(
+                    "InAppBrowser",
+                    "Handling WebView download: " + redactUrlForLogging(url) + ", mimeType=" + mimeType + ", bytes=" + contentLength
+                );
                 handleDownloadRequest(url, userAgent, contentDisposition, mimeType);
             });
         }
