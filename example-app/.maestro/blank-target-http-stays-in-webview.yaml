@@ -24,7 +24,9 @@ androidWebViewHierarchy: devtools
     text: "Open Blank Target HTTPS Test"
     retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
-- tapOn: "Open Example Domain"
+- tapOn:
+    text: "Open Example Domain"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Example Domain"
     timeout: 15000
@@ -33,5 +35,9 @@ androidWebViewHierarchy: devtools
     text: "Navigate up"
     optional: true
     label: "Close the plugin webview if an external browser opened first"
-- assertVisible: "internal navigation confirmed"
-- assertVisible: "https://example.com/#blank-target-webview"
+- extendedWaitUntil:
+    visible: "Blank target test result: internal navigation confirmed"
+    timeout: 15000
+- assertVisible: "Blank target test status: Closed"
+- assertVisible: "Blank target test result: internal navigation confirmed"
+- assertVisible: "Blank target last URL: https://example.com/#blank-target-webview"
