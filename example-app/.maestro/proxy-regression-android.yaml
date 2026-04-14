@@ -1,9 +1,6 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
-    visible: "Run Proxy Regression (Maestro)"
-    timeout: 240000
-- extendedWaitUntil:
     visible: "Proxy Regression Entry"
     timeout: 60000
 - extendedWaitUntil:
