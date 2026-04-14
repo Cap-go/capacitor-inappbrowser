@@ -8,8 +8,8 @@ androidWebViewHierarchy: devtools
 - tapOn: "Open Blank Target HTTPS Test"
 - assertVisible: "Target Blank Test Page"
 - tapOn: "Open Example Domain"
-- assertVisible:
-    text: "Example Domain"
+- extendedWaitUntil:
+    visible: "Example Domain"
     timeout: 15000
 - back
 - tapOn:
