@@ -1499,8 +1499,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             event.preventDefault();
-            event.stopImmediatePropagation();
-            window.location.assign(nextUrl.toString());
+            setTimeout(function() {
+              window.location.assign(nextUrl.toString());
+            }, 0);
           }, true);
         })();
         """

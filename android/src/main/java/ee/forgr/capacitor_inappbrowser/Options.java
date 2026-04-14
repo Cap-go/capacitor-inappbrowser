@@ -691,6 +691,7 @@ public class Options {
         copy.setMaterialPicker(materialPicker);
         copy.setTextZoom(textZoom);
         copy.setPreventDeeplink(preventDeeplink);
+        copy.setOpenBlankTargetInWebView(openBlankTargetInWebView);
         copy.setAuthorizedAppLinks(new ArrayList<>(authorizedAppLinks));
         copy.setEnabledSafeMargin(enabledSafeBottomMargin);
         copy.setEnabledSafeTopMargin(enabledSafeTopMargin);

@@ -2573,12 +2573,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
             return false;
         }
+        final String urlHost;
         try {
             URI uri = new URI(url);
-            String urlHost = uri.getHost();
-            if (urlHost == null) return false;
-            if (urlHost.startsWith("www.")) urlHost = urlHost.substring(4);
-            for (String authorized : authorizedLinks) {
+            String parsedUrlHost = uri.getHost();
+            if (parsedUrlHost == null) return false;
+            urlHost = parsedUrlHost.startsWith("www.") ? parsedUrlHost.substring(4) : parsedUrlHost;
+        } catch (URISyntaxException e) {
+            Log.e("InAppBrowser", "Invalid popup URL in authorized app link check: " + url, e);
+            return false;
+        }
+
+        for (String authorized : authorizedLinks) {
+            try {
                 URI authUri = new URI(authorized);
                 String authHost = authUri.getHost();
                 if (authHost == null) continue;
@@ -2586,9 +2593,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 if (urlHost.equalsIgnoreCase(authHost)) {
                     return true;
                 }
+            } catch (URISyntaxException e) {
+                Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
             }
-        } catch (URISyntaxException e) {
-            Log.e("InAppBrowser", "Invalid URI in authorized app link check: " + url, e);
         }
         return false;
     }
@@ -2625,12 +2632,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
                         return false;
                     }
+                    final String urlHost;
                     try {
                         URI uri = new URI(url);
-                        String urlHost = uri.getHost();
-                        if (urlHost == null) return false;
-                        if (urlHost.startsWith("www.")) urlHost = urlHost.substring(4);
-                        for (String authorized : authorizedLinks) {
+                        String parsedUrlHost = uri.getHost();
+                        if (parsedUrlHost == null) return false;
+                        urlHost = parsedUrlHost.startsWith("www.") ? parsedUrlHost.substring(4) : parsedUrlHost;
+                    } catch (URISyntaxException e) {
+                        Log.e("InAppBrowser", "Invalid URI in isUrlAuthorized: " + url, e);
+                        return false;
+                    }
+
+                    for (String authorized : authorizedLinks) {
+                        try {
                             URI authUri = new URI(authorized);
                             String authHost = authUri.getHost();
                             if (authHost == null) continue;
@@ -2638,9 +2652,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             if (urlHost.equalsIgnoreCase(authHost)) {
                                 return true;
                             }
+                        } catch (URISyntaxException e) {
+                            Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
                         }
-                    } catch (URISyntaxException e) {
-                        Log.e("InAppBrowser", "Invalid URI in isUrlAuthorized: " + url, e);
                     }
                     return false;
                 }

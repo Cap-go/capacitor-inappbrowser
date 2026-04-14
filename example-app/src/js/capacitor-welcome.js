@@ -309,6 +309,8 @@ window.customElements.define(
       const blankTargetResultText = self.shadowRoot.querySelector("#blank-target-result-text");
       const blankTargetLastUrlText = self.shadowRoot.querySelector("#blank-target-last-url-text");
       let blankTargetTestActive = false;
+      let blankTargetWebViewId = null;
+      let blankTargetListenerHandles = [];
 
       function setBlankTargetState({ status, result, lastUrl }) {
         blankTargetStatusText.textContent = status;
@@ -316,53 +318,82 @@ window.customElements.define(
         blankTargetLastUrlText.textContent = lastUrl;
       }
 
+      function isBlankTargetEvent(result) {
+        return blankTargetTestActive && result?.id === blankTargetWebViewId;
+      }
+
+      async function clearBlankTargetListeners() {
+        const handles = blankTargetListenerHandles;
+        blankTargetListenerHandles = [];
+
+        await Promise.all(
+          handles.map((handle) => {
+            if (!handle || typeof handle.remove !== "function") {
+              return Promise.resolve();
+            }
+
+            return Promise.resolve(handle.remove()).catch(() => {});
+          }),
+        );
+      }
+
+      async function attachBlankTargetListeners() {
+        await clearBlankTargetListeners();
+
+        blankTargetListenerHandles = [
+          await InAppBrowser.addListener("urlChangeEvent", (result) => {
+            if (!isBlankTargetEvent(result)) {
+              return;
+            }
+
+            setBlankTargetState({
+              status: result.url === blankTargetExpectedUrl ? "Linked page loaded" : "Navigating",
+              result: blankTargetResultText.textContent,
+              lastUrl: result.url,
+            });
+          }),
+          await InAppBrowser.addListener("closeEvent", async (result) => {
+            if (!isBlankTargetEvent(result)) {
+              return;
+            }
+
+            const closedUrl = result.url || "unknown";
+            blankTargetTestActive = false;
+            blankTargetWebViewId = null;
+
+            setBlankTargetState({
+              status: "Closed",
+              result:
+                closedUrl === blankTargetExpectedUrl
+                  ? "internal navigation confirmed"
+                  : `closed on ${closedUrl}`,
+              lastUrl: closedUrl,
+            });
+
+            await clearBlankTargetListeners();
+          }),
+          await InAppBrowser.addListener("pageLoadError", async (result) => {
+            if (!isBlankTargetEvent(result)) {
+              return;
+            }
+
+            blankTargetTestActive = false;
+            blankTargetWebViewId = null;
+            setBlankTargetState({
+              status: "Page load error",
+              result: "page load error",
+              lastUrl: blankTargetLastUrlText.textContent,
+            });
+
+            await clearBlankTargetListeners();
+          }),
+        ];
+      }
+
       setBlankTargetState({
         status: "Idle",
         result: "not run",
         lastUrl: "none",
-      });
-
-      InAppBrowser.addListener("urlChangeEvent", (result) => {
-        if (!blankTargetTestActive) {
-          return;
-        }
-
-        setBlankTargetState({
-          status: result.url === blankTargetExpectedUrl ? "Linked page loaded" : "Navigating",
-          result: blankTargetResultText.textContent,
-          lastUrl: result.url,
-        });
-      });
-
-      InAppBrowser.addListener("closeEvent", (result) => {
-        if (!blankTargetTestActive) {
-          return;
-        }
-
-        const closedUrl = result.url || "unknown";
-        blankTargetTestActive = false;
-
-        setBlankTargetState({
-          status: "Closed",
-          result:
-            closedUrl === blankTargetExpectedUrl
-              ? "internal navigation confirmed"
-              : `closed on ${closedUrl}`,
-          lastUrl: closedUrl,
-        });
-      });
-
-      InAppBrowser.addListener("pageLoadError", () => {
-        if (!blankTargetTestActive) {
-          return;
-        }
-
-        blankTargetTestActive = false;
-        setBlankTargetState({
-          status: "Page load error",
-          result: "page load error",
-          lastUrl: blankTargetLastUrlText.textContent,
-        });
       });
 
       async function loadLocalTestWebappUrl() {
@@ -696,6 +727,7 @@ window.customElements.define(
         .querySelector("#open-blank-target-test")
         .addEventListener("click", async function () {
           blankTargetTestActive = true;
+          blankTargetWebViewId = null;
           setBlankTargetState({
             status: "Opening test webview...",
             result: "waiting for navigation",
@@ -703,7 +735,9 @@ window.customElements.define(
           });
 
           try {
-            await InAppBrowser.openWebView({
+            await attachBlankTargetListeners();
+
+            const { id } = await InAppBrowser.openWebView({
               url: blankTargetTestUrl,
               toolbarType: ToolBarType.COMPACT,
               backgroundColor: BackgroundColor.WHITE,
@@ -714,8 +748,11 @@ window.customElements.define(
               enabledSafeBottomMargin: true,
               openBlankTargetInWebView: true,
             });
+            blankTargetWebViewId = id;
           } catch (e) {
             blankTargetTestActive = false;
+            blankTargetWebViewId = null;
+            await clearBlankTargetListeners();
             console.error("Error opening blank target test:", e);
             setBlankTargetState({
               status: "Error",
