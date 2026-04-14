@@ -3649,6 +3649,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (activity == null) {
             return;
         }
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            return;
+        }
 
         Window dialogWindow = getWindow();
         View dialogDecorView = dialogWindow != null ? dialogWindow.getDecorView() : null;

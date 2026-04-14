@@ -381,7 +381,8 @@ export function attachKeyboardRegressionHarness() {
     const finalMetrics = getViewportMetrics();
     const finalHeight = getTrackedHeight(finalMetrics);
     const keyboardDelta = run.baselineHeight - run.minHeight;
-    const keyboardOpened = run.pageKeyboardOpened;
+    const hostKeyboardOpened = keyboardDelta >= KEYBOARD_OPEN_THRESHOLD_PX;
+    const keyboardOpened = run.pageKeyboardOpened || hostKeyboardOpened;
     const restored = Math.abs(finalHeight - run.baselineHeight) <= KEYBOARD_RESTORE_TOLERANCE_PX;
     const pageKeyboardDelta =
       run.pageBaselineHeight !== null && run.pageMinHeight !== null ? run.pageBaselineHeight - run.pageMinHeight : null;
@@ -395,6 +396,7 @@ export function attachKeyboardRegressionHarness() {
       `Page current height: ${run.pageCurrentHeight ?? "n/a"}px`,
       `Page keyboard delta: ${pageKeyboardDelta ?? "n/a"}px`,
       `Page reported keyboard open: ${run.pageKeyboardOpened}`,
+      `Host inferred keyboard open: ${hostKeyboardOpened}`,
       "",
       `Baseline metrics: ${formatMetrics(run.baselineMetrics)}`,
       "",
@@ -413,7 +415,9 @@ export function attachKeyboardRegressionHarness() {
     if (!keyboardOpened) {
       setStatus(
         "Keyboard regression inconclusive",
-        ["The in-app browser page never reported a keyboard-open state.", "", ...detailLines].join("\n"),
+        ["Neither the host viewport nor the in-app browser page reported a keyboard-open state.", "", ...detailLines].join(
+          "\n",
+        ),
       );
       runButton.disabled = false;
       syncMaestroNativeRunning(false);
