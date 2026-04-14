@@ -3,9 +3,8 @@ appId: app.capgo.inappbrowser
 - extendedWaitUntil:
     visible: "InAppBrowser Test App"
     timeout: 20000
-- scrollUntilVisible:
-    element: "Open Auto Download Demo"
-    direction: DOWN
+- extendedWaitUntil:
+    visible: "Open Auto Download Demo"
     timeout: 20000
 - tapOn: "Open Auto Download Demo"
 - extendedWaitUntil:

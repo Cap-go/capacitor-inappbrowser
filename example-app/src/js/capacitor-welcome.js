@@ -74,6 +74,20 @@ window.customElements.define(
         <p>
           This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
         </p>
+        <h2>Download Handling</h2>
+        <p>
+          Open a page that immediately downloads a blob text file. With native download handling enabled, the downloaded file should reopen inside the webview.
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="handle-downloads-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Handle downloads natively</span>
+          </label>
+        </p>
+        <p>
+          <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
+        </p>
+        <hr />
         <h2>Custom URL</h2>
         <p>
           Enter a URL to open in the in-app browser.
@@ -176,20 +190,6 @@ window.customElements.define(
         </p>
         <p>
           <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
-        </p>
-        <hr />
-        <h2>Download Handling</h2>
-        <p>
-          Open a page that immediately downloads a blob text file. With native download handling enabled, the downloaded file should reopen inside the webview.
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="handle-downloads-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Handle downloads natively</span>
-          </label>
-        </p>
-        <p>
-          <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
         </p>
         <hr />
         <h2>System Bars</h2>

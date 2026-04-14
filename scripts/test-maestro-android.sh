@@ -8,12 +8,13 @@ RESULTS_DIR="$ROOT_DIR/maestro-results"
 FLOW_PATH="$ROOT_DIR/.maestro/download-handling-android.yaml"
 APP_ID="app.capgo.inappbrowser"
 SKIP_BUILD="${CAPGO_MAESTRO_SKIP_BUILD:-0}"
-DEVICE_ID="${CAPGO_MAESTRO_ANDROID_DEVICE_ID:-$(adb devices | awk 'NR > 1 && $2 == "device" { print $1; exit }')}"
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "adb is required to run Android Maestro tests." >&2
   exit 1
 fi
+
+DEVICE_ID="${CAPGO_MAESTRO_ANDROID_DEVICE_ID:-$(adb devices | awk 'NR > 1 && $2 == "device" { print $1; exit }')}"
 
 if ! command -v maestro >/dev/null 2>&1; then
   echo "maestro is required to run Android Maestro tests." >&2

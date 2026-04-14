@@ -95,6 +95,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
@@ -193,6 +194,26 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
     private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
     private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
+    private static final int BLOB_DOWNLOAD_CHUNK_BYTES = 64 * 1024;
+    private static final long MAX_LEGACY_BLOB_DOWNLOAD_BYTES = 512L * 1024L;
+    private static final long MAX_INLINE_TEXT_PREVIEW_BYTES = 512L * 1024L;
+
+    private static class BlobDownloadSession {
+
+        private final File outputFile;
+        private final String mimeType;
+        private final FileOutputStream outputStream;
+        private final long expectedSize;
+        private long bytesWritten;
+
+        private BlobDownloadSession(File outputFile, String mimeType, FileOutputStream outputStream, long expectedSize) {
+            this.outputFile = outputFile;
+            this.mimeType = mimeType;
+            this.outputStream = outputStream;
+            this.expectedSize = expectedSize;
+            this.bytesWritten = 0L;
+        }
+    }
 
     private WebView _webView;
     private Toolbar _toolbar;
@@ -209,6 +230,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
     private WindowManager.LayoutParams previousWindowAttributes;
@@ -428,6 +450,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         throw new IOException("Blob download payload is empty");
                     }
 
+                    long declaredSize = jsonPayload.optLong("size", -1L);
+                    long decodedSize = declaredSize >= 0 ? declaredSize : estimateDecodedByteCount(base64);
+                    if (decodedSize > MAX_LEGACY_BLOB_DOWNLOAD_BYTES) {
+                        throw new IOException("Blob download is too large for the legacy bridge");
+                    }
+
                     String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
                     String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
                     File outputFile = createDownloadFile(fileName);
@@ -441,6 +469,136 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     showDownloadError("Failed to save blob download", exception);
                 }
             });
+        }
+
+        @JavascriptInterface
+        public void startBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            try {
+                JSONObject jsonPayload = new JSONObject(payload);
+                String sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
+                long expectedSize = jsonPayload.optLong("size", -1L);
+                File outputFile = createDownloadFile(fileName);
+                BlobDownloadSession session = new BlobDownloadSession(outputFile, mimeType, new FileOutputStream(outputFile), expectedSize);
+
+                BlobDownloadSession existingSession = blobDownloadSessions.putIfAbsent(sessionId, session);
+                if (existingSession != null) {
+                    cleanupBlobDownloadSession(session, true);
+                    throw new IOException("Blob download session already exists");
+                }
+            } catch (Exception exception) {
+                showDownloadError("Failed to start blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void appendBlobDownloadChunk(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            try {
+                JSONObject jsonPayload = new JSONObject(payload);
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                String base64 = jsonPayload.optString("base64", "");
+                if (TextUtils.isEmpty(base64)) {
+                    return;
+                }
+
+                BlobDownloadSession session = blobDownloadSessions.get(sessionId);
+                if (session == null) {
+                    throw new IOException("Blob download session was not initialized");
+                }
+
+                byte[] chunkBytes = Base64.decode(base64, Base64.DEFAULT);
+                synchronized (session) {
+                    session.outputStream.write(chunkBytes);
+                    session.bytesWritten += chunkBytes.length;
+                    if (session.expectedSize >= 0 && session.bytesWritten > session.expectedSize) {
+                        throw new IOException("Blob download exceeded expected size");
+                    }
+                }
+            } catch (Exception exception) {
+                abortBlobDownloadSession(sessionId, true);
+                showDownloadError("Failed to save blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void finishBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            try {
+                JSONObject jsonPayload = new JSONObject(payload);
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                BlobDownloadSession session = blobDownloadSessions.remove(sessionId);
+                if (session == null) {
+                    throw new IOException("Blob download session was not initialized");
+                }
+
+                synchronized (session) {
+                    session.outputStream.flush();
+                    session.outputStream.close();
+                }
+
+                if (session.expectedSize >= 0 && session.bytesWritten != session.expectedSize) {
+                    Log.w(
+                        "InAppBrowser",
+                        "Blob download size mismatch for " +
+                            session.outputFile.getName() +
+                            ": expected " +
+                            session.expectedSize +
+                            ", wrote " +
+                            session.bytesWritten
+                    );
+                }
+
+                finalizeDownload(session.outputFile, session.mimeType);
+            } catch (Exception exception) {
+                abortBlobDownloadSession(sessionId, true);
+                showDownloadError("Failed to finalize blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void abortBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            String reason = "Blob download aborted";
+            try {
+                JSONObject jsonPayload = new JSONObject(payload);
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (!TextUtils.isEmpty(jsonPayload.optString("reason", ""))) {
+                    reason = jsonPayload.optString("reason", reason);
+                }
+            } catch (JSONException ignored) {}
+
+            abortBlobDownloadSession(sessionId, true);
+            Log.w("InAppBrowser", reason);
         }
     }
 
@@ -509,17 +667,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private boolean shouldPreviewDownloadedFile(String mimeType) {
-        if (TextUtils.isEmpty(mimeType)) {
-            return false;
-        }
-
-        return (
-            mimeType.startsWith("text/") ||
-            mimeType.startsWith("image/") ||
-            "application/json".equals(mimeType) ||
-            "application/javascript".equals(mimeType) ||
-            "application/xhtml+xml".equals(mimeType)
-        );
+        return isTextPreviewMimeType(mimeType);
     }
 
     private boolean isTextPreviewMimeType(String mimeType) {
@@ -527,7 +675,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return false;
         }
 
-        return mimeType.startsWith("text/") || "application/json".equals(mimeType) || "application/javascript".equals(mimeType);
+        return (
+            mimeType.startsWith("text/") ||
+            "application/json".equals(mimeType) ||
+            "application/javascript".equals(mimeType) ||
+            "application/xhtml+xml".equals(mimeType) ||
+            "image/svg+xml".equals(mimeType)
+        );
     }
 
     private File downloadDirectory() throws IOException {
@@ -545,18 +699,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             ? sanitizedFileName
             : sanitizedFileName.substring(0, sanitizedFileName.length() - extension.length() - 1);
         File directory = downloadDirectory();
-        File candidate = new File(directory, sanitizedFileName);
-        int duplicateIndex = 1;
 
-        while (candidate.exists()) {
-            String duplicateName = extension.isEmpty()
-                ? baseName + "-" + duplicateIndex
-                : baseName + "-" + duplicateIndex + "." + extension;
-            candidate = new File(directory, duplicateName);
+        int duplicateIndex = 0;
+        while (true) {
+            String candidateName =
+                duplicateIndex == 0
+                    ? sanitizedFileName
+                    : extension.isEmpty()
+                        ? baseName + "-" + duplicateIndex
+                        : baseName + "-" + duplicateIndex + "." + extension;
+            File candidate = new File(directory, candidateName);
+            if (candidate.createNewFile()) {
+                return candidate;
+            }
             duplicateIndex++;
         }
-
-        return candidate;
     }
 
     private String readUtf8File(File file) throws IOException {
@@ -566,8 +723,49 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, bytesRead);
             }
-            return outputStream.toString(StandardCharsets.UTF_8);
+            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
         }
+    }
+
+    private long estimateDecodedByteCount(String base64) {
+        if (TextUtils.isEmpty(base64)) {
+            return 0L;
+        }
+
+        int padding = 0;
+        int length = base64.length();
+        if (length > 0 && base64.charAt(length - 1) == '=') {
+            padding++;
+        }
+        if (length > 1 && base64.charAt(length - 2) == '=') {
+            padding++;
+        }
+        return ((long) length * 3L) / 4L - padding;
+    }
+
+    private void cleanupBlobDownloadSession(BlobDownloadSession session, boolean deleteFile) {
+        if (session == null) {
+            return;
+        }
+
+        synchronized (session) {
+            try {
+                session.outputStream.close();
+            } catch (IOException ignored) {}
+        }
+
+        if (deleteFile && session.outputFile.exists() && !session.outputFile.delete()) {
+            session.outputFile.deleteOnExit();
+        }
+    }
+
+    private void abortBlobDownloadSession(String sessionId, boolean deleteFile) {
+        if (TextUtils.isEmpty(sessionId)) {
+            return;
+        }
+
+        BlobDownloadSession session = blobDownloadSessions.remove(sessionId);
+        cleanupBlobDownloadSession(session, deleteFile);
     }
 
     private String textPreviewHtml(File file, String bodyText) {
@@ -632,6 +830,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         if (isTextPreviewMimeType(mimeType)) {
+            if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
+                Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
+                openDownloadedFile(file, mimeType);
+                return;
+            }
+
             executorService.execute(() -> {
                 try {
                     String previewHtml = textPreviewHtml(file, readUtf8File(file));
@@ -772,31 +976,83 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
               const blobUrl = %s;
               const fallbackMimeType = %s;
               const fallbackFileName = %s;
+              const legacyMaxBytes = %d;
+              const chunkSize = %d;
               const matchingLink = Array.from(document.querySelectorAll('a[download]')).find(link => link.href === blobUrl);
               const response = await fetch(blobUrl);
               const blob = await response.blob();
               const fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
-              const reader = new FileReader();
-              reader.onloadend = function() {
-                const dataUrl = reader.result || '';
-                const base64 = String(dataUrl).split(',').pop() || '';
-                const payload = JSON.stringify({
-                  fileName,
-                  mimeType: blob.type || fallbackMimeType,
-                  base64
-                });
-                if (window.mobileApp && window.mobileApp.handleBlobDownload) {
-                  window.mobileApp.handleBlobDownload(payload);
-                } else if (window.AndroidInterface && window.AndroidInterface.handleBlobDownload) {
-                  window.AndroidInterface.handleBlobDownload(payload);
+              const bridge = (window.mobileApp && window.mobileApp.startBlobDownload && window.mobileApp.appendBlobDownloadChunk && window.mobileApp.finishBlobDownload)
+                ? window.mobileApp
+                : (window.AndroidInterface && window.AndroidInterface.startBlobDownload && window.AndroidInterface.appendBlobDownloadChunk && window.AndroidInterface.finishBlobDownload)
+                  ? window.AndroidInterface
+                  : (window.mobileApp && window.mobileApp.handleBlobDownload)
+                    ? window.mobileApp
+                    : (window.AndroidInterface && window.AndroidInterface.handleBlobDownload)
+                      ? window.AndroidInterface
+                      : null;
+              const sessionId = `blob-download-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+              const readChunkAsBase64 = chunk => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                  const dataUrl = reader.result || '';
+                  resolve(String(dataUrl).split(',').pop() || '');
+                };
+                reader.onerror = function() {
+                  reject(reader.error || new Error('Failed to read blob chunk'));
+                };
+                reader.readAsDataURL(chunk);
+              });
+
+              if (!bridge) {
+                throw new Error('Blob download bridge is not available');
+              }
+
+              if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
+                let started = false;
+                try {
+                  bridge.startBlobDownload(JSON.stringify({
+                    sessionId,
+                    fileName,
+                    mimeType: blob.type || fallbackMimeType,
+                    size: blob.size
+                  }));
+                  started = true;
+                  for (let offset = 0; offset < blob.size; offset += chunkSize) {
+                    const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
+                    bridge.appendBlobDownloadChunk(JSON.stringify({ sessionId, base64 }));
+                  }
+                  bridge.finishBlobDownload(JSON.stringify({ sessionId }));
+                  return;
+                } catch (error) {
+                  if (started && bridge.abortBlobDownload) {
+                    bridge.abortBlobDownload(JSON.stringify({
+                      sessionId,
+                      reason: String((error && error.message) || error || 'Blob download failed')
+                    }));
+                  }
+                  throw error;
                 }
-              };
-              reader.readAsDataURL(blob);
+              }
+
+              if (blob.size > legacyMaxBytes) {
+                throw new Error('Blob download is too large for the legacy bridge');
+              }
+
+              const base64 = await readChunkAsBase64(blob);
+              bridge.handleBlobDownload(JSON.stringify({
+                fileName,
+                mimeType: blob.type || fallbackMimeType,
+                size: blob.size,
+                base64
+              }));
             })().catch(error => console.error('Failed to capture blob download', error));
             """,
             JSONObject.quote(blobUrl),
             JSONObject.quote(fallbackMimeType),
-            JSONObject.quote(fallbackFileName)
+            JSONObject.quote(fallbackFileName),
+            MAX_LEGACY_BLOB_DOWNLOAD_BYTES,
+            BLOB_DOWNLOAD_CHUNK_BYTES
         );
 
         _webView.post(() -> _webView.evaluateJavascript(script, null));
