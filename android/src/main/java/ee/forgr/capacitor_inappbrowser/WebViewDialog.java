@@ -38,6 +38,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
@@ -101,6 +102,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyRequestLocator {
+
+    private static final long HOST_WEBVIEW_INSET_RETRY_DELAY_MS = 160L;
 
     private static class ProxiedRequest {
 
@@ -3509,6 +3512,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     @Override
     public void dismiss() {
+        scheduleHostWebViewInsetRestore();
+
         // First, stop any ongoing operations and disable further interactions
         if (_webView != null) {
             try {
@@ -3627,6 +3632,76 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error dismissing dialog: " + e.getMessage());
         }
+
+        scheduleHostWebViewInsetRestore();
+    }
+
+    private void requestInsetsOnHostView(View view) {
+        if (view == null) {
+            return;
+        }
+
+        view.requestLayout();
+        ViewCompat.requestApplyInsets(view);
+    }
+
+    private void scheduleHostWebViewInsetRestore() {
+        if (activity == null) {
+            return;
+        }
+
+        Window dialogWindow = getWindow();
+        View dialogDecorView = dialogWindow != null ? dialogWindow.getDecorView() : null;
+        if (dialogWindow != null && dialogDecorView != null) {
+            dialogDecorView.clearFocus();
+
+            WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(dialogWindow, dialogDecorView);
+            insetsController.hide(WindowInsetsCompat.Type.ime());
+
+            InputMethodManager inputMethodManager = (InputMethodManager) _context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (inputMethodManager != null) {
+                inputMethodManager.hideSoftInputFromWindow(dialogDecorView.getWindowToken(), 0);
+            }
+        }
+
+        if (_webView != null) {
+            _webView.clearFocus();
+        }
+        if (capacitorWebView == null) {
+            return;
+        }
+
+        Window hostWindow = activity.getWindow();
+        if (hostWindow == null) {
+            return;
+        }
+
+        View hostDecorView = hostWindow.getDecorView();
+        if (hostDecorView == null) {
+            return;
+        }
+
+        View hostContentView = activity.findViewById(android.R.id.content);
+        Runnable restoreInsets = () -> {
+            try {
+                capacitorWebView.clearFocus();
+                capacitorWebView.requestFocus();
+
+                requestInsetsOnHostView(hostDecorView);
+                requestInsetsOnHostView(hostContentView);
+
+                if (capacitorWebView.getParent() instanceof View parentView) {
+                    requestInsetsOnHostView(parentView);
+                }
+
+                requestInsetsOnHostView(capacitorWebView);
+            } catch (Exception e) {
+                Log.w("InAppBrowser", "Failed to restore host window insets after dismiss: " + e.getMessage());
+            }
+        };
+
+        hostDecorView.post(restoreInsets);
+        hostDecorView.postDelayed(restoreInsets, HOST_WEBVIEW_INSET_RETRY_DELAY_MS);
     }
 
     private void forceStopMediaCapture(WebView webView) {

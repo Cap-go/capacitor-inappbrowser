@@ -1,0 +1,22 @@
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    text: "Run Keyboard Regression (Maestro)"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Keyboard Regression Page"
+    timeout: 120000
+- tapOn:
+    id: "keyboard-input"
+    retryTapIfNoChange: true
+- runFlow:
+    when:
+      visible: "Don't allow"
+    commands:
+      - tapOn: "Don't allow"
+- extendedWaitUntil:
+    visible: "Keyboard regression passed"
+    timeout: 120000
