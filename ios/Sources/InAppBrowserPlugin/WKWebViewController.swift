@@ -1192,9 +1192,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
-        webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
-
         // Enable background task processing
         if initialWebConfiguration == nil {
             webConfiguration.processPool = WKProcessPool()
