@@ -1,7 +1,5 @@
 appId: ${APP_ID}
 ---
-- launchApp:
-    clearState: false
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
