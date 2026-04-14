@@ -87,6 +87,12 @@ window.customElements.define(
         <p>
           <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
         </p>
+        <p>
+          <button class="button" id="open-download-demo-listener" style="background-color: #0ea5e9;">Open Auto Download Demo + Close On Event</button>
+        </p>
+        <p id="download-event-status" style="margin-top: 8px; padding: 10px 12px; border-radius: 8px; background-color: #f8f9fa; color: #495057; font-size: 0.85em;">
+          Download listener idle.
+        </p>
         <hr />
         <h2>Custom URL</h2>
         <p>
@@ -331,6 +337,94 @@ window.customElements.define(
 
         return `data:text/html;charset=utf-8,${encodeURIComponent(downloadDemoHtml)}`;
       }
+
+      let closeOnNextDownloadEvent = false;
+      const downloadStatusElement = () => self.shadowRoot.querySelector("#download-event-status");
+      const downloadListenerButtonElement = () => self.shadowRoot.querySelector("#open-download-demo-listener");
+
+      function setDownloadStatus(message, { backgroundColor = "#f8f9fa", color = "#495057" } = {}) {
+        const statusElement = downloadStatusElement();
+        if (!statusElement) {
+          return;
+        }
+
+        statusElement.textContent = message;
+        statusElement.style.backgroundColor = backgroundColor;
+        statusElement.style.color = color;
+      }
+
+      function setDownloadListenerButtonLabel(label) {
+        const button = downloadListenerButtonElement();
+        if (!button) {
+          return;
+        }
+        button.textContent = label;
+      }
+
+      async function openAutoDownloadDemo({ closeOnEvent = false } = {}) {
+        const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
+        closeOnNextDownloadEvent = closeOnEvent && handleDownloadsToggle.checked;
+        setDownloadListenerButtonLabel(
+          closeOnEvent && handleDownloadsToggle.checked
+            ? "Waiting For Download Event..."
+            : "Open Auto Download Demo + Close On Event",
+        );
+        setDownloadStatus(
+          handleDownloadsToggle.checked
+            ? closeOnEvent
+              ? "Waiting for native download event, then closing the webview..."
+              : "Waiting for native download event..."
+            : "Native download handling disabled for this run.",
+          {
+            backgroundColor: handleDownloadsToggle.checked ? "#e0f2fe" : "#f8f9fa",
+            color: handleDownloadsToggle.checked ? "#075985" : "#495057",
+          },
+        );
+
+        try {
+          await downloadListenerSetup;
+          await InAppBrowser.openWebView({
+            url: createAutoDownloadDemoUrl(),
+            title: "Auto Download Demo",
+            toolbarColor: "#198754",
+            toolbarType: ToolBarType.NAVIGATION,
+            backgroundColor: BackgroundColor.WHITE,
+            visibleTitle: true,
+            showReloadButton: true,
+            enabledSafeBottomMargin: true,
+            handleDownloads: handleDownloadsToggle.checked,
+          });
+        } catch (error) {
+          closeOnNextDownloadEvent = false;
+          console.error("Error opening auto download demo:", error);
+        }
+      }
+
+      const downloadListenerSetup = Promise.all([
+        InAppBrowser.addListener("downloadCompleted", (event) => {
+          setDownloadListenerButtonLabel(`Event OK: ${event.fileName}`);
+          setDownloadStatus(
+            `Download completed: ${event.fileName} via ${event.handledBy}`,
+            { backgroundColor: "#dcfce7", color: "#166534" },
+          );
+
+          if (closeOnNextDownloadEvent && event.id) {
+            closeOnNextDownloadEvent = false;
+            InAppBrowser.close({ id: event.id }).catch((error) => {
+              console.warn("Could not close webview after download event:", error);
+            });
+          }
+        }),
+        InAppBrowser.addListener("downloadFailed", (event) => {
+          closeOnNextDownloadEvent = false;
+          setDownloadListenerButtonLabel("Event Failed");
+          const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
+          setDownloadStatus(
+            `Download failed${fileLabel}: ${event.error}`,
+            { backgroundColor: "#fee2e2", color: "#991b1b" },
+          );
+        }),
+      ]);
 
       async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
         statusText.textContent = "Refreshing DOM content...";
@@ -729,23 +823,13 @@ window.customElements.define(
       self.shadowRoot
         .querySelector("#open-download-demo")
         .addEventListener("click", async function () {
-          const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
+          await openAutoDownloadDemo({ closeOnEvent: false });
+        });
 
-          try {
-            await InAppBrowser.openWebView({
-              url: createAutoDownloadDemoUrl(),
-              title: "Auto Download Demo",
-              toolbarColor: "#198754",
-              toolbarType: ToolBarType.NAVIGATION,
-              backgroundColor: BackgroundColor.WHITE,
-              visibleTitle: true,
-              showReloadButton: true,
-              enabledSafeBottomMargin: true,
-              handleDownloads: handleDownloadsToggle.checked,
-            });
-          } catch (error) {
-            console.error("Error opening auto download demo:", error);
-          }
+      self.shadowRoot
+        .querySelector("#open-download-demo-listener")
+        .addEventListener("click", async function () {
+          await openAutoDownloadDemo({ closeOnEvent: true });
         });
 
       self.shadowRoot

@@ -200,6 +200,77 @@ export interface ConsoleMessageEvent {
 }
 
 /**
+ * Native handling mode used after a managed download finishes.
+ *
+ * @since 8.6.0
+ */
+export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external';
+
+/**
+ * Event emitted after a managed download is saved locally.
+ *
+ * @since 8.6.0
+ */
+export interface DownloadCompletedEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  /**
+   * Original URL that triggered the download when available.
+   */
+  sourceUrl?: string;
+  /**
+   * Saved filename.
+   */
+  fileName: string;
+  /**
+   * Resolved MIME type when available.
+   */
+  mimeType?: string;
+  /**
+   * Absolute native filesystem path to the saved file.
+   */
+  path: string;
+  /**
+   * `file://` URL pointing at the saved file.
+   */
+  localUrl: string;
+  /**
+   * How native handled the downloaded file after saving it.
+   */
+  handledBy: DownloadHandledBy;
+}
+
+/**
+ * Event emitted when managed download handling fails.
+ *
+ * @since 8.6.0
+ */
+export interface DownloadFailedEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  /**
+   * Original URL that triggered the download when available.
+   */
+  sourceUrl?: string;
+  /**
+   * Intended filename when known.
+   */
+  fileName?: string;
+  /**
+   * Resolved MIME type when available.
+   */
+  mimeType?: string;
+  /**
+   * Native error message.
+   */
+  error: string;
+}
+
+/**
  * Decision returned to native when handling a proxied request.
  *
  * @since 8.6.0
@@ -535,6 +606,7 @@ export interface OpenWebViewOptions {
    * - `blob:` downloads are also captured when the platform supports them.
    * - Previewable files reopen inside the in-app browser when possible.
    * - Other files are handed off to the native preview or viewer flow.
+   * - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.
    *
    * @default false
    * @since 8.6.0
@@ -1211,6 +1283,26 @@ export interface InAppBrowserPlugin {
   addListener(
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered after native download handling saves a file locally.
+   * Enable this with `handleDownloads: true` when opening the webview.
+   *
+   * @since 8.6.0
+   */
+  addListener(
+    eventName: 'downloadCompleted',
+    listenerFunc: (event: DownloadCompletedEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when native download handling fails.
+   * Enable this with `handleDownloads: true` when opening the webview.
+   *
+   * @since 8.6.0
+   */
+  addListener(
+    eventName: 'downloadFailed',
+    listenerFunc: (event: DownloadFailedEvent) => void,
   ): Promise<PluginListenerHandle>;
   /**
    * Will be triggered whenever a page opens a popup/new window.

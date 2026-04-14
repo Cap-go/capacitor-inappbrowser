@@ -172,6 +172,47 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
 
             @Override
+            public void downloadCompleted(
+                String sourceUrl,
+                String fileName,
+                String mimeType,
+                String path,
+                String localUrl,
+                String handledBy
+            ) {
+                JSObject event = new JSObject();
+                event.put("id", webViewId);
+                if (sourceUrl != null) {
+                    event.put("sourceUrl", sourceUrl);
+                }
+                event.put("fileName", fileName);
+                if (mimeType != null) {
+                    event.put("mimeType", mimeType);
+                }
+                event.put("path", path);
+                event.put("localUrl", localUrl);
+                event.put("handledBy", handledBy);
+                notifyListeners("downloadCompleted", event);
+            }
+
+            @Override
+            public void downloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+                JSObject event = new JSObject();
+                event.put("id", webViewId);
+                if (sourceUrl != null) {
+                    event.put("sourceUrl", sourceUrl);
+                }
+                if (fileName != null) {
+                    event.put("fileName", fileName);
+                }
+                if (mimeType != null) {
+                    event.put("mimeType", mimeType);
+                }
+                event.put("error", error);
+                notifyListeners("downloadFailed", event);
+            }
+
+            @Override
             public void proxyRequestEvent(
                 String requestId,
                 String phase,

@@ -201,13 +201,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private static class BlobDownloadSession {
 
         private final File outputFile;
+        private final String sourceUrl;
         private final String mimeType;
         private final FileOutputStream outputStream;
         private final long expectedSize;
         private long bytesWritten;
 
-        private BlobDownloadSession(File outputFile, String mimeType, FileOutputStream outputStream, long expectedSize) {
+        private BlobDownloadSession(File outputFile, String sourceUrl, String mimeType, FileOutputStream outputStream, long expectedSize) {
             this.outputFile = outputFile;
+            this.sourceUrl = sourceUrl;
             this.mimeType = mimeType;
             this.outputStream = outputStream;
             this.expectedSize = expectedSize;
@@ -457,6 +459,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                    String sourceUrl = jsonPayload.optString("sourceUrl", null);
                     String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
                     File outputFile = createDownloadFile(fileName);
 
@@ -464,7 +467,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         outputStream.write(Base64.decode(base64, Base64.DEFAULT));
                     }
 
-                    finalizeDownload(outputFile, mimeType);
+                    finalizeDownload(outputFile, mimeType, sourceUrl);
                 } catch (Exception exception) {
                     showDownloadError("Failed to save blob download", exception);
                 }
@@ -485,10 +488,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                String sourceUrl = jsonPayload.optString("sourceUrl", null);
                 String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
                 long expectedSize = jsonPayload.optLong("size", -1L);
                 File outputFile = createDownloadFile(fileName);
-                BlobDownloadSession session = new BlobDownloadSession(outputFile, mimeType, new FileOutputStream(outputFile), expectedSize);
+                BlobDownloadSession session = new BlobDownloadSession(
+                    outputFile,
+                    sourceUrl,
+                    mimeType,
+                    new FileOutputStream(outputFile),
+                    expectedSize
+                );
 
                 BlobDownloadSession existingSession = blobDownloadSessions.putIfAbsent(sessionId, session);
                 if (existingSession != null) {
@@ -574,7 +584,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     );
                 }
 
-                finalizeDownload(session.outputFile, session.mimeType);
+                finalizeDownload(session.outputFile, session.mimeType, session.sourceUrl);
             } catch (Exception exception) {
                 abortBlobDownloadSession(sessionId, true);
                 showDownloadError("Failed to finalize blob download", exception);
@@ -597,7 +607,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             } catch (JSONException ignored) {}
 
-            abortBlobDownloadSession(sessionId, true);
+            BlobDownloadSession session = abortBlobDownloadSession(sessionId, true);
+            notifyDownloadFailed(
+                session != null ? session.sourceUrl : null,
+                session != null ? session.outputFile.getName() : null,
+                session != null ? session.mimeType : null,
+                reason
+            );
             Log.w("InAppBrowser", reason);
         }
     }
@@ -759,13 +775,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
-    private void abortBlobDownloadSession(String sessionId, boolean deleteFile) {
+    private BlobDownloadSession abortBlobDownloadSession(String sessionId, boolean deleteFile) {
         if (TextUtils.isEmpty(sessionId)) {
-            return;
+            return null;
         }
 
         BlobDownloadSession session = blobDownloadSessions.remove(sessionId);
         cleanupBlobDownloadSession(session, deleteFile);
+        return session;
     }
 
     private String textPreviewHtml(File file, String bodyText) {
@@ -824,7 +841,32 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         );
     }
 
-    private void previewDownloadedFileInWebView(File file, String mimeType) {
+    private void notifyDownloadCompleted(File file, String mimeType, String sourceUrl, String handledBy) {
+        if (_options == null || _options.getCallbacks() == null) {
+            return;
+        }
+
+        _options
+            .getCallbacks()
+            .downloadCompleted(sourceUrl, file.getName(), mimeType, file.getAbsolutePath(), Uri.fromFile(file).toString(), handledBy);
+    }
+
+    private void notifyDownloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+        if (_options == null || _options.getCallbacks() == null) {
+            return;
+        }
+
+        _options.getCallbacks().downloadFailed(sourceUrl, fileName, mimeType, error);
+    }
+
+    private String downloadErrorMessage(String message, Exception exception) {
+        if (exception == null || TextUtils.isEmpty(exception.getMessage())) {
+            return message;
+        }
+        return message + ": " + exception.getMessage();
+    }
+
+    private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
         if (_webView == null) {
             return;
         }
@@ -832,18 +874,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (isTextPreviewMimeType(mimeType)) {
             if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
                 Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
-                openDownloadedFile(file, mimeType);
+                openDownloadedFile(file, mimeType, sourceUrl);
                 return;
             }
 
             executorService.execute(() -> {
                 try {
                     String previewHtml = textPreviewHtml(file, readUtf8File(file));
-                    mainHandler.post(() ->
-                        _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null)
-                    );
+                    mainHandler.post(() -> {
+                        _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
+                        notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
+                    });
                 } catch (IOException ioException) {
-                    showDownloadError("Failed to preview downloaded text file", ioException);
+                    showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType);
                 }
             });
             return;
@@ -854,33 +897,42 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _options.setUrl(fileUrl);
         }
         _webView.loadUrl(fileUrl);
+        notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
     }
 
-    private void openDownloadedFile(File file, String mimeType) {
+    private void openDownloadedFile(File file, String mimeType, String sourceUrl) {
         try {
             Uri fileUri = FileProvider.getUriForFile(_context, _context.getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(fileUri, mimeType);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             _context.startActivity(intent);
+            notifyDownloadCompleted(file, mimeType, sourceUrl, "external");
         } catch (ActivityNotFoundException activityNotFoundException) {
-            showDownloadError("No app can open " + file.getName(), activityNotFoundException);
+            showDownloadError("No app can open " + file.getName(), activityNotFoundException, sourceUrl, file.getName(), mimeType);
+        } catch (Exception exception) {
+            showDownloadError("Failed to open " + file.getName(), exception, sourceUrl, file.getName(), mimeType);
         }
     }
 
-    private void finalizeDownload(File outputFile, String mimeType) {
+    private void finalizeDownload(File outputFile, String mimeType, String sourceUrl) {
         mainHandler.post(() -> {
             if (shouldPreviewDownloadedFile(mimeType) && _webView != null) {
-                previewDownloadedFileInWebView(outputFile, mimeType);
+                previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
                 return;
             }
 
-            openDownloadedFile(outputFile, mimeType);
+            openDownloadedFile(outputFile, mimeType, sourceUrl);
         });
     }
 
     private void showDownloadError(String message, Exception exception) {
+        showDownloadError(message, exception, null, null, null);
+    }
+
+    private void showDownloadError(String message, Exception exception, String sourceUrl, String fileName, String mimeType) {
         Log.e("InAppBrowser", message, exception);
+        notifyDownloadFailed(sourceUrl, fileName, mimeType, downloadErrorMessage(message, exception));
         mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
     }
 
@@ -946,9 +998,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
                 }
 
-                finalizeDownload(outputFile, resolvedMimeType);
+                finalizeDownload(outputFile, resolvedMimeType, url);
             } catch (Exception exception) {
-                showDownloadError("Failed to download file", exception);
+                showDownloadError("Failed to download file", exception, url, null, mimeType);
             } finally {
                 if (inputStream != null) {
                     try {
@@ -964,7 +1016,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     private void handleBlobDownloadFromPage(String blobUrl, String mimeType, String contentDisposition) {
         if (_webView == null) {
-            showDownloadError("Blob download requires an active WebView", new IllegalStateException("WebView not initialized"));
+            showDownloadError(
+                "Blob download requires an active WebView",
+                new IllegalStateException("WebView not initialized"),
+                blobUrl,
+                null,
+                mimeType
+            );
             return;
         }
 
@@ -1014,6 +1072,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                   bridge.startBlobDownload(JSON.stringify({
                     sessionId,
                     fileName,
+                    sourceUrl: blobUrl,
                     mimeType: blob.type || fallbackMimeType,
                     size: blob.size
                   }));
@@ -1042,6 +1101,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
               const base64 = await readChunkAsBase64(blob);
               bridge.handleBlobDownload(JSON.stringify({
                 fileName,
+                sourceUrl: blobUrl,
                 mimeType: blob.type || fallbackMimeType,
                 size: blob.size,
                 base64

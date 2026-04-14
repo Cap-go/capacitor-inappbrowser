@@ -21,8 +21,9 @@ private struct UrlsHandledByApp {
 }
 
 private struct WKDownloadState {
-    let destinationURL: URL
+    let destinationURL: URL?
     let mimeType: String?
+    let sourceURL: String?
 }
 
 public struct WKWebViewCredentials {
@@ -391,9 +392,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.authorizedAppLinks = authorizedAppLinks
     }
 
-    private func register(download: WKDownload, response: URLResponse?) {
+    private func register(download: WKDownload, response: URLResponse?, sourceURL: String? = nil) {
         download.delegate = self
-        downloadStates[ObjectIdentifier(download)] = WKDownloadState(destinationURL: FileManager.default.temporaryDirectory, mimeType: response?.mimeType)
+        downloadStates[ObjectIdentifier(download)] = WKDownloadState(
+            destinationURL: nil,
+            mimeType: response?.mimeType,
+            sourceURL: sourceURL ?? response?.url?.absoluteString
+        )
     }
 
     private func attachmentDisposition(_ response: URLResponse) -> String? {
@@ -501,12 +506,43 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             normalizedMimeType.starts(with: "image/")
     }
 
-    private func previewDownloadedFile(_ fileURL: URL, mimeType: String?) {
+    private func emitDownloadCompleted(_ fileURL: URL, mimeType: String?, sourceURL: String?, handledBy: String) {
+        var data: [String: Any] = [
+            "fileName": fileURL.lastPathComponent,
+            "path": fileURL.path,
+            "localUrl": fileURL.absoluteString,
+            "handledBy": handledBy,
+        ]
+        if let sourceURL {
+            data["sourceUrl"] = sourceURL
+        }
+        if let mimeType {
+            data["mimeType"] = mimeType
+        }
+        emit("downloadCompleted", data: data)
+    }
+
+    private func emitDownloadFailed(sourceURL: String?, fileName: String? = nil, mimeType: String? = nil, error: String) {
+        var data: [String: Any] = ["error": error]
+        if let sourceURL {
+            data["sourceUrl"] = sourceURL
+        }
+        if let fileName {
+            data["fileName"] = fileName
+        }
+        if let mimeType {
+            data["mimeType"] = mimeType
+        }
+        emit("downloadFailed", data: data)
+    }
+
+    private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
         DispatchQueue.main.async {
             if self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
                 let accessURL = fileURL.deletingLastPathComponent()
                 self.source = .file(fileURL, access: accessURL)
                 self.load(file: fileURL, access: accessURL)
+                self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "inAppBrowser")
                 return
             }
 
@@ -515,6 +551,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             previewController.dataSource = self
             previewController.delegate = self
             self.present(previewController, animated: true)
+            self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "systemPreview")
         }
     }
 
@@ -2623,7 +2660,7 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        register(download: download, response: nil)
+        register(download: download, response: nil, sourceURL: navigationAction.request.url?.absoluteString)
     }
 
     public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
@@ -2719,13 +2756,21 @@ extension WKWebViewController: WKNavigationDelegate {
 
 extension WKWebViewController: WKDownloadDelegate {
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        let identifier = ObjectIdentifier(download)
+        let sourceURL = downloadStates[identifier]?.sourceURL ?? response.url?.absoluteString
         do {
             let destinationURL = try uniqueDownloadDestination(for: suggestedFilename)
-            downloadStates[ObjectIdentifier(download)] = WKDownloadState(destinationURL: destinationURL, mimeType: response.mimeType)
+            downloadStates[identifier] = WKDownloadState(destinationURL: destinationURL, mimeType: response.mimeType, sourceURL: sourceURL)
             completionHandler(destinationURL)
         } catch {
             print("[InAppBrowser] Failed to prepare download destination: \(error)")
-            downloadStates.removeValue(forKey: ObjectIdentifier(download))
+            downloadStates.removeValue(forKey: identifier)
+            emitDownloadFailed(
+                sourceURL: sourceURL,
+                fileName: suggestedFilename,
+                mimeType: response.mimeType,
+                error: "Failed to prepare download destination: \(error.localizedDescription)"
+            )
             completionHandler(nil)
         }
     }
@@ -2735,12 +2780,22 @@ extension WKWebViewController: WKDownloadDelegate {
         guard let state = downloadStates.removeValue(forKey: identifier) else {
             return
         }
+        guard let destinationURL = state.destinationURL else {
+            emitDownloadFailed(sourceURL: state.sourceURL, mimeType: state.mimeType, error: "Download finished without a destination URL")
+            return
+        }
 
-        previewDownloadedFile(state.destinationURL, mimeType: state.mimeType)
+        previewDownloadedFile(destinationURL, mimeType: state.mimeType, sourceURL: state.sourceURL)
     }
 
     public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        downloadStates.removeValue(forKey: ObjectIdentifier(download))
+        let state = downloadStates.removeValue(forKey: ObjectIdentifier(download))
+        emitDownloadFailed(
+            sourceURL: state?.sourceURL,
+            fileName: state?.destinationURL?.lastPathComponent,
+            mimeType: state?.mimeType,
+            error: "Download failed: \(error.localizedDescription)"
+        )
         print("[InAppBrowser] Download failed: \(error.localizedDescription)")
     }
 }
