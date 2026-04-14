@@ -18,5 +18,14 @@ appId: ${APP_ID}
     commands:
       - tapOn: "Don't allow"
 - extendedWaitUntil:
+    visible: "Dismiss Keyboard"
+    timeout: 30000
+- tapOn:
+    text: "Dismiss Keyboard"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Close Browser"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
     visible: "Keyboard regression passed"
     timeout: 120000
