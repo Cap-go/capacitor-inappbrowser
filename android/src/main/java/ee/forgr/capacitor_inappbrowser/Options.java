@@ -172,6 +172,9 @@ public class Options {
     private String preShowScript;
     private String toolbarTextColor;
     private Pattern proxyRequestsPattern = null;
+    private boolean proxyRequests = false;
+    private List<NativeProxyRule> outboundProxyRules = new ArrayList<>();
+    private List<NativeProxyRule> inboundProxyRules = new ArrayList<>();
     private boolean materialPicker = false;
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
@@ -190,9 +193,12 @@ public class Options {
     private boolean showScreenshotButton = false;
     private boolean allowWebViewJsVisibilityControl = false;
     private boolean allowScreenshotsFromWebPage = false;
+    private boolean captureConsoleLogs = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
+    private boolean popupWindowMode = false;
+    private boolean hiddenPopupWindow = false;
 
     public Integer getWidth() {
         return width;
@@ -254,6 +260,14 @@ public class Options {
         this.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage;
     }
 
+    public boolean getCaptureConsoleLogs() {
+        return captureConsoleLogs;
+    }
+
+    public void setCaptureConsoleLogs(boolean captureConsoleLogs) {
+        this.captureConsoleLogs = captureConsoleLogs;
+    }
+
     public void setMaterialPicker(boolean materialPicker) {
         this.materialPicker = materialPicker;
     }
@@ -288,6 +302,34 @@ public class Options {
 
     public void setProxyRequestsPattern(Pattern proxyRequestsPattern) {
         this.proxyRequestsPattern = proxyRequestsPattern;
+    }
+
+    public boolean getProxyRequests() {
+        return proxyRequests;
+    }
+
+    public void setProxyRequests(boolean proxyRequests) {
+        this.proxyRequests = proxyRequests;
+    }
+
+    public List<NativeProxyRule> getOutboundProxyRules() {
+        return outboundProxyRules;
+    }
+
+    public void setOutboundProxyRules(List<NativeProxyRule> outboundProxyRules) {
+        this.outboundProxyRules = outboundProxyRules != null ? outboundProxyRules : new ArrayList<>();
+    }
+
+    public List<NativeProxyRule> getInboundProxyRules() {
+        return inboundProxyRules;
+    }
+
+    public void setInboundProxyRules(List<NativeProxyRule> inboundProxyRules) {
+        this.inboundProxyRules = inboundProxyRules != null ? inboundProxyRules : new ArrayList<>();
+    }
+
+    public boolean shouldEnableNativeProxy() {
+        return proxyRequests || proxyRequestsPattern != null || !outboundProxyRules.isEmpty() || !inboundProxyRules.isEmpty();
     }
 
     public PluginCall getPluginCall() {
@@ -589,5 +631,75 @@ public class Options {
 
     public void setHttpBody(String httpBody) {
         this.httpBody = httpBody;
+    }
+
+    public boolean isPopupWindowMode() {
+        return popupWindowMode;
+    }
+
+    public void setPopupWindowMode(boolean popupWindowMode) {
+        this.popupWindowMode = popupWindowMode;
+    }
+
+    public boolean isHiddenPopupWindow() {
+        return hiddenPopupWindow;
+    }
+
+    public void setHiddenPopupWindow(boolean hiddenPopupWindow) {
+        this.hiddenPopupWindow = hiddenPopupWindow;
+    }
+
+    public Options copyForPopup() {
+        Options copy = new Options();
+        copy.setTitle(title);
+        copy.setCloseModal(false);
+        copy.setCloseModalTitle(CloseModalTitle);
+        copy.setCloseModalDescription(CloseModalDescription);
+        copy.setCloseModalCancel(CloseModalCancel);
+        copy.setCloseModalOk(CloseModalOk);
+        copy.setCloseModalURLPattern(closeModalURLPattern);
+        copy.setButtonNearDone(buttonNearDone);
+        copy.setUrl("about:blank");
+        copy.setHeaders(headers);
+        copy.setCredentials(credentials);
+        copy.setToolbarType(toolbarType);
+        copy.setShareDisclaimer(shareDisclaimer);
+        copy.setShareSubject(shareSubject);
+        copy.setDisableGoBackOnNativeApplication(disableGoBackOnNativeApplication);
+        copy.setActiveNativeNavigationForWebview(activeNativeNavigationForWebview);
+        copy.setPresentAfterPageLoad(false);
+        copy.setVisibleTitle(VisibleTitle);
+        copy.setToolbarColor(ToolbarColor);
+        copy.setBackgroundColor(BackgroundColor);
+        copy.setArrow(ShowArrow);
+        copy.setIgnoreUntrustedSSLError(ignoreUntrustedSSLError);
+        copy.setPreShowScript(preShowScript);
+        copy.setToolbarTextColor(toolbarTextColor);
+        copy.setProxyRequestsPattern(proxyRequestsPattern);
+        copy.setProxyRequests(proxyRequests);
+        copy.setOutboundProxyRules(new ArrayList<>(outboundProxyRules));
+        copy.setInboundProxyRules(new ArrayList<>(inboundProxyRules));
+        copy.setMaterialPicker(materialPicker);
+        copy.setTextZoom(textZoom);
+        copy.setPreventDeeplink(preventDeeplink);
+        copy.setAuthorizedAppLinks(new ArrayList<>(authorizedAppLinks));
+        copy.setEnabledSafeMargin(enabledSafeBottomMargin);
+        copy.setEnabledSafeTopMargin(enabledSafeTopMargin);
+        copy.setUseTopInset(useTopInset);
+        copy.setEnableGooglePaySupport(enableGooglePaySupport);
+        copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
+        copy.setWidth(width);
+        copy.setHeight(height);
+        copy.setX(x);
+        copy.setY(y);
+        copy.setHidden(hidden || hiddenPopupWindow);
+        copy.setShowScreenshotButton(showScreenshotButton);
+        copy.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
+        copy.setAllowScreenshotsFromWebPage(allowScreenshotsFromWebPage);
+        copy.setCaptureConsoleLogs(captureConsoleLogs);
+        copy.setInvisibilityMode(invisibilityMode);
+        copy.setPopupWindowMode(true);
+        copy.setHiddenPopupWindow(hiddenPopupWindow);
+        return copy;
     }
 }

@@ -38,6 +38,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.webkit.ConsoleMessage;
+import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -73,8 +75,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
@@ -82,6 +87,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -90,17 +96,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class WebViewDialog extends Dialog {
+public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyRequestLocator {
 
     private static class ProxiedRequest {
 
         private WebResourceResponse response;
         private final Semaphore semaphore;
+        private NativeRequestContext requestContext;
+        private NativeResponseData nativeResponse;
+        private boolean canceled;
+        private boolean timedOut;
 
         public WebResourceResponse getResponse() {
             return response;
@@ -112,6 +121,75 @@ public class WebViewDialog extends Dialog {
         }
     }
 
+    private static class NativeRequestContext {
+
+        private String url;
+        private String method;
+        private Map<String, String> headers;
+        private String base64Body;
+        private boolean mainFrame;
+        private String credentialsMode;
+
+        NativeRequestContext(
+            String url,
+            String method,
+            Map<String, String> headers,
+            String base64Body,
+            boolean mainFrame,
+            String credentialsMode
+        ) {
+            this.url = url;
+            this.method = method;
+            this.headers = headers != null ? new HashMap<>(headers) : new HashMap<>();
+            this.base64Body = base64Body != null ? base64Body : "";
+            this.mainFrame = mainFrame;
+            this.credentialsMode = credentialsMode != null ? credentialsMode : "same-origin";
+        }
+    }
+
+    private static class NativeResponseData {
+
+        private int statusCode;
+        private String contentType;
+        private Map<String, String> headers;
+        private byte[] bodyBytes;
+
+        NativeResponseData(int statusCode, String contentType, Map<String, String> headers, byte[] bodyBytes) {
+            this.statusCode = statusCode;
+            this.contentType = contentType != null ? contentType : "application/octet-stream";
+            this.headers = headers != null ? new HashMap<>(headers) : new HashMap<>();
+            this.bodyBytes = bodyBytes != null ? bodyBytes : new byte[0];
+        }
+    }
+
+    private static class RedirectReplayResult {
+
+        private final NativeRequestContext requestContext;
+        private final NativeResponseData responseData;
+
+        RedirectReplayResult(NativeRequestContext requestContext, NativeResponseData responseData) {
+            this.requestContext = requestContext;
+            this.responseData = responseData;
+        }
+    }
+
+    private static class LegacyInitialProxyResult {
+
+        private final boolean canceled;
+        private final NativeResponseData responseData;
+        private final String requestUrl;
+
+        LegacyInitialProxyResult(boolean canceled, NativeResponseData responseData, String requestUrl) {
+            this.canceled = canceled;
+            this.responseData = responseData;
+            this.requestUrl = requestUrl;
+        }
+    }
+
+    private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
+    private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
+    private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
+
     private WebView _webView;
     private Toolbar _toolbar;
     private Options _options = null;
@@ -122,6 +200,9 @@ public class WebViewDialog extends Dialog {
     private final WebView capacitorWebView;
     private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
+    private ProxyBridge proxyBridge;
+    private String proxyBridgeScript;
+    private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
@@ -153,6 +234,8 @@ public class WebViewDialog extends Dialog {
         void handleMicrophonePermissionRequest(PermissionRequest request);
 
         void clearPendingPermissionRequest(PermissionRequest request);
+
+        boolean createManagedPopupWindow(WebViewDialog parentDialog, android.os.Message resultMsg, boolean isUserGesture, String popupUrl);
     }
 
     private final PermissionHandler permissionHandler;
@@ -174,6 +257,14 @@ public class WebViewDialog extends Dialog {
 
     public String getInstanceId() {
         return instanceId;
+    }
+
+    public Options getOptions() {
+        return _options;
+    }
+
+    public WebView getManagedWebView() {
+        return _webView;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -510,6 +601,12 @@ public class WebViewDialog extends Dialog {
         _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
         _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
         _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
+        if (_options.shouldEnableNativeProxy()) {
+            proxyAccessToken = UUID.randomUUID().toString();
+            proxyBridge = new ProxyBridge(proxyAccessToken);
+            _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
+            proxyBridgeScript = loadProxyBridgeScript();
+        }
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         _webView.getSettings().setDatabaseEnabled(true);
@@ -521,16 +618,13 @@ public class WebViewDialog extends Dialog {
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
+        _webView.getSettings().setSupportMultipleWindows(true);
         if (_options.getEnableZoom()) {
             _webView.getSettings().setSupportZoom(true);
             _webView.getSettings().setBuiltInZoomControls(true);
             _webView.getSettings().setDisplayZoomControls(false);
         }
-
-        // Open links in external browser for target="_blank" if preventDeepLink is false
-        if (!_options.getPreventDeeplink()) {
-            _webView.getSettings().setSupportMultipleWindows(true);
-        }
+        _webView.getSettings().setSupportMultipleWindows(true);
 
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
@@ -564,6 +658,22 @@ public class WebViewDialog extends Dialog {
 
         _webView.setWebChromeClient(
             new WebChromeClient() {
+                @Override
+                public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
+                    if (consoleMessage != null && _options != null && _options.getCaptureConsoleLogs() && _options.getCallbacks() != null) {
+                        _options
+                            .getCallbacks()
+                            .consoleMessage(
+                                consoleMessage.messageLevel().name(),
+                                consoleMessage.message(),
+                                consoleMessage.sourceId(),
+                                consoleMessage.lineNumber(),
+                                null
+                            );
+                    }
+                    return super.onConsoleMessage(consoleMessage);
+                }
+
                 // Enable file open dialog
                 @Override
                 public boolean onShowFileChooser(
@@ -932,7 +1042,6 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
-                // Support for Google Pay and popup windows (critical for OR_BIBED_15 fix)
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
                     Log.d(
@@ -945,69 +1054,51 @@ public class WebViewDialog extends Dialog {
                             _options.getPreventDeeplink()
                     );
 
-                    // When preventDeeplink is false, open target="_blank" links externally
+                    String popupUrl = null;
+                    try {
+                        WebView.HitTestResult hitTestResult = view.getHitTestResult();
+                        popupUrl = hitTestResult != null ? hitTestResult.getExtra() : null;
+                    } catch (Exception ignored) {}
+
+                    if (
+                        permissionHandler != null &&
+                        permissionHandler.createManagedPopupWindow(WebViewDialog.this, resultMsg, isUserGesture, popupUrl)
+                    ) {
+                        Log.d("InAppBrowser", "Created managed popup window");
+                        return true;
+                    }
+
                     if (!_options.getPreventDeeplink() && isUserGesture) {
                         try {
                             WebView.HitTestResult result = view.getHitTestResult();
                             String data = result.getExtra();
                             if (data != null && !data.isEmpty()) {
-                                Log.d("InAppBrowser", "Opening target=_blank link externally: " + data);
+                                Log.d("InAppBrowser", "Falling back to external browser for popup URL: " + data);
                                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
                                 browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                                 _webView.getContext().startActivity(browserIntent);
                                 return false;
                             }
                         } catch (Exception e) {
-                            Log.e("InAppBrowser", "Error opening external link: " + e.getMessage());
+                            Log.e("InAppBrowser", "Error opening external popup fallback: " + e.getMessage());
                         }
                     }
 
-                    // Only handle popup windows if Google Pay support is enabled
-                    if (_options.getEnableGooglePaySupport() && isUserGesture) {
-                        // Create a new WebView for the popup
-                        WebView popupWebView = new WebView(activity);
-                        popupWebView.getSettings().setJavaScriptEnabled(true);
-                        popupWebView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-                        popupWebView.getSettings().setSupportMultipleWindows(true);
-
-                        // Set WebViewClient to handle URL loading and closing
-                        popupWebView.setWebViewClient(
-                            new WebViewClient() {
-                                @Override
-                                public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                                    Log.d("InAppBrowser", "Popup WebView loading URL: " + url);
-
-                                    // Handle Google Pay result URLs or close conditions
-                                    if (url.contains("google.com/pay") || url.contains("close") || url.contains("cancel")) {
-                                        Log.d("InAppBrowser", "Closing popup for Google Pay result");
-                                        // Notify the parent WebView and close popup
-                                        activity.runOnUiThread(() -> {
-                                            try {
-                                                if (popupWebView.getParent() != null) {
-                                                    ((ViewGroup) popupWebView.getParent()).removeView(popupWebView);
-                                                }
-                                                popupWebView.destroy();
-                                            } catch (Exception e) {
-                                                Log.e("InAppBrowser", "Error closing popup: " + e.getMessage());
-                                            }
-                                        });
-                                        return true;
-                                    }
-                                    return false;
-                                }
-                            }
-                        );
-
-                        // Set up the popup WebView transport
-                        WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                        transport.setWebView(popupWebView);
-                        resultMsg.sendToTarget();
-
-                        Log.d("InAppBrowser", "Created popup window for Google Pay");
-                        return true;
-                    }
-
                     return false;
+                }
+
+                @Override
+                public void onCloseWindow(WebView window) {
+                    Log.d("InAppBrowser", "onCloseWindow called");
+                    if (window == _webView) {
+                        String currentUrl = getUrl();
+                        dismiss();
+                        if (_options != null && _options.getCallbacks() != null) {
+                            _options.getCallbacks().closeEvent(currentUrl);
+                        }
+                    } else {
+                        super.onCloseWindow(window);
+                    }
                 }
             }
         );
@@ -1029,53 +1120,61 @@ public class WebViewDialog extends Dialog {
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
 
-        if (supportsRequestBody(httpMethod) && httpBody != null) {
-            // For POST/PUT/PATCH requests with body
-            // Note: Android WebView has limitations with custom headers on POST
-            // Headers may not be sent with the initial request when using postUrl
-            byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
-            _webView.postUrl(this._options.getUrl(), postData);
+        if (!_options.isPopupWindowMode()) {
+            if (shouldBootstrapInitialLegacyProxyLoad()) {
+                loadInitialLegacyProxyContent(requestHeaders, httpMethod, httpBody);
+            } else if (supportsRequestBody(httpMethod) && httpBody != null) {
+                // For POST/PUT/PATCH requests with body
+                // Note: Android WebView has limitations with custom headers on POST
+                // Headers may not be sent with the initial request when using postUrl
+                byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
+                _webView.postUrl(this._options.getUrl(), postData);
 
-            // Log a warning if headers were provided, as they won't be sent with postUrl
-            if (!requestHeaders.isEmpty()) {
-                Log.w(
-                    "InAppBrowser",
-                    "Custom headers were provided but may not be sent with POST request. " +
-                        "Android WebView's postUrl method has limited header support."
-                );
-            }
-        } else {
-            // For GET and other methods, use loadUrl with headers
-            _webView.loadUrl(this._options.getUrl(), requestHeaders);
-        }
-
-        _webView.requestFocus();
-        _webView.requestFocusFromTouch();
-
-        // Inject JavaScript interface early to ensure it's available immediately
-        // This complements the injection in onPageFinished and doUpdateVisitedHistory
-        _webView.post(() -> {
-            if (_webView != null) {
-                injectJavaScriptInterface();
-
-                // Inject Google Pay support enhancements if enabled
-                if (_options.getEnableGooglePaySupport()) {
-                    injectGooglePayPolyfills();
+                // Log a warning if headers were provided, as they won't be sent with postUrl
+                if (!requestHeaders.isEmpty()) {
+                    Log.w(
+                        "InAppBrowser",
+                        "Custom headers were provided but may not be sent with POST request. " +
+                            "Android WebView's postUrl method has limited header support."
+                    );
                 }
-
-                Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+            } else {
+                // For GET and other methods, use loadUrl with headers
+                _webView.loadUrl(this._options.getUrl(), requestHeaders);
             }
-        });
+
+            _webView.requestFocus();
+            _webView.requestFocusFromTouch();
+
+            // Inject JavaScript interface early to ensure it's available immediately
+            // This complements the injection in onPageFinished and doUpdateVisitedHistory
+            _webView.post(() -> {
+                if (_webView != null) {
+                    injectJavaScriptInterface();
+
+                    // Inject Google Pay support enhancements if enabled
+                    if (_options.getEnableGooglePaySupport()) {
+                        injectGooglePayPolyfills();
+                    }
+
+                    Log.d("InAppBrowser", "JavaScript interface injected early after URL load");
+                }
+            });
+        }
 
         setupToolbar();
         setWebViewClient();
 
         if (this._options.isHidden()) {
-            if (_options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
+            if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
                 show();
-                applyHiddenMode();
+                if (!isHiddenModeActive) {
+                    applyHiddenMode();
+                }
             }
             resolveOpenWebViewIfNeeded();
+        } else if (_options.isPopupWindowMode()) {
+            show();
         } else if (!this._options.isPresentAfterPageLoad()) {
             show();
             resolveOpenWebViewIfNeeded();
@@ -2449,70 +2548,14 @@ public class WebViewDialog extends Dialog {
 
     public void handleProxyResultError(String result, String id) {
         Log.i("InAppBrowserProxy", String.format("handleProxyResultError: %s, ok: %s id: %s", result, false, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-        proxiedRequest.semaphore.release();
+        handleProxyResponse(id, null);
     }
 
     public void handleProxyResultOk(JSONObject result, String id) {
         Log.i("InAppBrowserProxy", String.format("handleProxyResultOk: %s, ok: %s, id: %s", result, true, id));
-        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(id);
-        if (proxiedRequest == null) {
-            Log.e("InAppBrowserProxy", "proxiedRequest is null");
-            return;
-        }
-        proxiedRequestsHashmap.remove(id);
-
-        if (result == null) {
-            proxiedRequest.semaphore.release();
-            return;
-        }
-
-        Map<String, String> responseHeaders = new HashMap<>();
-        String body;
-        int code;
-
-        try {
-            body = result.getString("body");
-            code = result.getInt("code");
-            JSONObject headers = result.getJSONObject("headers");
-            for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
-                String headerName = it.next();
-                String header = headers.getString(headerName);
-                responseHeaders.put(headerName, header);
-            }
-        } catch (JSONException e) {
-            Log.e("InAppBrowserProxy", "Cannot parse OK result", e);
-            return;
-        }
-
-        String contentType = responseHeaders.get("Content-Type");
-        if (contentType == null) {
-            contentType = responseHeaders.get("content-type");
-        }
-        if (contentType == null) {
-            Log.e("InAppBrowserProxy", "'Content-Type' header is required");
-            return;
-        }
-
-        if (!((100 <= code && code <= 299) || (400 <= code && code <= 599))) {
-            Log.e("InAppBrowserProxy", String.format("Status code %s outside of the allowed range", code));
-            return;
-        }
-
-        WebResourceResponse webResourceResponse = new WebResourceResponse(
-            contentType,
-            "utf-8",
-            new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
-        );
-
-        webResourceResponse.setStatusCodeAndReasonPhrase(code, getReasonPhrase(code));
-        proxiedRequest.response = webResourceResponse;
-        proxiedRequest.semaphore.release();
+        JSObject response = new JSObject();
+        response.put("response", result);
+        handleProxyResponse(id, response);
     }
 
     private void setWebViewClient() {
@@ -2816,132 +2859,257 @@ public class WebViewDialog extends Dialog {
                     }
                 }
 
-                private String randomRequestId() {
-                    return UUID.randomUUID().toString();
-                }
-
-                private String toBase64(String raw) {
-                    String s = Base64.encodeToString(raw.getBytes(), Base64.NO_WRAP);
-                    if (s.endsWith("=")) {
-                        s = s.substring(0, s.length() - 2);
-                    }
-                    return s;
-                }
-
-                //
-                //        void handleRedirect(String currentUrl, Response response) {
-                //          String loc = response.header("Location");
-                //          _webView.evaluateJavascript("");
-                //        }
-                //
                 @Override
                 public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     if (view == null || _webView == null) {
                         return null;
                     }
-                    Pattern pattern = _options.getProxyRequestsPattern();
-                    if (pattern == null) {
-                        return null;
-                    }
-                    Matcher matcher = pattern.matcher(request.getUrl().toString());
-                    if (!matcher.find()) {
+                    if (!shouldUseNativeProxy()) {
                         return null;
                     }
 
-                    // Requests matches the regex
-                    if (Objects.equals(request.getMethod(), "POST")) {
-                        // Log.e("HTTP", String.format("returned null (ok) %s", request.getUrl().toString()));
-                        return null;
-                    }
+                    String requestUrl = request.getUrl().toString();
+                    boolean bridgeBackedRequest = ProxyRequestSupport.isBridgeMarkerRequestUrl(requestUrl);
+                    String originalUrl;
+                    String method;
+                    Map<String, String> requestHeaders = new HashMap<>();
+                    String base64Body = "";
+                    String credentialsMode = "same-origin";
 
-                    Log.i("InAppBrowserProxy", String.format("Proxying request: %s", request.getUrl().toString()));
-
-                    // We need to call a JS function
-                    String requestId = randomRequestId();
-                    ProxiedRequest proxiedRequest = new ProxiedRequest();
-                    addProxiedRequest(requestId, proxiedRequest);
-
-                    // lsuakdchgbbaHandleProxiedRequest
-                    activity.runOnUiThread(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                StringBuilder headers = new StringBuilder();
-                                Map<String, String> requestHeaders = request.getRequestHeaders();
-                                for (Map.Entry<String, String> header : requestHeaders.entrySet()) {
-                                    headers.append(
-                                        String.format("h[atob('%s')]=atob('%s');", toBase64(header.getKey()), toBase64(header.getValue()))
-                                    );
-                                }
-                                String jsTemplate = """
-                                    try {
-                                      function getHeaders() {
-                                        const h = {};
-                                        %s
-                                        return h;
-                                      }
-                                      window.InAppBrowserProxyRequest(new Request(atob('%s'), {
-                                        headers: getHeaders(),
-                                        method: '%s'
-                                      })).then(async (res) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: true,
-                                          result: (!!res ? {
-                                            headers: Object.fromEntries(res.headers.entries()),
-                                            code: res.status,
-                                            body: (await res.text())
-                                          } : null),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      }).catch((e) => {
-                                        Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                          ok: false,
-                                          result: e.toString(),
-                                          id: '%s',
-                                          webviewId: '%s'
-                                        });
-                                      });
-                                    } catch (e) {
-                                      Capacitor.Plugins.InAppBrowser.lsuakdchgbbaHandleProxiedRequest({
-                                        ok: false,
-                                        result: e.toString(),
-                                        id: '%s',
-                                        webviewId: '%s'
-                                      });
-                                    }
-                                    """;
-                                String dialogId = instanceId != null ? instanceId : "";
-                                String s = String.format(
-                                    jsTemplate,
-                                    headers,
-                                    toBase64(request.getUrl().toString()),
-                                    request.getMethod(),
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId,
-                                    requestId,
-                                    dialogId
-                                );
-                                // Log.i("HTTP", s);
-                                capacitorWebView.evaluateJavascript(s, null);
-                            }
+                    if (bridgeBackedRequest) {
+                        Uri uri = request.getUrl();
+                        originalUrl = uri.getQueryParameter("u");
+                        String requestId = uri.getQueryParameter("rid");
+                        if (originalUrl == null || requestId == null) {
+                            return null;
                         }
+
+                        if (
+                            ProxyRequestSupport.usesLegacyJsProxyMode(_options) &&
+                            !ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, originalUrl)
+                        ) {
+                            if (proxyBridge != null) {
+                                proxyBridge.getAndRemove(requestId);
+                            }
+                            Log.w("InAppBrowserProxy", "Ignoring legacy regex miss for bridge-backed request: " + originalUrl);
+                            return createCanceledResponse();
+                        }
+
+                        ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
+                        if (stored == null) {
+                            Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
+                            return createCanceledResponse();
+                        }
+                        method = stored.method;
+                        base64Body = stored.base64Body;
+                        credentialsMode = stored.credentialsMode;
+                        Map<String, String> safeMarkerHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(request.getRequestHeaders());
+                        try {
+                            requestHeaders = ProxyRequestSupport.mergeRequestHeaders(null, stored.headersJson);
+                            requestHeaders = ProxyRequestSupport.mergeMissingHeaders(requestHeaders, safeMarkerHeaders);
+                        } catch (JSONException error) {
+                            Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
+                            return createCanceledResponse();
+                        }
+                        String initiatorUrl = request.getRequestHeaders().get("Referer");
+                        if (initiatorUrl == null || initiatorUrl.isBlank()) {
+                            initiatorUrl = _webView.getUrl();
+                        }
+                        String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
+                        if (
+                            targetCookies != null &&
+                            !targetCookies.isBlank() &&
+                            ProxyRequestSupport.shouldInjectCookies(credentialsMode, initiatorUrl, originalUrl, requestHeaders)
+                        ) {
+                            requestHeaders.put("Cookie", targetCookies);
+                        }
+                    } else {
+                        if (!ProxyRequestSupport.shouldHandleNonBridgeRequest(_options, requestUrl)) {
+                            return null;
+                        }
+
+                        originalUrl = requestUrl;
+                        method = request.getMethod();
+                        if (request.getRequestHeaders() != null) {
+                            requestHeaders.putAll(request.getRequestHeaders());
+                        }
+                    }
+
+                    NativeRequestContext requestContext = new NativeRequestContext(
+                        originalUrl,
+                        method,
+                        requestHeaders,
+                        base64Body,
+                        request.isForMainFrame(),
+                        credentialsMode
                     );
 
-                    // 10 seconds wait max
-                    try {
-                        if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                            return proxiedRequest.response;
-                        } else {
-                            Log.e("InAppBrowserProxy", "Semaphore timed out");
-                            removeProxiedRequest(requestId); // prevent mem leak
-                        }
-                    } catch (InterruptedException e) {
-                        Log.e("InAppBrowserProxy", "Semaphore wait error", e);
+                    if (
+                        ProxyRequestSupport.shouldLetWebViewHandleMissingBody(requestUrl, requestContext.method, requestContext.base64Body)
+                    ) {
+                        Log.w("InAppBrowserProxy", "Allowing WebView to handle request with uncaptured body: " + requestContext.url);
+                        return null;
                     }
-                    return null;
+
+                    boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
+                    boolean shouldDelegateLegacyRequest = ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(
+                        _options,
+                        requestContext.url
+                    );
+
+                    NativeProxyRule outboundRule =
+                        legacyProxyMode && shouldDelegateLegacyRequest
+                            ? new NativeProxyRule(
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  null,
+                                  false,
+                                  NativeProxyRule.Action.DELEGATE_TO_JS
+                              )
+                            : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
+
+                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                        return createCanceledResponse();
+                    }
+
+                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS) {
+                        String proxyId = UUID.randomUUID().toString();
+                        ProxiedRequest proxiedRequest = new ProxiedRequest();
+                        proxiedRequest.requestContext = requestContext;
+                        addProxiedRequest(proxyId, proxiedRequest);
+
+                        String dialogId = instanceId != null ? instanceId : "";
+                        _options
+                            .getCallbacks()
+                            .proxyRequestEvent(
+                                proxyId,
+                                "outbound",
+                                requestContext.url,
+                                requestContext.method,
+                                serializeHeaders(requestContext.headers),
+                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                null,
+                                null,
+                                null,
+                                dialogId
+                            );
+
+                        try {
+                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                if (proxiedRequest.canceled) {
+                                    return createCanceledResponse();
+                                }
+                                if (proxiedRequest.response != null) {
+                                    return proxiedRequest.response;
+                                }
+                                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                            } else {
+                                synchronized (proxiedRequest) {
+                                    proxiedRequest.timedOut = true;
+                                }
+                                removeProxiedRequest(proxyId);
+                                Log.w("InAppBrowserProxy", "Proxy timeout, falling back to native replay for: " + requestContext.url);
+                            }
+                        } catch (InterruptedException error) {
+                            removeProxiedRequest(proxyId);
+                            Thread.currentThread().interrupt();
+                            Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                        }
+                    }
+
+                    NativeResponseData nativeResponse;
+                    try {
+                        nativeResponse = performNativeRequest(requestContext);
+                    } catch (IOException error) {
+                        Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
+                        return bridgeBackedRequest ? createCanceledResponse() : null;
+                    }
+
+                    int redirectsFollowed = 0;
+                    while (true) {
+                        NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
+                        if (inboundRule == null || inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
+                            RedirectReplayResult redirectReplay;
+                            try {
+                                redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+                            } catch (IOException error) {
+                                Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
+                                return bridgeBackedRequest ? createCanceledResponse() : null;
+                            }
+                            if (redirectReplay != null) {
+                                requestContext = redirectReplay.requestContext;
+                                nativeResponse = redirectReplay.responseData;
+                                redirectsFollowed++;
+                                continue;
+                            }
+                            return buildWebResourceResponse(nativeResponse);
+                        }
+                        if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                            return createCanceledResponse();
+                        }
+
+                        String proxyId = UUID.randomUUID().toString();
+                        ProxiedRequest proxiedRequest = new ProxiedRequest();
+                        proxiedRequest.requestContext = requestContext;
+                        proxiedRequest.nativeResponse = nativeResponse;
+                        addProxiedRequest(proxyId, proxiedRequest);
+
+                        String dialogId = instanceId != null ? instanceId : "";
+                        _options
+                            .getCallbacks()
+                            .proxyRequestEvent(
+                                proxyId,
+                                "inbound",
+                                requestContext.url,
+                                requestContext.method,
+                                serializeHeaders(requestContext.headers),
+                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                nativeResponse.statusCode,
+                                serializeHeaders(nativeResponse.headers),
+                                Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
+                                dialogId
+                            );
+
+                        try {
+                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                if (proxiedRequest.canceled) {
+                                    return createCanceledResponse();
+                                }
+                                if (proxiedRequest.response != null) {
+                                    return proxiedRequest.response;
+                                }
+                            } else {
+                                synchronized (proxiedRequest) {
+                                    proxiedRequest.timedOut = true;
+                                }
+                                removeProxiedRequest(proxyId);
+                            }
+                        } catch (InterruptedException error) {
+                            Thread.currentThread().interrupt();
+                            Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                        }
+
+                        RedirectReplayResult redirectReplay;
+                        try {
+                            redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+                        } catch (IOException error) {
+                            Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
+                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                        }
+                        if (redirectReplay != null) {
+                            requestContext = redirectReplay.requestContext;
+                            nativeResponse = redirectReplay.responseData;
+                            redirectsFollowed++;
+                            continue;
+                        }
+                        return buildWebResourceResponse(nativeResponse);
+                    }
                 }
 
                 @Override
@@ -3013,6 +3181,12 @@ public class WebViewDialog extends Dialog {
                     super.onPageStarted(view, url, favicon);
                     if (view == null || _webView == null) {
                         return;
+                    }
+                    if (ProxyRequestSupport.shouldInjectBridge(_options) && proxyBridgeScript != null && proxyAccessToken != null) {
+                        String preparedProxyBridgeScript = prepareProxyBridgeScript();
+                        if (preparedProxyBridgeScript != null) {
+                            view.evaluateJavascript(preparedProxyBridgeScript, null);
+                        }
                     }
                     try {
                         URI uri = new URI(url);
@@ -3489,6 +3663,537 @@ public class WebViewDialog extends Dialog {
     public void removeProxiedRequest(String key) {
         synchronized (proxiedRequestsHashmap) {
             proxiedRequestsHashmap.remove(key);
+        }
+    }
+
+    private String loadProxyBridgeScript() {
+        try (InputStream is = _context.getAssets().open("proxy-bridge.js")) {
+            ByteArrayOutputStream result = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                result.write(buffer, 0, bytesRead);
+            }
+            return result.toString(StandardCharsets.UTF_8.name());
+        } catch (IOException e) {
+            Log.e("InAppBrowserProxy", "Failed to load proxy-bridge.js", e);
+            return null;
+        }
+    }
+
+    private static String escapeJavaScriptLiteral(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return value
+            .replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029");
+    }
+
+    private String prepareProxyBridgeScript() {
+        if (proxyBridgeScript == null || proxyAccessToken == null) {
+            return null;
+        }
+
+        String proxyRegexSource = "";
+        if (ProxyRequestSupport.usesLegacyJsProxyMode(_options) && _options.getProxyRequestsPattern() != null) {
+            proxyRegexSource = _options.getProxyRequestsPattern().pattern();
+        }
+
+        return proxyBridgeScript
+            .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
+            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
+    }
+
+    private boolean shouldUseNativeProxy() {
+        return _options != null && _options.shouldEnableNativeProxy();
+    }
+
+    private boolean shouldBootstrapInitialLegacyProxyLoad() {
+        if (_options == null || _options.isPopupWindowMode()) {
+            return false;
+        }
+        return ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, _options.getUrl());
+    }
+
+    private void loadInitialLegacyProxyContent(Map<String, String> requestHeaders, String httpMethod, String httpBody) {
+        final String initialUrl = _options.getUrl();
+        final Map<String, String> initialHeaders = requestHeaders != null ? new HashMap<>(requestHeaders) : new HashMap<>();
+        final String initialMethod = httpMethod != null && !httpMethod.isBlank() ? httpMethod : "GET";
+        final String initialBody =
+            supportsRequestBody(initialMethod) && httpBody != null
+                ? Base64.encodeToString(httpBody.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP)
+                : "";
+
+        executorService.execute(() -> {
+            NativeRequestContext requestContext = new NativeRequestContext(
+                initialUrl,
+                initialMethod,
+                initialHeaders,
+                initialBody,
+                true,
+                "same-origin"
+            );
+
+            try {
+                LegacyInitialProxyResult proxyResult = resolveLegacyInitialProxyResponse(requestContext);
+                if (proxyResult.canceled) {
+                    rejectOpenWebViewIfNeeded("Initial legacy proxy request canceled");
+                    return;
+                }
+
+                NativeResponseData responseData = proxyResult.responseData;
+                if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
+                    rejectOpenWebViewIfNeeded("Initial legacy proxy request did not return bootstrap HTML");
+                    return;
+                }
+
+                ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+                    responseData.contentType,
+                    responseData.headers
+                );
+                String encoding = metadata.encoding() != null && !metadata.encoding().isBlank() ? metadata.encoding() : "utf-8";
+                String body = decodeResponseBody(responseData.bodyBytes, encoding);
+                String bootstrapUrl = ProxyRequestSupport.resolveBootstrapBaseUrl(initialUrl, proxyResult.requestUrl);
+
+                if (_webView == null) {
+                    return;
+                }
+
+                _webView.post(() -> {
+                    if (_webView == null) {
+                        return;
+                    }
+                    _webView.loadDataWithBaseURL(bootstrapUrl, body, metadata.mimeType(), encoding, bootstrapUrl);
+                });
+            } catch (IOException error) {
+                Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
+                rejectOpenWebViewIfNeeded("Initial legacy proxy bootstrap failed: " + error.getMessage());
+            }
+        });
+    }
+
+    private LegacyInitialProxyResult resolveLegacyInitialProxyResponse(NativeRequestContext requestContext) throws IOException {
+        String proxyId = UUID.randomUUID().toString();
+        ProxiedRequest proxiedRequest = new ProxiedRequest();
+        proxiedRequest.requestContext = requestContext;
+        addProxiedRequest(proxyId, proxiedRequest);
+
+        String dialogId = instanceId != null ? instanceId : "";
+        _options
+            .getCallbacks()
+            .proxyRequestEvent(
+                proxyId,
+                "outbound",
+                requestContext.url,
+                requestContext.method,
+                serializeHeaders(requestContext.headers),
+                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                null,
+                null,
+                null,
+                dialogId
+            );
+
+        try {
+            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                if (proxiedRequest.canceled) {
+                    return new LegacyInitialProxyResult(true, null, requestContext.url);
+                }
+                if (proxiedRequest.nativeResponse != null) {
+                    return new LegacyInitialProxyResult(false, proxiedRequest.nativeResponse, requestContext.url);
+                }
+                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+            } else {
+                synchronized (proxiedRequest) {
+                    proxiedRequest.timedOut = true;
+                }
+                removeProxiedRequest(proxyId);
+            }
+        } catch (InterruptedException error) {
+            removeProxiedRequest(proxyId);
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for initial proxy response", error);
+        }
+
+        NativeResponseData nativeResponse = performNativeRequest(requestContext);
+        int redirectsFollowed = 0;
+        while (true) {
+            RedirectReplayResult redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+            if (redirectReplay == null) {
+                return new LegacyInitialProxyResult(false, nativeResponse, requestContext.url);
+            }
+            requestContext = redirectReplay.requestContext;
+            nativeResponse = redirectReplay.responseData;
+            redirectsFollowed++;
+        }
+    }
+
+    private boolean canBootstrapHtmlResponse(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return false;
+        }
+        String normalizedContentType = contentType.toLowerCase(Locale.US);
+        return (
+            normalizedContentType.startsWith("text/html") ||
+            normalizedContentType.startsWith("application/xhtml+xml") ||
+            normalizedContentType.startsWith("text/plain")
+        );
+    }
+
+    private String decodeResponseBody(byte[] bodyBytes, String encoding) {
+        if (bodyBytes == null || bodyBytes.length == 0) {
+            return "";
+        }
+        try {
+            return new String(bodyBytes, Charset.forName(encoding));
+        } catch (Exception _error) {
+            return new String(bodyBytes, StandardCharsets.UTF_8);
+        }
+    }
+
+    private String decodeBase64Body(String base64Body) {
+        if (base64Body == null || base64Body.isEmpty()) {
+            return null;
+        }
+        try {
+            return new String(Base64.decode(base64Body, Base64.DEFAULT), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String serializeHeaders(Map<String, String> headers) {
+        JSONObject jsonObject = new JSONObject();
+        if (headers != null) {
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                try {
+                    jsonObject.put(entry.getKey(), entry.getValue());
+                } catch (JSONException ignored) {}
+            }
+        }
+        return jsonObject.toString();
+    }
+
+    private NativeProxyRule findMatchingRule(
+        List<NativeProxyRule> rules,
+        NativeRequestContext requestContext,
+        NativeResponseData responseData
+    ) {
+        if (rules == null) {
+            return null;
+        }
+        String decodedRequestBody = decodeBase64Body(requestContext.base64Body);
+        String serializedRequestHeaders = serializeHeaders(requestContext.headers);
+        String serializedResponseHeaders = responseData != null ? serializeHeaders(responseData.headers) : null;
+        String decodedResponseBody = responseData != null ? new String(responseData.bodyBytes, StandardCharsets.UTF_8) : null;
+        Integer statusCode = responseData != null ? responseData.statusCode : null;
+
+        for (NativeProxyRule rule : rules) {
+            if (
+                rule.matches(
+                    requestContext.url,
+                    requestContext.method,
+                    serializedRequestHeaders,
+                    decodedRequestBody,
+                    requestContext.mainFrame,
+                    statusCode,
+                    serializedResponseHeaders,
+                    decodedResponseBody
+                )
+            ) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    private WebResourceResponse createCanceledResponse() {
+        WebResourceResponse response = new WebResourceResponse("text/plain", "utf-8", new ByteArrayInputStream(new byte[0]));
+        response.setStatusCodeAndReasonPhrase(204, "No Content");
+        response.setResponseHeaders(new HashMap<>());
+        return response;
+    }
+
+    private WebResourceResponse buildWebResourceResponse(NativeResponseData responseData) {
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+            responseData.contentType,
+            responseData.headers
+        );
+        WebResourceResponse webResourceResponse = new WebResourceResponse(
+            metadata.mimeType(),
+            metadata.encoding(),
+            new ByteArrayInputStream(responseData.bodyBytes)
+        );
+        String reasonPhrase = getReasonPhrase(responseData.statusCode);
+        if (reasonPhrase.isEmpty()) {
+            reasonPhrase = "Unknown";
+        }
+        webResourceResponse.setStatusCodeAndReasonPhrase(responseData.statusCode, reasonPhrase);
+        webResourceResponse.setResponseHeaders(responseData.headers);
+        return webResourceResponse;
+    }
+
+    private RedirectReplayResult followRedirectForWebView(
+        NativeRequestContext requestContext,
+        NativeResponseData responseData,
+        int redirectsFollowed
+    ) throws IOException {
+        String redirectUrl = ProxyRequestSupport.resolveRedirectUrl(requestContext.url, responseData.statusCode, responseData.headers);
+        if (redirectUrl == null) {
+            return null;
+        }
+        if (redirectsFollowed >= MAX_WEBVIEW_PROXY_REDIRECTS) {
+            throw new IOException("Too many proxy redirects for: " + requestContext.url);
+        }
+
+        NativeRequestContext redirectRequestContext = createRedirectRequestContext(requestContext, responseData.statusCode, redirectUrl);
+        NativeResponseData redirectResponse = performNativeRequest(redirectRequestContext);
+        return new RedirectReplayResult(redirectRequestContext, redirectResponse);
+    }
+
+    private NativeRequestContext createRedirectRequestContext(NativeRequestContext requestContext, int statusCode, String redirectUrl) {
+        boolean preserveRequestBody = ProxyRequestSupport.shouldPreserveRequestBodyOnRedirect(requestContext.method, statusCode);
+        String redirectMethod = ProxyRequestSupport.resolveRedirectMethod(requestContext.method, statusCode);
+        Map<String, String> redirectHeaders = ProxyRequestSupport.prepareRedirectHeaders(
+            requestContext.headers,
+            preserveRequestBody,
+            requestContext.url,
+            redirectUrl
+        );
+        String redirectCookies = CookieManager.getInstance().getCookie(redirectUrl);
+        if (
+            redirectCookies != null &&
+            !redirectCookies.isBlank() &&
+            ProxyRequestSupport.shouldInjectCookies(requestContext.credentialsMode, requestContext.url, redirectUrl, redirectHeaders)
+        ) {
+            redirectHeaders.put("Cookie", redirectCookies);
+        }
+        String redirectBody = preserveRequestBody ? requestContext.base64Body : "";
+        return new NativeRequestContext(
+            redirectUrl,
+            redirectMethod,
+            redirectHeaders,
+            redirectBody,
+            requestContext.mainFrame,
+            requestContext.credentialsMode
+        );
+    }
+
+    private NativeResponseData performNativeRequest(NativeRequestContext requestContext) throws IOException {
+        URL url = new URL(requestContext.url);
+        if (!ProxyRequestSupport.supportsNativeHttpRequest(url)) {
+            throw new IOException("Unsupported proxy URL: " + requestContext.url);
+        }
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        try {
+            conn.setConnectTimeout(REQUEST_CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(REQUEST_READ_TIMEOUT_MS);
+            conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
+            conn.setInstanceFollowRedirects(false);
+
+            for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
+                conn.setRequestProperty(entry.getKey(), entry.getValue());
+            }
+
+            if (requestContext.base64Body != null && !requestContext.base64Body.isEmpty()) {
+                byte[] bodyBytes = ProxyRequestSupport.decodeBase64Body(requestContext.base64Body);
+                conn.setDoOutput(true);
+                try (java.io.OutputStream outputStream = conn.getOutputStream()) {
+                    outputStream.write(bodyBytes);
+                }
+            }
+
+            int status = conn.getResponseCode();
+            InputStream inputStream;
+            try {
+                inputStream = conn.getInputStream();
+            } catch (IOException e) {
+                inputStream = conn.getErrorStream();
+            }
+
+            byte[] bodyBytes = new byte[0];
+            if (inputStream != null) {
+                try (InputStream stream = inputStream; ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = stream.read(buf)) != -1) {
+                        baos.write(buf, 0, n);
+                    }
+                    bodyBytes = baos.toByteArray();
+                }
+            }
+
+            ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(conn.getHeaderFields());
+            applyResponseCookies(requestContext.url, parsedHeaders.cookieHeaders());
+            Map<String, String> responseHeaders = parsedHeaders.responseHeaders();
+
+            String contentType = responseHeaders.get("Content-Type");
+            if (contentType == null) {
+                contentType = responseHeaders.get("content-type");
+            }
+            if (contentType == null) {
+                contentType = conn.getContentType();
+            }
+
+            return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private void applyResponseCookies(String requestUrl, java.util.List<String> cookieHeaders) {
+        if (requestUrl == null || requestUrl.isBlank() || cookieHeaders == null || cookieHeaders.isEmpty()) {
+            return;
+        }
+        CookieManager cookieManager = CookieManager.getInstance();
+        boolean wroteCookie = false;
+        for (String cookieHeader : cookieHeaders) {
+            if (cookieHeader == null || cookieHeader.isBlank()) {
+                continue;
+            }
+            cookieManager.setCookie(requestUrl, cookieHeader);
+            wroteCookie = true;
+        }
+        if (wroteCookie) {
+            cookieManager.flush();
+        }
+    }
+
+    public void handleProxyResponse(String requestId, JSObject response) {
+        ProxiedRequest proxiedRequest;
+        synchronized (proxiedRequestsHashmap) {
+            proxiedRequest = proxiedRequestsHashmap.get(requestId);
+        }
+        if (proxiedRequest == null) {
+            Log.e("InAppBrowserProxy", "No pending request for id: " + requestId);
+            return;
+        }
+        synchronized (proxiedRequest) {
+            if (proxiedRequest.timedOut) {
+                return;
+            }
+        }
+
+        if (response == null) {
+            synchronized (proxiedRequestsHashmap) {
+                proxiedRequestsHashmap.remove(requestId);
+            }
+            proxiedRequest.semaphore.release();
+            return;
+        }
+
+        synchronized (proxiedRequest) {
+            if (proxiedRequest.timedOut) {
+                return;
+            }
+            try {
+                Boolean canceled = response.getBool("cancel");
+                proxiedRequest.canceled = Boolean.TRUE.equals(canceled);
+
+                JSObject requestOverride = response.getJSObject("request");
+                if (requestOverride != null && proxiedRequest.requestContext != null) {
+                    String url = ProxyRequestSupport.resolveOverrideUrl(
+                        proxiedRequest.requestContext.url,
+                        requestOverride.getString("url", proxiedRequest.requestContext.url)
+                    );
+                    String method = ProxyRequestSupport.normalizeOverrideMethod(
+                        requestOverride.getString("method", proxiedRequest.requestContext.method)
+                    );
+                    JSObject headersObject = requestOverride.getJSObject("headers");
+                    Map<String, String> headers = ProxyRequestSupport.prepareOverrideHeaders(
+                        proxiedRequest.requestContext.headers,
+                        proxiedRequest.requestContext.url,
+                        url
+                    );
+                    if (headersObject != null) {
+                        headers = new HashMap<>();
+                        Iterator<String> keys = headersObject.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            headers.put(key, headersObject.getString(key));
+                        }
+                    }
+                    boolean hasBodyOverride = requestOverride.has("body");
+                    Object rawOverrideBody = hasBodyOverride ? requestOverride.opt("body") : null;
+                    String body = ProxyRequestSupport.resolveOverrideBody(
+                        proxiedRequest.requestContext.base64Body,
+                        method,
+                        hasBodyOverride,
+                        rawOverrideBody == null || rawOverrideBody == JSONObject.NULL ? null : String.valueOf(rawOverrideBody)
+                    );
+                    proxiedRequest.requestContext = new NativeRequestContext(
+                        url,
+                        method,
+                        headers,
+                        body,
+                        proxiedRequest.requestContext.mainFrame,
+                        proxiedRequest.requestContext.credentialsMode
+                    );
+                }
+
+                JSObject responseOverride = response.getJSObject("response");
+                if (responseOverride == null && response.get("status") != null) {
+                    responseOverride = response;
+                }
+
+                if (responseOverride != null) {
+                    String base64Body = responseOverride.getString("body");
+                    int status = responseOverride.getInteger("status", 200);
+                    JSObject headers = responseOverride.getJSObject("headers");
+
+                    Map<String, String> responseHeaders = new HashMap<>();
+                    if (headers != null) {
+                        Iterator<String> keys = headers.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            responseHeaders.put(key, headers.getString(key));
+                        }
+                    }
+
+                    byte[] bodyBytes = ProxyRequestSupport.decodeBase64Body(base64Body);
+                    ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitSyntheticResponseHeaders(
+                        responseHeaders
+                    );
+                    applyResponseCookies(proxiedRequest.requestContext.url, parsedHeaders.cookieHeaders());
+                    responseHeaders = parsedHeaders.responseHeaders();
+
+                    String contentType = responseHeaders.get("content-type");
+                    if (contentType == null) {
+                        contentType = responseHeaders.get("Content-Type");
+                    }
+                    if (contentType == null) {
+                        contentType = "application/octet-stream";
+                    }
+
+                    if (status < 100 || status > 599) {
+                        status = 200;
+                    }
+                    proxiedRequest.nativeResponse = new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+                    proxiedRequest.response = buildWebResourceResponse(proxiedRequest.nativeResponse);
+                }
+            } catch (IOException invalidBodyError) {
+                proxiedRequest.canceled = true;
+                Log.e("InAppBrowserProxy", "Invalid proxy response body for request: " + requestId, invalidBodyError);
+            } catch (Exception e) {
+                Log.e("InAppBrowserProxy", "Error building proxy response", e);
+            }
+        }
+
+        synchronized (proxiedRequestsHashmap) {
+            proxiedRequestsHashmap.remove(requestId);
+        }
+        proxiedRequest.semaphore.release();
+    }
+
+    @Override
+    public boolean hasPendingProxyRequest(String requestId) {
+        synchronized (proxiedRequestsHashmap) {
+            return proxiedRequestsHashmap.containsKey(requestId);
         }
     }
 

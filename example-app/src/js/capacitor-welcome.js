@@ -6,6 +6,8 @@ import {
   BackgroundColor,
   InvisibilityMode,
 } from "@capgo/inappbrowser";
+import { setupProxyDemoButtons } from "./proxy-demo.js";
+import { setupProxyRegression } from "./proxy-regression.js";
 
 // Default URL configuration
 let testWebappUrl = "http://localhost:8000/index.php";
@@ -121,6 +123,49 @@ window.customElements.define(
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
+        <h2>Proxy Regression</h2>
+        <p>
+          Run a self-contained proxy flow that serves the page, script, fetch, and XHR through <code>addProxyHandler()</code>.
+        </p>
+        <p>
+          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
+        </p>
+        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
+          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
+          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
+        </div>
+        <hr />
+        <h2>Proxy Demo Scenarios</h2>
+        <p>
+          Open real websites and exercise the proxy paths directly from this example app.
+        </p>
+        <p style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="button" id="proxy-demo-grailed-stub" style="background-color: #1f7a8c;">Grailed SDK Stub Proxy</button>
+          <button class="button" id="proxy-demo-grailed-google-login" style="background-color: #126b4c;">Grailed Google Login Proxy</button>
+          <button class="button" id="proxy-demo-grailed-background-login" style="background-color: #0b8f68;">Grailed Background Login</button>
+          <button class="button" id="proxy-demo-facebook-login" style="background-color: #1877f2;">Facebook Login</button>
+          <button class="button" id="proxy-demo-facebook-script" style="background-color: #0f5dcf;">Facebook Script Proxy</button>
+        </p>
+        <div style="display: grid; gap: 8px; max-width: 440px; margin-bottom: 12px;">
+          <input id="proxy-demo-google-email" type="email" placeholder="Google email" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
+          <input id="proxy-demo-google-password" type="password" placeholder="Google password" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
+          <input id="proxy-demo-google-otp" type="text" placeholder="Google 2FA code (optional)" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
+        </div>
+        <p style="font-size: 0.75em; color: #3f5f53; margin-top: -4px;">
+          The background Grailed demo keeps both the Grailed page and the Google popup hidden, drives them with injected JavaScript, and reports each step here.
+        </p>
+        <p style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+          <button class="button" id="proxy-demo-show-primary" style="background-color: #5b7c6f;" disabled>Show hidden Grailed window</button>
+          <button class="button" id="proxy-demo-show-popup" style="background-color: #466d8f;" disabled>Show hidden popup</button>
+        </p>
+        <div id="proxy-demo-status" style="margin-top: 10px; padding: 10px; background-color: #eefaf7; border-radius: 5px; font-size: 0.8em; color: #12372a;">
+          <strong>Status:</strong> <span id="proxy-demo-status-text">Not started</span>
+          <div id="proxy-demo-details" style="margin-top: 6px; white-space: pre-wrap; word-break: break-word;"></div>
+          <div style="margin-top: 10px;">
+            <strong>Steps:</strong>
+            <pre id="proxy-demo-history" style="margin-top: 6px; padding: 8px; background: rgba(18,55,42,0.06); border-radius: 4px; white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto;">No events yet.</pre>
+          </div>
+        </div>
         <hr />
         <h2>In-App Browser Demo</h2>
         <p>
@@ -245,6 +290,89 @@ window.customElements.define(
           domOutput.textContent = "";
         }
       }
+
+      const maestroReadyBanner = document.getElementById("maestro-ready-banner");
+      const maestroRunProxyButton = document.getElementById("maestro-run-proxy");
+      const maestroProxyStatus = document.getElementById("maestro-proxy-status");
+      const maestroProxyDetails = document.getElementById("maestro-proxy-details");
+
+      const withMaestroNativeHarness = (callback) => {
+        const harness = window.MaestroNativeHarness;
+        if (!harness || typeof callback !== "function") {
+          return;
+        }
+        try {
+          callback(harness);
+        } catch (_error) {}
+      };
+
+      const syncMaestroNativeReady = (ready) => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setReady === "function") {
+            harness.setReady(Boolean(ready));
+          }
+        });
+      };
+
+      const syncMaestroNativeRunning = (running) => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setRunning === "function") {
+            harness.setRunning(Boolean(running));
+          }
+        });
+      };
+
+      const syncMaestroNativeStatus = (message, details = "") => {
+        withMaestroNativeHarness((harness) => {
+          if (typeof harness.setStatus === "function") {
+            harness.setStatus(message, details);
+          }
+        });
+      };
+
+      const updateMaestroStatus = (message, details = "") => {
+        if (maestroProxyStatus) {
+          maestroProxyStatus.textContent = message;
+        }
+        if (maestroProxyDetails) {
+          maestroProxyDetails.textContent = details;
+        }
+        syncMaestroNativeStatus(message, details);
+      };
+
+      const updateMaestroRunning = (running) => {
+        if (maestroRunProxyButton) {
+          maestroRunProxyButton.disabled = running;
+        }
+        syncMaestroNativeRunning(running);
+      };
+
+      const proxyRegressionControls = setupProxyRegression(self.shadowRoot, {
+        onStatusChange: updateMaestroStatus,
+        onRunningChange: updateMaestroRunning,
+      });
+
+      if (proxyRegressionControls?.run && maestroRunProxyButton) {
+        window.__capgoRunMaestroProxy = () => {
+          proxyRegressionControls.run({
+            keepBrowserOpenOnFinish: typeof window.MaestroNativeHarness === "undefined",
+          });
+        };
+        maestroRunProxyButton.addEventListener("click", () => {
+          proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
+        });
+        maestroRunProxyButton.disabled = false;
+        if (maestroReadyBanner) {
+          maestroReadyBanner.textContent = "Maestro Ready";
+        }
+        syncMaestroNativeReady(true);
+      } else if (maestroReadyBanner) {
+        maestroReadyBanner.textContent = "Maestro Unavailable";
+        window.__capgoRunMaestroProxy = undefined;
+        syncMaestroNativeReady(false);
+      }
+
+      setupProxyDemoButtons(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot
@@ -598,7 +726,7 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import("./url.js");
+              const { url } = await import(/* @vite-ignore */ "./url.js");
               urlToUse = url;
             } catch (e) {
               console.warn(
@@ -839,7 +967,7 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import("./url.js");
+              const { url } = await import(/* @vite-ignore */ "./url.js");
               urlToUse = url;
             } catch (e) {
               console.warn(
