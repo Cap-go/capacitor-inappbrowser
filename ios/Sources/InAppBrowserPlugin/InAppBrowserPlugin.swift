@@ -735,6 +735,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let closeModalURLPattern = call.getString("closeModalURLPattern")
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
+        let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
@@ -893,7 +894,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
                 captureConsoleLogs: captureConsoleLogs,
                 proxyRequests: legacyProxyRequests.isEnabled,
-                proxySchemeHandler: proxyHandler
+                proxySchemeHandler: proxyHandler,
+                documentStartUserScripts: self.documentStartUserScripts(
+                    authorizedAppLinks: authorizedAppLinks,
+                    openBlankTargetInWebView: openBlankTargetInWebView
+                )
             )
 
             guard let webViewController = self.webViewController else {
@@ -1444,6 +1449,73 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+    }
+
+    private func normalizedAuthorizedHosts(from links: [String]) -> [String] {
+        links.compactMap { link in
+            guard let host = URLComponents(string: link)?.host?.lowercased() else {
+                return nil
+            }
+
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+    }
+
+    private func blankTargetInWebViewScript(authorizedAppLinks: [String]) -> String {
+        let authorizedHosts = normalizedAuthorizedHosts(from: authorizedAppLinks)
+        let hostsData = try? JSONSerialization.data(withJSONObject: authorizedHosts)
+        let hostsJSON = hostsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+
+        return """
+        (function() {
+          const authorizedHosts = new Set(\(hostsJSON));
+          const normalizeHost = (host) => (host || '').replace(/^www\\./i, '').toLowerCase();
+
+          document.addEventListener('click', function(event) {
+            const element = event.target;
+            if (!element || typeof element.closest !== 'function') {
+              return;
+            }
+
+            const anchor = element.closest('a[target="_blank"][href]');
+            if (!anchor) {
+              return;
+            }
+
+            let nextUrl;
+            try {
+              nextUrl = new URL(anchor.getAttribute('href'), window.location.href);
+            } catch (_) {
+              return;
+            }
+
+            const protocol = nextUrl.protocol.toLowerCase();
+            if (protocol !== 'http:' && protocol !== 'https:') {
+              return;
+            }
+
+            if (authorizedHosts.has(normalizeHost(nextUrl.hostname))) {
+              return;
+            }
+
+            event.preventDefault();
+            setTimeout(function() {
+              window.location.assign(nextUrl.toString());
+            }, 0);
+          }, true);
+        })();
+        """
+    }
+
+    private func documentStartUserScripts(
+        authorizedAppLinks: [String],
+        openBlankTargetInWebView: Bool
+    ) -> [String] {
+        guard openBlankTargetInWebView else {
+            return []
+        }
+
+        return [blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks)]
     }
 
     func isHexColorCode(_ input: String) -> Bool {
