@@ -361,6 +361,50 @@ window.customElements.define(
         button.textContent = label;
       }
 
+      let downloadListenerHandles = [];
+
+      async function createDownloadListeners() {
+        while (downloadListenerHandles.length > 0) {
+          const listenerHandle = downloadListenerHandles.pop();
+          if (!listenerHandle || typeof listenerHandle.remove !== "function") {
+            continue;
+          }
+          try {
+            await listenerHandle.remove();
+          } catch (error) {
+            console.warn("Could not remove stale download listener:", error);
+          }
+        }
+
+        downloadListenerHandles = await Promise.all([
+          InAppBrowser.addListener("downloadCompleted", (event) => {
+            setDownloadListenerButtonLabel(`Event OK: ${event.fileName}`);
+            setDownloadStatus(
+              `Download completed: ${event.fileName} via ${event.handledBy}`,
+              { backgroundColor: "#dcfce7", color: "#166534" },
+            );
+
+            if (closeOnNextDownloadEvent && event.id) {
+              closeOnNextDownloadEvent = false;
+              InAppBrowser.close({ id: event.id }).catch((error) => {
+                console.warn("Could not close webview after download event:", error);
+              });
+            }
+          }),
+          InAppBrowser.addListener("downloadFailed", (event) => {
+            closeOnNextDownloadEvent = false;
+            setDownloadListenerButtonLabel("Event Failed");
+            const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
+            setDownloadStatus(
+              `Download failed${fileLabel}: ${event.error}`,
+              { backgroundColor: "#fee2e2", color: "#991b1b" },
+            );
+          }),
+        ]);
+
+        return downloadListenerHandles;
+      }
+
       async function openAutoDownloadDemo({ closeOnEvent = false } = {}) {
         const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
         closeOnNextDownloadEvent = closeOnEvent && handleDownloadsToggle.checked;
@@ -382,7 +426,7 @@ window.customElements.define(
         );
 
         try {
-          await downloadListenerSetup;
+          await createDownloadListeners();
           await InAppBrowser.openWebView({
             url: createAutoDownloadDemoUrl(),
             title: "Auto Download Demo",
@@ -399,32 +443,6 @@ window.customElements.define(
           console.error("Error opening auto download demo:", error);
         }
       }
-
-      const downloadListenerSetup = Promise.all([
-        InAppBrowser.addListener("downloadCompleted", (event) => {
-          setDownloadListenerButtonLabel(`Event OK: ${event.fileName}`);
-          setDownloadStatus(
-            `Download completed: ${event.fileName} via ${event.handledBy}`,
-            { backgroundColor: "#dcfce7", color: "#166534" },
-          );
-
-          if (closeOnNextDownloadEvent && event.id) {
-            closeOnNextDownloadEvent = false;
-            InAppBrowser.close({ id: event.id }).catch((error) => {
-              console.warn("Could not close webview after download event:", error);
-            });
-          }
-        }),
-        InAppBrowser.addListener("downloadFailed", (event) => {
-          closeOnNextDownloadEvent = false;
-          setDownloadListenerButtonLabel("Event Failed");
-          const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
-          setDownloadStatus(
-            `Download failed${fileLabel}: ${event.error}`,
-            { backgroundColor: "#fee2e2", color: "#991b1b" },
-          );
-        }),
-      ]);
 
       async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
         statusText.textContent = "Refreshing DOM content...";
@@ -974,6 +992,7 @@ window.customElements.define(
             metricsDiv.style.display = "none";
 
             await InAppBrowser.removeAllListeners();
+            downloadListenerHandles = [];
             await InAppBrowser.openWebView({
               url: "https://example.com",
               hidden: true,

@@ -26,6 +26,11 @@ private struct WKDownloadState {
     let sourceURL: String?
 }
 
+private enum DownloadReservationStore {
+    static var paths: Set<String> = []
+    static let lock = NSLock()
+}
+
 public struct WKWebViewCredentials {
     var username: String
     var password: String
@@ -446,7 +451,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         var candidateURL = downloadsDirectory.appendingPathComponent(sanitizedFilename)
         var duplicateIndex = 1
 
-        while FileManager.default.fileExists(atPath: candidateURL.path) {
+        while FileManager.default.fileExists(atPath: candidateURL.path) || !reserveDownloadDestination(candidateURL) {
             let duplicateSuffix = "-\(duplicateIndex)"
             let duplicateFilename = fileExtension.isEmpty
                 ? baseName + duplicateSuffix
@@ -456,6 +461,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         return candidateURL
+    }
+
+    private func reserveDownloadDestination(_ candidateURL: URL) -> Bool {
+        DownloadReservationStore.lock.lock()
+        defer { DownloadReservationStore.lock.unlock() }
+
+        let candidatePath = candidateURL.path
+        guard !DownloadReservationStore.paths.contains(candidatePath) else {
+            return false
+        }
+        DownloadReservationStore.paths.insert(candidatePath)
+        return true
+    }
+
+    private func releaseDownloadDestination(_ destinationURL: URL?) {
+        guard let destinationURL else {
+            return
+        }
+
+        DownloadReservationStore.lock.lock()
+        DownloadReservationStore.paths.remove(destinationURL.path)
+        DownloadReservationStore.lock.unlock()
     }
 
     private func normalizedMimeType(_ mimeType: String?, fileURL: URL) -> String? {
@@ -480,6 +507,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return "text/csv"
         case "html", "htm":
             return "text/html"
+        case "xhtml":
+            return "application/xhtml+xml"
         case "png":
             return "image/png"
         case "jpg", "jpeg":
@@ -498,6 +527,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     private func shouldPreviewDownloadedFile(_ fileURL: URL, mimeType: String?) -> Bool {
         guard let normalizedMimeType = normalizedMimeType(mimeType, fileURL: fileURL) else {
             return false
+        }
+
+        switch normalizedMimeType {
+        case "text/html", "application/xhtml+xml", "image/svg+xml":
+            return false
+        default:
+            break
         }
 
         return normalizedMimeType == "application/pdf" ||
@@ -1407,6 +1443,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.captureConsoleLogs = parent.captureConsoleLogs
         self.allowWebViewJsVisibilityControl = parent.allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = parent.allowScreenshotsFromWebPage
+        self.handleDownloads = parent.handleDownloads
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition
         self.showArrowAsClose = parent.showArrowAsClose
@@ -1677,6 +1714,9 @@ public extension WKWebViewController {
     open func cleanupWebView() {
         guard let webView = self.webView else { return }
         webView.stopLoading()
+        downloadStates.values.forEach { releaseDownloadDestination($0.destinationURL) }
+        downloadStates.removeAll()
+        previewItemURL = nil
 
         // Remove KVO observers FIRST, before any operation that could trigger them
         webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
@@ -2780,6 +2820,7 @@ extension WKWebViewController: WKDownloadDelegate {
         guard let state = downloadStates.removeValue(forKey: identifier) else {
             return
         }
+        releaseDownloadDestination(state.destinationURL)
         guard let destinationURL = state.destinationURL else {
             emitDownloadFailed(sourceURL: state.sourceURL, mimeType: state.mimeType, error: "Download finished without a destination URL")
             return
@@ -2790,6 +2831,7 @@ extension WKWebViewController: WKDownloadDelegate {
 
     public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
         let state = downloadStates.removeValue(forKey: ObjectIdentifier(download))
+        releaseDownloadDestination(state?.destinationURL)
         emitDownloadFailed(
             sourceURL: state?.sourceURL,
             fileName: state?.destinationURL?.lastPathComponent,

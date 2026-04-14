@@ -706,6 +706,7 @@ public class Options {
         copy.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         copy.setAllowScreenshotsFromWebPage(allowScreenshotsFromWebPage);
         copy.setCaptureConsoleLogs(captureConsoleLogs);
+        copy.setHandleDownloads(handleDownloads);
         copy.setInvisibilityMode(invisibilityMode);
         copy.setPopupWindowMode(true);
         copy.setHiddenPopupWindow(hiddenPopupWindow);
