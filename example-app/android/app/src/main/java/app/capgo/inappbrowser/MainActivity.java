@@ -75,7 +75,10 @@ public class MainActivity extends BridgeActivity {
     private void installMaestroHarness() {
         boolean overlayInstalled = installMaestroOverlay();
         boolean bridgeInjected = ensureMaestroHarnessBridge();
-        if (!overlayInstalled || !bridgeInjected) {
+        if (overlayInstalled && bridgeInjected) {
+            syncMaestroReadyFromPage();
+        }
+        if (!overlayInstalled || !bridgeInjected || !maestroReady) {
             WebView retryView = bridge != null ? bridge.getWebView() : null;
             scheduleMaestroHarnessRetry(retryView);
         }
@@ -228,9 +231,11 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void scheduleMaestroHarnessRetry(@Nullable View retryView) {
-        if ((maestroHarnessInstalled && maestroHarnessBridgeInjected) || maestroHarnessRetryCount >= MAESTRO_HARNESS_MAX_RETRIES) {
+        if ((maestroHarnessInstalled && maestroHarnessBridgeInjected && maestroReady) || maestroHarnessRetryCount >= MAESTRO_HARNESS_MAX_RETRIES) {
             if (!maestroHarnessBridgeInjected) {
                 Log.w(TAG, "Stopped retrying before Maestro bridge became ready");
+            } else if (!maestroReady) {
+                Log.w(TAG, "Stopped retrying before Maestro page became ready");
             }
             return;
         }
@@ -245,6 +250,24 @@ public class MainActivity extends BridgeActivity {
         if (targetView != null) {
             targetView.postDelayed(this::installMaestroHarness, MAESTRO_HARNESS_RETRY_DELAY_MS);
         }
+    }
+
+    private void syncMaestroReadyFromPage() {
+        if (bridge == null || bridge.getWebView() == null || maestroReady) {
+            return;
+        }
+
+        WebView webView = bridge.getWebView();
+        webView.post(() ->
+            webView.evaluateJavascript(
+                "(function(){var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');return !!(window.__capgoRunMaestroProxy||(button&&!button.disabled));})()",
+                value -> {
+                    if ("true".equals(value)) {
+                        updateMaestroReady(true);
+                    }
+                }
+            )
+        );
     }
 
     private void triggerMaestroProxyRegression() {
