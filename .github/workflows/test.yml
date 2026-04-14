@@ -120,9 +120,7 @@ jobs:
           profile: pixel_7_pro
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk
-            maestro test --format junit --output maestro-report.xml --debug-output maestro-artifacts --flatten-debug-output --env APP_ID=app.capgo.inappbrowser example-app/.maestro/blank-target-http-stays-in-webview.yaml
+          script: sh ./scripts/run-android-maestro-with-retry.sh maestro:test:android:blank-target
       - name: Upload Maestro blank target artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
