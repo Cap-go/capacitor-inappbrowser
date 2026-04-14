@@ -4,7 +4,7 @@ appId: ${APP_ID}
     visible: "Maestro Ready"
     timeout: 240000
 - tapOn:
-    text: "Run Keyboard Regression (Maestro)"
+    id: "maestro-run-keyboard"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Keyboard Regression Page"
