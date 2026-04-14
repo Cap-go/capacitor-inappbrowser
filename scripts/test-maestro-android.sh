@@ -6,6 +6,7 @@ EXAMPLE_DIR="$ROOT_DIR/example-app"
 APK_PATH="$EXAMPLE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
 RESULTS_DIR="$ROOT_DIR/maestro-results"
 FLOW_PATH="$ROOT_DIR/.maestro/download-handling-android.yaml"
+APP_ID="app.capgo.inappbrowser"
 SKIP_BUILD="${CAPGO_MAESTRO_SKIP_BUILD:-0}"
 DEVICE_ID="${CAPGO_MAESTRO_ANDROID_DEVICE_ID:-$(adb devices | awk 'NR > 1 && $2 == "device" { print $1; exit }')}"
 
@@ -73,12 +74,31 @@ fi
 
 wait_for_device
 
+resolve_launch_activity() {
+  local resolved_activity
+
+  resolved_activity="$(adb -s "$DEVICE_ID" shell cmd package resolve-activity --brief "$APP_ID" 2>/dev/null | tr -d '\r' | tail -n 1)"
+  if [[ "$resolved_activity" == *"/"* ]]; then
+    printf '%s\n' "$resolved_activity"
+    return 0
+  fi
+
+  resolved_activity="$(adb -s "$DEVICE_ID" shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 && adb -s "$DEVICE_ID" shell dumpsys package "$APP_ID" | awk '/android.intent.action.MAIN:/ { capture = 1; next } capture && /[A-Za-z0-9_.]+\\// { print; exit }' | tr -d '\r' | xargs)"
+  if [[ "$resolved_activity" == *"/"* ]]; then
+    printf '%s\n' "$resolved_activity"
+    return 0
+  fi
+
+  echo "Unable to resolve launcher activity for $APP_ID." >&2
+  exit 1
+}
+
 adb -s "$DEVICE_ID" shell settings put global window_animation_scale 0 >/dev/null 2>&1 || true
 adb -s "$DEVICE_ID" shell settings put global transition_animation_scale 0 >/dev/null 2>&1 || true
 adb -s "$DEVICE_ID" shell settings put global animator_duration_scale 0 >/dev/null 2>&1 || true
 adb -s "$DEVICE_ID" install -r "$APK_PATH"
-adb -s "$DEVICE_ID" shell am force-stop app.capgo.inappbrowser >/dev/null 2>&1 || true
-adb -s "$DEVICE_ID" shell am start -W -n app.capgo.inappbrowser/app.capgo.plugin.InappBrowser.MainActivity >/dev/null
+adb -s "$DEVICE_ID" shell am force-stop "$APP_ID" >/dev/null 2>&1 || true
+adb -s "$DEVICE_ID" shell am start -W -n "$(resolve_launch_activity)" >/dev/null
 
 rm -rf "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR"

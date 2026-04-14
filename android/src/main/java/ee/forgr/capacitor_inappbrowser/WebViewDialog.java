@@ -82,7 +82,6 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.charset.Charset;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -636,7 +635,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             executorService.execute(() -> {
                 try {
                     String previewHtml = textPreviewHtml(file, readUtf8File(file));
-                    mainHandler.post(() -> _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null));
+                    mainHandler.post(() ->
+                        _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null)
+                    );
                 } catch (IOException ioException) {
                     showDownloadError("Failed to preview downloaded text file", ioException);
                 }
