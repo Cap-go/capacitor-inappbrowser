@@ -237,6 +237,15 @@ enum ProxySchemeRequestSupport {
         return .executeInboundDecision
     }
 
+    static func shouldFollowDelegatedRedirect(
+        phase: String,
+        hasPendingRedirect: Bool,
+        hasDirectResponse: Bool,
+        isCanceled: Bool
+    ) -> Bool {
+        phase == "inbound" && hasPendingRedirect && !hasDirectResponse && !isCanceled
+    }
+
     static func timeoutTokenMatches(scheduledToken: UUID, currentToken: UUID?) -> Bool {
         currentToken == scheduledToken
     }
@@ -522,7 +531,12 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                 }
             }
 
-            if pendingTask.phase == "inbound", pendingTask.redirectRequest != nil, !hasDirectResponse {
+            if ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(
+                phase: pendingTask.phase,
+                hasPendingRedirect: pendingTask.redirectRequest != nil,
+                hasDirectResponse: hasDirectResponse,
+                isCanceled: pendingTask.canceled
+            ) {
                 if let requestOverride = responseData["request"] as? [String: Any] {
                     followPendingRedirect(requestId: requestId, requestOverride: requestOverride)
                 } else {

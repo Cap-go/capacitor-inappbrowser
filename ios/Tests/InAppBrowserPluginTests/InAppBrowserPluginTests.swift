@@ -94,6 +94,41 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testDelegatedRedirectFollowSkipsCanceledInboundResponses() {
+        XCTAssertTrue(
+            ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(
+                phase: "inbound",
+                hasPendingRedirect: true,
+                hasDirectResponse: false,
+                isCanceled: false
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(
+                phase: "inbound",
+                hasPendingRedirect: true,
+                hasDirectResponse: false,
+                isCanceled: true
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(
+                phase: "inbound",
+                hasPendingRedirect: true,
+                hasDirectResponse: true,
+                isCanceled: false
+            )
+        )
+        XCTAssertFalse(
+            ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(
+                phase: "outbound",
+                hasPendingRedirect: true,
+                hasDirectResponse: false,
+                isCanceled: false
+            )
+        )
+    }
+
     func testProxySchemeMainFrameDetectionTracksMainDocumentURL() throws {
         let pageURL = try XCTUnwrap(URL(string: "https://example.com/page"))
         let scriptURL = try XCTUnwrap(URL(string: "https://example.com/app.js"))
