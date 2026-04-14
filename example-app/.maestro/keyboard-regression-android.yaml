@@ -12,20 +12,12 @@ appId: ${APP_ID}
 - tapOn:
     id: "keyboard-input"
     retryTapIfNoChange: true
+- inputText: "keyboard regression"
 - runFlow:
     when:
       visible: "Don't allow"
     commands:
       - tapOn: "Don't allow"
-- extendedWaitUntil:
-    visible: "Dismiss Keyboard"
-    timeout: 30000
-- tapOn:
-    text: "Dismiss Keyboard"
-    retryTapIfNoChange: true
-- tapOn:
-    text: "Close Browser"
-    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Keyboard regression passed"
     timeout: 120000
