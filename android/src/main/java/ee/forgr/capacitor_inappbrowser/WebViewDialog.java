@@ -1027,16 +1027,98 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
+    private boolean shouldBlockManagedDownload(String url) {
+        if (_options == null) {
+            return false;
+        }
+
+        return shouldBlockHost(url, _options.getBlockedHosts());
+    }
+
+    private boolean shouldBlockHost(String url, List<String> blockedHosts) {
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+
+        if (host == null || host.isEmpty()) {
+            return false;
+        }
+
+        if (blockedHosts == null || blockedHosts.isEmpty()) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.US);
+        for (String blockPattern : blockedHosts) {
+            if (blockPattern != null && matchesBlockPattern(normalizedHost, blockPattern.toLowerCase(Locale.US))) {
+                Log.d("InAppBrowser", "Blocked managed download host detected: " + host);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean matchesBlockPattern(String host, String pattern) {
+        if (pattern == null || pattern.isEmpty()) {
+            return false;
+        }
+
+        if (host.equals(pattern)) {
+            return true;
+        }
+
+        if (!pattern.contains("*")) {
+            return false;
+        }
+
+        if (pattern.startsWith("*.")) {
+            return matchesWildcardDomain(host, pattern);
+        } else if (pattern.contains("*")) {
+            return matchesRegexPattern(host, pattern);
+        }
+
+        return false;
+    }
+
+    private boolean matchesWildcardDomain(String host, String pattern) {
+        String domain = pattern.substring(2);
+        if (domain.isEmpty()) {
+            return false;
+        }
+
+        return host.equals(domain) || host.endsWith("." + domain);
+    }
+
+    private boolean matchesRegexPattern(String host, String pattern) {
+        try {
+            String escapedPattern = pattern
+                .replace("\\", "\\\\")
+                .replace(".", "\\.")
+                .replace("+", "\\+")
+                .replace("?", "\\?")
+                .replace("^", "\\^")
+                .replace("$", "\\$")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("|", "\\|");
+            String regexPattern = "^" + escapedPattern.replace("*", ".*") + "$";
+            return Pattern.matches(regexPattern, host);
+        } catch (Exception exception) {
+            Log.e("InAppBrowser", "Invalid blocked host pattern '" + pattern + "': " + exception.getMessage());
+            return false;
+        }
+    }
+
     private boolean shouldForwardCustomDownloadHeader(String headerKey) {
         if (TextUtils.isEmpty(headerKey)) {
             return false;
         }
 
-        return !(
-            "authorization".equalsIgnoreCase(headerKey) ||
-            "cookie".equalsIgnoreCase(headerKey) ||
-            "proxy-authorization".equalsIgnoreCase(headerKey)
-        );
+        return !("cookie".equalsIgnoreCase(headerKey) || "proxy-authorization".equalsIgnoreCase(headerKey));
     }
 
     private String redactUrlForLogging(String rawUrl) {
@@ -1170,6 +1252,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             boolean downloadSucceeded = false;
 
             try {
+                if (shouldBlockManagedDownload(url)) {
+                    throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(url));
+                }
+
                 URL downloadUrl = new URL(url);
                 connection = (HttpURLConnection) downloadUrl.openConnection();
                 configureDownloadTlsIfNeeded(connection, downloadUrl);
@@ -1369,11 +1455,30 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             BLOB_DOWNLOAD_CHUNK_BYTES
         );
 
-        _webView.post(() -> _webView.evaluateJavascript(script, null));
+        final WebView webView = _webView;
+        webView.post(() -> {
+            if (isDismissing || _webView == null || _webView != webView) {
+                Log.w("InAppBrowser", "Skipping blob download bridge dispatch because the WebView is no longer available");
+                return;
+            }
+
+            webView.evaluateJavascript(script, null);
+        });
     }
 
     private void handleDownloadRequest(String url, String userAgent, String contentDisposition, String mimeType) {
         if (_options == null || !_options.getHandleDownloads() || TextUtils.isEmpty(url)) {
+            return;
+        }
+
+        if (shouldBlockManagedDownload(url)) {
+            showDownloadError(
+                "Blocked download URL",
+                new SecurityException("Download blocked for URL: " + redactUrlForLogging(url)),
+                url,
+                null,
+                mimeType
+            );
             return;
         }
 
