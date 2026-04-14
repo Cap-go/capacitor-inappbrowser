@@ -894,7 +894,11 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
                 captureConsoleLogs: captureConsoleLogs,
                 proxyRequests: legacyProxyRequests.isEnabled,
-                proxySchemeHandler: proxyHandler
+                proxySchemeHandler: proxyHandler,
+                documentStartUserScripts: self.documentStartUserScripts(
+                    authorizedAppLinks: authorizedAppLinks,
+                    openBlankTargetInWebView: openBlankTargetInWebView
+                )
             )
 
             guard let webViewController = self.webViewController else {
@@ -1036,14 +1040,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 print("[DEBUG] No share disclaimer set")
             }
 
-            let mergedPreShowScript = self.mergedPreShowScript(
-                userScript: call.getString("preShowScript"),
-                injectionTime: call.getString("preShowScriptInjectionTime", "pageLoad"),
-                authorizedAppLinks: authorizedAppLinks,
-                openBlankTargetInWebView: openBlankTargetInWebView
-            )
-            webViewController.preShowScript = mergedPreShowScript.script
-            webViewController.preShowScriptInjectionTime = mergedPreShowScript.injectionTime
+            webViewController.preShowScript = call.getString("preShowScript")
+            webViewController.preShowScriptInjectionTime = call.getString("preShowScriptInjectionTime", "pageLoad")
 
             // If script should be injected at document start, inject it now
             if webViewController.preShowScriptInjectionTime == "documentStart" {
@@ -1508,36 +1506,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         """
     }
 
-    private func mergedPreShowScript(
-        userScript: String?,
-        injectionTime: String,
+    private func documentStartUserScripts(
         authorizedAppLinks: [String],
         openBlankTargetInWebView: Bool
-    ) -> (script: String?, injectionTime: String) {
+    ) -> [String] {
         guard openBlankTargetInWebView else {
-            return (userScript, injectionTime)
+            return []
         }
 
-        let interceptorScript = blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks)
-        guard let userScript, !userScript.isEmpty else {
-            return (interceptorScript, "documentStart")
-        }
-
-        if injectionTime == "documentStart" {
-            return (interceptorScript + "\n" + userScript, "documentStart")
-        }
-
-        let deferredUserScript = """
-        window.addEventListener('load', function() {
-          (async function() {
-            \(userScript)
-          })().catch(function(error) {
-            console.error('[InAppBrowser] preShowScript error', error);
-          });
-        });
-        """
-
-        return (interceptorScript + "\n" + deferredUserScript, "documentStart")
+        return [blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks)]
     }
 
     func isHexColorCode(_ input: String) -> Bool {

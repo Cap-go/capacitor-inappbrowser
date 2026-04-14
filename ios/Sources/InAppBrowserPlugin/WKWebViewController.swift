@@ -276,7 +276,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = []) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -292,6 +292,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
         self.setAuthorizedAppLinks(authorizedAppLinks: authorizedAppLinks)
+        self.documentStartUserScripts = documentStartUserScripts
         self.initWebview(isInspectable: isInspectable)
     }
 
@@ -412,6 +413,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var websiteTitleInNavigationBar = true
     open var doneBarButtonItemPosition: NavigationBarPosition = .right
     open var showArrowAsClose = false
+    open var documentStartUserScripts: [String] = []
     open var preShowScript: String?
     open var preShowScriptInjectionTime: String = "pageLoad" // "documentStart" or "pageLoad"
     open var leftNavigationBarItemTypes: [BarButtonItemType] = []
@@ -1039,6 +1041,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             )
             print("[InAppBrowser] Injected preShowScript at document start")
         }
+        for scriptSource in documentStartUserScripts where !scriptSource.isEmpty {
+            userContentController.addUserScript(
+                WKUserScript(
+                    source: scriptSource,
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: false
+                )
+            )
+        }
         userContentController.add(weakHandler, name: "magicPrint")
 
         // Inject JavaScript to override window.print
@@ -1240,6 +1251,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition
         self.showArrowAsClose = parent.showArrowAsClose
+        self.documentStartUserScripts = parent.documentStartUserScripts
         self.preShowScript = parent.preShowScript
         self.preShowScriptInjectionTime = parent.preShowScriptInjectionTime
         self.leftNavigationBarItemTypes = parent.leftNavigationBarItemTypes
