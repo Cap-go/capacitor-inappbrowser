@@ -126,17 +126,22 @@
     originalSubmit.call(form);
   }
   function captureXhrReplayState(xhr) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     return {
       responseType: (_a = xhr.responseType) != null ? _a : "",
       timeout: (_b = xhr.timeout) != null ? _b : 0,
-      withCredentials: (_c = xhr.withCredentials) != null ? _c : false
+      withCredentials: (_c = xhr.withCredentials) != null ? _c : false,
+      overrideMimeType: (_d = xhr.__proxyOverrideMimeType) != null ? _d : null
     };
   }
   function restoreXhrReplayState(xhr, state) {
     xhr.responseType = state.responseType;
     xhr.timeout = state.timeout;
     xhr.withCredentials = state.withCredentials;
+    xhr.__proxyOverrideMimeType = state.overrideMimeType;
+    if (state.overrideMimeType && typeof xhr.overrideMimeType === "function") {
+      xhr.overrideMimeType(state.overrideMimeType);
+    }
   }
 
   // src/proxy-bridge.ts
@@ -447,6 +452,7 @@
     const originalXhrSend = XMLHttpRequest.prototype.send;
     const originalXhrAbort = XMLHttpRequest.prototype.abort;
     const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+    const originalXhrOverrideMimeType = XMLHttpRequest.prototype.overrideMimeType;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
       this.__proxyMethod = method;
       this.__proxyUrl = resolveUrl(url instanceof URL ? url.toString() : url);
@@ -456,6 +462,7 @@
       this.__proxyUsername = typeof rest[1] === "string" ? rest[1] : null;
       this.__proxyPassword = typeof rest[2] === "string" ? rest[2] : "";
       this.__proxyAborted = false;
+      this.__proxyOverrideMimeType = null;
       return originalXhrOpen.apply(this, [method, url, ...rest]);
     };
     XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
@@ -468,6 +475,12 @@
       this.__proxyAborted = true;
       return originalXhrAbort.call(this);
     };
+    if (typeof originalXhrOverrideMimeType === "function") {
+      XMLHttpRequest.prototype.overrideMimeType = function(mimeType) {
+        this.__proxyOverrideMimeType = mimeType;
+        return originalXhrOverrideMimeType.call(this, mimeType);
+      };
+    }
     XMLHttpRequest.prototype.send = function(body) {
       const xhr = this;
       const method = xhr.__proxyMethod || "GET";

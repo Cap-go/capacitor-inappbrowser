@@ -66,11 +66,13 @@ describe('proxy bridge xhr replay helpers', () => {
         responseType: 'arraybuffer',
         timeout: 4500,
         withCredentials: true,
+        __proxyOverrideMimeType: 'text/plain',
       }),
     ).toEqual({
       responseType: 'arraybuffer',
       timeout: 4500,
       withCredentials: true,
+      overrideMimeType: 'text/plain',
     });
   });
 
@@ -79,18 +81,25 @@ describe('proxy bridge xhr replay helpers', () => {
       responseType: '',
       timeout: 0,
       withCredentials: false,
+      __proxyOverrideMimeType: null as string | null,
+      overrideMimeType(mimeType: string) {
+        this.__proxyOverrideMimeType = mimeType;
+      },
     };
 
     restoreXhrReplayState(xhr, {
       responseType: 'blob',
       timeout: 9000,
       withCredentials: true,
+      overrideMimeType: 'application/json',
     });
 
     expect(xhr).toEqual({
       responseType: 'blob',
       timeout: 9000,
       withCredentials: true,
+      __proxyOverrideMimeType: 'application/json',
+      overrideMimeType: xhr.overrideMimeType,
     });
   });
 });

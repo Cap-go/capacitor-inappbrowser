@@ -382,6 +382,7 @@ import {
   const originalXhrSend = XMLHttpRequest.prototype.send;
   const originalXhrAbort = XMLHttpRequest.prototype.abort;
   const originalXhrSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+  const originalXhrOverrideMimeType = XMLHttpRequest.prototype.overrideMimeType;
 
   XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
     (this as any).__proxyMethod = method;
@@ -392,6 +393,7 @@ import {
     (this as any).__proxyUsername = typeof rest[1] === 'string' ? rest[1] : null;
     (this as any).__proxyPassword = typeof rest[2] === 'string' ? rest[2] : '';
     (this as any).__proxyAborted = false;
+    (this as any).__proxyOverrideMimeType = null;
     return originalXhrOpen.apply(this, [method, url, ...rest] as any);
   };
 
@@ -406,6 +408,13 @@ import {
     (this as any).__proxyAborted = true;
     return originalXhrAbort.call(this);
   };
+
+  if (typeof originalXhrOverrideMimeType === 'function') {
+    XMLHttpRequest.prototype.overrideMimeType = function (mimeType: string) {
+      (this as any).__proxyOverrideMimeType = mimeType;
+      return originalXhrOverrideMimeType.call(this, mimeType);
+    };
+  }
 
   XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
     const xhr = this;

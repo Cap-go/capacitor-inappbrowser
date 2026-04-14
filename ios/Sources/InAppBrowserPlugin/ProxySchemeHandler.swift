@@ -130,9 +130,9 @@ enum ProxySchemeRequestSupport {
         }
     }
 
-    static func isMainFrameRequest(_ request: URLRequest) -> Bool {
-        guard let url = request.url else { return false }
-        guard let mainDocumentURL = request.mainDocumentURL else { return true }
+    static func isMainFrameRequest(_ request: URLRequest, fallback: Bool = false) -> Bool {
+        guard let url = request.url else { return fallback }
+        guard let mainDocumentURL = request.mainDocumentURL else { return fallback }
         return mainDocumentURL.absoluteString == url.absoluteString
     }
 
@@ -945,7 +945,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                 method: method,
                 fallback: fallback.base64Body
             ),
-            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(request)
+            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(request, fallback: fallback.isMainFrame)
         )
     }
 

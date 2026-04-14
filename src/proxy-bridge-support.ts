@@ -147,12 +147,15 @@ type XhrReplayStateSource = {
   responseType?: string;
   timeout?: number;
   withCredentials?: boolean;
+  __proxyOverrideMimeType?: string | null;
+  overrideMimeType?: (mime: string) => void;
 };
 
 export type XhrReplayState = {
   responseType: string;
   timeout: number;
   withCredentials: boolean;
+  overrideMimeType: string | null;
 };
 
 export function captureXhrReplayState(xhr: XhrReplayStateSource): XhrReplayState {
@@ -160,6 +163,7 @@ export function captureXhrReplayState(xhr: XhrReplayStateSource): XhrReplayState
     responseType: xhr.responseType ?? '',
     timeout: xhr.timeout ?? 0,
     withCredentials: xhr.withCredentials ?? false,
+    overrideMimeType: xhr.__proxyOverrideMimeType ?? null,
   };
 }
 
@@ -167,4 +171,8 @@ export function restoreXhrReplayState(xhr: XhrReplayStateSource, state: XhrRepla
   xhr.responseType = state.responseType;
   xhr.timeout = state.timeout;
   xhr.withCredentials = state.withCredentials;
+  xhr.__proxyOverrideMimeType = state.overrideMimeType;
+  if (state.overrideMimeType && typeof xhr.overrideMimeType === 'function') {
+    xhr.overrideMimeType(state.overrideMimeType);
+  }
 }
