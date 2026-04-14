@@ -3,6 +3,54 @@ import Capacitor
 import WebKit
 import AuthenticationServices
 
+enum ActiveWebViewSupport {
+    static func shouldActivateNewWebView(isHidden: Bool, hasActiveWebView: Bool) -> Bool {
+        !isHidden || !hasActiveWebView
+    }
+
+    static func resolveVisibilityTarget(originatingWebViewId: String?, activeWebViewId: String?) -> String? {
+        originatingWebViewId ?? activeWebViewId
+    }
+}
+
+protocol ProxyRequestLocating {
+    func hasPendingProxyRequest(_ requestId: String) -> Bool
+}
+
+enum ProxyResponseRoutingSupport {
+    enum Resolution<T> {
+        case matched(T)
+        case ambiguous
+        case missing
+    }
+
+    static func resolveTargetHandler<T: ProxyRequestLocating>(
+        webviewId: String?,
+        requestId: String,
+        handlers: [String: T]
+    ) -> Resolution<T> {
+        if let webviewId, !webviewId.isEmpty {
+            guard let handler = handlers[webviewId] else {
+                return .missing
+            }
+            return .matched(handler)
+        }
+
+        var matchedHandler: T?
+        for handler in handlers.values where handler.hasPendingProxyRequest(requestId) {
+            if matchedHandler != nil {
+                return .ambiguous
+            }
+            matchedHandler = handler
+        }
+
+        guard let matchedHandler else {
+            return .missing
+        }
+        return .matched(matchedHandler)
+    }
+}
+
 extension UIColor {
 
     convenience init(hexString: String) {
@@ -29,7 +77,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.5.5"
+    private let pluginVersion: String = "8.5.6"
     public let identifier = "InAppBrowserPlugin"
     public let jsName = "InAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -52,7 +100,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeTopMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -64,11 +113,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var invisibilityMode: InvisibilityMode = .aware
     var webViewController: WKWebViewController?
     private var webViewControllers: [String: WKWebViewController] = [:]
+    private var proxySchemeHandlers: [String: ProxySchemeHandler] = [:]
     private var webViewStack: [String] = []
     private var activeWebViewId: String?
     private weak var presentationContainerView: UIView?
     private var presentationContainerWasInteractive = true
     private var presentationContainerPreviousAlpha: CGFloat = 1
+    private var hiddenWebViewContainers: [ObjectIdentifier: UIView] = [:]
     private var closeModalTitle: String?
     private var closeModalDescription: String?
     private var closeModalOk: String?
@@ -87,17 +138,33 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         #endif
     }
 
-    private func registerWebView(id: String, webView: WKWebViewController, navigationController: UINavigationController) {
-        webViewControllers[id] = webView
-        navigationControllers[id] = navigationController
-        webViewStack.removeAll { $0 == id }
-        webViewStack.append(id)
+    private func setActiveWebView(id: String, webView: WKWebViewController, navigationController: UINavigationController) {
         activeWebViewId = id
         self.webViewController = webView
         self.navigationWebViewController = navigationController
     }
 
+    private func registerWebView(
+        id: String,
+        webView: WKWebViewController,
+        navigationController: UINavigationController,
+        makeActive: Bool = true
+    ) {
+        webViewControllers[id] = webView
+        navigationControllers[id] = navigationController
+        webViewStack.removeAll { $0 == id }
+        webViewStack.append(id)
+        if makeActive || activeWebViewId == nil || self.webViewController == nil || self.navigationWebViewController == nil {
+            setActiveWebView(id: id, webView: webView, navigationController: navigationController)
+        }
+    }
+
     private func unregisterWebView(id: String) {
+        if let webView = webViewControllers[id]?.capableWebView {
+            cleanupHiddenWebViewContainer(for: webView)
+        }
+        proxySchemeHandlers[id]?.cancelAllPendingTasks()
+        proxySchemeHandlers[id] = nil
         webViewControllers[id] = nil
         navigationControllers[id] = nil
         webViewStack.removeAll { $0 == id }
@@ -111,11 +178,120 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    private func resolveNavigationController(for id: String?) -> UINavigationController? {
+        if let id {
+            return navigationControllers[id]
+        }
+        return navigationWebViewController
+    }
+
+    private func notifyPopupWindowOpened(id: String, parentId: String?, url: String?, visible: Bool) {
+        var event: [String: Any] = [
+            "id": id,
+            "visible": visible
+        ]
+        if let parentId, !parentId.isEmpty {
+            event["parentId"] = parentId
+        }
+        if let url, !url.isEmpty {
+            event["url"] = url
+        }
+        notifyListeners("popupWindowOpened", data: event)
+    }
+
+    private func cloneNavigationAppearance(from source: UINavigationController?, to target: UINavigationController) {
+        guard let source else { return }
+        target.navigationBar.isTranslucent = source.navigationBar.isTranslucent
+        target.toolbar.isTranslucent = source.toolbar.isTranslucent
+        target.navigationBar.tintColor = source.navigationBar.tintColor
+        target.navigationBar.barTintColor = source.navigationBar.barTintColor
+        target.navigationBar.titleTextAttributes = source.navigationBar.titleTextAttributes
+        target.toolbar.tintColor = source.toolbar.tintColor
+
+        if #available(iOS 13.0, *) {
+            target.navigationBar.standardAppearance = source.navigationBar.standardAppearance
+            target.navigationBar.scrollEdgeAppearance = source.navigationBar.scrollEdgeAppearance
+            target.navigationBar.compactAppearance = source.navigationBar.compactAppearance
+            target.navigationBar.compactScrollEdgeAppearance = source.navigationBar.compactScrollEdgeAppearance
+            target.toolbar.standardAppearance = source.toolbar.standardAppearance
+            target.toolbar.compactAppearance = source.toolbar.compactAppearance
+            target.toolbar.scrollEdgeAppearance = source.toolbar.scrollEdgeAppearance
+        } else {
+            target.navigationBar.setBackgroundImage(source.navigationBar.backgroundImage(for: .default), for: .default)
+            target.navigationBar.shadowImage = source.navigationBar.shadowImage
+        }
+    }
+
+    func createManagedPopupWebView(
+        from parentController: WKWebViewController,
+        configuration: WKWebViewConfiguration,
+        navigationAction: WKNavigationAction
+    ) -> WKWebView? {
+        let popupId = UUID().uuidString
+        let shouldHidePopup = parentController.hiddenPopupWindow
+        if let parentWebView = parentController.capableWebView {
+            configuration.processPool = parentWebView.configuration.processPool
+        }
+        if let dataStore = parentController.websiteDataStore() {
+            configuration.websiteDataStore = dataStore
+        }
+
+        let proxyHandler = parentController.proxySchemeHandler?.duplicate(for: popupId)
+        if let proxyHandler {
+            proxySchemeHandlers[popupId] = proxyHandler
+        }
+
+        let popupController = WKWebViewController()
+        guard let popupWebView = popupController.inheritPopupPresentation(
+            from: parentController,
+            request: navigationAction.request,
+            configuration: configuration,
+            instanceId: popupId,
+            proxySchemeHandler: proxyHandler
+        ) else {
+            proxySchemeHandlers[popupId] = nil
+            return nil
+        }
+
+        let navigationController = UINavigationController(rootViewController: popupController)
+        cloneNavigationAppearance(from: parentController.navigationController, to: navigationController)
+        let shouldActivatePopup = ActiveWebViewSupport.shouldActivateNewWebView(
+            isHidden: shouldHidePopup,
+            hasActiveWebView: activeWebViewId != nil
+        )
+        registerWebView(
+            id: popupId,
+            webView: popupController,
+            navigationController: navigationController,
+            makeActive: shouldActivatePopup
+        )
+        if shouldHidePopup {
+            guard attachWebViewToWindow(popupWebView) else {
+                unregisterWebView(id: popupId)
+                return nil
+            }
+        } else {
+            let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
+            presenter?.present(navigationController, animated: true, completion: nil)
+        }
+        notifyPopupWindowOpened(
+            id: popupId,
+            parentId: parentController.instanceId,
+            url: navigationAction.request.url?.absoluteString,
+            visible: !shouldHidePopup
+        )
+        return popupWebView
+    }
+
     private func resolveWebViewController(for id: String?) -> WKWebViewController? {
         if let id {
             return webViewControllers[id]
         }
         return webViewController
+    }
+
+    func cookieStore(for id: String) -> WKHTTPCookieStore? {
+        resolveWebViewController(for: id)?.websiteDataStore()?.httpCookieStore
     }
 
     private func dataStores(for targetId: String?) -> [WKWebsiteDataStore] {
@@ -145,6 +321,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         return stores
     }
 
+    private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
+        try rawRules.enumerated().map { index, item in
+            guard let dictionary = item as? [String: Any] else {
+                throw NSError(
+                    domain: "InAppBrowserPlugin",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Proxy rule at index \(index) must be an object"]
+                )
+            }
+            return try NativeProxyRule.from(dictionary: dictionary)
+        }
+    }
+
     func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
         let resolvedId = webViewId ?? activeWebViewId
         let navigationController = resolvedId.flatMap { navigationControllers[$0] } ?? self.navigationWebViewController
@@ -167,32 +356,92 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             .first { $0.isKeyWindow }
     }
 
+    private func hiddenContainerFrame(in window: UIWindow) -> CGRect {
+        switch self.invisibilityMode {
+        case .aware:
+            return CGRect(
+                x: window.bounds.maxX + 2048,
+                y: window.bounds.maxY + 2048,
+                width: 1,
+                height: 1
+            )
+        case .fakeVisible:
+            return CGRect(
+                x: window.bounds.maxX + 2048,
+                y: 0,
+                width: max(window.bounds.width, 1),
+                height: max(window.bounds.height, 1)
+            )
+        }
+    }
+
+    private func ensureHiddenWebViewContainer(for webView: WKWebView, in window: UIWindow) -> UIView {
+        let key = ObjectIdentifier(webView)
+        let frame = hiddenContainerFrame(in: window)
+
+        if let existingContainer = hiddenWebViewContainers[key] {
+            existingContainer.frame = frame
+            if existingContainer.superview !== window {
+                existingContainer.removeFromSuperview()
+                window.addSubview(existingContainer)
+            }
+            return existingContainer
+        }
+
+        let container = UIView(frame: frame)
+        container.backgroundColor = .clear
+        container.isOpaque = false
+        container.isUserInteractionEnabled = false
+        container.clipsToBounds = true
+        container.accessibilityElementsHidden = true
+        window.addSubview(container)
+        hiddenWebViewContainers[key] = container
+        return container
+    }
+
+    private func cleanupHiddenWebViewContainer(for webView: WKWebView?) {
+        guard let webView else {
+            return
+        }
+
+        let key = ObjectIdentifier(webView)
+        if let container = hiddenWebViewContainers.removeValue(forKey: key) {
+            container.removeFromSuperview()
+        }
+    }
+
     private func attachWebViewToWindow(_ webView: WKWebView) -> Bool {
         guard let window = activeWindow() else {
             return false
         }
 
+        let container = ensureHiddenWebViewContainer(for: webView, in: window)
         webView.removeFromSuperview()
+        webView.translatesAutoresizingMaskIntoConstraints = true
+        webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
         switch self.invisibilityMode {
         case .aware:
-            webView.frame = .zero
+            webView.frame = container.bounds
             webView.alpha = 1
-            webView.isOpaque = true
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
         case .fakeVisible:
-            webView.frame = window.bounds
-            webView.alpha = 0
+            webView.frame = container.bounds
+            webView.alpha = 1
             webView.isOpaque = false
             webView.backgroundColor = .clear
             webView.scrollView.backgroundColor = .clear
         }
 
         webView.isUserInteractionEnabled = false
-        window.addSubview(webView)
+        container.addSubview(webView)
         return true
     }
 
     private func attachWebViewToController(_ webViewController: WKWebViewController, webView: WKWebView) {
+        cleanupHiddenWebViewContainer(for: webView)
         webView.removeFromSuperview()
         webView.translatesAutoresizingMaskIntoConstraints = false
         webViewController.view.addSubview(webView)
@@ -228,6 +477,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        cleanupHiddenWebViewContainer(for: self.webViewController?.capableWebView)
         self.notifyListeners("closeEvent", data: ["url": url])
         self.webViewController = nil
         self.navigationWebViewController = nil
@@ -491,8 +741,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
         let hidden = call.getBool("hidden", false)
         self.isHidden = hidden
+        let hiddenPopupWindow = call.getBool("hiddenPopupWindow", false)
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
         let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
+        let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -589,6 +841,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
+        let legacyProxyRequests = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: call.options["proxyRequests"])
+        let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
+        let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
+        let outboundProxyRules: [NativeProxyRule]
+        let inboundProxyRules: [NativeProxyRule]
+        do {
+            outboundProxyRules = try parseProxyRules(outboundProxyRulesRaw)
+            inboundProxyRules = try parseProxyRules(inboundProxyRulesRaw)
+        } catch {
+            call.reject("Invalid proxy rules: \(error.localizedDescription)")
+            return
+        }
+
         // Validate dimension parameters
         if width != nil && height == nil {
             call.reject("Height must be specified when width is provided")
@@ -599,6 +864,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let url = URL(string: urlString) else {
                 call.reject("Invalid URL format")
                 return
+            }
+
+            var proxyHandler: ProxySchemeHandler?
+            if legacyProxyRequests.isEnabled || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+                proxyHandler = ProxySchemeHandler(
+                    plugin: self,
+                    webviewId: webViewId,
+                    legacyProxyRequests: legacyProxyRequests.isEnabled,
+                    legacyProxyRequestURLRegex: legacyProxyRequests.urlRegex,
+                    outboundRules: outboundProxyRules,
+                    inboundRules: inboundProxyRules
+                )
+                self.proxySchemeHandlers[webViewId] = proxyHandler
             }
 
             self.webViewController = WKWebViewController.init(
@@ -613,7 +891,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 blockedHosts: blockedHosts,
                 authorizedAppLinks: authorizedAppLinks,
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
-                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage
+                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
+                captureConsoleLogs: captureConsoleLogs,
+                proxyRequests: legacyProxyRequests.isEnabled,
+                proxySchemeHandler: proxyHandler
             )
 
             guard let webViewController = self.webViewController else {
@@ -774,6 +1055,9 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             // Set Google Pay support
             webViewController.enableGooglePaySupport = enableGooglePaySupport
+            webViewController.hiddenPopupWindow = hiddenPopupWindow
+            webViewController.opensHidden = hidden
+            webViewController.captureConsoleLogs = captureConsoleLogs
 
             // Set text zoom if specified
             if let textZoom = call.getInt("textZoom") {
@@ -999,18 +1283,20 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
-    private func setHiddenState(_ hidden: Bool, call: CAPPluginCall?) {
+    private func setHiddenState(_ hidden: Bool, targetId: String?, call: CAPPluginCall?) {
         DispatchQueue.main.async {
-            guard let webViewController = self.webViewController,
+            let resolvedId = targetId ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: resolvedId),
                   let webView = webViewController.capableWebView else {
                 call?.reject("WebView is not initialized")
                 return
             }
+            let navigationController = self.resolveNavigationController(for: resolvedId)
 
             self.isHidden = hidden
 
             if hidden {
-                if let navController = self.navigationWebViewController, navController.presentingViewController != nil {
+                if let navController = navigationController, navController.presentingViewController != nil {
                     navController.view.isHidden = true
                     navController.view.isUserInteractionEnabled = false
                     if let containerView = navController.view.superview {
@@ -1033,7 +1319,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.attachWebViewToController(webViewController, webView: webView)
                 }
 
-                if let navController = self.navigationWebViewController {
+                if let navController = navigationController {
+                    if let resolvedId {
+                        self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
+                    }
                     navController.view.isHidden = false
                     navController.view.isUserInteractionEnabled = true
                     if let containerView = self.presentationContainerView {
@@ -1045,7 +1334,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
 
                     if navController.presentingViewController == nil {
-                        self.bridge?.viewController?.present(navController, animated: true, completion: {
+                        let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
+                        presenter?.present(navController, animated: true, completion: {
                             call?.resolve()
                         })
                         return
@@ -1057,16 +1347,23 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    func setHiddenFromJavaScript(_ hidden: Bool) {
-        self.setHiddenState(hidden, call: nil)
+    func setHiddenFromJavaScript(_ hidden: Bool, sourceId: String? = nil) {
+        self.setHiddenState(
+            hidden,
+            targetId: ActiveWebViewSupport.resolveVisibilityTarget(
+                originatingWebViewId: sourceId,
+                activeWebViewId: activeWebViewId
+            ),
+            call: nil
+        )
     }
 
     @objc func hide(_ call: CAPPluginCall) {
-        self.setHiddenState(true, call: call)
+        self.setHiddenState(true, targetId: call.getString("id"), call: call)
     }
 
     @objc func show(_ call: CAPPluginCall) {
-        self.setHiddenState(false, call: call)
+        self.setHiddenState(false, targetId: call.getString("id"), call: call)
     }
 
     @objc func executeScript(_ call: CAPPluginCall) {
@@ -1343,6 +1640,93 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve()
         }
+    }
+
+    @objc func handleProxyRequest(_ call: CAPPluginCall) {
+        guard let requestId = call.getString("requestId") else {
+            call.reject("requestId is required")
+            return
+        }
+
+        let webviewId = call.getString("webviewId")
+        let phase = call.getString("phase")
+        let decisionObj = call.getObject("decision") ?? call.getObject("response")
+
+        let handler: ProxySchemeHandler?
+        switch ProxyResponseRoutingSupport.resolveTargetHandler(
+            webviewId: webviewId,
+            requestId: requestId,
+            handlers: proxySchemeHandlers
+        ) {
+        case .matched(let proxyHandler):
+            handler = proxyHandler
+        case .ambiguous:
+            call.reject("webviewId is required when multiple webviews are open")
+            return
+        case .missing:
+            handler = nil
+        }
+
+        guard let proxyHandler = handler else {
+            if let webviewId,
+               webViewControllers[webviewId] == nil,
+               navigationControllers[webviewId] == nil {
+                print("[InAppBrowser][Proxy] Ignoring late proxy response for closed webview \(webviewId)")
+                call.resolve()
+                return
+            }
+            call.reject("No proxy handler found")
+            return
+        }
+
+        var responseDict: [String: Any]?
+        if let decisionObj = decisionObj {
+            var dict: [String: Any] = [:]
+            if let cancel = decisionObj["cancel"] as? Bool {
+                dict["cancel"] = cancel
+            }
+            if let request = decisionObj["request"] as? JSObject {
+                var requestDict: [String: Any] = [:]
+                requestDict["url"] = request["url"]
+                requestDict["method"] = request["method"]
+                requestDict["body"] = request["body"]
+                if let headers = request["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
+                    }
+                    requestDict["headers"] = headersDict
+                }
+                dict["request"] = requestDict
+            }
+
+            let responsePayload = (decisionObj["response"] as? JSObject) ?? decisionObj
+            if responsePayload["status"] != nil {
+                var responsePayloadDict: [String: Any] = [:]
+                responsePayloadDict["status"] = responsePayload["status"]
+                responsePayloadDict["body"] = responsePayload["body"]
+                if let headers = responsePayload["headers"] as? JSObject {
+                    var headersDict: [String: String] = [:]
+                    for (key, value) in headers {
+                        if let strValue = value as? String {
+                            headersDict[key] = strValue
+                        }
+                    }
+                    responsePayloadDict["headers"] = headersDict
+                }
+                if decisionObj["response"] != nil {
+                    dict["response"] = responsePayloadDict
+                } else {
+                    dict.merge(responsePayloadDict) { _, new in new }
+                }
+            }
+            responseDict = dict
+        }
+
+        proxyHandler.handleResponse(requestId: requestId, phase: phase, responseData: responseDict)
+        call.resolve()
     }
 
     @objc func close(_ call: CAPPluginCall) {

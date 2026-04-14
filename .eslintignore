@@ -2,3 +2,4 @@ build
 dist
 example-app
 docs
+android/src/main/assets/proxy-bridge.js

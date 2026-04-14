@@ -90,6 +90,158 @@ export interface Credentials {
   password: string;
 }
 
+/**
+ * Represents an intercepted HTTP request from the in-app browser webview.
+ *
+ * Request and response bodies are base64-encoded when present.
+ *
+ * @since 8.6.0
+ */
+export interface ProxyRequest {
+  requestId: string;
+  phase: 'outbound' | 'inbound';
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string | null;
+  status?: number;
+  responseHeaders?: Record<string, string>;
+  responseBody?: string | null;
+  webviewId: string;
+}
+
+/**
+ * Response payload returned to native for a proxied request.
+ *
+ * The body must be base64-encoded.
+ *
+ * @since 8.6.0
+ */
+export interface ProxyResponse {
+  body: string;
+  status: number;
+  headers: Record<string, string>;
+}
+
+/**
+ * Request override returned to native for an outbound proxied request.
+ *
+ * The body must be base64-encoded when present.
+ *
+ * @since 8.6.0
+ */
+export interface ProxyRequestOverride {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string | null;
+}
+
+/**
+ * Event emitted when a web page opens a popup/new window.
+ *
+ * @since 8.6.0
+ */
+export interface PopupWindowEvent {
+  /**
+   * Popup webview instance id.
+   */
+  id: string;
+  /**
+   * Parent webview instance id.
+   */
+  parentId?: string;
+  /**
+   * Requested popup URL when available.
+   */
+  url?: string;
+  /**
+   * Whether the popup was presented immediately.
+   */
+  visible: boolean;
+}
+
+/**
+ * Event emitted when JavaScript running inside the managed webview writes to the console.
+ *
+ * Enable this with `captureConsoleLogs: true` when opening the webview.
+ *
+ * @since 8.6.0
+ */
+export interface ConsoleMessageEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  /**
+   * Console method or normalized severity.
+   */
+  level: 'log' | 'info' | 'warn' | 'error' | 'debug' | 'assert' | string;
+  /**
+   * Joined string representation of the console arguments.
+   */
+  message: string;
+  /**
+   * Script URL or page URL when available.
+   */
+  source?: string;
+  /**
+   * 1-based line number when available.
+   */
+  line?: number;
+  /**
+   * 1-based column number when available.
+   */
+  column?: number;
+  /**
+   * Optional subtype for runtime-originated errors on supported platforms.
+   */
+  kind?: string;
+}
+
+/**
+ * Decision returned to native when handling a proxied request.
+ *
+ * @since 8.6.0
+ */
+export interface ProxyDecision {
+  request?: ProxyRequestOverride | null;
+  response?: ProxyResponse | null;
+  cancel?: boolean;
+}
+
+/**
+ * Native-first proxy rule used on Android and iOS.
+ *
+ * Any regex property that is omitted is treated as a wildcard.
+ *
+ * @since 8.6.0
+ */
+export interface NativeProxyRule {
+  id?: string;
+  urlRegex?: string;
+  methodRegex?: string;
+  headerRegex?: string;
+  bodyRegex?: string;
+  statusRegex?: string;
+  responseHeaderRegex?: string;
+  responseBodyRegex?: string;
+  mainFrameOnly?: boolean;
+  action: 'continue' | 'cancel' | 'delegateToJs';
+}
+
+export type ProxyHandlerResult = Response | ProxyResponse | ProxyRequestOverride | ProxyDecision | null;
+
+/**
+ * JavaScript callback used to handle proxied requests.
+ *
+ * Return a `Response`, `ProxyResponse`, `ProxyRequestOverride`, `ProxyDecision`,
+ * or `null` to let native continue unchanged.
+ *
+ * @since 8.6.0
+ */
+export type ProxyHandler = (request: ProxyRequest) => ProxyHandlerResult | Promise<ProxyHandlerResult>;
+
 export interface OpenOptions {
   /**
    * Target URL to load.
@@ -368,6 +520,14 @@ export interface OpenWebViewOptions {
    */
   allowScreenshotsFromWebPage?: boolean;
   /**
+   * Emits `consoleMessage` events for JavaScript `console.*` output coming from the managed page.
+   * Useful when the webview stays hidden and you still need page-level diagnostics.
+   *
+   * @default false
+   * @since 8.6.0
+   */
+  captureConsoleLogs?: boolean;
+  /**
    * Share options for the webview. When provided, shows a disclaimer dialog before sharing content.
    * This is useful for:
    * - Warning users about sharing sensitive information
@@ -582,10 +742,28 @@ export interface OpenWebViewOptions {
    */
   preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
   /**
-   * proxyRequests is a regex expression. Please see [this pr](https://github.com/Cap-go/capacitor-inappbrowser/pull/222) for more info. (Android only)
+   * Proxy interception mode.
+   *
+   * - `true`: legacy blanket mode, delegates all HTTP/HTTPS requests to JavaScript.
+   * - `string`: Android-only regex mode kept for backward compatibility.
+   *
+   * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
+   *
    * @since 6.9.0
    */
-  proxyRequests?: string;
+  proxyRequests?: boolean | string;
+  /**
+   * Native-first outbound proxy rules.
+   *
+   * @since 8.6.0
+   */
+  outboundProxyRules?: NativeProxyRule[];
+  /**
+   * Native-first inbound proxy rules.
+   *
+   * @since 8.6.0
+   */
+  inboundProxyRules?: NativeProxyRule[];
   /**
    * buttonNearDone allows for a creation of a custom button near the done/close button.
    * The button is only shown when toolbarType is not "activity", "navigation", or "blank".
@@ -748,6 +926,18 @@ export interface OpenWebViewOptions {
    * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
    */
   enableGooglePaySupport?: boolean;
+
+  /**
+   * Opens popup windows created by the page in hidden mode.
+   * Hidden popup windows can still be controlled with `executeScript`, `postMessage`, `show`, and `close`.
+   * Listen to `popupWindowOpened` to capture the popup id, then call `show({ id })` only if you want to reveal it.
+   *
+   * @default false
+   * @since 8.6.0
+   * @example
+   * hiddenPopupWindow: true
+   */
+  hiddenPopupWindow?: boolean;
 
   /**
    * blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations.
@@ -913,16 +1103,18 @@ export interface InAppBrowserPlugin {
   /**
    * Hide the webview without closing it.
    * Use show() to bring it back.
+   * When `id` is omitted, targets the active webview.
    *
    * @since 8.0.8
    */
-  hide(): Promise<void>;
+  hide(options?: { id?: string }): Promise<void>;
   /**
    * Show a previously hidden webview.
+   * When `id` is omitted, targets the active webview.
    *
    * @since 8.0.8
    */
-  show(): Promise<void>;
+  show(options?: { id?: string }): Promise<void>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
@@ -1019,6 +1211,46 @@ export interface InAppBrowserPlugin {
     eventName: 'pageLoadError',
     listenerFunc: (event: { id?: string }) => void,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered whenever a page opens a popup/new window.
+   * Use the returned popup id with `executeScript`, `postMessage`, `show`, `hide`, and `close`.
+   *
+   * @since 8.6.0
+   */
+  addListener(
+    eventName: 'popupWindowOpened',
+    listenerFunc: (event: PopupWindowEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Listen for proxied requests delegated by the native runtime.
+   * Prefer `addProxyHandler()` instead of calling this directly.
+   *
+   * @since 8.6.0
+   */
+  addListener(eventName: 'proxyRequest', listenerFunc: (event: ProxyRequest) => void): Promise<PluginListenerHandle>;
+  /**
+   * Listen for JavaScript console output emitted by the managed page.
+   * Enable this with `captureConsoleLogs: true` when opening the webview.
+   *
+   * @since 8.6.0
+   */
+  addListener(
+    eventName: 'consoleMessage',
+    listenerFunc: (event: ConsoleMessageEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Internal method used by `addProxyHandler()` to send a proxy decision back to native.
+   * Forward the original `phase` when replying to a manual `proxyRequest` listener.
+   *
+   * @since 8.6.0
+   */
+  handleProxyRequest(options: {
+    requestId: string;
+    decision?: ProxyDecision | null;
+    response?: ProxyResponse | null;
+    webviewId?: string;
+    phase?: 'outbound' | 'inbound';
+  }): Promise<void>;
   /**
    * Remove all listeners for this plugin.
    *

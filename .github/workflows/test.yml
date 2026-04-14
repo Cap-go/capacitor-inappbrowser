@@ -6,6 +6,7 @@ on:
       - renovate/**
   pull_request:
     branches: [main]
+  workflow_dispatch:
   workflow_call: # Allow this workflow to be called by other workflows
 
 jobs:
@@ -14,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Enforce capacitor-swift-pm version
         run: |
           set -euo pipefail
@@ -22,6 +23,7 @@ jobs:
             echo "Expected capacitor-swift-pm to be pinned to 8.0.0 in Package.swift"
             exit 1
           fi
+
   build_android:
     timeout-minutes: 30
     runs-on: ubuntu-latest
@@ -40,51 +42,78 @@ jobs:
       - name: Build
         id: build_code
         run: bun run verify:android
-  maestro_android:
+
+  maestro_android_proxy_regression:
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: bun i
       - name: Setup java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
         with:
           distribution: 'zulu'
           java-version: '21'
-      - name: Install root dependencies
-        run: bun i
-      - name: Build plugin
-        run: |
-          bun run clean
-          bun run docgen
-          bunx tsc
-          bunx rollup -c rollup.config.mjs
-      - name: Install example app dependencies
-        run: bun i
-        working-directory: example-app
-      - name: Build example app web assets
-        run: bun run build
-        working-directory: example-app
-      - name: Sync Android example app
-        run: bunx cap sync android
-        working-directory: example-app
-      - name: Build Android example app
-        run: ./gradlew assembleDebug
-        working-directory: example-app/android
       - name: Install Maestro CLI
         run: |
-          curl -fsSL https://get.maestro.mobile.dev | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      - name: Verify Maestro CLI
-        run: maestro --version
-      - name: Enable KVM
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Build example app for Android regression flow
+        run: bun run example-app:prepare:android
+      - name: Enable KVM group perms
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Run Maestro flow
-        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
+      - name: Run Maestro proxy regression
+        uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: sh ./scripts/run-android-maestro-with-retry.sh
+
+  maestro_android_blank_target_regression:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: bun i
+      - name: Setup java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build example app for Android blank target flow
+        run: bun run example-app:prepare:android
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Maestro blank target regression
+        uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
         with:
           api-level: 34
           target: google_apis
@@ -95,14 +124,76 @@ jobs:
           script: |
             adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk
             maestro test --format junit --output maestro-report.xml --debug-output maestro-artifacts --flatten-debug-output --env APP_ID=app.capgo.plugin.InappBrowser example-app/.maestro/blank-target-http-stays-in-webview.yaml
-      - name: Upload Maestro artifacts
+      - name: Upload Maestro blank target artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: maestro-android-artifacts
+          name: maestro-android-blank-target-artifacts
           path: |
             maestro-artifacts
             maestro-report.xml
+
+  maestro_ios_proxy_regression:
+    timeout-minutes: 45
+    runs-on: macos-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24
+      - name: Install root dependencies
+        run: bun i
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Build example app for iOS regression flow
+        run: bun run example-app:prepare:ios
+      - name: Select iOS Simulator
+        run: |
+          xcrun simctl shutdown all || true
+          IOS_SIMULATOR_UDID=$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')
+          if [ -z "$IOS_SIMULATOR_UDID" ]; then
+            echo "No available iPhone simulator found"
+            exit 1
+          fi
+          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+      - name: Build and install iOS example app
+        run: |
+          open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
+          xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+          xcodebuild \
+            -project example-app/ios/App/App.xcodeproj \
+            -scheme App \
+            -destination "id=$IOS_SIMULATOR_UDID" \
+            -derivedDataPath example-app/ios/DerivedData \
+            build
+          xcrun simctl install "$IOS_SIMULATOR_UDID" example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+      - name: Run Maestro proxy regression
+        run: |
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
+          for attempt in 1 2; do
+            open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
+            xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
+            xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+            xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+            if $HOME/.maestro/bin/maestro test -e APP_ID=app.capgo.inappbrowser example-app/.maestro/proxy-regression.yaml; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              exit 1
+            fi
+            echo "Maestro iOS run failed. Restarting simulator and retrying once..."
+            xcrun simctl terminate "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+            xcrun simctl shutdown "$IOS_SIMULATOR_UDID" || true
+            sleep 5
+          done
+
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest
@@ -116,6 +207,7 @@ jobs:
       - name: Build
         id: build_code
         run: bun run verify:ios
+
   web:
     timeout-minutes: 30
     runs-on: ubuntu-latest

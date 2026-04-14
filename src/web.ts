@@ -46,18 +46,18 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return code;
   }
 
-  async close(): Promise<any> {
-    console.log('close');
+  async close(options?: { id?: string }): Promise<any> {
+    console.log('close', options);
     return;
   }
 
-  async hide(): Promise<void> {
-    console.log('hide');
+  async hide(options?: { id?: string }): Promise<void> {
+    console.log('hide', options);
     return;
   }
 
-  async show(): Promise<void> {
-    console.log('show');
+  async show(options?: { id?: string }): Promise<void> {
+    console.log('show', options);
     return;
   }
 
@@ -66,8 +66,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
-  async reload(): Promise<any> {
-    console.log('reload');
+  async reload(options?: { id?: string }): Promise<any> {
+    console.log('reload', options);
     return;
   }
   async postMessage(options: Record<string, any>): Promise<any> {
@@ -75,7 +75,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return options;
   }
 
-  async takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
+  async takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
+    console.log('takeScreenshot not supported on web', options);
     throw this.unimplemented('Screenshots are not supported on web.');
   }
 
@@ -94,13 +95,18 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return;
   }
 
-  async setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeTopMargin not supported on web');
+  async handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+    console.log('handleProxyRequest not supported on web', options);
     return;
   }
 
-  async setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeBottomMargin not supported on web');
+  async setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeTopMargin not supported on web', options);
+    return;
+  }
+
+  async setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeBottomMargin not supported on web', options);
     return;
   }
 
@@ -116,7 +122,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       .map((x) => x.join('='))
       .join(',');
 
-    const popup = window.open(options.authEndpoint, 'Authorization', settings)!;
+    const popup = window.open(options.authEndpoint, 'Authorization', settings);
+    if (!popup) {
+      throw new Error('Failed to open secure window');
+    }
     if (typeof popup.focus === 'function') {
       popup.focus();
     }
