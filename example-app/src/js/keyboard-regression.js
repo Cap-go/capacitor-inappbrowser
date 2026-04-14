@@ -28,7 +28,7 @@ function formatMetrics(metrics) {
 }
 
 function buildKeyboardRegressionUrl() {
-  const html = `<!doctype html>
+  const html = String.raw`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -168,9 +168,9 @@ function buildKeyboardRegressionUrl() {
 
           viewportDebug.textContent =
             "innerHeight=" + window.innerHeight +
-            "\\nvisualViewport.height=" + viewportHeight +
-            "\\nvisualViewport.offsetTop=" + viewportOffsetTop +
-            "\\nkeyboardDelta=" + keyboardDelta;
+            "\nvisualViewport.height=" + viewportHeight +
+            "\nvisualViewport.offsetTop=" + viewportOffsetTop +
+            "\nkeyboardDelta=" + keyboardDelta;
 
           postMetrics({
             baselineHeight,
@@ -376,7 +376,7 @@ export function attachKeyboardRegressionHarness() {
 
       run.messageHandle = await InAppBrowser.addListener("messageFromWebview", (event) => {
         const detail = event.detail;
-        if (!detail || detail.type !== "keyboardRegressionMetrics") {
+        if (detail?.type !== "keyboardRegressionMetrics") {
           return;
         }
 
