@@ -787,10 +787,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return "application/octet-stream";
     }
 
-    private boolean shouldPreviewDownloadedFile(String mimeType) {
-        return isTextPreviewMimeType(mimeType);
-    }
-
     private boolean isTextPreviewMimeType(String mimeType) {
         if (TextUtils.isEmpty(mimeType)) {
             return false;
@@ -1180,43 +1176,33 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        if (isTextPreviewMimeType(mimeType)) {
-            if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
-                Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
-                openDownloadedFile(file, mimeType, sourceUrl);
-                return;
-            }
-
-            executorService.execute(() -> {
-                try {
-                    String previewHtml = textPreviewHtml(file, readUtf8File(file));
-                    mainHandler.post(() -> {
-                        if (isDismissing || _webView == null || _webView != webView) {
-                            openDownloadedFile(file, mimeType, sourceUrl);
-                            return;
-                        }
-
-                        webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
-                        notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
-                    });
-                } catch (IOException ioException) {
-                    showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType);
-                }
-            });
-            return;
-        }
-
-        String fileUrl = Uri.fromFile(file).toString();
-        if (_options != null) {
-            _options.setUrl(fileUrl);
-        }
-        if (isDismissing || _webView == null || _webView != webView) {
+        if (!isTextPreviewMimeType(mimeType)) {
             openDownloadedFile(file, mimeType, sourceUrl);
             return;
         }
 
-        webView.loadUrl(fileUrl);
-        notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
+        if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
+            Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
+            openDownloadedFile(file, mimeType, sourceUrl);
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                String previewHtml = textPreviewHtml(file, readUtf8File(file));
+                mainHandler.post(() -> {
+                    if (isDismissing || _webView == null || _webView != webView) {
+                        openDownloadedFile(file, mimeType, sourceUrl);
+                        return;
+                    }
+
+                    webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
+                    notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
+                });
+            } catch (IOException ioException) {
+                showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType);
+            }
+        });
     }
 
     private void openDownloadedFile(File file, String mimeType, String sourceUrl) {
@@ -1236,7 +1222,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     private void finalizeDownload(File outputFile, String mimeType, String sourceUrl) {
         mainHandler.post(() -> {
-            if (shouldPreviewDownloadedFile(mimeType) && _webView != null) {
+            if (isTextPreviewMimeType(mimeType) && _webView != null) {
                 previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
                 return;
             }

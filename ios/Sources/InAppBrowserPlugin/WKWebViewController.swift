@@ -547,6 +547,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func shouldPreviewDownloadedFile(_ fileURL: URL, mimeType: String?) -> Bool {
+        let activeExtensions: Set<String> = ["html", "htm", "xhtml", "svg"]
+        if activeExtensions.contains(fileURL.pathExtension.lowercased()) {
+            return false
+        }
+
         guard let normalizedMimeType = normalizedMimeType(mimeType, fileURL: fileURL) else {
             return false
         }
