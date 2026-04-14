@@ -335,6 +335,7 @@ public class ProxyRequestSupportTest {
     @Test
     public void shouldLetWebViewHandleMissingBodyForOriginalMutatingRequests() {
         assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "POST", ""));
+        assertTrue(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "DELETE", ""));
         assertFalse(ProxyRequestSupport.shouldLetWebViewHandleMissingBody("https://example.com/login", "GET", ""));
         assertFalse(
             ProxyRequestSupport.shouldLetWebViewHandleMissingBody(

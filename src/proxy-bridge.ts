@@ -70,10 +70,17 @@ import {
     return 'same-origin';
   }
 
+  function getDocumentBaseUrl(): string {
+    if (typeof document !== 'undefined' && typeof document.baseURI === 'string' && document.baseURI) {
+      return document.baseURI;
+    }
+    return window.location.href;
+  }
+
   function resolveUrl(url: string): string {
     if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//)) {
       try {
-        return new URL(url, window.location.href).href;
+        return new URL(url, getDocumentBaseUrl()).href;
       } catch (_error) {
         return url;
       }
@@ -178,7 +185,7 @@ import {
   }
 
   function appendFormDataToUrl(url: string, formData: FormData): string {
-    const resolvedUrl = new URL(url, window.location.href);
+    const resolvedUrl = new URL(url, getDocumentBaseUrl());
     const searchParams = new URLSearchParams(resolvedUrl.search);
 
     formData.forEach((value, key) => {
@@ -211,7 +218,7 @@ import {
 
   function resolveFormAction(form: HTMLFormElement, submitter?: Element | null): string {
     return resolveUrl(
-      getSubmitterAttribute(submitter, 'formaction') || form.getAttribute('action') || window.location.href,
+      getSubmitterAttribute(submitter, 'formaction') || form.getAttribute('action') || getDocumentBaseUrl(),
     );
   }
 
@@ -282,7 +289,7 @@ import {
       }
     }
 
-    if (!shouldProxyBridgeUrl(requestUrl, window.location.href, proxyRequestPattern)) {
+    if (!shouldProxyBridgeUrl(requestUrl, getDocumentBaseUrl(), proxyRequestPattern)) {
       return false;
     }
 
@@ -352,7 +359,7 @@ import {
       return originalFetch.call(window, input, init);
     }
 
-    if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
+    if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
       return originalFetch.call(window, input, init);
     }
 
@@ -423,7 +430,7 @@ import {
       originalXhrSend.call(xhr, null);
     }
 
-    if (!shouldProxyBridgeUrl(url, window.location.href, proxyRequestPattern)) {
+    if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
       originalXhrSend.call(xhr, body ?? null);
       return;
     }
@@ -469,7 +476,7 @@ import {
         event.defaultPrevented,
         canProxyFormTarget(target),
         requestUrl,
-        window.location.href,
+        getDocumentBaseUrl(),
         proxyRequestPattern,
       )
     ) {

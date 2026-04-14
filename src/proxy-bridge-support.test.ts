@@ -151,6 +151,12 @@ describe('proxy bridge url helpers', () => {
     );
   });
 
+  it('resolves relative urls against the active document base url', () => {
+    expect(resolveProxyBridgeUrl('api/private', 'https://cdn.example.com/app/index.html')).toBe(
+      'https://cdn.example.com/app/api/private',
+    );
+  });
+
   it('skips non-http urls and regex misses', () => {
     expect(shouldProxyBridgeUrl('mailto:test@example.com', 'https://www.grailed.com', null)).toBe(false);
     expect(

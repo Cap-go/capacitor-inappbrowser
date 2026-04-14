@@ -425,8 +425,7 @@ final class ProxyRequestSupport {
     }
 
     private static boolean requiresCapturedRequestBody(String method) {
-        String normalizedMethod = normalizeMethod(method);
-        return "POST".equals(normalizedMethod) || "PUT".equals(normalizedMethod) || "PATCH".equals(normalizedMethod);
+        return !shouldDropRequestBody(method);
     }
 
     private static boolean shouldDropRequestBody(String method) {
