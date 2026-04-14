@@ -485,6 +485,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let closeModalURLPattern = call.getString("closeModalURLPattern")
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
+        let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
@@ -621,6 +622,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.instanceId = webViewId
+            webViewController.openBlankTargetInWebView = openBlankTargetInWebView
 
             // Set HTTP method and body if provided
             if let method = httpMethod {

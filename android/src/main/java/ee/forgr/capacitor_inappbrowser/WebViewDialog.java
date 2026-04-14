@@ -527,10 +527,9 @@ public class WebViewDialog extends Dialog {
             _webView.getSettings().setDisplayZoomControls(false);
         }
 
-        // Open links in external browser for target="_blank" if preventDeepLink is false
-        if (!_options.getPreventDeeplink()) {
-            _webView.getSettings().setSupportMultipleWindows(true);
-        }
+        // Keep multiple windows enabled so target="_blank" navigations can be
+        // routed either back into this WebView or to external apps as needed.
+        _webView.getSettings().setSupportMultipleWindows(true);
 
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
@@ -942,14 +941,23 @@ public class WebViewDialog extends Dialog {
                             ", GooglePaySupport: " +
                             _options.getEnableGooglePaySupport() +
                             ", preventDeeplink: " +
-                            _options.getPreventDeeplink()
+                            _options.getPreventDeeplink() +
+                            ", openBlankTargetInWebView: " +
+                            _options.getOpenBlankTargetInWebView()
                     );
+
+                    WebView.HitTestResult result = view.getHitTestResult();
+                    String data = result != null ? result.getExtra() : null;
+
+                    if (shouldLoadBlankTargetInCurrentWebView(data)) {
+                        Log.d("InAppBrowser", "Loading target=_blank link in current WebView: " + data);
+                        view.post(() -> _webView.loadUrl(data));
+                        return false;
+                    }
 
                     // When preventDeeplink is false, open target="_blank" links externally
                     if (!_options.getPreventDeeplink() && isUserGesture) {
                         try {
-                            WebView.HitTestResult result = view.getHitTestResult();
-                            String data = result.getExtra();
                             if (data != null && !data.isEmpty()) {
                                 Log.d("InAppBrowser", "Opening target=_blank link externally: " + data);
                                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
@@ -2513,6 +2521,46 @@ public class WebViewDialog extends Dialog {
         webResourceResponse.setStatusCodeAndReasonPhrase(code, getReasonPhrase(code));
         proxiedRequest.response = webResourceResponse;
         proxiedRequest.semaphore.release();
+    }
+
+    private boolean isHttpOrHttpsUrl(String url) {
+        return url != null && (url.startsWith("https://") || url.startsWith("http://"));
+    }
+
+    private boolean isAuthorizedAppLink(String url, List<String> authorizedLinks) {
+        if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
+            return false;
+        }
+        try {
+            URI uri = new URI(url);
+            String urlHost = uri.getHost();
+            if (urlHost == null) return false;
+            if (urlHost.startsWith("www.")) urlHost = urlHost.substring(4);
+            for (String authorized : authorizedLinks) {
+                URI authUri = new URI(authorized);
+                String authHost = authUri.getHost();
+                if (authHost == null) continue;
+                if (authHost.startsWith("www.")) authHost = authHost.substring(4);
+                if (urlHost.equalsIgnoreCase(authHost)) {
+                    return true;
+                }
+            }
+        } catch (URISyntaxException e) {
+            Log.e("InAppBrowser", "Invalid URI in authorized app link check: " + url, e);
+        }
+        return false;
+    }
+
+    private boolean shouldLoadBlankTargetInCurrentWebView(String url) {
+        if (!isHttpOrHttpsUrl(url)) {
+            return false;
+        }
+
+        if (isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
+            return false;
+        }
+
+        return _options.getPreventDeeplink() || _options.getOpenBlankTargetInWebView();
     }
 
     private void setWebViewClient() {

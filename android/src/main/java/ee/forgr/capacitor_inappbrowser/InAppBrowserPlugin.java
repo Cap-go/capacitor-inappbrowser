@@ -640,6 +640,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setShareSubject(call.getString("shareSubject", null));
         options.setToolbarType(call.getString("toolbarType", ""));
         options.setPreventDeeplink(Boolean.TRUE.equals(call.getBoolean("preventDeeplink", false)));
+        options.setOpenBlankTargetInWebView(Boolean.TRUE.equals(call.getBoolean("openBlankTargetInWebView", false)));
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if (call.getData().has("preShowScript") && !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))) {

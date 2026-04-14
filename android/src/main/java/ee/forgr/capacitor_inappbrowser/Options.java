@@ -175,6 +175,7 @@ public class Options {
     private boolean materialPicker = false;
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
+    private boolean openBlankTargetInWebView = false;
     private List<String> authorizedAppLinks = new ArrayList<>();
     private boolean enabledSafeBottomMargin = false;
     private boolean enabledSafeTopMargin = true;
@@ -514,6 +515,14 @@ public class Options {
 
     public void setPreventDeeplink(boolean preventDeeplink) {
         this.preventDeeplink = preventDeeplink;
+    }
+
+    public boolean getOpenBlankTargetInWebView() {
+        return openBlankTargetInWebView;
+    }
+
+    public void setOpenBlankTargetInWebView(boolean openBlankTargetInWebView) {
+        this.openBlankTargetInWebView = openBlankTargetInWebView;
     }
 
     public List<String> getAuthorizedAppLinks() {

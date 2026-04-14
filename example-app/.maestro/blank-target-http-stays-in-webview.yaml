@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: Blank target HTTPS links stay in the current webview
+androidWebViewHierarchy: devtools
+---
+- launchApp:
+    clearState: true
+- assertVisible: "InAppBrowser Test App"
+- tapOn: "Open Blank Target HTTPS Test"
+- assertVisible: "Target Blank Test Page"
+- tapOn: "Open Example Domain"
+- assertVisible:
+    text: "Example Domain"
+    timeout: 15000
+- back
+- tapOn:
+    text: "Navigate up"
+    optional: true
+    label: "Close the plugin webview if an external browser opened first"
+- assertVisible: "internal navigation confirmed"
+- assertVisible: "https://example.com/#blank-target-webview"

@@ -5,8 +5,8 @@ on:
     branches:
       - renovate/**
   pull_request:
-    branches: [ main ]
-  workflow_call:  # Allow this workflow to be called by other workflows
+    branches: [main]
+  workflow_call: # Allow this workflow to be called by other workflows
 
 jobs:
   guard_swiftpm_version:
@@ -40,6 +40,69 @@ jobs:
       - name: Build
         id: build_code
         run: bun run verify:android
+  maestro_android:
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+      - name: Setup java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - name: Install root dependencies
+        run: bun i
+      - name: Build plugin
+        run: |
+          bun run clean
+          bun run docgen
+          bunx tsc
+          bunx rollup -c rollup.config.mjs
+      - name: Install example app dependencies
+        run: bun i
+        working-directory: example-app
+      - name: Build example app web assets
+        run: bun run build
+        working-directory: example-app
+      - name: Sync Android example app
+        run: bunx cap sync android
+        working-directory: example-app
+      - name: Build Android example app
+        run: ./gradlew assembleDebug
+        working-directory: example-app/android
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Verify Maestro CLI
+        run: maestro --version
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Maestro flow
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb install -r example-app/android/app/build/outputs/apk/debug/app-debug.apk
+            maestro test --format junit --output maestro-report.xml --debug-output maestro-artifacts --flatten-debug-output --env APP_ID=app.capgo.plugin.InappBrowser example-app/.maestro/blank-target-http-stays-in-webview.yaml
+      - name: Upload Maestro artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-android-artifacts
+          path: |
+            maestro-artifacts
+            maestro-report.xml
   build_ios:
     timeout-minutes: 30
     runs-on: macOS-latest

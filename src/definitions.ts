@@ -669,6 +669,18 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
+   * When true, HTTP and HTTPS links opened from `target="_blank"` anchors stay inside the current webview instead of opening in the system browser.
+   * This preserves the current webview cookie/session context for popup-style links while still allowing custom schemes such as `tel:` and `mailto:` to use their native handlers.
+   * Authorized app links continue to prefer their native applications.
+   *
+   * @since 8.5.6
+   * @default false
+   * @example
+   * openBlankTargetInWebView: true
+   */
+  openBlankTargetInWebView?: boolean;
+
+  /**
    * List of base URLs whose hosts are treated as authorized App Links (Android) and Universal Links (iOS).
    *
    * - On both platforms, only HTTPS links whose host matches any entry in this list

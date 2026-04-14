@@ -122,6 +122,19 @@ window.customElements.define(
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
         <hr />
+        <h2>Target Blank Test</h2>
+        <p>
+          Open a deterministic target="_blank" HTTPS test page inside the plugin and verify that the linked page stays inside the current webview.
+        </p>
+        <p>
+          <button class="button" id="open-blank-target-test" style="background-color: #0f766e;">Open Blank Target HTTPS Test</button>
+        </p>
+        <div id="blank-target-test-status" style="margin-top: 10px; padding: 10px; background-color: #ecfeff; border-radius: 5px; font-size: 0.8em; color: #134e4a;">
+          <div><strong>Blank target test status:</strong> <span id="blank-target-status-text">Idle</span></div>
+          <div><strong>Blank target test result:</strong> <span id="blank-target-result-text">not run</span></div>
+          <div><strong>Blank target last URL:</strong> <span id="blank-target-last-url-text">none</span></div>
+        </div>
+        <hr />
         <h2>In-App Browser Demo</h2>
         <p>
           Open the Capacitor InAppBrowser plugin documentation in an in-app browser.
@@ -208,6 +221,115 @@ window.customElements.define(
           return url.protocol === 'http:' || url.protocol === 'https:';
         } catch (_) {
           return false;
+        }
+      }
+
+      const blankTargetExpectedUrl = "https://example.com/#blank-target-webview";
+      const blankTargetTestHtml = `
+        <!doctype html>
+        <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>Target Blank Test Page</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                padding: 24px;
+                line-height: 1.5;
+                color: #0f172a;
+                background: #f8fafc;
+              }
+              a {
+                display: inline-block;
+                margin-top: 16px;
+                padding: 12px 16px;
+                border-radius: 999px;
+                background: #0f766e;
+                color: white;
+                text-decoration: none;
+                font-weight: 600;
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Target Blank Test Page</h1>
+            <p>This link should open inside the current InAppBrowser webview.</p>
+            <a href="${blankTargetExpectedUrl}" target="_blank" rel="noopener noreferrer">Open Example Domain</a>
+          </body>
+        </html>
+      `;
+      const blankTargetTestUrl = `data:text/html;charset=utf-8,${encodeURIComponent(blankTargetTestHtml)}`;
+      const blankTargetStatusText = self.shadowRoot.querySelector("#blank-target-status-text");
+      const blankTargetResultText = self.shadowRoot.querySelector("#blank-target-result-text");
+      const blankTargetLastUrlText = self.shadowRoot.querySelector("#blank-target-last-url-text");
+      let blankTargetTestActive = false;
+
+      function setBlankTargetState({ status, result, lastUrl }) {
+        blankTargetStatusText.textContent = status;
+        blankTargetResultText.textContent = result;
+        blankTargetLastUrlText.textContent = lastUrl;
+      }
+
+      setBlankTargetState({
+        status: "Idle",
+        result: "not run",
+        lastUrl: "none",
+      });
+
+      InAppBrowser.addListener("urlChangeEvent", (result) => {
+        if (!blankTargetTestActive) {
+          return;
+        }
+
+        setBlankTargetState({
+          status: result.url === blankTargetExpectedUrl ? "Linked page loaded" : "Navigating",
+          result: blankTargetResultText.textContent,
+          lastUrl: result.url,
+        });
+      });
+
+      InAppBrowser.addListener("closeEvent", (result) => {
+        if (!blankTargetTestActive) {
+          return;
+        }
+
+        const closedUrl = result.url || "unknown";
+        blankTargetTestActive = false;
+
+        setBlankTargetState({
+          status: "Closed",
+          result:
+            closedUrl === blankTargetExpectedUrl
+              ? "internal navigation confirmed"
+              : `closed on ${closedUrl}`,
+          lastUrl: closedUrl,
+        });
+      });
+
+      InAppBrowser.addListener("pageLoadError", () => {
+        if (!blankTargetTestActive) {
+          return;
+        }
+
+        blankTargetTestActive = false;
+        setBlankTargetState({
+          status: "Page load error",
+          result: "page load error",
+          lastUrl: blankTargetLastUrlText.textContent,
+        });
+      });
+
+      async function loadLocalTestWebappUrl() {
+        try {
+          const localUrlModule = "./url.js";
+          const { url } = await import(/* @vite-ignore */ localUrlModule);
+          return url;
+        } catch (e) {
+          console.warn(
+            "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
+          );
+          return testWebappUrl;
         }
       }
 
@@ -442,6 +564,39 @@ window.customElements.define(
           }
         });
 
+      self.shadowRoot
+        .querySelector("#open-blank-target-test")
+        .addEventListener("click", async function () {
+          blankTargetTestActive = true;
+          setBlankTargetState({
+            status: "Opening test webview...",
+            result: "waiting for navigation",
+            lastUrl: "none",
+          });
+
+          try {
+            await InAppBrowser.openWebView({
+              url: blankTargetTestUrl,
+              toolbarType: ToolBarType.COMPACT,
+              backgroundColor: BackgroundColor.WHITE,
+              title: "Target Blank Test",
+              visibleTitle: true,
+              showReloadButton: false,
+              activeNativeNavigationForWebview: false,
+              enabledSafeBottomMargin: true,
+              openBlankTargetInWebView: true,
+            });
+          } catch (e) {
+            blankTargetTestActive = false;
+            console.error("Error opening blank target test:", e);
+            setBlankTargetState({
+              status: "Error",
+              result: e.message,
+              lastUrl: "none",
+            });
+          }
+        });
+
       // Add Enter key support for the input field
       self.shadowRoot
         .querySelector("#custom-url-input")
@@ -595,16 +750,7 @@ window.customElements.define(
         .querySelector("#open-test-webapp")
         .addEventListener("click", async function (e) {
           try {
-            // Try to load custom URL configuration
-            let urlToUse = testWebappUrl;
-            try {
-              const { url } = await import("./url.js");
-              urlToUse = url;
-            } catch (e) {
-              console.warn(
-                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
-              );
-            }
+            const urlToUse = await loadLocalTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,
@@ -836,16 +982,7 @@ window.customElements.define(
         .querySelector("#open-test-webapp-activity")
         .addEventListener("click", async function (e) {
           try {
-            // Try to load custom URL configuration
-            let urlToUse = testWebappUrl;
-            try {
-              const { url } = await import("./url.js");
-              urlToUse = url;
-            } catch (e) {
-              console.warn(
-                "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
-              );
-            }
+            const urlToUse = await loadLocalTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,
