@@ -5,7 +5,14 @@ androidWebViewHierarchy: devtools
 - launchApp:
     clearState: true
 - assertVisible: "InAppBrowser Test App"
-- tapOn: "Open Blank Target HTTPS Test"
+- scrollUntilVisible:
+    element: "Open Blank Target HTTPS Test"
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn:
+    text: "Open Blank Target HTTPS Test"
+    retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
 - tapOn: "Open Example Domain"
 - extendedWaitUntil:
