@@ -831,8 +831,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
-        webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+        // Required for bundled/local HTML content loaded inside this isolated WKWebView configuration.
+        webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs") // NOSONAR
+        webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs") // NOSONAR
 
         // Enable background task processing
         webConfiguration.processPool = WKProcessPool()

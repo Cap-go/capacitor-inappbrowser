@@ -27,13 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       - name: Install dependencies
         id: install_code
         run: bun i
       - name: Setup java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
         with:
           distribution: 'zulu'
           java-version: '21'
@@ -45,10 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       - name: Setup java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
         with:
           distribution: 'zulu'
           java-version: '21'
@@ -84,7 +84,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run Maestro flow
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
         with:
           api-level: 34
           target: google_apis
@@ -97,7 +97,7 @@ jobs:
             maestro test --format junit --output maestro-report.xml --debug-output maestro-artifacts --flatten-debug-output --env APP_ID=app.capgo.plugin.InappBrowser example-app/.maestro/blank-target-http-stays-in-webview.yaml
       - name: Upload Maestro artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: maestro-android-artifacts
           path: |
@@ -108,8 +108,8 @@ jobs:
     runs-on: macOS-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       - name: Install dependencies
         id: install_code
         run: bun i
@@ -122,8 +122,8 @@ jobs:
     name: 'Build code and test'
     steps:
       - name: Check out
-        uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       - name: Install dependencies
         id: install_code
         run: bun i
