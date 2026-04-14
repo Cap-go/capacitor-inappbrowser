@@ -4,6 +4,7 @@ const KEYBOARD_OPEN_THRESHOLD_PX = 120;
 const KEYBOARD_RESTORE_TOLERANCE_PX = 32;
 const FINAL_MEASUREMENT_DELAY_MS = 800;
 const VIEWPORT_POLL_INTERVAL_MS = 100;
+const RUN_TIMEOUT_MS = 20_000;
 
 let harnessAttached = false;
 let harnessAttachPending = false;
@@ -313,17 +314,67 @@ export function attachKeyboardRegressionHarness() {
     }
   };
 
+  const cleanupRun = async (run) => {
+    if (run.pollId !== null) {
+      window.clearInterval(run.pollId);
+      run.pollId = null;
+    }
+
+    if (run.timeoutId !== null) {
+      window.clearTimeout(run.timeoutId);
+      run.timeoutId = null;
+    }
+
+    await removeHandle(run.closeHandle);
+    run.closeHandle = null;
+
+    await removeHandle(run.pageLoadedHandle);
+    run.pageLoadedHandle = null;
+
+    await removeHandle(run.messageHandle);
+    run.messageHandle = null;
+  };
+
+  const failRun = async (run, reason, closeBrowser = false) => {
+    if (currentRun !== run) {
+      return;
+    }
+
+    currentRun = null;
+    await cleanupRun(run);
+
+    if (closeBrowser) {
+      try {
+        await InAppBrowser.close();
+      } catch (error) {
+        console.warn("Unable to close timed out keyboard regression run:", error);
+      }
+    }
+
+    const finalMetrics = getViewportMetrics();
+    const detailLines = [
+      reason,
+      "",
+      `Host metrics: ${formatMetrics(finalMetrics)}`,
+      "",
+      `Page baseline height: ${run.pageBaselineHeight ?? "n/a"}px`,
+      `Page minimum height: ${run.pageMinHeight ?? "n/a"}px`,
+      `Page current height: ${run.pageCurrentHeight ?? "n/a"}px`,
+      `Page reported keyboard open: ${run.pageKeyboardOpened}`,
+    ];
+
+    setStatus("Keyboard regression failed", detailLines.join("\n"));
+    runButton.disabled = false;
+    syncMaestroNativeRunning(false);
+  };
+
   const finishRun = async (run) => {
     if (currentRun !== run) {
       return;
     }
 
     currentRun = null;
-    window.clearInterval(run.pollId);
-
-    await removeHandle(run.closeHandle);
-    await removeHandle(run.pageLoadedHandle);
-    await removeHandle(run.messageHandle);
+    await cleanupRun(run);
 
     await new Promise((resolve) => window.setTimeout(resolve, FINAL_MEASUREMENT_DELAY_MS));
 
@@ -406,6 +457,7 @@ export function attachKeyboardRegressionHarness() {
       minHeight: baselineHeight,
       minMetrics: baselineMetrics,
       pollId: null,
+      timeoutId: null,
       closeHandle: null,
       pageLoadedHandle: null,
       messageHandle: null,
@@ -415,6 +467,10 @@ export function attachKeyboardRegressionHarness() {
       pageKeyboardOpened: false,
     };
     currentRun = run;
+
+    run.timeoutId = window.setTimeout(() => {
+      void failRun(run, "Timed out waiting for the browser to close.", true);
+    }, RUN_TIMEOUT_MS);
 
     run.pollId = window.setInterval(() => {
       const metrics = getViewportMetrics();
@@ -467,12 +523,9 @@ export function attachKeyboardRegressionHarness() {
       });
     } catch (error) {
       currentRun = null;
-      window.clearInterval(run.pollId);
+      await cleanupRun(run);
       runButton.disabled = false;
       syncMaestroNativeRunning(false);
-      await removeHandle(run.closeHandle);
-      await removeHandle(run.pageLoadedHandle);
-      await removeHandle(run.messageHandle);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
       setStatus("Keyboard regression failed to start", errorMessage);
