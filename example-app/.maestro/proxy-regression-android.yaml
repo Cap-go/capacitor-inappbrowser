@@ -1,14 +1,8 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
-    visible: "Proxy Regression Entry"
-    timeout: 60000
-- extendedWaitUntil:
-    visible: "Script loaded"
+    visible: "Proxy regression passed"
     timeout: 120000
 - extendedWaitUntil:
-    visible: "Fetch OK"
-    timeout: 120000
-- extendedWaitUntil:
-    visible: "XHR OK"
+    visible: "Script loaded | Fetch OK | XHR OK"
     timeout: 120000

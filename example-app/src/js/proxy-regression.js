@@ -217,12 +217,11 @@ export function setupProxyRegression(root, options = {}) {
           await finish(
             "Proxy regression passed",
             `${detail.scriptMessage} | ${detail.fetchMessage} | ${detail.xhrMessage}`,
-            false,
           );
           return;
         }
 
-        await finish("Proxy regression failed", detail.reason ?? "Unknown proxy error", false);
+        await finish("Proxy regression failed", detail.reason ?? "Unknown proxy error");
       }),
     );
 

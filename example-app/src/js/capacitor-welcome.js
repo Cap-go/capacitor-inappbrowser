@@ -354,7 +354,9 @@ window.customElements.define(
 
       if (proxyRegressionControls?.run && maestroRunProxyButton) {
         window.__capgoRunMaestroProxy = () => {
-          proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
+          proxyRegressionControls.run({
+            keepBrowserOpenOnFinish: typeof window.MaestroNativeHarness === "undefined",
+          });
         };
         maestroRunProxyButton.addEventListener("click", () => {
           proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
