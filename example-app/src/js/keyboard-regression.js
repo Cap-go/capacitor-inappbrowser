@@ -6,6 +6,53 @@ const FINAL_MEASUREMENT_DELAY_MS = 800;
 const VIEWPORT_POLL_INTERVAL_MS = 100;
 
 let harnessAttached = false;
+let harnessAttachPending = false;
+
+function scheduleHarnessAttachRetry() {
+  if (harnessAttachPending) {
+    return;
+  }
+
+  harnessAttachPending = true;
+  const retry = () => {
+    harnessAttachPending = false;
+    attachKeyboardRegressionHarness();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", retry, { once: true });
+    return;
+  }
+
+  window.requestAnimationFrame(retry);
+}
+
+function withMaestroNativeHarness(callback) {
+  const harness = window.MaestroNativeHarness;
+  if (!harness || typeof callback !== "function") {
+    return;
+  }
+
+  try {
+    callback(harness);
+  } catch (_error) {}
+}
+
+function syncMaestroNativeRunning(running) {
+  withMaestroNativeHarness((harness) => {
+    if (typeof harness.setRunning === "function") {
+      harness.setRunning(Boolean(running));
+    }
+  });
+}
+
+function syncMaestroNativeStatus(message, details = "") {
+  withMaestroNativeHarness((harness) => {
+    if (typeof harness.setStatus === "function") {
+      harness.setStatus(message, details);
+    }
+  });
+}
 
 function getViewportMetrics() {
   const visualViewport = window.visualViewport;
@@ -233,6 +280,7 @@ export function attachKeyboardRegressionHarness() {
   const details = document.getElementById("maestro-keyboard-details");
 
   if (!readyBanner || !runButton || !status || !details) {
+    scheduleHarnessAttachRetry();
     return;
   }
 
@@ -243,6 +291,16 @@ export function attachKeyboardRegressionHarness() {
   const setStatus = (text, detailText = "") => {
     status.textContent = text;
     details.textContent = detailText;
+    syncMaestroNativeStatus(text, detailText);
+
+    if (text === "Not started") {
+      readyBanner.textContent = "Maestro Ready";
+      return;
+    }
+
+    if (text.startsWith("Keyboard regression")) {
+      readyBanner.textContent = text;
+    }
   };
 
   const removeHandle = async (handle) => {
@@ -299,6 +357,7 @@ export function attachKeyboardRegressionHarness() {
     if (keyboardOpened && restored) {
       setStatus("Keyboard regression passed", detailLines.join("\n"));
       runButton.disabled = false;
+      syncMaestroNativeRunning(false);
       return;
     }
 
@@ -308,6 +367,7 @@ export function attachKeyboardRegressionHarness() {
         ["The in-app browser page never reported a keyboard-open state.", "", ...detailLines].join("\n"),
       );
       runButton.disabled = false;
+      syncMaestroNativeRunning(false);
       return;
     }
 
@@ -316,6 +376,7 @@ export function attachKeyboardRegressionHarness() {
       ["The host viewport stayed shrunk after the browser closed.", "", ...detailLines].join("\n"),
     );
     runButton.disabled = false;
+    syncMaestroNativeRunning(false);
   };
 
   readyBanner.textContent = "Maestro Ready";
@@ -335,6 +396,7 @@ export function attachKeyboardRegressionHarness() {
     }
 
     runButton.disabled = true;
+    syncMaestroNativeRunning(true);
     setStatus(
       "Keyboard regression booting",
       `Baseline metrics: ${formatMetrics(baselineMetrics)}\n\nLoading the in-app browser...`,
@@ -409,6 +471,7 @@ export function attachKeyboardRegressionHarness() {
       currentRun = null;
       window.clearInterval(run.pollId);
       runButton.disabled = false;
+      syncMaestroNativeRunning(false);
       await removeHandle(run.closeHandle);
       await removeHandle(run.pageLoadedHandle);
       await removeHandle(run.messageHandle);
