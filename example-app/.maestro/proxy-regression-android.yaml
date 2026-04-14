@@ -1,6 +1,5 @@
 appId: ${APP_ID}
 ---
-- launchApp
 - extendedWaitUntil:
     visible: "Run Proxy Regression (Maestro)"
     timeout: 240000
