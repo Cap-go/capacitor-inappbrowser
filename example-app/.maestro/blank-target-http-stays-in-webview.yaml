@@ -4,7 +4,13 @@ androidWebViewHierarchy: devtools
 ---
 - launchApp:
     clearState: true
-- assertVisible: "InAppBrowser Test App"
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog when it appears"
 - scrollUntilVisible:
     element: "Open Blank Target HTTPS Test"
     direction: DOWN
