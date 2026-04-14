@@ -188,14 +188,12 @@ function buildKeyboardRegressionUrl() {
 
         const postMetrics = (payload) => {
           if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
-            window.mobileApp.postMessage(
-              JSON.stringify({
-                detail: {
-                  type: "keyboardRegressionMetrics",
-                  ...payload,
-                },
-              }),
-            );
+            window.mobileApp.postMessage({
+              detail: {
+                type: "keyboardRegressionMetrics",
+                ...payload,
+              },
+            });
           }
         };
 
