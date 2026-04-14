@@ -414,6 +414,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         return httpResponse.value(forHTTPHeaderField: "Content-Disposition")
     }
 
+    private func attachmentDispositionType(_ response: URLResponse) -> String? {
+        guard let disposition = attachmentDisposition(response)?
+            .split(separator: ";", maxSplits: 1)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+              !disposition.isEmpty else {
+            return nil
+        }
+
+        return disposition
+    }
+
     private func shouldInterceptDownload(for response: WKNavigationResponse) -> Bool {
         guard handleDownloads else {
             return false
@@ -423,11 +436,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return true
         }
 
-        guard let disposition = attachmentDisposition(response.response)?.lowercased() else {
+        guard let disposition = attachmentDispositionType(response.response) else {
             return false
         }
 
-        return disposition.contains("attachment")
+        return disposition == "attachment"
     }
 
     private func sanitizeDownloadFilename(_ suggestedFilename: String) -> String {
@@ -1723,8 +1736,6 @@ public extension WKWebViewController {
     open func cleanupWebView() {
         guard let webView = self.webView else { return }
         webView.stopLoading()
-        downloadStates.values.forEach { releaseDownloadDestination($0.destinationURL) }
-        downloadStates.removeAll()
         previewItemURL = nil
 
         // Remove KVO observers FIRST, before any operation that could trigger them

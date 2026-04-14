@@ -202,6 +202,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
     private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
     private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
+    private static final int MAX_MANAGED_DOWNLOAD_REDIRECTS = 10;
     private static final int BLOB_DOWNLOAD_CHUNK_BYTES = 64 * 1024;
     private static final long MAX_LEGACY_BLOB_DOWNLOAD_BYTES = 512L * 1024L;
     private static final long MAX_INLINE_TEXT_PREVIEW_BYTES = 512L * 1024L;
@@ -628,7 +629,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 if (session == null) {
-                    throw new IOException("Blob download session was not initialized");
+                    Log.w("InAppBrowser", "Ignoring chunk for missing or aborted blob session: " + sessionId);
+                    return;
                 }
 
                 byte[] chunkBytes = Base64.decode(base64, Base64.DEFAULT);
@@ -1169,13 +1171,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         HttpsURLConnection secureConnection = (HttpsURLConnection) connection;
         secureConnection.setSSLSocketFactory(sslContext.getSocketFactory());
-        if (ignoreUntrustedSslError) {
-            secureConnection.setHostnameVerifier((hostname, session) -> true);
-        }
     }
 
     private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
-        if (_webView == null) {
+        WebView webView = _webView;
+        if (webView == null || isDismissing) {
+            openDownloadedFile(file, mimeType, sourceUrl);
             return;
         }
 
@@ -1190,7 +1191,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 try {
                     String previewHtml = textPreviewHtml(file, readUtf8File(file));
                     mainHandler.post(() -> {
-                        _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
+                        if (isDismissing || _webView == null || _webView != webView) {
+                            openDownloadedFile(file, mimeType, sourceUrl);
+                            return;
+                        }
+
+                        webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
                         notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
                     });
                 } catch (IOException ioException) {
@@ -1204,7 +1210,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_options != null) {
             _options.setUrl(fileUrl);
         }
-        _webView.loadUrl(fileUrl);
+        if (isDismissing || _webView == null || _webView != webView) {
+            openDownloadedFile(file, mimeType, sourceUrl);
+            return;
+        }
+
+        webView.loadUrl(fileUrl);
         notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
     }
 
@@ -1244,6 +1255,77 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
     }
 
+    private String currentManagedDownloadPageUrl() {
+        if (_webView != null && !TextUtils.isEmpty(_webView.getUrl())) {
+            return _webView.getUrl();
+        }
+
+        return _options != null ? _options.getUrl() : null;
+    }
+
+    private HttpURLConnection openManagedDownloadConnection(String url, String userAgent, String pageUrl) throws Exception {
+        URL downloadUrl = new URL(url);
+        HttpURLConnection connection = (HttpURLConnection) downloadUrl.openConnection();
+        configureDownloadTlsIfNeeded(connection, downloadUrl);
+        connection.setConnectTimeout(REQUEST_CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(REQUEST_READ_TIMEOUT_MS);
+        connection.setInstanceFollowRedirects(false);
+        connection.setRequestProperty("Accept", "*/*");
+
+        if (!TextUtils.isEmpty(userAgent)) {
+            connection.setRequestProperty("User-Agent", userAgent);
+        }
+
+        String cookie = android.webkit.CookieManager.getInstance().getCookie(url);
+        if (!TextUtils.isEmpty(cookie)) {
+            connection.setRequestProperty("Cookie", cookie);
+        }
+
+        if (!TextUtils.isEmpty(pageUrl)) {
+            connection.setRequestProperty("Referer", pageUrl);
+        }
+
+        if (_options != null && _options.getHeaders() != null) {
+            if (isSameOrigin(pageUrl, url)) {
+                Iterator<String> headerKeys = _options.getHeaders().keys();
+                while (headerKeys.hasNext()) {
+                    String headerKey = headerKeys.next();
+                    if (!shouldForwardCustomDownloadHeader(headerKey)) {
+                        continue;
+                    }
+
+                    String headerValue = _options.getHeaders().getString(headerKey);
+                    if (!TextUtils.isEmpty(headerValue)) {
+                        connection.setRequestProperty(headerKey, headerValue);
+                    }
+                }
+            } else {
+                Log.w("InAppBrowser", "Skipping custom headers for cross-origin download: " + redactUrlForLogging(url));
+            }
+        }
+
+        return connection;
+    }
+
+    private boolean isManagedDownloadRedirect(int responseCode) {
+        return (
+            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+            responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+            responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+            responseCode == 307 ||
+            responseCode == 308
+        );
+    }
+
+    private String resolveManagedDownloadRedirectUrl(HttpURLConnection connection) throws IOException {
+        String location = connection.getHeaderField("Location");
+        if (TextUtils.isEmpty(location)) {
+            throw new IOException("Managed download redirect missing Location header");
+        }
+
+        return new URL(connection.getURL(), location).toString();
+    }
+
     private void downloadUrlToFile(String url, String userAgent, String contentDisposition, String mimeType) {
         executorService.execute(() -> {
             HttpURLConnection connection = null;
@@ -1252,52 +1334,37 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             boolean downloadSucceeded = false;
 
             try {
-                if (shouldBlockManagedDownload(url)) {
-                    throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(url));
-                }
-
-                URL downloadUrl = new URL(url);
-                connection = (HttpURLConnection) downloadUrl.openConnection();
-                configureDownloadTlsIfNeeded(connection, downloadUrl);
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(30000);
-                connection.setInstanceFollowRedirects(true);
-                connection.setRequestProperty("Accept", "*/*");
-
-                if (!TextUtils.isEmpty(userAgent)) {
-                    connection.setRequestProperty("User-Agent", userAgent);
-                }
-
-                String cookie = android.webkit.CookieManager.getInstance().getCookie(url);
-                if (!TextUtils.isEmpty(cookie)) {
-                    connection.setRequestProperty("Cookie", cookie);
-                }
-
-                if (_webView != null && !TextUtils.isEmpty(_webView.getUrl())) {
-                    connection.setRequestProperty("Referer", _webView.getUrl());
-                }
-
-                if (_options != null && _options.getHeaders() != null) {
-                    String pageUrl = _webView != null ? _webView.getUrl() : _options.getUrl();
-                    if (isSameOrigin(pageUrl, url)) {
-                        Iterator<String> headerKeys = _options.getHeaders().keys();
-                        while (headerKeys.hasNext()) {
-                            String headerKey = headerKeys.next();
-                            if (!shouldForwardCustomDownloadHeader(headerKey)) {
-                                continue;
-                            }
-
-                            String headerValue = _options.getHeaders().getString(headerKey);
-                            if (!TextUtils.isEmpty(headerValue)) {
-                                connection.setRequestProperty(headerKey, headerValue);
-                            }
-                        }
-                    } else {
-                        Log.w("InAppBrowser", "Skipping custom headers for cross-origin download: " + redactUrlForLogging(url));
+                String pageUrl = currentManagedDownloadPageUrl();
+                String currentUrl = url;
+                int redirectsFollowed = 0;
+                while (true) {
+                    if (shouldBlockManagedDownload(currentUrl)) {
+                        throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(currentUrl));
                     }
+
+                    connection = openManagedDownloadConnection(currentUrl, userAgent, pageUrl);
+                    connection.connect();
+
+                    int responseCode = connection.getResponseCode();
+                    if (!isManagedDownloadRedirect(responseCode)) {
+                        break;
+                    }
+
+                    if (redirectsFollowed >= MAX_MANAGED_DOWNLOAD_REDIRECTS) {
+                        throw new IOException("Too many managed download redirects for: " + redactUrlForLogging(url));
+                    }
+
+                    String redirectUrl = resolveManagedDownloadRedirectUrl(connection);
+                    if (shouldBlockManagedDownload(redirectUrl)) {
+                        throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(redirectUrl));
+                    }
+
+                    connection.disconnect();
+                    connection = null;
+                    currentUrl = redirectUrl;
+                    redirectsFollowed++;
                 }
 
-                connection.connect();
                 int responseCode = connection.getResponseCode();
                 if (responseCode < 200 || responseCode >= 300) {
                     String responseMessage = connection.getResponseMessage();
