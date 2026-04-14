@@ -198,6 +198,20 @@ enum ProxySchemeRequestSupport {
         return storage.cookies(for: cookieURL) ?? []
     }
 
+    static func resolvedRedirectHeaders(_ headers: [String: String]?, fallback: [String: String]) -> [String: String] {
+        guard let headers else {
+            return [:]
+        }
+        return headers
+    }
+
+    static func resolvedRedirectBody(_ body: String?, method: String, fallback: String?) -> String? {
+        guard supportsRequestBody(method: method) else {
+            return nil
+        }
+        return body ?? fallback
+    }
+
     static func responseCookies(from headers: [String: String], fallback: String) -> [HTTPCookie] {
         guard let cookieURL = URL(string: fallback) else {
             return []
@@ -921,11 +935,16 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     }
 
     private func makeRequestContext(from request: URLRequest, fallback: NativeRequestContext) -> NativeRequestContext {
-        NativeRequestContext(
+        let method = ProxySchemeRequestSupport.normalizedRequestMethod(request.httpMethod)
+        return NativeRequestContext(
             url: request.url?.absoluteString ?? fallback.url,
-            method: ProxySchemeRequestSupport.normalizedRequestMethod(request.httpMethod),
-            headers: request.allHTTPHeaderFields ?? fallback.headers,
-            base64Body: extractBody(from: request),
+            method: method,
+            headers: ProxySchemeRequestSupport.resolvedRedirectHeaders(request.allHTTPHeaderFields, fallback: fallback.headers),
+            base64Body: ProxySchemeRequestSupport.resolvedRedirectBody(
+                extractBody(from: request),
+                method: method,
+                fallback: fallback.base64Body
+            ),
             isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(request)
         )
     }
@@ -1096,8 +1115,16 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             )
         }
     }
+
+    func hasPendingProxyRequest(_ requestId: String) -> Bool {
+        taskLock.lock()
+        defer { taskLock.unlock() }
+        return pendingTasks[requestId] != nil
+    }
 }
 // swiftlint:enable type_body_length
+
+extension ProxySchemeHandler: ProxyRequestLocating {}
 
 extension Data {
     init(reading input: InputStream) {

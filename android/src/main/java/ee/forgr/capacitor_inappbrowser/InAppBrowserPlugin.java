@@ -1312,7 +1312,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             JSONObject object = call.getObject("result");
             if (object != null) {
                 decision = new JSObject();
-                decision.put("response", object);
+                decision.put("response", ProxyRequestSupport.normalizeLegacySyntheticResponse(object));
             }
         }
         handleProxyRequestInternal(call.getString("webviewId"), requestId, decision, call);

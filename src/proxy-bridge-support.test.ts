@@ -3,9 +3,11 @@ import { describe, expect, it } from 'bun:test';
 import {
   appendCapturedHeader,
   captureXhrReplayState,
+  consumeProxySubmitReplayBypass,
   ensureInferredContentType,
   getSubmitEventSubmitter,
   inferContentTypeFromBody,
+  replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
   resolveProxyBridgeUrl,
@@ -141,6 +143,41 @@ describe('proxy bridge submit helpers', () => {
         /accounts\.example\.com/,
       ),
     ).toBe(true);
+  });
+
+  it('replays failed intercepted submits through requestSubmit to preserve submitter semantics', () => {
+    const calls: unknown[] = [];
+    const form = {
+      requestSubmit: (submitter?: unknown) => {
+        calls.push(submitter ?? 'no-submitter');
+      },
+    };
+    const originalSubmit = () => {
+      calls.push('submit');
+    };
+
+    replaySubmitAfterProxyFailure(form, originalSubmit as (this: HTMLFormElement) => void, 'button');
+
+    expect(calls).toEqual(['button']);
+    expect(consumeProxySubmitReplayBypass(form)).toBe(true);
+    expect(consumeProxySubmitReplayBypass(form)).toBe(false);
+  });
+
+  it('falls back to native submit when requestSubmit replay fails', () => {
+    const calls: unknown[] = [];
+    const form = {
+      requestSubmit: () => {
+        throw new Error('bad submitter');
+      },
+    };
+    const originalSubmit = () => {
+      calls.push('submit');
+    };
+
+    replaySubmitAfterProxyFailure(form, originalSubmit as (this: HTMLFormElement) => void, 'button');
+
+    expect(calls).toEqual(['submit']);
+    expect(consumeProxySubmitReplayBypass(form)).toBe(false);
   });
 });
 

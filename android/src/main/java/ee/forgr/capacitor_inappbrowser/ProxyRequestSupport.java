@@ -1,7 +1,9 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import com.getcapacitor.JSObject;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -10,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.json.JSONException;
+import org.json.JSONObject;
 
 final class ProxyRequestSupport {
 
@@ -422,6 +425,90 @@ final class ProxyRequestSupport {
         }
 
         return new ParsedResponseHeaders(responseHeaders, cookieHeaders);
+    }
+
+    static JSObject normalizeLegacySyntheticResponse(JSONObject legacyResponse) {
+        JSObject normalizedResponse = new JSObject();
+        if (legacyResponse == null) {
+            normalizedResponse.put("status", 200);
+            normalizedResponse.put("body", "");
+            return normalizedResponse;
+        }
+
+        normalizedResponse.put(
+            "status",
+            normalizeLegacySyntheticStatus(
+                legacyResponse.has("status") ? legacyResponse.optInt("status") : null,
+                legacyResponse.has("code") ? legacyResponse.optInt("code") : null
+            )
+        );
+        normalizedResponse.put(
+            "body",
+            normalizeLegacySyntheticBody(
+                legacyResponse.opt("body"),
+                legacyResponse.optBoolean("base64Encoded", false) ||
+                    legacyResponse.optBoolean("bodyIsBase64", false) ||
+                    legacyResponse.optBoolean("isBase64", false)
+            )
+        );
+
+        JSONObject headers = legacyResponse.optJSONObject("headers");
+        if (headers != null) {
+            Map<String, Object> normalizedHeaderMap = new LinkedHashMap<>();
+            java.util.Iterator<String> keys = headers.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                Object value = headers.opt(key);
+                normalizedHeaderMap.put(key, value);
+            }
+            JSObject normalizedHeaders = new JSObject();
+            for (Map.Entry<String, String> entry : normalizeLegacyStringMap(normalizedHeaderMap).entrySet()) {
+                normalizedHeaders.put(entry.getKey(), entry.getValue());
+            }
+            normalizedResponse.put("headers", normalizedHeaders);
+        }
+
+        return normalizedResponse;
+    }
+
+    static int normalizeLegacySyntheticStatus(Integer status, Integer code) {
+        if (status != null) {
+            return status;
+        }
+        if (code != null) {
+            return code;
+        }
+        return 200;
+    }
+
+    static String normalizeLegacySyntheticBody(Object rawBody, boolean isBase64Body) {
+        if (rawBody == null || rawBody == JSONObject.NULL) {
+            return "";
+        }
+
+        String normalizedBody = rawBody.toString();
+        if (isBase64Body) {
+            return normalizedBody;
+        }
+        return Base64.getEncoder().encodeToString(normalizedBody.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static Map<String, String> normalizeLegacyStringMap(Map<String, ?> rawMap) {
+        Map<String, String> normalizedMap = new LinkedHashMap<>();
+        if (rawMap == null || rawMap.isEmpty()) {
+            return normalizedMap;
+        }
+
+        for (Map.Entry<String, ?> entry : rawMap.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (key == null || value == null || value == JSONObject.NULL) {
+                continue;
+            }
+            normalizedMap.put(key, value.toString());
+        }
+
+        return normalizedMap;
     }
 
     private static boolean requiresCapturedRequestBody(String method) {

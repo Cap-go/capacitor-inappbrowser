@@ -7,6 +7,48 @@ enum ActiveWebViewSupport {
     static func shouldActivateNewWebView(isHidden: Bool, hasActiveWebView: Bool) -> Bool {
         !isHidden || !hasActiveWebView
     }
+
+    static func resolveVisibilityTarget(originatingWebViewId: String?, activeWebViewId: String?) -> String? {
+        originatingWebViewId ?? activeWebViewId
+    }
+}
+
+protocol ProxyRequestLocating {
+    func hasPendingProxyRequest(_ requestId: String) -> Bool
+}
+
+enum ProxyResponseRoutingSupport {
+    enum Resolution<T> {
+        case matched(T)
+        case ambiguous
+        case missing
+    }
+
+    static func resolveTargetHandler<T: ProxyRequestLocating>(
+        webviewId: String?,
+        requestId: String,
+        handlers: [String: T]
+    ) -> Resolution<T> {
+        if let webviewId, !webviewId.isEmpty {
+            guard let handler = handlers[webviewId] else {
+                return .missing
+            }
+            return .matched(handler)
+        }
+
+        var matchedHandler: T?
+        for handler in handlers.values where handler.hasPendingProxyRequest(requestId) {
+            if matchedHandler != nil {
+                return .ambiguous
+            }
+            matchedHandler = handler
+        }
+
+        guard let matchedHandler else {
+            return .missing
+        }
+        return .matched(matchedHandler)
+    }
 }
 
 extension UIColor {
@@ -1298,8 +1340,15 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    func setHiddenFromJavaScript(_ hidden: Bool) {
-        self.setHiddenState(hidden, targetId: activeWebViewId, call: nil)
+    func setHiddenFromJavaScript(_ hidden: Bool, sourceId: String? = nil) {
+        self.setHiddenState(
+            hidden,
+            targetId: ActiveWebViewSupport.resolveVisibilityTarget(
+                originatingWebViewId: sourceId,
+                activeWebViewId: activeWebViewId
+            ),
+            call: nil
+        )
     }
 
     @objc func hide(_ call: CAPPluginCall) {
@@ -1509,14 +1558,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let phase = call.getString("phase")
         let decisionObj = call.getObject("decision") ?? call.getObject("response")
 
-        var handler: ProxySchemeHandler?
-        if let webviewId = webviewId {
-            handler = proxySchemeHandlers[webviewId]
-        } else if proxySchemeHandlers.count == 1 {
-            handler = proxySchemeHandlers.values.first
-        } else if proxySchemeHandlers.count > 1 {
+        let handler: ProxySchemeHandler?
+        switch ProxyResponseRoutingSupport.resolveTargetHandler(
+            webviewId: webviewId,
+            requestId: requestId,
+            handlers: proxySchemeHandlers
+        ) {
+        case .matched(let proxyHandler):
+            handler = proxyHandler
+        case .ambiguous:
             call.reject("webviewId is required when multiple webviews are open")
             return
+        case .missing:
+            handler = nil
         }
 
         guard let proxyHandler = handler else {

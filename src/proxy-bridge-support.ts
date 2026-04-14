@@ -107,6 +107,42 @@ export function shouldProxySubmitRequest(
   return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
 }
 
+type SubmitReplayForm = {
+  requestSubmit?: (submitter?: unknown) => void;
+  __capgoSkipNextProxySubmit?: boolean;
+};
+
+export function consumeProxySubmitReplayBypass(form: SubmitReplayForm): boolean {
+  if (!form.__capgoSkipNextProxySubmit) {
+    return false;
+  }
+
+  delete form.__capgoSkipNextProxySubmit;
+  return true;
+}
+
+export function replaySubmitAfterProxyFailure(
+  form: SubmitReplayForm,
+  originalSubmit: (this: HTMLFormElement) => void,
+  submitter?: unknown | null,
+): void {
+  if (typeof form.requestSubmit === 'function') {
+    form.__capgoSkipNextProxySubmit = true;
+    try {
+      if (submitter !== null && submitter !== undefined) {
+        form.requestSubmit(submitter);
+      } else {
+        form.requestSubmit();
+      }
+      return;
+    } catch (_error) {
+      delete form.__capgoSkipNextProxySubmit;
+    }
+  }
+
+  originalSubmit.call(form as HTMLFormElement);
+}
+
 type XhrReplayStateSource = {
   responseType?: string;
   timeout?: number;

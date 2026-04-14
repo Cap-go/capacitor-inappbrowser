@@ -406,4 +406,19 @@ public class ProxyRequestSupportTest {
         assertFalse(parsedHeaders.responseHeaders().containsKey("Set-Cookie"));
         assertEquals(List.of("session=abc; Path=/; Secure"), parsedHeaders.cookieHeaders());
     }
+
+    @Test
+    public void normalizeLegacySyntheticResponseMapsCodeAndPlainTextBody() throws Exception {
+        assertEquals(201, ProxyRequestSupport.normalizeLegacySyntheticStatus(null, 201));
+        assertEquals(202, ProxyRequestSupport.normalizeLegacySyntheticStatus(202, 201));
+        assertEquals(
+            java.util.Base64.getEncoder().encodeToString("<html>ok</html>".getBytes(StandardCharsets.UTF_8)),
+            ProxyRequestSupport.normalizeLegacySyntheticBody("<html>ok</html>", false)
+        );
+        assertEquals("<html>ok</html>", ProxyRequestSupport.normalizeLegacySyntheticBody("<html>ok</html>", true));
+        Map<String, Object> rawHeaders = new LinkedHashMap<>();
+        rawHeaders.put("Content-Type", "text/html");
+        rawHeaders.put("Ignored", null);
+        assertEquals(Map.of("Content-Type", "text/html"), ProxyRequestSupport.normalizeLegacyStringMap(rawHeaders));
+    }
 }

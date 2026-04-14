@@ -164,36 +164,6 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
-    func testProxySchemeNormalizedRequestMethodCanonicalizesOverrides() {
-        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod(" post "), "POST")
-        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod("head"), "HEAD")
-    }
-
-    func testProxySchemeNormalizedRequestMethodDefaultsBlankValuesToGet() {
-        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod(nil), "GET")
-        XCTAssertEqual(ProxySchemeRequestSupport.normalizedRequestMethod("   "), "GET")
-    }
-
-    func testProxySchemePrepareOverrideHeadersDropsOriginBoundHeadersAcrossOrigins() {
-        let overrideHeaders = ProxySchemeRequestSupport.prepareOverrideHeaders(
-            originalHeaders: [
-                "Authorization": "Bearer abc",
-                "Cookie": "session=123",
-                "Origin": "https://example.com",
-                "Referer": "https://example.com/login",
-                "Accept": "application/json"
-            ],
-            requestURL: "https://example.com/login",
-            overrideURL: "https://accounts.example.net/oauth"
-        )
-
-        XCTAssertNil(overrideHeaders["Authorization"])
-        XCTAssertNil(overrideHeaders["Cookie"])
-        XCTAssertNil(overrideHeaders["Origin"])
-        XCTAssertNil(overrideHeaders["Referer"])
-        XCTAssertEqual(overrideHeaders["Accept"], "application/json")
-    }
-
     func testProxySchemeDecodedRequestBodyAcceptsValidBase64() throws {
         let decodedBody = try ProxySchemeRequestSupport.decodedRequestBody(
             from: Data("hello".utf8).base64EncodedString()

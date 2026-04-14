@@ -850,12 +850,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             guard allowWebViewJsVisibilityControl else {
                 return
             }
-            capBrowserPlugin?.setHiddenFromJavaScript(true)
+            capBrowserPlugin?.setHiddenFromJavaScript(true, sourceId: instanceId)
         } else if message.name == "show" {
             guard allowWebViewJsVisibilityControl else {
                 return
             }
-            capBrowserPlugin?.setHiddenFromJavaScript(false)
+            capBrowserPlugin?.setHiddenFromJavaScript(false, sourceId: instanceId)
         } else if message.name == "takeScreenshot" {
             guard let body = message.body as? [String: Any],
                   let requestId = body["requestId"] as? String,

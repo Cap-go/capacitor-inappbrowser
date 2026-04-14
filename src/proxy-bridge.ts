@@ -1,8 +1,10 @@
 import {
   appendCapturedHeader,
   captureXhrReplayState,
+  consumeProxySubmitReplayBypass,
   ensureInferredContentType,
   getSubmitEventSubmitter,
+  replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
   shouldProxyBridgeUrl,
@@ -462,6 +464,10 @@ import {
       return;
     }
 
+    if (consumeProxySubmitReplayBypass(form)) {
+      return;
+    }
+
     const submitter = getSubmitEventSubmitter(event as Event & { submitter?: Element | null }) as Element | null;
     const target = resolveFormTarget(form, submitter);
     const method = resolveFormMethod(form, submitter);
@@ -487,12 +493,12 @@ import {
     proxyFormSubmission(form, submitter)
       .then((handled) => {
         if (!handled) {
-          originalFormSubmit.call(form);
+          replaySubmitAfterProxyFailure(form, originalFormSubmit, submitter);
         }
       })
       .catch((error) => {
         console.error('[proxy-bridge] Failed to proxy form submission', error);
-        originalFormSubmit.call(form);
+        replaySubmitAfterProxyFailure(form, originalFormSubmit, submitter);
       });
   });
 

@@ -102,6 +102,29 @@
   function shouldProxySubmitRequest(defaultPrevented, canProxyTarget, rawUrl, baseUrl, urlRegex) {
     return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
   }
+  function consumeProxySubmitReplayBypass(form) {
+    if (!form.__capgoSkipNextProxySubmit) {
+      return false;
+    }
+    delete form.__capgoSkipNextProxySubmit;
+    return true;
+  }
+  function replaySubmitAfterProxyFailure(form, originalSubmit, submitter) {
+    if (typeof form.requestSubmit === "function") {
+      form.__capgoSkipNextProxySubmit = true;
+      try {
+        if (submitter !== null && submitter !== void 0) {
+          form.requestSubmit(submitter);
+        } else {
+          form.requestSubmit();
+        }
+        return;
+      } catch (_error) {
+        delete form.__capgoSkipNextProxySubmit;
+      }
+    }
+    originalSubmit.call(form);
+  }
   function captureXhrReplayState(xhr) {
     var _a, _b, _c;
     return {
@@ -491,6 +514,9 @@
       if (!form) {
         return;
       }
+      if (consumeProxySubmitReplayBypass(form)) {
+        return;
+      }
       const submitter = getSubmitEventSubmitter(event);
       const target = resolveFormTarget(form, submitter);
       const method = resolveFormMethod(form, submitter);
@@ -510,11 +536,11 @@
       event.preventDefault();
       proxyFormSubmission(form, submitter).then((handled) => {
         if (!handled) {
-          originalFormSubmit.call(form);
+          replaySubmitAfterProxyFailure(form, originalFormSubmit, submitter);
         }
       }).catch((error) => {
         console.error("[proxy-bridge] Failed to proxy form submission", error);
-        originalFormSubmit.call(form);
+        replaySubmitAfterProxyFailure(form, originalFormSubmit, submitter);
       });
     });
     HTMLFormElement.prototype.submit = function() {
