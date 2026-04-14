@@ -1312,6 +1312,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return new URL(connection.getURL(), location).toString();
     }
 
+    private void persistManagedDownloadResponseCookies(HttpURLConnection connection, String requestUrl) {
+        if (connection == null || TextUtils.isEmpty(requestUrl)) {
+            return;
+        }
+
+        ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(connection.getHeaderFields());
+        applyResponseCookies(requestUrl, parsedHeaders.cookieHeaders());
+    }
+
     private void downloadUrlToFile(String url, String userAgent, String contentDisposition, String mimeType) {
         executorService.execute(() -> {
             HttpURLConnection connection = null;
@@ -1332,6 +1341,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     connection.connect();
 
                     int responseCode = connection.getResponseCode();
+                    persistManagedDownloadResponseCookies(connection, currentUrl);
                     if (!isManagedDownloadRedirect(responseCode)) {
                         break;
                     }
