@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import QuickLook
 import WebKit
 
 private let estimatedProgressKeyPath = "estimatedProgress"
@@ -17,6 +18,11 @@ private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
     static var schemes = ["tel", "mailto", "sms"]
     static var blank = true
+}
+
+private struct WKDownloadState {
+    let destinationURL: URL
+    let mimeType: String?
 }
 
 public struct WKWebViewCredentials {
@@ -304,6 +310,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
     open var captureConsoleLogs = false
+    open var handleDownloads = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
@@ -357,6 +364,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
     private var isWebViewInitialized = false
+    private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
+    private var previewItemURL: URL?
 
     func setHeaders(headers: [String: String]) {
         self.headers = headers
@@ -380,6 +389,133 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func setAuthorizedAppLinks(authorizedAppLinks: [String]) {
         self.authorizedAppLinks = authorizedAppLinks
+    }
+
+    private func register(download: WKDownload, response: URLResponse?) {
+        download.delegate = self
+        downloadStates[ObjectIdentifier(download)] = WKDownloadState(destinationURL: FileManager.default.temporaryDirectory, mimeType: response?.mimeType)
+    }
+
+    private func attachmentDisposition(_ response: URLResponse) -> String? {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return nil
+        }
+
+        return httpResponse.value(forHTTPHeaderField: "Content-Disposition")
+    }
+
+    private func shouldInterceptDownload(for response: WKNavigationResponse) -> Bool {
+        guard handleDownloads else {
+            return false
+        }
+
+        if !response.canShowMIMEType {
+            return true
+        }
+
+        guard let disposition = attachmentDisposition(response.response)?.lowercased() else {
+            return false
+        }
+
+        return disposition.contains("attachment")
+    }
+
+    private func sanitizeDownloadFilename(_ suggestedFilename: String) -> String {
+        let invalidCharacters = CharacterSet(charactersIn: "/:\\?%*|\"<>")
+        let sanitized = suggestedFilename
+            .components(separatedBy: invalidCharacters)
+            .joined(separator: "_")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return sanitized.isEmpty ? "download" : sanitized
+    }
+
+    private func uniqueDownloadDestination(for suggestedFilename: String) throws -> URL {
+        let downloadsDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("InAppBrowserDownloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+
+        let sanitizedFilename = sanitizeDownloadFilename(suggestedFilename)
+        let baseName = (sanitizedFilename as NSString).deletingPathExtension
+        let fileExtension = (sanitizedFilename as NSString).pathExtension
+
+        var candidateURL = downloadsDirectory.appendingPathComponent(sanitizedFilename)
+        var duplicateIndex = 1
+
+        while FileManager.default.fileExists(atPath: candidateURL.path) {
+            let duplicateSuffix = "-\(duplicateIndex)"
+            let duplicateFilename = fileExtension.isEmpty
+                ? baseName + duplicateSuffix
+                : baseName + duplicateSuffix + "." + fileExtension
+            candidateURL = downloadsDirectory.appendingPathComponent(duplicateFilename)
+            duplicateIndex += 1
+        }
+
+        return candidateURL
+    }
+
+    private func normalizedMimeType(_ mimeType: String?, fileURL: URL) -> String? {
+        let candidate = mimeType?
+            .components(separatedBy: ";")
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        if let candidate, !candidate.isEmpty {
+            return candidate
+        }
+
+        switch fileURL.pathExtension.lowercased() {
+        case "pdf":
+            return "application/pdf"
+        case "json":
+            return "application/json"
+        case "txt":
+            return "text/plain"
+        case "csv":
+            return "text/csv"
+        case "html", "htm":
+            return "text/html"
+        case "png":
+            return "image/png"
+        case "jpg", "jpeg":
+            return "image/jpeg"
+        case "gif":
+            return "image/gif"
+        case "webp":
+            return "image/webp"
+        case "svg":
+            return "image/svg+xml"
+        default:
+            return nil
+        }
+    }
+
+    private func shouldPreviewDownloadedFile(_ fileURL: URL, mimeType: String?) -> Bool {
+        guard let normalizedMimeType = normalizedMimeType(mimeType, fileURL: fileURL) else {
+            return false
+        }
+
+        return normalizedMimeType == "application/pdf" ||
+            normalizedMimeType == "application/json" ||
+            normalizedMimeType.starts(with: "text/") ||
+            normalizedMimeType.starts(with: "image/")
+    }
+
+    private func previewDownloadedFile(_ fileURL: URL, mimeType: String?) {
+        DispatchQueue.main.async {
+            if self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
+                let accessURL = fileURL.deletingLastPathComponent()
+                self.source = .file(fileURL, access: accessURL)
+                self.load(file: fileURL, access: accessURL)
+                return
+            }
+
+            self.previewItemURL = fileURL
+            let previewController = QLPreviewController()
+            previewController.dataSource = self
+            previewController.delegate = self
+            self.present(previewController, animated: true)
+        }
     }
 
     internal var customUserAgent: String? {
@@ -2416,6 +2552,11 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if handleDownloads, navigationAction.shouldPerformDownload {
+            decisionHandler(.download)
+            return
+        }
+
         var actionPolicy: WKNavigationActionPolicy = self.preventDeeplink ? .preventDeeplinkActionPolicy : .allow
 
         guard let url = navigationAction.request.url else {
@@ -2473,6 +2614,23 @@ extension WKWebViewController: WKNavigationDelegate {
             self.injectJavaScriptInterface()
             decisionHandler(actionPolicy)
         }
+    }
+
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if shouldInterceptDownload(for: navigationResponse) {
+            decisionHandler(.download)
+            return
+        }
+
+        decisionHandler(.allow)
+    }
+
+    public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        register(download: download, response: nil)
+    }
+
+    public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        register(download: download, response: navigationResponse.response)
     }
 
     // MARK: - Dimension Management
@@ -2559,6 +2717,48 @@ extension WKWebViewController: WKNavigationDelegate {
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         self.view.layoutIfNeeded()
+    }
+}
+
+extension WKWebViewController: WKDownloadDelegate {
+    public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        do {
+            let destinationURL = try uniqueDownloadDestination(for: suggestedFilename)
+            downloadStates[ObjectIdentifier(download)] = WKDownloadState(destinationURL: destinationURL, mimeType: response.mimeType)
+            completionHandler(destinationURL)
+        } catch {
+            print("[InAppBrowser] Failed to prepare download destination: \(error)")
+            downloadStates.removeValue(forKey: ObjectIdentifier(download))
+            completionHandler(nil)
+        }
+    }
+
+    public func downloadDidFinish(_ download: WKDownload) {
+        let identifier = ObjectIdentifier(download)
+        guard let state = downloadStates.removeValue(forKey: identifier) else {
+            return
+        }
+
+        previewDownloadedFile(state.destinationURL, mimeType: state.mimeType)
+    }
+
+    public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        downloadStates.removeValue(forKey: ObjectIdentifier(download))
+        print("[InAppBrowser] Download failed: \(error.localizedDescription)")
+    }
+}
+
+extension WKWebViewController: QLPreviewControllerDataSource, QLPreviewControllerDelegate {
+    public func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+        previewItemURL == nil ? 0 : 1
+    }
+
+    public func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+        return previewItemURL! as NSURL
+    }
+
+    public func previewControllerDidDismiss(_ controller: QLPreviewController) {
+        previewItemURL = nil
     }
 }
 

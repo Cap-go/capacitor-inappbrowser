@@ -744,6 +744,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
         let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
+        let handleDownloads = call.getBool("handleDownloads", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -927,6 +928,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             // Set disableOverscroll option
             webViewController.disableOverscroll = disableOverscroll
+            webViewController.handleDownloads = handleDownloads
 
             // Set native navigation gestures before view loads
             webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview

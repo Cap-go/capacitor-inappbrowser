@@ -803,6 +803,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
         options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
         options.setCaptureConsoleLogs(Boolean.TRUE.equals(call.getBoolean("captureConsoleLogs", false)));
+        options.setHandleDownloads(Boolean.TRUE.equals(call.getBoolean("handleDownloads", false)));
 
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");

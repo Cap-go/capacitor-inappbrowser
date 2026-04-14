@@ -528,6 +528,19 @@ export interface OpenWebViewOptions {
    */
   captureConsoleLogs?: boolean;
   /**
+   * Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge.
+   *
+   * When enabled:
+   * - Standard attachment responses are written to a temporary file.
+   * - `blob:` downloads are also captured when the platform supports them.
+   * - Previewable files reopen inside the in-app browser when possible.
+   * - Other files are handed off to the native preview or viewer flow.
+   *
+   * @default false
+   * @since 8.6.0
+   */
+  handleDownloads?: boolean;
+  /**
    * Share options for the webview. When provided, shows a disclaimer dialog before sharing content.
    * This is useful for:
    * - Warning users about sharing sensitive information

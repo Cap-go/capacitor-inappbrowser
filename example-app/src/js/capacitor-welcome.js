@@ -178,6 +178,20 @@ window.customElements.define(
           <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
         </p>
         <hr />
+        <h2>Download Handling</h2>
+        <p>
+          Open a page that immediately downloads a blob text file. With native download handling enabled, the downloaded file should reopen inside the webview.
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="handle-downloads-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Handle downloads natively</span>
+          </label>
+        </p>
+        <p>
+          <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
+        </p>
+        <hr />
         <h2>System Bars</h2>
         <p>
           Use the SystemBars API to show the system UI after changing visibility.
@@ -254,6 +268,68 @@ window.customElements.define(
         } catch (_) {
           return false;
         }
+      }
+
+      function createAutoDownloadDemoUrl() {
+        const content = [
+          "Capgo download demo successful.",
+          "This file was downloaded natively by InAppBrowser.",
+        ].join("\\n");
+
+        const downloadDemoHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auto Download Demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(180deg, #f8f9fa 0%, #dbeafe 100%);
+        color: #111827;
+      }
+      .card {
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 1.4rem;
+      }
+      p {
+        margin: 0;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Preparing download</h1>
+      <p id="status">Creating a sample blob file and handing it to the native download flow.</p>
+    </div>
+    <script>
+      const status = document.getElementById("status");
+      const blob = new Blob([${JSON.stringify(content)}], { type: "text/plain" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.download = "capgo-download-demo.txt";
+      downloadLink.textContent = "Download sample file";
+      document.body.appendChild(downloadLink);
+      status.textContent = "Starting download...";
+      window.setTimeout(() => downloadLink.click(), 300);
+    </script>
+  </body>
+</html>`;
+
+        return `data:text/html;charset=utf-8,${encodeURIComponent(downloadDemoHtml)}`;
       }
 
       async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
@@ -651,6 +727,28 @@ window.customElements.define(
         });
 
       self.shadowRoot
+        .querySelector("#open-download-demo")
+        .addEventListener("click", async function () {
+          const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
+
+          try {
+            await InAppBrowser.openWebView({
+              url: createAutoDownloadDemoUrl(),
+              title: "Auto Download Demo",
+              toolbarColor: "#198754",
+              toolbarType: ToolBarType.NAVIGATION,
+              backgroundColor: BackgroundColor.WHITE,
+              visibleTitle: true,
+              showReloadButton: true,
+              enabledSafeBottomMargin: true,
+              handleDownloads: handleDownloadsToggle.checked,
+            });
+          } catch (error) {
+            console.error("Error opening auto download demo:", error);
+          }
+        });
+
+      self.shadowRoot
         .querySelector("#system-bars-show-all")
         .addEventListener("click", async function () {
           try {
@@ -726,7 +824,8 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import(/* @vite-ignore */ "./url.js");
+              const optionalUrlModule = "./url.js";
+              const { url } = await import(/* @vite-ignore */ optionalUrlModule);
               urlToUse = url;
             } catch (e) {
               console.warn(
@@ -967,7 +1066,8 @@ window.customElements.define(
             // Try to load custom URL configuration
             let urlToUse = testWebappUrl;
             try {
-              const { url } = await import(/* @vite-ignore */ "./url.js");
+              const optionalUrlModule = "./url.js";
+              const { url } = await import(/* @vite-ignore */ optionalUrlModule);
               urlToUse = url;
             } catch (e) {
               console.warn(

@@ -52,6 +52,7 @@ proguard
 
 # Log Files
 *.log
+maestro-results
 
 # Android Studio Navigation editor temp files
 .navigation

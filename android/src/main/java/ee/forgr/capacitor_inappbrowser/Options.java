@@ -194,6 +194,7 @@ public class Options {
     private boolean allowWebViewJsVisibilityControl = false;
     private boolean allowScreenshotsFromWebPage = false;
     private boolean captureConsoleLogs = false;
+    private boolean handleDownloads = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
@@ -266,6 +267,14 @@ public class Options {
 
     public void setCaptureConsoleLogs(boolean captureConsoleLogs) {
         this.captureConsoleLogs = captureConsoleLogs;
+    }
+
+    public boolean getHandleDownloads() {
+        return handleDownloads;
+    }
+
+    public void setHandleDownloads(boolean handleDownloads) {
+        this.handleDownloads = handleDownloads;
     }
 
     public void setMaterialPicker(boolean materialPicker) {

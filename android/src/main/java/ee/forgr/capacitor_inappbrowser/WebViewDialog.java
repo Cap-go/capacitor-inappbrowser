@@ -44,6 +44,7 @@ import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -73,12 +74,16 @@ import com.getcapacitor.PluginCall;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
@@ -204,6 +209,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
     private WindowManager.LayoutParams previousWindowAttributes;
@@ -408,6 +414,35 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             );
         }
+
+        @JavascriptInterface
+        public void handleBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            executorService.execute(() -> {
+                try {
+                    JSONObject jsonPayload = new JSONObject(payload);
+                    String base64 = jsonPayload.optString("base64", "");
+                    if (TextUtils.isEmpty(base64)) {
+                        throw new IOException("Blob download payload is empty");
+                    }
+
+                    String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                    String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
+                    File outputFile = createDownloadFile(fileName);
+
+                    try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+                        outputStream.write(Base64.decode(base64, Base64.DEFAULT));
+                    }
+
+                    finalizeDownload(outputFile, mimeType);
+                } catch (Exception exception) {
+                    showDownloadError("Failed to save blob download", exception);
+                }
+            });
+        }
     }
 
     public interface ScreenshotResultCallback {
@@ -431,6 +466,352 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
         String upperMethod = method.toUpperCase();
         return upperMethod.equals("POST") || upperMethod.equals("PUT") || upperMethod.equals("PATCH");
+    }
+
+    private String sanitizeFileName(String fileName) {
+        if (TextUtils.isEmpty(fileName)) {
+            return "download";
+        }
+
+        String sanitized = fileName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        return sanitized.isEmpty() ? "download" : sanitized;
+    }
+
+    private String fileExtension(String fileName) {
+        int lastDotIndex = fileName.lastIndexOf('.');
+        if (lastDotIndex < 0 || lastDotIndex == fileName.length() - 1) {
+            return "";
+        }
+        return fileName.substring(lastDotIndex + 1).toLowerCase();
+    }
+
+    private String normalizeMimeType(String mimeType, String fileName) {
+        if (!TextUtils.isEmpty(mimeType)) {
+            String normalized = mimeType.split(";")[0].trim().toLowerCase();
+            if (!TextUtils.isEmpty(normalized)) {
+                return normalized;
+            }
+        }
+
+        String guessedType = URLConnection.guessContentTypeFromName(fileName);
+        if (!TextUtils.isEmpty(guessedType)) {
+            return guessedType.toLowerCase();
+        }
+
+        String extension = fileExtension(fileName);
+        if ("pdf".equals(extension)) {
+            return "application/pdf";
+        }
+        if ("json".equals(extension)) {
+            return "application/json";
+        }
+
+        return "application/octet-stream";
+    }
+
+    private boolean shouldPreviewDownloadedFile(String mimeType) {
+        if (TextUtils.isEmpty(mimeType)) {
+            return false;
+        }
+
+        return (
+            mimeType.startsWith("text/") ||
+            mimeType.startsWith("image/") ||
+            "application/json".equals(mimeType) ||
+            "application/javascript".equals(mimeType) ||
+            "application/xhtml+xml".equals(mimeType)
+        );
+    }
+
+    private boolean isTextPreviewMimeType(String mimeType) {
+        if (TextUtils.isEmpty(mimeType)) {
+            return false;
+        }
+
+        return mimeType.startsWith("text/") || "application/json".equals(mimeType) || "application/javascript".equals(mimeType);
+    }
+
+    private File downloadDirectory() throws IOException {
+        File directory = new File(_context.getCacheDir(), "inappbrowser-downloads");
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Could not create download directory");
+        }
+        return directory;
+    }
+
+    private File createDownloadFile(String fileName) throws IOException {
+        String sanitizedFileName = sanitizeFileName(fileName);
+        String extension = fileExtension(sanitizedFileName);
+        String baseName = extension.isEmpty()
+            ? sanitizedFileName
+            : sanitizedFileName.substring(0, sanitizedFileName.length() - extension.length() - 1);
+        File directory = downloadDirectory();
+        File candidate = new File(directory, sanitizedFileName);
+        int duplicateIndex = 1;
+
+        while (candidate.exists()) {
+            String duplicateName = extension.isEmpty()
+                ? baseName + "-" + duplicateIndex
+                : baseName + "-" + duplicateIndex + "." + extension;
+            candidate = new File(directory, duplicateName);
+            duplicateIndex++;
+        }
+
+        return candidate;
+    }
+
+    private String readUtf8File(File file) throws IOException {
+        try (FileInputStream inputStream = new FileInputStream(file); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            return outputStream.toString(StandardCharsets.UTF_8);
+        }
+    }
+
+    private String textPreviewHtml(File file, String bodyText) {
+        String fileName = TextUtils.htmlEncode(file.getName());
+        String escapedBody = TextUtils.htmlEncode(bodyText);
+
+        return String.format(
+            """
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>%s</title>
+                <style>
+                  body {
+                    margin: 0;
+                    min-height: 100vh;
+                    padding: 24px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    background: linear-gradient(180deg, #f8fafc 0%%, #e2e8f0 100%%);
+                    color: #0f172a;
+                  }
+                  main {
+                    max-width: 720px;
+                    margin: 0 auto;
+                    background: rgba(255, 255, 255, 0.94);
+                    border-radius: 20px;
+                    padding: 24px;
+                    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+                  }
+                  h1 {
+                    margin: 0 0 16px;
+                    font-size: 1.2rem;
+                  }
+                  pre {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    font-size: 1rem;
+                    line-height: 1.6;
+                  }
+                </style>
+              </head>
+              <body>
+                <main>
+                  <h1>%s</h1>
+                  <pre>%s</pre>
+                </main>
+              </body>
+            </html>
+            """,
+            fileName,
+            fileName,
+            escapedBody
+        );
+    }
+
+    private void previewDownloadedFileInWebView(File file, String mimeType) {
+        if (_webView == null) {
+            return;
+        }
+
+        if (isTextPreviewMimeType(mimeType)) {
+            executorService.execute(() -> {
+                try {
+                    String previewHtml = textPreviewHtml(file, readUtf8File(file));
+                    mainHandler.post(() -> _webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null));
+                } catch (IOException ioException) {
+                    showDownloadError("Failed to preview downloaded text file", ioException);
+                }
+            });
+            return;
+        }
+
+        String fileUrl = Uri.fromFile(file).toString();
+        if (_options != null) {
+            _options.setUrl(fileUrl);
+        }
+        _webView.loadUrl(fileUrl);
+    }
+
+    private void openDownloadedFile(File file, String mimeType) {
+        try {
+            Uri fileUri = FileProvider.getUriForFile(_context, _context.getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(fileUri, mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            _context.startActivity(intent);
+        } catch (ActivityNotFoundException activityNotFoundException) {
+            showDownloadError("No app can open " + file.getName(), activityNotFoundException);
+        }
+    }
+
+    private void finalizeDownload(File outputFile, String mimeType) {
+        mainHandler.post(() -> {
+            if (shouldPreviewDownloadedFile(mimeType) && _webView != null) {
+                previewDownloadedFileInWebView(outputFile, mimeType);
+                return;
+            }
+
+            openDownloadedFile(outputFile, mimeType);
+        });
+    }
+
+    private void showDownloadError(String message, Exception exception) {
+        Log.e("InAppBrowser", message, exception);
+        mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
+    }
+
+    private void downloadUrlToFile(String url, String userAgent, String contentDisposition, String mimeType) {
+        executorService.execute(() -> {
+            HttpURLConnection connection = null;
+            InputStream inputStream = null;
+
+            try {
+                URL downloadUrl = new URL(url);
+                connection = (HttpURLConnection) downloadUrl.openConnection();
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(30000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("Accept", "*/*");
+
+                if (!TextUtils.isEmpty(userAgent)) {
+                    connection.setRequestProperty("User-Agent", userAgent);
+                }
+
+                String cookie = android.webkit.CookieManager.getInstance().getCookie(url);
+                if (!TextUtils.isEmpty(cookie)) {
+                    connection.setRequestProperty("Cookie", cookie);
+                }
+
+                if (_webView != null && !TextUtils.isEmpty(_webView.getUrl())) {
+                    connection.setRequestProperty("Referer", _webView.getUrl());
+                }
+
+                if (_options != null && _options.getHeaders() != null) {
+                    Iterator<String> headerKeys = _options.getHeaders().keys();
+                    while (headerKeys.hasNext()) {
+                        String headerKey = headerKeys.next();
+                        String headerValue = _options.getHeaders().getString(headerKey);
+                        if (!TextUtils.isEmpty(headerValue)) {
+                            connection.setRequestProperty(headerKey, headerValue);
+                        }
+                    }
+                }
+
+                connection.connect();
+
+                String resolvedDisposition = connection.getHeaderField("Content-Disposition");
+                if (TextUtils.isEmpty(resolvedDisposition)) {
+                    resolvedDisposition = contentDisposition;
+                }
+
+                String provisionalMimeType = connection.getContentType();
+                if (TextUtils.isEmpty(provisionalMimeType)) {
+                    provisionalMimeType = mimeType;
+                }
+
+                String fileName = URLUtil.guessFileName(connection.getURL().toString(), resolvedDisposition, provisionalMimeType);
+                String resolvedMimeType = normalizeMimeType(provisionalMimeType, fileName);
+                File outputFile = createDownloadFile(fileName);
+
+                inputStream = connection.getInputStream();
+                try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                }
+
+                finalizeDownload(outputFile, resolvedMimeType);
+            } catch (Exception exception) {
+                showDownloadError("Failed to download file", exception);
+            } finally {
+                if (inputStream != null) {
+                    try {
+                        inputStream.close();
+                    } catch (IOException ignored) {}
+                }
+                if (connection != null) {
+                    connection.disconnect();
+                }
+            }
+        });
+    }
+
+    private void handleBlobDownloadFromPage(String blobUrl, String mimeType, String contentDisposition) {
+        if (_webView == null) {
+            showDownloadError("Blob download requires an active WebView", new IllegalStateException("WebView not initialized"));
+            return;
+        }
+
+        String fallbackMimeType = normalizeMimeType(mimeType, "download");
+        String fallbackFileName = URLUtil.guessFileName("download", contentDisposition, fallbackMimeType);
+        String script = String.format(
+            """
+            (async function() {
+              const blobUrl = %s;
+              const fallbackMimeType = %s;
+              const fallbackFileName = %s;
+              const matchingLink = Array.from(document.querySelectorAll('a[download]')).find(link => link.href === blobUrl);
+              const response = await fetch(blobUrl);
+              const blob = await response.blob();
+              const fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+              const reader = new FileReader();
+              reader.onloadend = function() {
+                const dataUrl = reader.result || '';
+                const base64 = String(dataUrl).split(',').pop() || '';
+                const payload = JSON.stringify({
+                  fileName,
+                  mimeType: blob.type || fallbackMimeType,
+                  base64
+                });
+                if (window.mobileApp && window.mobileApp.handleBlobDownload) {
+                  window.mobileApp.handleBlobDownload(payload);
+                } else if (window.AndroidInterface && window.AndroidInterface.handleBlobDownload) {
+                  window.AndroidInterface.handleBlobDownload(payload);
+                }
+              };
+              reader.readAsDataURL(blob);
+            })().catch(error => console.error('Failed to capture blob download', error));
+            """,
+            JSONObject.quote(blobUrl),
+            JSONObject.quote(fallbackMimeType),
+            JSONObject.quote(fallbackFileName)
+        );
+
+        _webView.post(() -> _webView.evaluateJavascript(script, null));
+    }
+
+    private void handleDownloadRequest(String url, String userAgent, String contentDisposition, String mimeType) {
+        if (_options == null || !_options.getHandleDownloads() || TextUtils.isEmpty(url)) {
+            return;
+        }
+
+        if (url.startsWith("blob:")) {
+            handleBlobDownloadFromPage(url, mimeType, contentDisposition);
+            return;
+        }
+
+        downloadUrlToFile(url, userAgent, contentDisposition, mimeType);
     }
 
     public class PreShowScriptInterface {
@@ -611,6 +992,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         _webView.getSettings().setDatabaseEnabled(true);
         _webView.getSettings().setDomStorageEnabled(true);
+        _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
@@ -1102,6 +1484,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             }
         );
+
+        if (_options.getHandleDownloads()) {
+            _webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+                Log.d("InAppBrowser", "Handling WebView download: " + url + ", mimeType=" + mimeType + ", bytes=" + contentLength);
+                handleDownloadRequest(url, userAgent, contentDisposition, mimeType);
+            });
+        }
 
         Map<String, String> requestHeaders = new HashMap<>();
         if (_options.getHeaders() != null) {
