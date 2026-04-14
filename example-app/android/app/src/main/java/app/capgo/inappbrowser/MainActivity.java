@@ -77,6 +77,9 @@ public class MainActivity extends BridgeActivity {
         boolean bridgeInjected = ensureMaestroHarnessBridge();
         if (overlayInstalled && bridgeInjected) {
             syncMaestroReadyFromPage();
+            if (maestroPendingRun && !maestroRunning) {
+                maybeRunQueuedMaestroProxyRegression();
+            }
         }
         if (!overlayInstalled || !bridgeInjected || !maestroReady) {
             WebView retryView = bridge != null ? bridge.getWebView() : null;
