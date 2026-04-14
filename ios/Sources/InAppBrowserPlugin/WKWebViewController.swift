@@ -164,7 +164,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
-    var openBlankTargetInWebView: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
@@ -206,14 +205,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     func setAuthorizedAppLinks(authorizedAppLinks: [String]) {
         self.authorizedAppLinks = authorizedAppLinks
-    }
-
-    private func shouldLoadBlankTargetInCurrentWebView(_ url: URL) -> Bool {
-        let scheme = url.scheme?.lowercased() ?? ""
-        guard scheme == "http" || scheme == "https" else { return false }
-        guard !isUrlAuthorized(url, authorizedLinks: self.authorizedAppLinks) else { return false }
-
-        return self.preventDeeplink || self.openBlankTargetInWebView
     }
 
     internal var customUserAgent: String? {
@@ -831,9 +822,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
-        // Required for bundled/local HTML content loaded inside this isolated WKWebView configuration.
-        webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs") // NOSONAR
-        webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs") // NOSONAR
+        webConfiguration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        webConfiguration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
         // Enable background task processing
         webConfiguration.processPool = WKProcessPool()
@@ -1600,11 +1590,6 @@ fileprivate extension WKWebViewController {
             return
         }
         if blank && targetFrame == nil {
-            if shouldLoadBlankTargetInCurrentWebView(url) {
-                print("[InAppBrowser] blank target HTTP(S) URL will stay in the current webview")
-                completion(false)
-                return
-            }
             print("[InAppBrowser] is blank and targetFrame is nil, try to open URLs in external apps")
             completion(tryOpenCustomScheme(url))
             return
@@ -1863,13 +1848,13 @@ extension WKWebViewController: WKUIDelegate {
 
     public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Handle target="_blank" links and popup windows
-        // When preventDeeplink or openBlankTargetInWebView is enabled for HTTP(S),
-        // we should load these in the same webview instead of opening externally
+        // When preventDeeplink is true, we should load these in the same webview instead of opening externally
         if let url = navigationAction.request.url {
             print("[InAppBrowser] Handling popup/new window request for URL: \(url.absoluteString)")
 
-            if shouldLoadBlankTargetInCurrentWebView(url) {
-                print("[InAppBrowser] Loading popup URL in current webview")
+            // If preventDeeplink is true, load the URL in the current webview
+            if preventDeeplink {
+                print("[InAppBrowser] preventDeeplink is true, loading popup URL in current webview")
                 DispatchQueue.main.async { [weak self] in
                     self?.load(remote: url)
                 }

@@ -622,7 +622,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.instanceId = webViewId
-            webViewController.openBlankTargetInWebView = openBlankTargetInWebView
 
             // Set HTTP method and body if provided
             if let method = httpMethod {
@@ -756,8 +755,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 print("[DEBUG] No share disclaimer set")
             }
 
-            webViewController.preShowScript = call.getString("preShowScript")
-            webViewController.preShowScriptInjectionTime = call.getString("preShowScriptInjectionTime", "pageLoad")
+            let mergedPreShowScript = self.mergedPreShowScript(
+                userScript: call.getString("preShowScript"),
+                injectionTime: call.getString("preShowScriptInjectionTime", "pageLoad"),
+                authorizedAppLinks: authorizedAppLinks,
+                openBlankTargetInWebView: openBlankTargetInWebView
+            )
+            webViewController.preShowScript = mergedPreShowScript.script
+            webViewController.preShowScriptInjectionTime = mergedPreShowScript.injectionTime
 
             // If script should be injected at document start, inject it now
             if webViewController.preShowScriptInjectionTime == "documentStart" {
@@ -1149,6 +1154,93 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+    }
+
+    private func normalizedAuthorizedHosts(from links: [String]) -> [String] {
+        links.compactMap { link in
+            guard let host = URLComponents(string: link)?.host?.lowercased() else {
+                return nil
+            }
+
+            return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        }
+    }
+
+    private func blankTargetInWebViewScript(authorizedAppLinks: [String]) -> String {
+        let authorizedHosts = normalizedAuthorizedHosts(from: authorizedAppLinks)
+        let hostsData = try? JSONSerialization.data(withJSONObject: authorizedHosts)
+        let hostsJSON = hostsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+
+        return """
+        (function() {
+          const authorizedHosts = new Set(\(hostsJSON));
+          const normalizeHost = (host) => (host || '').replace(/^www\\./i, '').toLowerCase();
+
+          document.addEventListener('click', function(event) {
+            const element = event.target;
+            if (!element || typeof element.closest !== 'function') {
+              return;
+            }
+
+            const anchor = element.closest('a[target="_blank"][href]');
+            if (!anchor) {
+              return;
+            }
+
+            let nextUrl;
+            try {
+              nextUrl = new URL(anchor.getAttribute('href'), window.location.href);
+            } catch (_) {
+              return;
+            }
+
+            const protocol = nextUrl.protocol.toLowerCase();
+            if (protocol !== 'http:' && protocol !== 'https:') {
+              return;
+            }
+
+            if (authorizedHosts.has(normalizeHost(nextUrl.hostname))) {
+              return;
+            }
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            window.location.assign(nextUrl.toString());
+          }, true);
+        })();
+        """
+    }
+
+    private func mergedPreShowScript(
+        userScript: String?,
+        injectionTime: String,
+        authorizedAppLinks: [String],
+        openBlankTargetInWebView: Bool
+    ) -> (script: String?, injectionTime: String) {
+        guard openBlankTargetInWebView else {
+            return (userScript, injectionTime)
+        }
+
+        let interceptorScript = blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks)
+        guard let userScript, !userScript.isEmpty else {
+            return (interceptorScript, "documentStart")
+        }
+
+        if injectionTime == "documentStart" {
+            return (interceptorScript + "\n" + userScript, "documentStart")
+        }
+
+        let deferredUserScript = """
+        window.addEventListener('load', function() {
+          (async function() {
+            \(userScript)
+          })().catch(function(error) {
+            console.error('[InAppBrowser] preShowScript error', error);
+          });
+        });
+        """
+
+        return (interceptorScript + "\n" + deferredUserScript, "documentStart")
     }
 
     func isHexColorCode(_ input: String) -> Bool {
