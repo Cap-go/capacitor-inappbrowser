@@ -492,7 +492,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        if let candidate, !candidate.isEmpty {
+        let genericMimeTypes: Set<String> = [
+            "application/octet-stream",
+            "binary/octet-stream",
+            "application/download",
+            "application/x-download",
+            "application/binary",
+            "application/x-binary",
+        ]
+
+        if let candidate, !candidate.isEmpty, !genericMimeTypes.contains(candidate) {
             return candidate
         }
 

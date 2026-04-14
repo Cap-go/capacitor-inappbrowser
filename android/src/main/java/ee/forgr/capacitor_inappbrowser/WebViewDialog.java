@@ -85,6 +85,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
@@ -104,8 +105,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -222,6 +225,85 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
+    private static class ClientCertificateIdentity {
+
+        private final PrivateKey privateKey;
+        private final X509Certificate[] certificateChain;
+
+        private ClientCertificateIdentity(PrivateKey privateKey, X509Certificate[] certificateChain) {
+            this.privateKey = privateKey;
+            this.certificateChain = certificateChain;
+        }
+    }
+
+    private static class FixedClientCertificateKeyManager implements X509KeyManager {
+
+        private static final String ALIAS = "inappbrowser-client-cert";
+        private final ClientCertificateIdentity identity;
+
+        private FixedClientCertificateKeyManager(ClientCertificateIdentity identity) {
+            this.identity = identity;
+        }
+
+        @Override
+        public String[] getClientAliases(String keyType, Principal[] issuers) {
+            return shouldUseIdentity(keyType) ? new String[] { ALIAS } : null;
+        }
+
+        @Override
+        public String chooseClientAlias(String[] keyTypes, Principal[] issuers, java.net.Socket socket) {
+            if (keyTypes == null) {
+                return ALIAS;
+            }
+
+            for (String keyType : keyTypes) {
+                if (shouldUseIdentity(keyType)) {
+                    return ALIAS;
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        public String[] getServerAliases(String keyType, Principal[] issuers) {
+            return null;
+        }
+
+        @Override
+        public String chooseServerAlias(String keyType, Principal[] issuers, java.net.Socket socket) {
+            return null;
+        }
+
+        @Override
+        public X509Certificate[] getCertificateChain(String alias) {
+            return ALIAS.equals(alias) ? identity.certificateChain : null;
+        }
+
+        @Override
+        public PrivateKey getPrivateKey(String alias) {
+            return ALIAS.equals(alias) ? identity.privateKey : null;
+        }
+
+        private boolean shouldUseIdentity(String keyType) {
+            if (
+                identity == null ||
+                identity.privateKey == null ||
+                identity.certificateChain == null ||
+                identity.certificateChain.length == 0
+            ) {
+                return false;
+            }
+
+            if (TextUtils.isEmpty(keyType)) {
+                return true;
+            }
+
+            String privateKeyAlgorithm = identity.privateKey.getAlgorithm();
+            return !TextUtils.isEmpty(privateKeyAlgorithm) && privateKeyAlgorithm.equalsIgnoreCase(keyType);
+        }
+    }
+
     private WebView _webView;
     private Toolbar _toolbar;
     private Options _options = null;
@@ -238,6 +320,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
+    private final Map<String, ClientCertificateIdentity> clientCertificateIdentities = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
     private WindowManager.LayoutParams previousWindowAttributes;
@@ -467,13 +550,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
                     String sourceUrl = jsonPayload.optString("sourceUrl", null);
                     String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
-                    File outputFile = createDownloadFile(fileName);
+                    File outputFile = null;
 
-                    try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
-                        outputStream.write(Base64.decode(base64, Base64.DEFAULT));
+                    try {
+                        outputFile = createDownloadFile(fileName);
+                        try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+                            outputStream.write(Base64.decode(base64, Base64.DEFAULT));
+                        }
+
+                        finalizeDownload(outputFile, mimeType, sourceUrl);
+                    } catch (Exception innerException) {
+                        if (outputFile != null && outputFile.exists() && !outputFile.delete()) {
+                            outputFile.deleteOnExit();
+                        }
+                        throw innerException;
                     }
-
-                    finalizeDownload(outputFile, mimeType, sourceUrl);
                 } catch (Exception exception) {
                     showDownloadError("Failed to save blob download", exception);
                 }
@@ -885,6 +976,69 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return message + ": " + exception.getMessage();
     }
 
+    private int normalizedPort(String scheme, int port) {
+        if (port >= 0) {
+            return port;
+        }
+        if ("https".equalsIgnoreCase(scheme)) {
+            return 443;
+        }
+        if ("http".equalsIgnoreCase(scheme)) {
+            return 80;
+        }
+        return -1;
+    }
+
+    private String clientCertificateIdentityKey(String host, int port, String scheme) {
+        if (TextUtils.isEmpty(host)) {
+            return null;
+        }
+        return host.toLowerCase(Locale.ROOT) + ":" + normalizedPort(scheme, port);
+    }
+
+    private String clientCertificateIdentityKey(URL url) {
+        if (url == null) {
+            return null;
+        }
+        return clientCertificateIdentityKey(url.getHost(), url.getPort(), url.getProtocol());
+    }
+
+    private boolean isSameOrigin(String firstUrl, String secondUrl) {
+        if (TextUtils.isEmpty(firstUrl) || TextUtils.isEmpty(secondUrl)) {
+            return false;
+        }
+
+        try {
+            URI firstUri = new URI(firstUrl);
+            URI secondUri = new URI(secondUrl);
+            String firstHost = firstUri.getHost();
+            String secondHost = secondUri.getHost();
+            if (firstHost == null || secondHost == null) {
+                return false;
+            }
+
+            return (
+                Objects.equals(firstUri.getScheme(), secondUri.getScheme()) &&
+                firstHost.equalsIgnoreCase(secondHost) &&
+                normalizedPort(firstUri.getScheme(), firstUri.getPort()) == normalizedPort(secondUri.getScheme(), secondUri.getPort())
+            );
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean shouldForwardCustomDownloadHeader(String headerKey) {
+        if (TextUtils.isEmpty(headerKey)) {
+            return false;
+        }
+
+        return !(
+            "authorization".equalsIgnoreCase(headerKey) ||
+            "cookie".equalsIgnoreCase(headerKey) ||
+            "proxy-authorization".equalsIgnoreCase(headerKey)
+        );
+    }
+
     private String redactUrlForLogging(String rawUrl) {
         if (TextUtils.isEmpty(rawUrl)) {
             return rawUrl;
@@ -898,31 +1052,44 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
-    private void configureDownloadTlsIfNeeded(HttpURLConnection connection) throws Exception {
-        if (!(connection instanceof HttpsURLConnection) || _options == null || !_options.ignoreUntrustedSSLError()) {
+    private void configureDownloadTlsIfNeeded(HttpURLConnection connection, URL downloadUrl) throws Exception {
+        if (!(connection instanceof HttpsURLConnection)) {
             return;
         }
 
-        TrustManager[] trustManagers = new TrustManager[] {
-            new X509TrustManager() {
-                @Override
-                public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+        ClientCertificateIdentity clientCertificateIdentity = clientCertificateIdentities.get(clientCertificateIdentityKey(downloadUrl));
+        boolean ignoreUntrustedSslError = _options != null && _options.ignoreUntrustedSSLError();
+        if (clientCertificateIdentity == null && !ignoreUntrustedSslError) {
+            return;
+        }
 
-                @Override
-                public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+        KeyManager[] keyManagers =
+            clientCertificateIdentity != null ? new KeyManager[] { new FixedClientCertificateKeyManager(clientCertificateIdentity) } : null;
 
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-            }
-        };
+        TrustManager[] trustManagers = ignoreUntrustedSslError
+            ? new TrustManager[] {
+                  new X509TrustManager() {
+                      @Override
+                      public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+
+                      @Override
+                      public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+
+                      @Override
+                      public X509Certificate[] getAcceptedIssuers() {
+                          return new X509Certificate[0];
+                      }
+                  }
+              }
+            : null;
         SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(null, trustManagers, new SecureRandom());
+        sslContext.init(keyManagers, trustManagers, new SecureRandom());
 
         HttpsURLConnection secureConnection = (HttpsURLConnection) connection;
         secureConnection.setSSLSocketFactory(sslContext.getSocketFactory());
-        secureConnection.setHostnameVerifier((hostname, session) -> true);
+        if (ignoreUntrustedSslError) {
+            secureConnection.setHostnameVerifier((hostname, session) -> true);
+        }
     }
 
     private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
@@ -1005,7 +1172,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             try {
                 URL downloadUrl = new URL(url);
                 connection = (HttpURLConnection) downloadUrl.openConnection();
-                configureDownloadTlsIfNeeded(connection);
+                configureDownloadTlsIfNeeded(connection, downloadUrl);
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(30000);
                 connection.setInstanceFollowRedirects(true);
@@ -1025,13 +1192,22 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 if (_options != null && _options.getHeaders() != null) {
-                    Iterator<String> headerKeys = _options.getHeaders().keys();
-                    while (headerKeys.hasNext()) {
-                        String headerKey = headerKeys.next();
-                        String headerValue = _options.getHeaders().getString(headerKey);
-                        if (!TextUtils.isEmpty(headerValue)) {
-                            connection.setRequestProperty(headerKey, headerValue);
+                    String pageUrl = _webView != null ? _webView.getUrl() : _options.getUrl();
+                    if (isSameOrigin(pageUrl, url)) {
+                        Iterator<String> headerKeys = _options.getHeaders().keys();
+                        while (headerKeys.hasNext()) {
+                            String headerKey = headerKeys.next();
+                            if (!shouldForwardCustomDownloadHeader(headerKey)) {
+                                continue;
+                            }
+
+                            String headerValue = _options.getHeaders().getString(headerKey);
+                            if (!TextUtils.isEmpty(headerValue)) {
+                                connection.setRequestProperty(headerKey, headerValue);
+                            }
                         }
+                    } else {
+                        Log.w("InAppBrowser", "Skipping custom headers for cross-origin download: " + redactUrlForLogging(url));
                     }
                 }
 
@@ -3610,9 +3786,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                         try {
                                             PrivateKey privateKey = KeyChain.getPrivateKey(activity, alias);
                                             X509Certificate[] certChain = KeyChain.getCertificateChain(activity, alias);
+                                            clientCertificateIdentities.put(
+                                                clientCertificateIdentityKey(request.getHost(), request.getPort(), "https"),
+                                                new ClientCertificateIdentity(privateKey, certChain)
+                                            );
                                             request.proceed(privateKey, certChain);
                                             Log.i("InAppBrowser", "Selected certificate: " + alias);
                                         } catch (Exception e) {
+                                            clientCertificateIdentities.remove(
+                                                clientCertificateIdentityKey(request.getHost(), request.getPort(), "https")
+                                            );
                                             try {
                                                 request.cancel();
                                             } catch (Exception cancelEx) {
@@ -3621,6 +3804,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                             Log.e("InAppBrowser", "Error selecting certificate: " + e.getMessage());
                                         }
                                     } else {
+                                        clientCertificateIdentities.remove(
+                                            clientCertificateIdentityKey(request.getHost(), request.getPort(), "https")
+                                        );
                                         try {
                                             request.cancel();
                                         } catch (Exception e) {
@@ -3638,6 +3824,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         );
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error in onReceivedClientCertRequest: " + e.getMessage());
+                        clientCertificateIdentities.remove(clientCertificateIdentityKey(request.getHost(), request.getPort(), "https"));
                         try {
                             request.cancel();
                         } catch (Exception cancelEx) {
@@ -4344,6 +4531,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             cleanupBlobDownloadSession(session, true);
         }
         blobDownloadSessions.clear();
+        clientCertificateIdentities.clear();
 
         // Shutdown executor service asynchronously to avoid blocking UI thread
         shutdownExecutorServiceAsync();
