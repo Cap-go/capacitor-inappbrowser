@@ -65,6 +65,11 @@ jobs:
           curl -fsSL "https://get.maestro.mobile.dev" | bash
       - name: Build example app for Android regression flow
         run: bun run example-app:prepare:android
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: Run Maestro proxy regression
         uses: ReactiveCircus/android-emulator-runner@e89f39f1abbbd05b1113a29cf4db69e7540cae5a
         with:
