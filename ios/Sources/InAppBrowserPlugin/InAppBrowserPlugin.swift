@@ -898,7 +898,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 documentStartUserScripts: self.documentStartUserScripts(
                     authorizedAppLinks: authorizedAppLinks,
                     openBlankTargetInWebView: openBlankTargetInWebView
-                )
+                ),
+                openBlankTargetInWebView: openBlankTargetInWebView
             )
 
             guard let webViewController = self.webViewController else {

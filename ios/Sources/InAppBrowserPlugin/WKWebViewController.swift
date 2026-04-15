@@ -16,7 +16,6 @@ private let cookieKey = "Cookie"
 private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
     static var schemes = ["tel", "mailto", "sms"]
-    static var blank = true
 }
 
 public struct WKWebViewCredentials {
@@ -245,7 +244,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, openBlankTargetInWebView: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -255,12 +254,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.captureConsoleLogs = captureConsoleLogs
+        self.openBlankTargetInWebView = openBlankTargetInWebView
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, openBlankTargetInWebView: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -270,13 +270,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.captureConsoleLogs = captureConsoleLogs
+        self.openBlankTargetInWebView = openBlankTargetInWebView
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = []) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = [], openBlankTargetInWebView: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -288,6 +289,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.captureConsoleLogs = captureConsoleLogs
         self.proxyRequests = proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
+        self.openBlankTargetInWebView = openBlankTargetInWebView
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
         self.setBlockedHosts(blockedHosts: blockedHosts)
@@ -334,6 +336,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
+    var openBlankTargetInWebView: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
@@ -1232,6 +1235,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.ignoreUntrustedSSLError = parent.ignoreUntrustedSSLError
         self.enableGooglePaySupport = parent.enableGooglePaySupport
         self.preventDeeplink = parent.preventDeeplink
+        self.openBlankTargetInWebView = parent.openBlankTargetInWebView
         self.blankNavigationTab = false
         self.enabledSafeBottomMargin = parent.enabledSafeBottomMargin
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
@@ -1863,9 +1867,32 @@ fileprivate extension WKWebViewController {
         return false
     }
 
+    private func isHttpOrHttps(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
+    }
+
+    private func shouldLoadBlankTargetInCurrentWebView(_ url: URL, targetFrame: WKFrameInfo?) -> Bool {
+        guard targetFrame == nil else {
+            return false
+        }
+        guard isHttpOrHttps(url) else {
+            return false
+        }
+
+        // Preserve native handling for authorized App/Universal Links unless deeplinks are blocked
+        if isUrlAuthorized(url, authorizedLinks: authorizedAppLinks) && !preventDeeplink {
+            return false
+        }
+
+        return openBlankTargetInWebView || preventDeeplink
+    }
+
     /// Attempts to open URL in an external app if it's a custom scheme OR an authorized universal link.
     /// Returns via completion whether an external app was opened (true) or not (false).
-    private func handleURLWithApp(_ url: URL, targetFrame: WKFrameInfo?, completion: @escaping (Bool) -> Void) {
+    private func handleURLWithApp(_ url: URL, targetFrame _: WKFrameInfo?, completion: @escaping (Bool) -> Void) {
 
         // If preventDeeplink is true, don't try to open URLs in external apps
         if preventDeeplink {
@@ -1897,7 +1924,6 @@ fileprivate extension WKWebViewController {
         // Also handle specific hosts and schemes from UrlsHandledByApp
         let hosts = UrlsHandledByApp.hosts
         let schemes = UrlsHandledByApp.schemes
-        let blank = UrlsHandledByApp.blank
 
         if hosts.contains(host) {
             print("[InAppBrowser] host \(host) matches one in UrlsHandledByApp, try to open URLs in external apps")
@@ -1906,11 +1932,6 @@ fileprivate extension WKWebViewController {
         }
         if schemes.contains(scheme) {
             print("[InAppBrowser] scheme \(scheme) matches one in UrlsHandledByApp, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
-            return
-        }
-        if blank && targetFrame == nil {
-            print("[InAppBrowser] is blank and targetFrame is nil, try to open URLs in external apps")
             completion(tryOpenCustomScheme(url))
             return
         }
@@ -2456,6 +2477,16 @@ extension WKWebViewController: WKNavigationDelegate {
             }
 
             if openedExternally {
+                decisionHandler(.cancel)
+                return
+            }
+
+            if self.shouldLoadBlankTargetInCurrentWebView(url, targetFrame: navigationAction.targetFrame) {
+                if let webView = self.webView {
+                    webView.load(navigationAction.request)
+                } else {
+                    self.load(remote: url)
+                }
                 decisionHandler(.cancel)
                 return
             }
