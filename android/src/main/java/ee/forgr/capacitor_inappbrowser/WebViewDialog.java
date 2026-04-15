@@ -3789,6 +3789,63 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         buttonNearDoneView.setColorFilter(iconColor);
     }
 
+    private void updateNavigationButtonsState() {
+        if (_toolbar == null || _webView == null) {
+            return;
+        }
+
+        ImageButton backButton = _toolbar.findViewById(R.id.backButton);
+        ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
+        if (backButton == null || forwardButton == null) {
+            return;
+        }
+
+        boolean canGoBack = _webView.canGoBack();
+        boolean canGoForward = _webView.canGoForward();
+
+        if (canGoBack) {
+            backButton.setImageResource(R.drawable.arrow_back_enabled);
+            backButton.setEnabled(true);
+            backButton.setColorFilter(iconColor);
+            backButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if (_webView != null && _webView.canGoBack()) {
+                            _webView.goBack();
+                        }
+                    }
+                }
+            );
+        } else {
+            backButton.setImageResource(R.drawable.arrow_back_disabled);
+            backButton.setEnabled(false);
+            backButton.setColorFilter(Color.argb(128, Color.red(iconColor), Color.green(iconColor), Color.blue(iconColor)));
+            backButton.setOnClickListener(null);
+        }
+
+        if (canGoForward) {
+            forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
+            forwardButton.setEnabled(true);
+            forwardButton.setColorFilter(iconColor);
+            forwardButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        if (_webView != null && _webView.canGoForward()) {
+                            _webView.goForward();
+                        }
+                    }
+                }
+            );
+        } else {
+            forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
+            forwardButton.setEnabled(false);
+            forwardButton.setColorFilter(Color.argb(128, Color.red(iconColor), Color.green(iconColor), Color.blue(iconColor)));
+            forwardButton.setOnClickListener(null);
+        }
+    }
+
     public void handleProxyResultError(String result, String id) {
         Log.i("InAppBrowserProxy", String.format("handleProxyResultError: %s, ok: %s id: %s", result, false, id));
         handleProxyResponse(id, null);
@@ -4513,6 +4570,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }
+                    updateNavigationButtonsState();
                     super.doUpdateVisitedHistory(view, url, isReload);
                     injectJavaScriptInterface();
 
@@ -4570,47 +4628,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         );
                     }
 
-                    ImageButton backButton = _toolbar.findViewById(R.id.backButton);
-                    if (_webView != null && _webView.canGoBack()) {
-                        backButton.setImageResource(R.drawable.arrow_back_enabled);
-                        backButton.setEnabled(true);
-                        backButton.setColorFilter(iconColor);
-                        backButton.setOnClickListener(
-                            new View.OnClickListener() {
-                                @Override
-                                public void onClick(View view) {
-                                    if (_webView != null && _webView.canGoBack()) {
-                                        _webView.goBack();
-                                    }
-                                }
-                            }
-                        );
-                    } else {
-                        backButton.setImageResource(R.drawable.arrow_back_disabled);
-                        backButton.setEnabled(false);
-                        backButton.setColorFilter(Color.argb(128, Color.red(iconColor), Color.green(iconColor), Color.blue(iconColor)));
-                    }
-
-                    ImageButton forwardButton = _toolbar.findViewById(R.id.forwardButton);
-                    if (_webView != null && _webView.canGoForward()) {
-                        forwardButton.setImageResource(R.drawable.arrow_forward_enabled);
-                        forwardButton.setEnabled(true);
-                        forwardButton.setColorFilter(iconColor);
-                        forwardButton.setOnClickListener(
-                            new View.OnClickListener() {
-                                @Override
-                                public void onClick(View view) {
-                                    if (_webView != null && _webView.canGoForward()) {
-                                        _webView.goForward();
-                                    }
-                                }
-                            }
-                        );
-                    } else {
-                        forwardButton.setImageResource(R.drawable.arrow_forward_disabled);
-                        forwardButton.setEnabled(false);
-                        forwardButton.setColorFilter(Color.argb(128, Color.red(iconColor), Color.green(iconColor), Color.blue(iconColor)));
-                    }
+                    updateNavigationButtonsState();
 
                     _options.getCallbacks().pageLoaded();
                     injectJavaScriptInterface();

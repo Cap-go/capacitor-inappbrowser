@@ -1659,6 +1659,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             // Guard against notifications during cleanup when webView is being torn down
             guard self.webView != nil else { return }
             emit("urlChangeEvent", data: ["url": webView?.url?.absoluteString ?? ""])
+            DispatchQueue.main.async { [weak self] in
+                self?.updateBarButtonItems()
+            }
             self.injectJavaScriptInterface()
         default:
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
