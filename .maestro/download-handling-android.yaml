@@ -1,0 +1,14 @@
+appId: app.capgo.inappbrowser
+---
+- extendedWaitUntil:
+    visible: "InAppBrowser Test App"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Open Auto Download Demo \\+ Close On Event"
+    timeout: 20000
+- tapOn: "Open Auto Download Demo + Close On Event"
+- extendedWaitUntil:
+    visible: "Event OK: capgo-download-demo(-\\d+)?\\.txt"
+    timeout: 30000
+- assertVisible: "InAppBrowser Test App"
+- assertVisible: "Event OK: capgo-download-demo(-\\d+)?\\.txt"

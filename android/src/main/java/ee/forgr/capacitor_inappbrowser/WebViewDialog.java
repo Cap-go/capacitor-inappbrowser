@@ -45,6 +45,7 @@ import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
+import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -74,15 +75,25 @@ import com.getcapacitor.PluginCall;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.Principal;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
+import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -92,12 +103,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509KeyManager;
+import javax.net.ssl.X509TrustManager;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -192,6 +211,108 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private static final int REQUEST_CONNECT_TIMEOUT_MS = 15_000;
     private static final int REQUEST_READ_TIMEOUT_MS = 30_000;
     private static final int MAX_WEBVIEW_PROXY_REDIRECTS = 10;
+    private static final int MAX_MANAGED_DOWNLOAD_REDIRECTS = 10;
+    private static final int BLOB_DOWNLOAD_CHUNK_BYTES = 64 * 1024;
+    private static final long MAX_LEGACY_BLOB_DOWNLOAD_BYTES = 512L * 1024L;
+    private static final long MAX_INLINE_TEXT_PREVIEW_BYTES = 512L * 1024L;
+
+    private static class BlobDownloadSession {
+
+        private final File outputFile;
+        private final String sourceUrl;
+        private final String mimeType;
+        private final FileOutputStream outputStream;
+        private final long expectedSize;
+        private long bytesWritten;
+
+        private BlobDownloadSession(File outputFile, String sourceUrl, String mimeType, FileOutputStream outputStream, long expectedSize) {
+            this.outputFile = outputFile;
+            this.sourceUrl = sourceUrl;
+            this.mimeType = mimeType;
+            this.outputStream = outputStream;
+            this.expectedSize = expectedSize;
+            this.bytesWritten = 0L;
+        }
+    }
+
+    private static class ClientCertificateIdentity {
+
+        private final PrivateKey privateKey;
+        private final X509Certificate[] certificateChain;
+
+        private ClientCertificateIdentity(PrivateKey privateKey, X509Certificate[] certificateChain) {
+            this.privateKey = privateKey;
+            this.certificateChain = certificateChain;
+        }
+    }
+
+    private static class FixedClientCertificateKeyManager implements X509KeyManager {
+
+        private static final String ALIAS = "inappbrowser-client-cert";
+        private final ClientCertificateIdentity identity;
+
+        private FixedClientCertificateKeyManager(ClientCertificateIdentity identity) {
+            this.identity = identity;
+        }
+
+        @Override
+        public String[] getClientAliases(String keyType, Principal[] issuers) {
+            return shouldUseIdentity(keyType) ? new String[] { ALIAS } : null;
+        }
+
+        @Override
+        public String chooseClientAlias(String[] keyTypes, Principal[] issuers, java.net.Socket socket) {
+            if (keyTypes == null) {
+                return ALIAS;
+            }
+
+            for (String keyType : keyTypes) {
+                if (shouldUseIdentity(keyType)) {
+                    return ALIAS;
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        public String[] getServerAliases(String keyType, Principal[] issuers) {
+            return null;
+        }
+
+        @Override
+        public String chooseServerAlias(String keyType, Principal[] issuers, java.net.Socket socket) {
+            return null;
+        }
+
+        @Override
+        public X509Certificate[] getCertificateChain(String alias) {
+            return ALIAS.equals(alias) ? identity.certificateChain : null;
+        }
+
+        @Override
+        public PrivateKey getPrivateKey(String alias) {
+            return ALIAS.equals(alias) ? identity.privateKey : null;
+        }
+
+        private boolean shouldUseIdentity(String keyType) {
+            if (
+                identity == null ||
+                identity.privateKey == null ||
+                identity.certificateChain == null ||
+                identity.certificateChain.length == 0
+            ) {
+                return false;
+            }
+
+            if (TextUtils.isEmpty(keyType)) {
+                return true;
+            }
+
+            String privateKeyAlgorithm = identity.privateKey.getAlgorithm();
+            return !TextUtils.isEmpty(privateKeyAlgorithm) && privateKeyAlgorithm.equalsIgnoreCase(keyType);
+        }
+    }
 
     private WebView _webView;
     private Toolbar _toolbar;
@@ -207,6 +328,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
+    private final Map<String, ClientCertificateIdentity> clientCertificateIdentities = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
     private boolean isHiddenModeActive = false;
     private WindowManager.LayoutParams previousWindowAttributes;
@@ -411,6 +535,201 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             );
         }
+
+        @JavascriptInterface
+        public void handleBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            executorService.execute(() -> {
+                try {
+                    JSONObject jsonPayload = parseBridgePayload(payload, "Blob download payload is missing");
+                    String base64 = jsonPayload.optString("base64", "");
+                    if (TextUtils.isEmpty(base64)) {
+                        throw new IOException("Blob download payload is empty");
+                    }
+
+                    long declaredSize = jsonPayload.optLong("size", -1L);
+                    long estimatedSize = estimateDecodedByteCount(base64);
+                    long decodedSize = declaredSize >= 0 ? Math.max(declaredSize, estimatedSize) : estimatedSize;
+                    if (decodedSize > MAX_LEGACY_BLOB_DOWNLOAD_BYTES) {
+                        throw new IOException("Blob download is too large for the legacy bridge");
+                    }
+
+                    String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                    String sourceUrl = jsonPayload.optString("sourceUrl", null);
+                    String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
+                    File outputFile = null;
+
+                    try {
+                        outputFile = createDownloadFile(fileName);
+                        try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+                            outputStream.write(Base64.decode(base64, Base64.DEFAULT));
+                        }
+
+                        finalizeDownload(outputFile, mimeType, sourceUrl);
+                    } catch (Exception innerException) {
+                        if (outputFile != null && outputFile.exists() && !outputFile.delete()) {
+                            outputFile.deleteOnExit();
+                        }
+                        throw innerException;
+                    }
+                } catch (Exception exception) {
+                    showDownloadError("Failed to save blob download", exception);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void startBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            try {
+                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download start payload is missing");
+                String sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
+                String sourceUrl = jsonPayload.optString("sourceUrl", null);
+                String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
+                long expectedSize = jsonPayload.optLong("size", -1L);
+                File outputFile = createDownloadFile(fileName);
+                BlobDownloadSession session = new BlobDownloadSession(
+                    outputFile,
+                    sourceUrl,
+                    mimeType,
+                    new FileOutputStream(outputFile),
+                    expectedSize
+                );
+
+                BlobDownloadSession existingSession = blobDownloadSessions.putIfAbsent(sessionId, session);
+                if (existingSession != null) {
+                    cleanupBlobDownloadSession(session, true);
+                    throw new IOException("Blob download session already exists");
+                }
+            } catch (Exception exception) {
+                showDownloadError("Failed to start blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void appendBlobDownloadChunk(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            try {
+                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download chunk payload is missing");
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                String base64 = jsonPayload.optString("base64", "");
+                if (TextUtils.isEmpty(base64)) {
+                    return;
+                }
+
+                BlobDownloadSession session = blobDownloadSessions.get(sessionId);
+                if (session == null) {
+                    Log.w("InAppBrowser", "Ignoring chunk for missing or aborted blob session: " + sessionId);
+                    return;
+                }
+
+                byte[] chunkBytes = Base64.decode(base64, Base64.DEFAULT);
+                synchronized (session) {
+                    session.outputStream.write(chunkBytes);
+                    session.bytesWritten += chunkBytes.length;
+                    if (session.expectedSize >= 0 && session.bytesWritten > session.expectedSize) {
+                        throw new IOException("Blob download exceeded expected size");
+                    }
+                }
+            } catch (Exception exception) {
+                abortBlobDownloadSession(sessionId, true);
+                showDownloadError("Failed to save blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void finishBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            try {
+                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download completion payload is missing");
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (TextUtils.isEmpty(sessionId)) {
+                    throw new IOException("Blob download session id is missing");
+                }
+
+                BlobDownloadSession session = blobDownloadSessions.get(sessionId);
+                if (session == null) {
+                    throw new IOException("Blob download session was not initialized");
+                }
+
+                synchronized (session) {
+                    session.outputStream.flush();
+                    session.outputStream.close();
+                }
+
+                if (session.expectedSize >= 0 && session.bytesWritten != session.expectedSize) {
+                    throw new IOException(
+                        "Blob download size mismatch for " +
+                            session.outputFile.getName() +
+                            ": expected " +
+                            session.expectedSize +
+                            ", wrote " +
+                            session.bytesWritten
+                    );
+                }
+
+                finalizeDownload(session.outputFile, session.mimeType, session.sourceUrl);
+                blobDownloadSessions.remove(sessionId);
+            } catch (Exception exception) {
+                abortBlobDownloadSession(sessionId, true);
+                showDownloadError("Failed to finalize blob download", exception);
+            }
+        }
+
+        @JavascriptInterface
+        public void abortBlobDownload(String payload) {
+            if (_options == null || !_options.getHandleDownloads()) {
+                return;
+            }
+
+            String sessionId = null;
+            String reason = "Blob download aborted";
+            String sourceUrl = null;
+            String fileName = null;
+            String mimeType = null;
+            try {
+                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download abort payload is missing");
+                sessionId = jsonPayload.optString("sessionId", "");
+                if (!TextUtils.isEmpty(jsonPayload.optString("reason", ""))) {
+                    reason = jsonPayload.optString("reason", reason);
+                }
+                sourceUrl = jsonPayload.optString("sourceUrl", null);
+                fileName = jsonPayload.optString("fileName", null);
+                mimeType = jsonPayload.optString("mimeType", null);
+            } catch (Exception ignored) {}
+
+            BlobDownloadSession session = abortBlobDownloadSession(sessionId, true);
+            notifyDownloadFailed(
+                session != null ? session.sourceUrl : sourceUrl,
+                session != null ? session.outputFile.getName() : fileName,
+                session != null ? session.mimeType : mimeType,
+                reason
+            );
+            Log.w("InAppBrowser", reason);
+        }
     }
 
     public interface ScreenshotResultCallback {
@@ -434,6 +753,909 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
         String upperMethod = method.toUpperCase();
         return upperMethod.equals("POST") || upperMethod.equals("PUT") || upperMethod.equals("PATCH");
+    }
+
+    private String sanitizeFileName(String fileName) {
+        if (TextUtils.isEmpty(fileName)) {
+            return "download";
+        }
+
+        String sanitized = fileName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        return sanitized.isEmpty() ? "download" : sanitized;
+    }
+
+    private String fileExtension(String fileName) {
+        int lastDotIndex = fileName.lastIndexOf('.');
+        if (lastDotIndex < 0 || lastDotIndex == fileName.length() - 1) {
+            return "";
+        }
+        return fileName.substring(lastDotIndex + 1).toLowerCase();
+    }
+
+    private String normalizeMimeType(String mimeType, String fileName) {
+        if (!TextUtils.isEmpty(mimeType)) {
+            String normalized = mimeType.split(";")[0].trim().toLowerCase();
+            if (!TextUtils.isEmpty(normalized)) {
+                return normalized;
+            }
+        }
+
+        String guessedType = URLConnection.guessContentTypeFromName(fileName);
+        if (!TextUtils.isEmpty(guessedType)) {
+            return guessedType.toLowerCase();
+        }
+
+        String extension = fileExtension(fileName);
+        if ("pdf".equals(extension)) {
+            return "application/pdf";
+        }
+        if ("json".equals(extension)) {
+            return "application/json";
+        }
+
+        return "application/octet-stream";
+    }
+
+    private boolean isTextPreviewMimeType(String mimeType) {
+        if (TextUtils.isEmpty(mimeType)) {
+            return false;
+        }
+
+        return (
+            mimeType.startsWith("text/") ||
+            "application/json".equals(mimeType) ||
+            "application/javascript".equals(mimeType) ||
+            "application/xhtml+xml".equals(mimeType) ||
+            "image/svg+xml".equals(mimeType)
+        );
+    }
+
+    private File downloadDirectory() throws IOException {
+        File directory = new File(_context.getCacheDir(), "inappbrowser-downloads");
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Could not create download directory");
+        }
+        return directory;
+    }
+
+    private File createDownloadFile(String fileName) throws IOException {
+        String sanitizedFileName = sanitizeFileName(fileName);
+        String extension = fileExtension(sanitizedFileName);
+        String baseName = extension.isEmpty()
+            ? sanitizedFileName
+            : sanitizedFileName.substring(0, sanitizedFileName.length() - extension.length() - 1);
+        File directory = downloadDirectory();
+
+        int duplicateIndex = 0;
+        while (true) {
+            String candidateName =
+                duplicateIndex == 0
+                    ? sanitizedFileName
+                    : extension.isEmpty()
+                        ? baseName + "-" + duplicateIndex
+                        : baseName + "-" + duplicateIndex + "." + extension;
+            File candidate = new File(directory, candidateName);
+            if (candidate.createNewFile()) {
+                return candidate;
+            }
+            duplicateIndex++;
+        }
+    }
+
+    private String readUtf8File(File file) throws IOException {
+        try (FileInputStream inputStream = new FileInputStream(file); ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            return new String(outputStream.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private long estimateDecodedByteCount(String base64) {
+        if (TextUtils.isEmpty(base64)) {
+            return 0L;
+        }
+
+        int padding = 0;
+        int length = base64.length();
+        if (length > 0 && base64.charAt(length - 1) == '=') {
+            padding++;
+        }
+        if (length > 1 && base64.charAt(length - 2) == '=') {
+            padding++;
+        }
+        return ((long) length * 3L) / 4L - padding;
+    }
+
+    private JSONObject parseBridgePayload(String payload, String errorMessage) throws JSONException {
+        if (TextUtils.isEmpty(payload)) {
+            throw new JSONException(errorMessage);
+        }
+        return new JSONObject(payload);
+    }
+
+    private void cleanupBlobDownloadSession(BlobDownloadSession session, boolean deleteFile) {
+        if (session == null) {
+            return;
+        }
+
+        synchronized (session) {
+            try {
+                session.outputStream.close();
+            } catch (IOException ignored) {}
+        }
+
+        if (deleteFile && session.outputFile.exists() && !session.outputFile.delete()) {
+            session.outputFile.deleteOnExit();
+        }
+    }
+
+    private BlobDownloadSession abortBlobDownloadSession(String sessionId, boolean deleteFile) {
+        if (TextUtils.isEmpty(sessionId)) {
+            return null;
+        }
+
+        BlobDownloadSession session = blobDownloadSessions.remove(sessionId);
+        cleanupBlobDownloadSession(session, deleteFile);
+        return session;
+    }
+
+    private String textPreviewHtml(File file, String bodyText) {
+        String fileName = TextUtils.htmlEncode(file.getName());
+        String escapedBody = TextUtils.htmlEncode(bodyText);
+
+        return String.format(
+            """
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>%s</title>
+                <style>
+                  body {
+                    margin: 0;
+                    min-height: 100vh;
+                    padding: 24px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                    background: linear-gradient(180deg, #f8fafc 0%%, #e2e8f0 100%%);
+                    color: #0f172a;
+                  }
+                  main {
+                    max-width: 720px;
+                    margin: 0 auto;
+                    background: rgba(255, 255, 255, 0.94);
+                    border-radius: 20px;
+                    padding: 24px;
+                    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+                  }
+                  h1 {
+                    margin: 0 0 16px;
+                    font-size: 1.2rem;
+                  }
+                  pre {
+                    margin: 0;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    font-size: 1rem;
+                    line-height: 1.6;
+                  }
+                </style>
+              </head>
+              <body>
+                <main>
+                  <h1>%s</h1>
+                  <pre>%s</pre>
+                </main>
+              </body>
+            </html>
+            """,
+            fileName,
+            fileName,
+            escapedBody
+        );
+    }
+
+    private void notifyDownloadCompleted(File file, String mimeType, String sourceUrl, String handledBy) {
+        if (_options == null || _options.getCallbacks() == null) {
+            return;
+        }
+
+        _options
+            .getCallbacks()
+            .downloadCompleted(sourceUrl, file.getName(), mimeType, file.getAbsolutePath(), Uri.fromFile(file).toString(), handledBy);
+    }
+
+    private void notifyDownloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+        if (_options == null || _options.getCallbacks() == null) {
+            return;
+        }
+
+        _options.getCallbacks().downloadFailed(sourceUrl, fileName, mimeType, error);
+    }
+
+    private String downloadErrorMessage(String message, Exception exception) {
+        if (exception == null || TextUtils.isEmpty(exception.getMessage())) {
+            return message;
+        }
+        return message + ": " + exception.getMessage();
+    }
+
+    private int normalizedPort(String scheme, int port) {
+        if (port >= 0) {
+            return port;
+        }
+        if ("https".equalsIgnoreCase(scheme)) {
+            return 443;
+        }
+        if ("http".equalsIgnoreCase(scheme)) {
+            return 80;
+        }
+        return -1;
+    }
+
+    private String clientCertificateIdentityKey(String host, int port, String scheme) {
+        if (TextUtils.isEmpty(host)) {
+            return null;
+        }
+        return host.toLowerCase(Locale.ROOT) + ":" + normalizedPort(scheme, port);
+    }
+
+    private String clientCertificateIdentityKey(URL url) {
+        if (url == null) {
+            return null;
+        }
+        return clientCertificateIdentityKey(url.getHost(), url.getPort(), url.getProtocol());
+    }
+
+    private boolean isSameOrigin(String firstUrl, String secondUrl) {
+        if (TextUtils.isEmpty(firstUrl) || TextUtils.isEmpty(secondUrl)) {
+            return false;
+        }
+
+        try {
+            URI firstUri = new URI(firstUrl);
+            URI secondUri = new URI(secondUrl);
+            String firstHost = firstUri.getHost();
+            String secondHost = secondUri.getHost();
+            if (firstHost == null || secondHost == null) {
+                return false;
+            }
+
+            return (
+                Objects.equals(firstUri.getScheme(), secondUri.getScheme()) &&
+                firstHost.equalsIgnoreCase(secondHost) &&
+                normalizedPort(firstUri.getScheme(), firstUri.getPort()) == normalizedPort(secondUri.getScheme(), secondUri.getPort())
+            );
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean shouldBlockManagedDownload(String url) {
+        if (_options == null) {
+            return false;
+        }
+
+        return shouldBlockHost(url, _options.getBlockedHosts());
+    }
+
+    private boolean shouldBlockHost(String url, List<String> blockedHosts) {
+        Uri uri = Uri.parse(url);
+        String host = uri.getHost();
+
+        if (host == null || host.isEmpty()) {
+            return false;
+        }
+
+        if (blockedHosts == null || blockedHosts.isEmpty()) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.US);
+        for (String blockPattern : blockedHosts) {
+            if (blockPattern != null && matchesBlockPattern(normalizedHost, blockPattern.toLowerCase(Locale.US))) {
+                Log.d("InAppBrowser", "Blocked managed download host detected: " + host);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean matchesBlockPattern(String host, String pattern) {
+        if (pattern == null || pattern.isEmpty()) {
+            return false;
+        }
+
+        if (host.equals(pattern)) {
+            return true;
+        }
+
+        if (!pattern.contains("*")) {
+            return false;
+        }
+
+        if (pattern.startsWith("*.")) {
+            return matchesWildcardDomain(host, pattern);
+        } else if (pattern.contains("*")) {
+            return matchesRegexPattern(host, pattern);
+        }
+
+        return false;
+    }
+
+    private boolean matchesWildcardDomain(String host, String pattern) {
+        String domain = pattern.substring(2);
+        if (domain.isEmpty()) {
+            return false;
+        }
+
+        return host.equals(domain) || host.endsWith("." + domain);
+    }
+
+    private boolean matchesRegexPattern(String host, String pattern) {
+        try {
+            String escapedPattern = pattern
+                .replace("\\", "\\\\")
+                .replace(".", "\\.")
+                .replace("+", "\\+")
+                .replace("?", "\\?")
+                .replace("^", "\\^")
+                .replace("$", "\\$")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("|", "\\|");
+            String regexPattern = "^" + escapedPattern.replace("*", ".*") + "$";
+            return Pattern.matches(regexPattern, host);
+        } catch (Exception exception) {
+            Log.e("InAppBrowser", "Invalid blocked host pattern '" + pattern + "': " + exception.getMessage());
+            return false;
+        }
+    }
+
+    private boolean shouldForwardCustomDownloadHeader(String headerKey) {
+        if (TextUtils.isEmpty(headerKey)) {
+            return false;
+        }
+
+        return !("cookie".equalsIgnoreCase(headerKey) || "proxy-authorization".equalsIgnoreCase(headerKey));
+    }
+
+    private String redactUrlForLogging(String rawUrl) {
+        if (TextUtils.isEmpty(rawUrl)) {
+            return rawUrl;
+        }
+
+        try {
+            Uri parsedUrl = Uri.parse(rawUrl);
+            return parsedUrl.buildUpon().encodedQuery(null).encodedFragment(null).build().toString();
+        } catch (Exception exception) {
+            return rawUrl;
+        }
+    }
+
+    private void configureDownloadTlsIfNeeded(HttpURLConnection connection, URL downloadUrl) throws Exception {
+        if (!(connection instanceof HttpsURLConnection)) {
+            return;
+        }
+
+        ClientCertificateIdentity clientCertificateIdentity = clientCertificateIdentities.get(clientCertificateIdentityKey(downloadUrl));
+        boolean ignoreUntrustedSslError = _options != null && _options.ignoreUntrustedSSLError();
+        if (clientCertificateIdentity == null && !ignoreUntrustedSslError) {
+            return;
+        }
+
+        KeyManager[] keyManagers =
+            clientCertificateIdentity != null ? new KeyManager[] { new FixedClientCertificateKeyManager(clientCertificateIdentity) } : null;
+
+        X509TrustManager defaultTrustManager = ignoreUntrustedSslError ? createDefaultTrustManager() : null;
+        TrustManager[] trustManagers = ignoreUntrustedSslError
+            ? new TrustManager[] {
+                  new X509TrustManager() {
+                      @Override
+                      public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                          defaultTrustManager.checkClientTrusted(chain, authType);
+                      }
+
+                      @Override
+                      public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                          try {
+                              defaultTrustManager.checkServerTrusted(chain, authType);
+                          } catch (CertificateException certificateException) {
+                              if (!shouldBypassDownloadTrustFailure(certificateException, chain)) {
+                                  throw certificateException;
+                              }
+                              Log.w(
+                                  "InAppBrowser",
+                                  "Ignoring untrusted download certificate for " + redactUrlForLogging(downloadUrl.toString())
+                              );
+                          }
+                      }
+
+                      @Override
+                      public X509Certificate[] getAcceptedIssuers() {
+                          return defaultTrustManager.getAcceptedIssuers();
+                      }
+                  }
+              }
+            : null;
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagers, trustManagers, new SecureRandom());
+
+        HttpsURLConnection secureConnection = (HttpsURLConnection) connection;
+        secureConnection.setSSLSocketFactory(sslContext.getSocketFactory());
+    }
+
+    private X509TrustManager createDefaultTrustManager() throws GeneralSecurityException {
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init((java.security.KeyStore) null);
+        for (TrustManager trustManager : trustManagerFactory.getTrustManagers()) {
+            if (trustManager instanceof X509TrustManager) {
+                return (X509TrustManager) trustManager;
+            }
+        }
+        throw new GeneralSecurityException("No default X509TrustManager available");
+    }
+
+    private boolean shouldBypassDownloadTrustFailure(CertificateException certificateException, X509Certificate[] chain) {
+        return areCertificatesCurrentlyValid(chain) && isUntrustedIssuerFailure(certificateException);
+    }
+
+    private boolean areCertificatesCurrentlyValid(X509Certificate[] chain) {
+        if (chain == null || chain.length == 0) {
+            return false;
+        }
+
+        for (X509Certificate certificate : chain) {
+            if (certificate == null) {
+                return false;
+            }
+
+            try {
+                certificate.checkValidity();
+            } catch (CertificateExpiredException | CertificateNotYetValidException certificateValidityException) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isUntrustedIssuerFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof CertificateExpiredException || current instanceof CertificateNotYetValidException) {
+                return false;
+            }
+            if (current instanceof CertPathValidatorException) {
+                CertPathValidatorException validatorException = (CertPathValidatorException) current;
+                CertPathValidatorException.Reason reason = validatorException.getReason();
+                if (
+                    reason == CertPathValidatorException.BasicReason.EXPIRED ||
+                    reason == CertPathValidatorException.BasicReason.NOT_YET_VALID ||
+                    reason == CertPathValidatorException.BasicReason.REVOKED ||
+                    reason == CertPathValidatorException.BasicReason.INVALID_SIGNATURE ||
+                    reason == CertPathValidatorException.BasicReason.ALGORITHM_CONSTRAINED
+                ) {
+                    return false;
+                }
+            }
+
+            String message = current.getMessage();
+            if (!TextUtils.isEmpty(message)) {
+                String normalizedMessage = message.toLowerCase(Locale.US);
+                if (
+                    normalizedMessage.contains("trust anchor for certification path not found") ||
+                    normalizedMessage.contains("unable to find valid certification path") ||
+                    normalizedMessage.contains("trust anchor")
+                ) {
+                    return true;
+                }
+                if (
+                    normalizedMessage.contains("certificate expired") ||
+                    normalizedMessage.contains("not yet valid") ||
+                    normalizedMessage.contains("certificate revoked") ||
+                    normalizedMessage.contains("revoked")
+                ) {
+                    return false;
+                }
+            }
+
+            current = current.getCause();
+        }
+
+        return false;
+    }
+
+    private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
+        WebView webView = _webView;
+        if (webView == null || isDismissing) {
+            openDownloadedFile(file, mimeType, sourceUrl);
+            return;
+        }
+
+        if (!isTextPreviewMimeType(mimeType)) {
+            openDownloadedFile(file, mimeType, sourceUrl);
+            return;
+        }
+
+        if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
+            Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
+            openDownloadedFile(file, mimeType, sourceUrl);
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                String previewHtml = textPreviewHtml(file, readUtf8File(file));
+                mainHandler.post(() -> {
+                    if (isDismissing || _webView == null || _webView != webView) {
+                        openDownloadedFile(file, mimeType, sourceUrl);
+                        return;
+                    }
+
+                    webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
+                    notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
+                });
+            } catch (IOException ioException) {
+                showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType);
+            }
+        });
+    }
+
+    private void openDownloadedFile(File file, String mimeType, String sourceUrl) {
+        try {
+            Uri fileUri = FileProvider.getUriForFile(_context, _context.getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(fileUri, mimeType);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            _context.startActivity(intent);
+            notifyDownloadCompleted(file, mimeType, sourceUrl, "external");
+        } catch (ActivityNotFoundException activityNotFoundException) {
+            showDownloadError("No app can open " + file.getName(), activityNotFoundException, sourceUrl, file.getName(), mimeType);
+        } catch (Exception exception) {
+            showDownloadError("Failed to open " + file.getName(), exception, sourceUrl, file.getName(), mimeType);
+        }
+    }
+
+    private void finalizeDownload(File outputFile, String mimeType, String sourceUrl) {
+        mainHandler.post(() -> {
+            if (isTextPreviewMimeType(mimeType) && _webView != null) {
+                previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
+                return;
+            }
+
+            openDownloadedFile(outputFile, mimeType, sourceUrl);
+        });
+    }
+
+    private void showDownloadError(String message, Exception exception) {
+        showDownloadError(message, exception, null, null, null);
+    }
+
+    private void showDownloadError(String message, Exception exception, String sourceUrl, String fileName, String mimeType) {
+        Log.e("InAppBrowser", message, exception);
+        notifyDownloadFailed(sourceUrl, fileName, mimeType, downloadErrorMessage(message, exception));
+        mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
+    }
+
+    private String currentManagedDownloadPageUrl() {
+        if (_webView != null && !TextUtils.isEmpty(_webView.getUrl())) {
+            return _webView.getUrl();
+        }
+
+        return _options != null ? _options.getUrl() : null;
+    }
+
+    private HttpURLConnection openManagedDownloadConnection(String url, String userAgent, String pageUrl) throws Exception {
+        URL downloadUrl = new URL(url);
+        HttpURLConnection connection = (HttpURLConnection) downloadUrl.openConnection();
+        configureDownloadTlsIfNeeded(connection, downloadUrl);
+        connection.setConnectTimeout(REQUEST_CONNECT_TIMEOUT_MS);
+        connection.setReadTimeout(REQUEST_READ_TIMEOUT_MS);
+        connection.setInstanceFollowRedirects(false);
+        connection.setRequestProperty("Accept", "*/*");
+
+        if (!TextUtils.isEmpty(userAgent)) {
+            connection.setRequestProperty("User-Agent", userAgent);
+        }
+
+        String cookie = android.webkit.CookieManager.getInstance().getCookie(url);
+        if (!TextUtils.isEmpty(cookie)) {
+            connection.setRequestProperty("Cookie", cookie);
+        }
+
+        if (!TextUtils.isEmpty(pageUrl)) {
+            connection.setRequestProperty("Referer", pageUrl);
+        }
+
+        if (_options != null && _options.getHeaders() != null) {
+            if (isSameOrigin(pageUrl, url)) {
+                Iterator<String> headerKeys = _options.getHeaders().keys();
+                while (headerKeys.hasNext()) {
+                    String headerKey = headerKeys.next();
+                    if (!shouldForwardCustomDownloadHeader(headerKey)) {
+                        continue;
+                    }
+
+                    String headerValue = _options.getHeaders().getString(headerKey);
+                    if (!TextUtils.isEmpty(headerValue)) {
+                        connection.setRequestProperty(headerKey, headerValue);
+                    }
+                }
+            } else {
+                Log.w("InAppBrowser", "Skipping custom headers for cross-origin download: " + redactUrlForLogging(url));
+            }
+        }
+
+        return connection;
+    }
+
+    private boolean isManagedDownloadRedirect(int responseCode) {
+        return (
+            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+            responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+            responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
+            responseCode == 307 ||
+            responseCode == 308
+        );
+    }
+
+    private String resolveManagedDownloadRedirectUrl(HttpURLConnection connection) throws IOException {
+        String location = connection.getHeaderField("Location");
+        if (TextUtils.isEmpty(location)) {
+            throw new IOException("Managed download redirect missing Location header");
+        }
+
+        return new URL(connection.getURL(), location).toString();
+    }
+
+    private void persistManagedDownloadResponseCookies(HttpURLConnection connection, String requestUrl) {
+        if (connection == null || TextUtils.isEmpty(requestUrl)) {
+            return;
+        }
+
+        ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(connection.getHeaderFields());
+        applyResponseCookies(requestUrl, parsedHeaders.cookieHeaders());
+    }
+
+    private void downloadUrlToFile(String url, String userAgent, String contentDisposition, String mimeType) {
+        executorService.execute(() -> {
+            HttpURLConnection connection = null;
+            InputStream inputStream = null;
+            File outputFile = null;
+            boolean downloadSucceeded = false;
+
+            try {
+                String pageUrl = currentManagedDownloadPageUrl();
+                String currentUrl = url;
+                int redirectsFollowed = 0;
+                while (true) {
+                    if (shouldBlockManagedDownload(currentUrl)) {
+                        throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(currentUrl));
+                    }
+
+                    connection = openManagedDownloadConnection(currentUrl, userAgent, pageUrl);
+                    connection.connect();
+
+                    int responseCode = connection.getResponseCode();
+                    persistManagedDownloadResponseCookies(connection, currentUrl);
+                    if (!isManagedDownloadRedirect(responseCode)) {
+                        break;
+                    }
+
+                    if (redirectsFollowed >= MAX_MANAGED_DOWNLOAD_REDIRECTS) {
+                        throw new IOException("Too many managed download redirects for: " + redactUrlForLogging(url));
+                    }
+
+                    String redirectUrl = resolveManagedDownloadRedirectUrl(connection);
+                    if (shouldBlockManagedDownload(redirectUrl)) {
+                        throw new SecurityException("Download blocked for URL: " + redactUrlForLogging(redirectUrl));
+                    }
+
+                    connection.disconnect();
+                    connection = null;
+                    currentUrl = redirectUrl;
+                    redirectsFollowed++;
+                }
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode < 200 || responseCode >= 300) {
+                    String responseMessage = connection.getResponseMessage();
+                    throw new IOException(
+                        "Download request failed with HTTP " +
+                            responseCode +
+                            (TextUtils.isEmpty(responseMessage) ? "" : " " + responseMessage)
+                    );
+                }
+
+                String resolvedDisposition = connection.getHeaderField("Content-Disposition");
+                if (TextUtils.isEmpty(resolvedDisposition)) {
+                    resolvedDisposition = contentDisposition;
+                }
+
+                String provisionalMimeType = connection.getContentType();
+                if (TextUtils.isEmpty(provisionalMimeType)) {
+                    provisionalMimeType = mimeType;
+                }
+
+                String fileName = URLUtil.guessFileName(connection.getURL().toString(), resolvedDisposition, provisionalMimeType);
+                String resolvedMimeType = normalizeMimeType(provisionalMimeType, fileName);
+                outputFile = createDownloadFile(fileName);
+
+                inputStream = connection.getInputStream();
+                try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                }
+
+                finalizeDownload(outputFile, resolvedMimeType, url);
+                downloadSucceeded = true;
+            } catch (Exception exception) {
+                showDownloadError("Failed to download file", exception, url, null, mimeType);
+            } finally {
+                if (inputStream != null) {
+                    try {
+                        inputStream.close();
+                    } catch (IOException ignored) {}
+                }
+                if (connection != null) {
+                    connection.disconnect();
+                }
+                if (!downloadSucceeded && outputFile != null && outputFile.exists() && !outputFile.delete()) {
+                    outputFile.deleteOnExit();
+                }
+            }
+        });
+    }
+
+    private void handleBlobDownloadFromPage(String blobUrl, String mimeType, String contentDisposition) {
+        if (_webView == null) {
+            showDownloadError(
+                "Blob download requires an active WebView",
+                new IllegalStateException("WebView not initialized"),
+                blobUrl,
+                null,
+                mimeType
+            );
+            return;
+        }
+
+        String fallbackMimeType = normalizeMimeType(mimeType, "download");
+        String fallbackFileName = URLUtil.guessFileName("download", contentDisposition, fallbackMimeType);
+        String script = String.format(
+            """
+            (() => {
+              const blobUrl = %s;
+              const fallbackMimeType = %s;
+              const fallbackFileName = %s;
+              const legacyMaxBytes = %d;
+              const chunkSize = %d;
+              const matchingLink = Array.from(document.querySelectorAll('a[download]')).find(link => link.href === blobUrl);
+              const bridge = (window.mobileApp && window.mobileApp.startBlobDownload && window.mobileApp.appendBlobDownloadChunk && window.mobileApp.finishBlobDownload)
+                ? window.mobileApp
+                : (window.AndroidInterface && window.AndroidInterface.startBlobDownload && window.AndroidInterface.appendBlobDownloadChunk && window.AndroidInterface.finishBlobDownload)
+                  ? window.AndroidInterface
+                  : (window.mobileApp && window.mobileApp.handleBlobDownload)
+                    ? window.mobileApp
+                    : (window.AndroidInterface && window.AndroidInterface.handleBlobDownload)
+                      ? window.AndroidInterface
+                      : null;
+              const sessionId = `blob-download-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+              let fileName = fallbackFileName;
+              const readChunkAsBase64 = chunk => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                  const dataUrl = reader.result || '';
+                  resolve(String(dataUrl).split(',').pop() || '');
+                };
+                reader.onerror = function() {
+                  reject(reader.error || new Error('Failed to read blob chunk'));
+                };
+                reader.readAsDataURL(chunk);
+              });
+
+              return (async function() {
+                if (!bridge) {
+                  throw new Error('Blob download bridge is not available');
+                }
+
+                const response = await fetch(blobUrl);
+                const blob = await response.blob();
+                fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+
+                if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
+                  bridge.startBlobDownload(JSON.stringify({
+                    sessionId,
+                    fileName,
+                    sourceUrl: blobUrl,
+                    mimeType: blob.type || fallbackMimeType,
+                    size: blob.size
+                  }));
+                  for (let offset = 0; offset < blob.size; offset += chunkSize) {
+                    const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
+                    bridge.appendBlobDownloadChunk(JSON.stringify({ sessionId, base64 }));
+                  }
+                  bridge.finishBlobDownload(JSON.stringify({ sessionId }));
+                  return;
+                }
+
+                if (blob.size > legacyMaxBytes) {
+                  throw new Error('Blob download is too large for the legacy bridge');
+                }
+
+                const base64 = await readChunkAsBase64(blob);
+                bridge.handleBlobDownload(JSON.stringify({
+                  fileName,
+                  sourceUrl: blobUrl,
+                  mimeType: blob.type || fallbackMimeType,
+                  size: blob.size,
+                  base64
+                }));
+              })().catch(error => {
+              if (bridge && bridge.abortBlobDownload) {
+                bridge.abortBlobDownload(JSON.stringify({
+                  sessionId,
+                  fileName,
+                  sourceUrl: blobUrl,
+                  mimeType: fallbackMimeType,
+                  reason: String((error && error.message) || error || 'Blob download failed')
+                }));
+              }
+              console.error('Failed to capture blob download', error);
+            });
+            })();
+            """,
+            JSONObject.quote(blobUrl),
+            JSONObject.quote(fallbackMimeType),
+            JSONObject.quote(fallbackFileName),
+            MAX_LEGACY_BLOB_DOWNLOAD_BYTES,
+            BLOB_DOWNLOAD_CHUNK_BYTES
+        );
+
+        final WebView webView = _webView;
+        webView.post(() -> {
+            if (isDismissing || _webView == null || _webView != webView) {
+                Log.w("InAppBrowser", "Skipping blob download bridge dispatch because the WebView is no longer available");
+                return;
+            }
+
+            webView.evaluateJavascript(script, null);
+        });
+    }
+
+    private void handleDownloadRequest(String url, String userAgent, String contentDisposition, String mimeType) {
+        if (_options == null || !_options.getHandleDownloads() || TextUtils.isEmpty(url)) {
+            return;
+        }
+
+        if (shouldBlockManagedDownload(url)) {
+            showDownloadError(
+                "Blocked download URL",
+                new SecurityException("Download blocked for URL: " + redactUrlForLogging(url)),
+                url,
+                null,
+                mimeType
+            );
+            return;
+        }
+
+        if (url.startsWith("blob:")) {
+            handleBlobDownloadFromPage(url, mimeType, contentDisposition);
+            return;
+        }
+
+        downloadUrlToFile(url, userAgent, contentDisposition, mimeType);
     }
 
     public class PreShowScriptInterface {
@@ -614,6 +1836,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         _webView.getSettings().setDatabaseEnabled(true);
         _webView.getSettings().setDomStorageEnabled(true);
+        _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
@@ -1112,6 +2335,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             }
         );
+
+        if (_options.getHandleDownloads()) {
+            _webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+                Log.d(
+                    "InAppBrowser",
+                    "Handling WebView download: " + redactUrlForLogging(url) + ", mimeType=" + mimeType + ", bytes=" + contentLength
+                );
+                handleDownloadRequest(url, userAgent, contentDisposition, mimeType);
+            });
+        }
 
         Map<String, String> requestHeaders = new HashMap<>();
         if (_options.getHeaders() != null) {
@@ -2887,9 +4120,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                         try {
                                             PrivateKey privateKey = KeyChain.getPrivateKey(activity, alias);
                                             X509Certificate[] certChain = KeyChain.getCertificateChain(activity, alias);
+                                            clientCertificateIdentities.put(
+                                                clientCertificateIdentityKey(request.getHost(), request.getPort(), "https"),
+                                                new ClientCertificateIdentity(privateKey, certChain)
+                                            );
                                             request.proceed(privateKey, certChain);
                                             Log.i("InAppBrowser", "Selected certificate: " + alias);
                                         } catch (Exception e) {
+                                            clientCertificateIdentities.remove(
+                                                clientCertificateIdentityKey(request.getHost(), request.getPort(), "https")
+                                            );
                                             try {
                                                 request.cancel();
                                             } catch (Exception cancelEx) {
@@ -2898,6 +4138,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                             Log.e("InAppBrowser", "Error selecting certificate: " + e.getMessage());
                                         }
                                     } else {
+                                        clientCertificateIdentities.remove(
+                                            clientCertificateIdentityKey(request.getHost(), request.getPort(), "https")
+                                        );
                                         try {
                                             request.cancel();
                                         } catch (Exception e) {
@@ -2915,6 +4158,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         );
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error in onReceivedClientCertRequest: " + e.getMessage());
+                        clientCertificateIdentities.remove(clientCertificateIdentityKey(request.getHost(), request.getPort(), "https"));
                         try {
                             request.cancel();
                         } catch (Exception cancelEx) {
@@ -3618,6 +4862,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 _webView = null;
             }
         }
+
+        for (BlobDownloadSession session : new java.util.ArrayList<>(blobDownloadSessions.values())) {
+            cleanupBlobDownloadSession(session, true);
+        }
+        blobDownloadSessions.clear();
+        clientCertificateIdentities.clear();
 
         // Shutdown executor service asynchronously to avoid blocking UI thread
         shutdownExecutorServiceAsync();

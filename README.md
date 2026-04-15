@@ -434,6 +434,8 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
 * [`addListener('browserPageLoaded', ...)`](#addlistenerbrowserpageloaded-)
 * [`addListener('pageLoadError', ...)`](#addlistenerpageloaderror-)
+* [`addListener('downloadCompleted', ...)`](#addlistenerdownloadcompleted-)
+* [`addListener('downloadFailed', ...)`](#addlistenerdownloadfailed-)
 * [`addListener('popupWindowOpened', ...)`](#addlistenerpopupwindowopened-)
 * [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
 * [`addListener('consoleMessage', ...)`](#addlistenerconsolemessage-)
@@ -875,6 +877,48 @@ Will be triggered when page load error
 --------------------
 
 
+### addListener('downloadCompleted', ...)
+
+```typescript
+addListener(eventName: 'downloadCompleted', listenerFunc: (event: DownloadCompletedEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered after native download handling saves a file locally.
+Enable this with `handleDownloads: true` when opening the webview.
+
+| Param              | Type                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadCompleted'</code>                                                              |
+| **`listenerFunc`** | <code>(event: <a href="#downloadcompletedevent">DownloadCompletedEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.0
+
+--------------------
+
+
+### addListener('downloadFailed', ...)
+
+```typescript
+addListener(eventName: 'downloadFailed', listenerFunc: (event: DownloadFailedEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when native download handling fails.
+Enable this with `handleDownloads: true` when opening the webview.
+
+| Param              | Type                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadFailed'</code>                                                           |
+| **`listenerFunc`** | <code>(event: <a href="#downloadfailedevent">DownloadFailedEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.0
+
+--------------------
+
+
 ### addListener('popupWindowOpened', ...)
 
 ```typescript
@@ -1161,6 +1205,7 @@ And in the AndroidManifest.xml file:
 | **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                              |                                                               | 6.10.0 |
 | **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.4.0  |
 | **`captureConsoleLogs`**               | <code>boolean</code>                                                                                                                                                   | Emits `consoleMessage` events for JavaScript `console.*` output coming from the managed page. Useful when the webview stays hidden and you still need page-level diagnostics.                                                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 8.6.0  |
+| **`handleDownloads`**                  | <code>boolean</code>                                                                                                                                                   | Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge. When enabled: - Standard attachment responses are written to a temporary file. - `blob:` downloads are also captured when the platform supports them. - Previewable files reopen inside the in-app browser when possible. - Other files are handed off to the native preview or viewer flow. - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.                                                        | <code>false</code>                                            | 8.6.0  |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
@@ -1284,6 +1329,34 @@ Any regex property that is omitted is treated as a wildcard.
 | --------- | ------------------- | ------------------------------ | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.           |       |
 | **`url`** | <code>string</code> | Emit when a button is clicked. | 0.0.1 |
+
+
+#### DownloadCompletedEvent
+
+Event emitted after a managed download is saved locally.
+
+| Prop            | Type                                                            | Description                                              |
+| --------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| **`id`**        | <code>string</code>                                             | Source webview instance id.                              |
+| **`sourceUrl`** | <code>string</code>                                             | Original URL that triggered the download when available. |
+| **`fileName`**  | <code>string</code>                                             | Saved filename.                                          |
+| **`mimeType`**  | <code>string</code>                                             | Resolved MIME type when available.                       |
+| **`path`**      | <code>string</code>                                             | Absolute native filesystem path to the saved file.       |
+| **`localUrl`**  | <code>string</code>                                             | `file://` URL pointing at the saved file.                |
+| **`handledBy`** | <code><a href="#downloadhandledby">DownloadHandledBy</a></code> | How native handled the downloaded file after saving it.  |
+
+
+#### DownloadFailedEvent
+
+Event emitted when managed download handling fails.
+
+| Prop            | Type                | Description                                              |
+| --------------- | ------------------- | -------------------------------------------------------- |
+| **`id`**        | <code>string</code> | Source webview instance id.                              |
+| **`sourceUrl`** | <code>string</code> | Original URL that triggered the download when available. |
+| **`fileName`**  | <code>string</code> | Intended filename when known.                            |
+| **`mimeType`**  | <code>string</code> | Resolved MIME type when available.                       |
+| **`error`**     | <code>string</code> | Native error message.                                    |
 
 
 #### PopupWindowEvent
@@ -1454,6 +1527,13 @@ Construct a type with a set of properties K of type T
 #### ConfirmBtnListener
 
 <code>(state: <a href="#btnevent">BtnEvent</a>): void</code>
+
+
+#### DownloadHandledBy
+
+Native handling mode used after a managed download finishes.
+
+<code>'inAppBrowser' | 'systemPreview' | 'external'</code>
 
 
 ### Enums

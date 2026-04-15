@@ -80,6 +80,26 @@ window.customElements.define(
         <p>
           This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
         </p>
+        <h2>Download Handling</h2>
+        <p>
+          Open a page that immediately downloads a blob text file. With native download handling enabled, the downloaded file should reopen inside the webview.
+        </p>
+        <p style="margin-bottom: 10px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
+            <input type="checkbox" id="handle-downloads-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
+            <span>Handle downloads natively</span>
+          </label>
+        </p>
+        <p>
+          <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
+        </p>
+        <p>
+          <button class="button" id="open-download-demo-listener" style="background-color: #0ea5e9;">Open Auto Download Demo + Close On Event</button>
+        </p>
+        <p id="download-event-status" style="margin-top: 8px; padding: 10px 12px; border-radius: 8px; background-color: #f8f9fa; color: #495057; font-size: 0.85em;">
+          Download listener idle.
+        </p>
+        <hr />
         <h2>Custom URL</h2>
         <p>
           Enter a URL to open in the in-app browser.
@@ -274,6 +294,174 @@ window.customElements.define(
           return url.protocol === 'http:' || url.protocol === 'https:';
         } catch (_) {
           return false;
+        }
+      }
+
+      function createAutoDownloadDemoUrl() {
+        const content = [
+          "Capgo download demo successful.",
+          "This file was downloaded natively by InAppBrowser.",
+        ].join("\\n");
+
+        const downloadDemoHtml = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auto Download Demo</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(180deg, #f8f9fa 0%, #dbeafe 100%);
+        color: #111827;
+      }
+      .card {
+        width: min(420px, calc(100vw - 32px));
+        padding: 24px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 1.4rem;
+      }
+      p {
+        margin: 0;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Preparing download</h1>
+      <p id="status">Creating a sample blob file and handing it to the native download flow.</p>
+    </div>
+    <script>
+      const status = document.getElementById("status");
+      const blob = new Blob([${JSON.stringify(content)}], { type: "text/plain" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement("a");
+      downloadLink.href = downloadUrl;
+      downloadLink.download = "capgo-download-demo.txt";
+      downloadLink.textContent = "Download sample file";
+      document.body.appendChild(downloadLink);
+      status.textContent = "Starting download...";
+      window.setTimeout(() => downloadLink.click(), 300);
+    </script>
+  </body>
+</html>`;
+
+        return `data:text/html;charset=utf-8,${encodeURIComponent(downloadDemoHtml)}`;
+      }
+
+      let closeOnNextDownloadEvent = false;
+      const downloadStatusElement = () => self.shadowRoot.querySelector("#download-event-status");
+      const downloadListenerButtonElement = () => self.shadowRoot.querySelector("#open-download-demo-listener");
+
+      function setDownloadStatus(message, { backgroundColor = "#f8f9fa", color = "#495057" } = {}) {
+        const statusElement = downloadStatusElement();
+        if (!statusElement) {
+          return;
+        }
+
+        statusElement.textContent = message;
+        statusElement.style.backgroundColor = backgroundColor;
+        statusElement.style.color = color;
+      }
+
+      function setDownloadListenerButtonLabel(label) {
+        const button = downloadListenerButtonElement();
+        if (!button) {
+          return;
+        }
+        button.textContent = label;
+      }
+
+      let downloadListenerHandles = [];
+
+      async function createDownloadListeners() {
+        while (downloadListenerHandles.length > 0) {
+          const listenerHandle = downloadListenerHandles.pop();
+          if (!listenerHandle || typeof listenerHandle.remove !== "function") {
+            continue;
+          }
+          try {
+            await listenerHandle.remove();
+          } catch (error) {
+            console.warn("Could not remove stale download listener:", error);
+          }
+        }
+
+        downloadListenerHandles = await Promise.all([
+          InAppBrowser.addListener("downloadCompleted", (event) => {
+            setDownloadListenerButtonLabel(`Event OK: ${event.fileName}`);
+            setDownloadStatus(
+              `Download completed: ${event.fileName} via ${event.handledBy}`,
+              { backgroundColor: "#dcfce7", color: "#166534" },
+            );
+
+            if (closeOnNextDownloadEvent && event.id) {
+              closeOnNextDownloadEvent = false;
+              InAppBrowser.close({ id: event.id }).catch((error) => {
+                console.warn("Could not close webview after download event:", error);
+              });
+            }
+          }),
+          InAppBrowser.addListener("downloadFailed", (event) => {
+            closeOnNextDownloadEvent = false;
+            setDownloadListenerButtonLabel("Event Failed");
+            const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
+            setDownloadStatus(
+              `Download failed${fileLabel}: ${event.error}`,
+              { backgroundColor: "#fee2e2", color: "#991b1b" },
+            );
+          }),
+        ]);
+
+        return downloadListenerHandles;
+      }
+
+      async function openAutoDownloadDemo({ closeOnEvent = false } = {}) {
+        const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
+        closeOnNextDownloadEvent = closeOnEvent && handleDownloadsToggle.checked;
+        setDownloadListenerButtonLabel(
+          closeOnEvent && handleDownloadsToggle.checked
+            ? "Waiting For Download Event..."
+            : "Open Auto Download Demo + Close On Event",
+        );
+        setDownloadStatus(
+          handleDownloadsToggle.checked
+            ? closeOnEvent
+              ? "Waiting for native download event, then closing the webview..."
+              : "Waiting for native download event..."
+            : "Native download handling disabled for this run.",
+          {
+            backgroundColor: handleDownloadsToggle.checked ? "#e0f2fe" : "#f8f9fa",
+            color: handleDownloadsToggle.checked ? "#075985" : "#495057",
+          },
+        );
+
+        try {
+          await createDownloadListeners();
+          await InAppBrowser.openWebView({
+            url: createAutoDownloadDemoUrl(),
+            title: "Auto Download Demo",
+            toolbarColor: "#198754",
+            toolbarType: ToolBarType.NAVIGATION,
+            backgroundColor: BackgroundColor.WHITE,
+            visibleTitle: true,
+            showReloadButton: true,
+            enabledSafeBottomMargin: true,
+            handleDownloads: handleDownloadsToggle.checked,
+          });
+        } catch (error) {
+          closeOnNextDownloadEvent = false;
+          console.error("Error opening auto download demo:", error);
         }
       }
 
@@ -838,6 +1026,18 @@ window.customElements.define(
         });
 
       self.shadowRoot
+        .querySelector("#open-download-demo")
+        .addEventListener("click", async function () {
+          await openAutoDownloadDemo({ closeOnEvent: false });
+        });
+
+      self.shadowRoot
+        .querySelector("#open-download-demo-listener")
+        .addEventListener("click", async function () {
+          await openAutoDownloadDemo({ closeOnEvent: true });
+        });
+
+      self.shadowRoot
         .querySelector("#system-bars-show-all")
         .addEventListener("click", async function () {
           try {
@@ -969,6 +1169,7 @@ window.customElements.define(
             metricsDiv.style.display = "none";
 
             await InAppBrowser.removeAllListeners();
+            downloadListenerHandles = [];
             await InAppBrowser.openWebView({
               url: "https://example.com",
               hidden: true,

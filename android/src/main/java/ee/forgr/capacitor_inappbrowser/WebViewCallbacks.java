@@ -21,6 +21,10 @@ public interface WebViewCallbacks {
 
     public void screenshotTaken(JSObject screenshot);
 
+    public void downloadCompleted(String sourceUrl, String fileName, String mimeType, String path, String localUrl, String handledBy);
+
+    public void downloadFailed(String sourceUrl, String fileName, String mimeType, String error);
+
     public void proxyRequestEvent(
         String requestId,
         String phase,
