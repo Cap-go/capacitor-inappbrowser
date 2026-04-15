@@ -86,9 +86,14 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -109,6 +114,7 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 import org.json.JSONException;
@@ -1149,18 +1155,30 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         KeyManager[] keyManagers =
             clientCertificateIdentity != null ? new KeyManager[] { new FixedClientCertificateKeyManager(clientCertificateIdentity) } : null;
 
+        X509TrustManager defaultTrustManager = ignoreUntrustedSslError ? createDefaultTrustManager() : null;
         TrustManager[] trustManagers = ignoreUntrustedSslError
             ? new TrustManager[] {
                   new X509TrustManager() {
                       @Override
-                      public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                      public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                          defaultTrustManager.checkClientTrusted(chain, authType);
+                      }
 
                       @Override
-                      public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                      public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+                          try {
+                              defaultTrustManager.checkServerTrusted(chain, authType);
+                          } catch (CertificateException certificateException) {
+                              if (!shouldBypassDownloadTrustFailure(certificateException, chain)) {
+                                  throw certificateException;
+                              }
+                              Log.w("InAppBrowser", "Ignoring untrusted download certificate for " + redactUrlForLogging(downloadUrl.toString()));
+                          }
+                      }
 
                       @Override
                       public X509Certificate[] getAcceptedIssuers() {
-                          return new X509Certificate[0];
+                          return defaultTrustManager.getAcceptedIssuers();
                       }
                   }
               }
@@ -1170,6 +1188,87 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         HttpsURLConnection secureConnection = (HttpsURLConnection) connection;
         secureConnection.setSSLSocketFactory(sslContext.getSocketFactory());
+    }
+
+    private X509TrustManager createDefaultTrustManager() throws GeneralSecurityException {
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init((java.security.KeyStore) null);
+        for (TrustManager trustManager : trustManagerFactory.getTrustManagers()) {
+            if (trustManager instanceof X509TrustManager) {
+                return (X509TrustManager) trustManager;
+            }
+        }
+        throw new GeneralSecurityException("No default X509TrustManager available");
+    }
+
+    private boolean shouldBypassDownloadTrustFailure(CertificateException certificateException, X509Certificate[] chain) {
+        return areCertificatesCurrentlyValid(chain) && isUntrustedIssuerFailure(certificateException);
+    }
+
+    private boolean areCertificatesCurrentlyValid(X509Certificate[] chain) {
+        if (chain == null || chain.length == 0) {
+            return false;
+        }
+
+        for (X509Certificate certificate : chain) {
+            if (certificate == null) {
+                return false;
+            }
+
+            try {
+                certificate.checkValidity();
+            } catch (CertificateExpiredException | CertificateNotYetValidException certificateValidityException) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isUntrustedIssuerFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof CertificateExpiredException || current instanceof CertificateNotYetValidException) {
+                return false;
+            }
+            if (current instanceof CertPathValidatorException) {
+                CertPathValidatorException validatorException = (CertPathValidatorException) current;
+                CertPathValidatorException.Reason reason = validatorException.getReason();
+                if (
+                    reason == CertPathValidatorException.BasicReason.EXPIRED ||
+                    reason == CertPathValidatorException.BasicReason.NOT_YET_VALID ||
+                    reason == CertPathValidatorException.BasicReason.REVOKED ||
+                    reason == CertPathValidatorException.BasicReason.INVALID_SIGNATURE ||
+                    reason == CertPathValidatorException.BasicReason.ALGORITHM_CONSTRAINED
+                ) {
+                    return false;
+                }
+            }
+
+            String message = current.getMessage();
+            if (!TextUtils.isEmpty(message)) {
+                String normalizedMessage = message.toLowerCase(Locale.US);
+                if (
+                    normalizedMessage.contains("trust anchor for certification path not found") ||
+                    normalizedMessage.contains("unable to find valid certification path") ||
+                    normalizedMessage.contains("trust anchor")
+                ) {
+                    return true;
+                }
+                if (
+                    normalizedMessage.contains("certificate expired") ||
+                    normalizedMessage.contains("not yet valid") ||
+                    normalizedMessage.contains("certificate revoked") ||
+                    normalizedMessage.contains("revoked")
+                ) {
+                    return false;
+                }
+            }
+
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
