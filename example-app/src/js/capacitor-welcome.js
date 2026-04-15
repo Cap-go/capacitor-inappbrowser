@@ -8,9 +8,15 @@ import {
 } from "@capgo/inappbrowser";
 import { setupProxyDemoButtons } from "./proxy-demo.js";
 import { setupProxyRegression } from "./proxy-regression.js";
+import { attachKeyboardRegressionHarness } from "./keyboard-regression.js";
+import { url as configuredTestWebappUrl } from "./url.js";
 
 // Default URL configuration
 let testWebappUrl = "http://localhost:8000/index.php";
+
+function getConfiguredTestWebappUrl() {
+  return configuredTestWebappUrl || testWebappUrl;
+}
 
 window.customElements.define(
   "capacitor-welcome",
@@ -278,6 +284,8 @@ window.customElements.define(
 
     connectedCallback() {
       const self = this;
+
+      attachKeyboardRegressionHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {
@@ -583,19 +591,6 @@ window.customElements.define(
         result: "not run",
         lastUrl: "none",
       });
-
-      async function loadLocalTestWebappUrl() {
-        try {
-          const localUrlModule = "./url.js";
-          const { url } = await import(/* @vite-ignore */ localUrlModule);
-          return url;
-        } catch (e) {
-          console.warn(
-            "url.js not found, using default URL. Copy url.js.example to url.js and configure your server URL.",
-          );
-          return testWebappUrl;
-        }
-      }
 
       async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
         statusText.textContent = "Refreshing DOM content...";
@@ -1115,7 +1110,7 @@ window.customElements.define(
         .querySelector("#open-test-webapp")
         .addEventListener("click", async function (e) {
           try {
-            const urlToUse = await loadLocalTestWebappUrl();
+            const urlToUse = getConfiguredTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,
@@ -1348,7 +1343,7 @@ window.customElements.define(
         .querySelector("#open-test-webapp-activity")
         .addEventListener("click", async function (e) {
           try {
-            const urlToUse = await loadLocalTestWebappUrl();
+            const urlToUse = getConfiguredTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,

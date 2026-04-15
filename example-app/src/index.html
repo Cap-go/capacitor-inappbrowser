@@ -32,7 +32,7 @@
   <body>
     <div
       id="maestro-controls"
-      style="padding: 12px; border-bottom: 1px solid #d8e1ff; background: #f4f7ff; color: #1b1f3b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"
+      style="position: sticky; top: 0; z-index: 20; padding: 12px; border-bottom: 1px solid #d8e1ff; background: #f4f7ff; color: #1b1f3b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"
     >
       <div id="maestro-ready-banner" style="font-weight: 700;">Maestro Booting</div>
       <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
@@ -43,9 +43,18 @@
         >
           Run Proxy Regression (Maestro)
         </button>
+        <button
+          id="maestro-run-keyboard"
+          disabled
+          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #1d3557; color: #fff; font-size: 14px;"
+        >
+          Run Keyboard Regression (Maestro)
+        </button>
       </div>
       <div id="maestro-proxy-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
       <div id="maestro-proxy-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
+      <div id="maestro-keyboard-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
+      <div id="maestro-keyboard-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
     </div>
     <capacitor-welcome></capacitor-welcome>
 
