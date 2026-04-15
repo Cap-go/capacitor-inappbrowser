@@ -1172,7 +1172,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                               if (!shouldBypassDownloadTrustFailure(certificateException, chain)) {
                                   throw certificateException;
                               }
-                              Log.w("InAppBrowser", "Ignoring untrusted download certificate for " + redactUrlForLogging(downloadUrl.toString()));
+                              Log.w(
+                                  "InAppBrowser",
+                                  "Ignoring untrusted download certificate for " + redactUrlForLogging(downloadUrl.toString())
+                              );
                           }
                       }
 
