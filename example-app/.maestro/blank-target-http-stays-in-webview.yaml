@@ -1,0 +1,43 @@
+appId: ${APP_ID}
+name: Blank target HTTPS links stay in the current webview
+androidWebViewHierarchy: devtools
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness"
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog when it appears"
+- scrollUntilVisible:
+    element: "Open Blank Target HTTPS Test"
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn:
+    text: "Open Blank Target HTTPS Test"
+    retryTapIfNoChange: true
+- assertVisible: "Target Blank Test Page"
+- tapOn:
+    text: "Open Example Domain"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Example Domain"
+    timeout: 15000
+- back
+- tapOn:
+    text: "Navigate up"
+    optional: true
+    label: "Close the plugin webview if an external browser opened first"
+- extendedWaitUntil:
+    visible: "Blank target test result: internal navigation confirmed"
+    timeout: 15000
+- assertVisible: "Blank target test status: Closed"
+- assertVisible: "Blank target test result: internal navigation confirmed"
+- assertVisible: "Blank target last URL: https://example.com/#blank-target-webview"

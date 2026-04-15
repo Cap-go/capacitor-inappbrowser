@@ -64,7 +64,7 @@ import org.json.JSONObject;
 )
 public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
-    private final String pluginVersion = "8.5.6";
+    private final String pluginVersion = "8.5.7";
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -923,6 +923,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         options.setShareSubject(call.getString("shareSubject", null));
         options.setToolbarType(call.getString("toolbarType", ""));
         options.setPreventDeeplink(Boolean.TRUE.equals(call.getBoolean("preventDeeplink", false)));
+        options.setOpenBlankTargetInWebView(Boolean.TRUE.equals(call.getBoolean("openBlankTargetInWebView", false)));
 
         // Validate preShowScript requires isPresentAfterPageLoad
         if (call.getData().has("preShowScript") && !Boolean.TRUE.equals(call.getBoolean("isPresentAfterPageLoad", false))) {

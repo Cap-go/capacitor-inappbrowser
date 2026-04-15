@@ -178,6 +178,7 @@ public class Options {
     private boolean materialPicker = false;
     private int textZoom = 100; // Default text zoom is 100%
     private boolean preventDeeplink = false;
+    private boolean openBlankTargetInWebView = false;
     private List<String> authorizedAppLinks = new ArrayList<>();
     private boolean enabledSafeBottomMargin = false;
     private boolean enabledSafeTopMargin = true;
@@ -567,6 +568,14 @@ public class Options {
         this.preventDeeplink = preventDeeplink;
     }
 
+    public boolean getOpenBlankTargetInWebView() {
+        return openBlankTargetInWebView;
+    }
+
+    public void setOpenBlankTargetInWebView(boolean openBlankTargetInWebView) {
+        this.openBlankTargetInWebView = openBlankTargetInWebView;
+    }
+
     public List<String> getAuthorizedAppLinks() {
         return authorizedAppLinks;
     }
@@ -691,6 +700,7 @@ public class Options {
         copy.setMaterialPicker(materialPicker);
         copy.setTextZoom(textZoom);
         copy.setPreventDeeplink(preventDeeplink);
+        copy.setOpenBlankTargetInWebView(openBlankTargetInWebView);
         copy.setAuthorizedAppLinks(new ArrayList<>(authorizedAppLinks));
         copy.setEnabledSafeMargin(enabledSafeBottomMargin);
         copy.setEnabledSafeTopMargin(enabledSafeTopMargin);

@@ -1745,7 +1745,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _webView.getSettings().setBuiltInZoomControls(true);
             _webView.getSettings().setDisplayZoomControls(false);
         }
-        _webView.getSettings().setSupportMultipleWindows(true);
 
         // Enhanced settings for Google Pay and Payment Request API support (only when enabled)
         if (_options.getEnableGooglePaySupport()) {
@@ -2172,8 +2171,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             ", GooglePaySupport: " +
                             _options.getEnableGooglePaySupport() +
                             ", preventDeeplink: " +
-                            _options.getPreventDeeplink()
+                            _options.getPreventDeeplink() +
+                            ", openBlankTargetInWebView: " +
+                            _options.getOpenBlankTargetInWebView()
                     );
+
+                    WebView.HitTestResult result = view.getHitTestResult();
+                    String data = result != null ? result.getExtra() : null;
+
+                    if (shouldLoadBlankTargetInCurrentWebView(data)) {
+                        Log.d("InAppBrowser", "Loading target=_blank link in current WebView: " + data);
+                        view.post(() -> _webView.loadUrl(data));
+                        return false;
+                    }
 
                     String popupUrl = null;
                     try {
@@ -2188,11 +2198,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         Log.d("InAppBrowser", "Created managed popup window");
                         return true;
                     }
-
                     if (!_options.getPreventDeeplink() && isUserGesture) {
                         try {
-                            WebView.HitTestResult result = view.getHitTestResult();
-                            String data = result.getExtra();
                             if (data != null && !data.isEmpty()) {
                                 Log.d("InAppBrowser", "Falling back to external browser for popup URL: " + data);
                                 Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
@@ -3689,6 +3696,53 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         handleProxyResponse(id, response);
     }
 
+    private boolean isHttpOrHttpsUrl(String url) {
+        return url != null && (url.startsWith("https://") || url.startsWith("http://"));
+    }
+
+    private boolean isAuthorizedAppLink(String url, List<String> authorizedLinks) {
+        if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
+            return false;
+        }
+        final String urlHost;
+        try {
+            URI uri = new URI(url);
+            String parsedUrlHost = uri.getHost();
+            if (parsedUrlHost == null) return false;
+            urlHost = parsedUrlHost.startsWith("www.") ? parsedUrlHost.substring(4) : parsedUrlHost;
+        } catch (URISyntaxException e) {
+            Log.e("InAppBrowser", "Invalid popup URL in authorized app link check: " + url, e);
+            return false;
+        }
+
+        for (String authorized : authorizedLinks) {
+            try {
+                URI authUri = new URI(authorized);
+                String authHost = authUri.getHost();
+                if (authHost == null) continue;
+                if (authHost.startsWith("www.")) authHost = authHost.substring(4);
+                if (urlHost.equalsIgnoreCase(authHost)) {
+                    return true;
+                }
+            } catch (URISyntaxException e) {
+                Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
+            }
+        }
+        return false;
+    }
+
+    private boolean shouldLoadBlankTargetInCurrentWebView(String url) {
+        if (!isHttpOrHttpsUrl(url)) {
+            return false;
+        }
+
+        if (isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
+            return false;
+        }
+
+        return _options.getPreventDeeplink() || _options.getOpenBlankTargetInWebView();
+    }
+
     private void setWebViewClient() {
         _webView.setWebViewClient(
             new WebViewClient() {
@@ -3709,12 +3763,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (authorizedLinks == null || authorizedLinks.isEmpty() || url == null) {
                         return false;
                     }
+                    final String urlHost;
                     try {
                         URI uri = new URI(url);
-                        String urlHost = uri.getHost();
-                        if (urlHost == null) return false;
-                        if (urlHost.startsWith("www.")) urlHost = urlHost.substring(4);
-                        for (String authorized : authorizedLinks) {
+                        String parsedUrlHost = uri.getHost();
+                        if (parsedUrlHost == null) return false;
+                        urlHost = parsedUrlHost.startsWith("www.") ? parsedUrlHost.substring(4) : parsedUrlHost;
+                    } catch (URISyntaxException e) {
+                        Log.e("InAppBrowser", "Invalid URI in isUrlAuthorized: " + url, e);
+                        return false;
+                    }
+
+                    for (String authorized : authorizedLinks) {
+                        try {
                             URI authUri = new URI(authorized);
                             String authHost = authUri.getHost();
                             if (authHost == null) continue;
@@ -3722,9 +3783,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             if (urlHost.equalsIgnoreCase(authHost)) {
                                 return true;
                             }
+                        } catch (URISyntaxException e) {
+                            Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
                         }
-                    } catch (URISyntaxException e) {
-                        Log.e("InAppBrowser", "Invalid URI in isUrlAuthorized: " + url, e);
                     }
                     return false;
                 }
