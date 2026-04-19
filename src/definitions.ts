@@ -932,9 +932,9 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
-   * When true, HTTP and HTTPS links opened from `target="_blank"` anchors stay inside the current webview instead of opening in the system browser.
-   * This preserves the current webview cookie/session context for popup-style links while still allowing custom schemes such as `tel:` and `mailto:` to use their native handlers.
-   * Authorized app links continue to prefer their native applications unless `preventDeeplink` is enabled.
+   * When true, HTTP and HTTPS links opened from `target="_blank"` anchors stay in the current webview instead of spawning a popup or opening in the system browser.
+   * By default, blank-target HTTP(S) links stay inside the plugin as managed popups that share cookies with the opener; enabling this option keeps everything in the same tab.
+   * Custom schemes such as `tel:` and `mailto:` and authorized app links still prefer their native handlers unless `preventDeeplink` is enabled.
    *
    * @since 8.5.6
    * @default false
