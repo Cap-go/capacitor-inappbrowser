@@ -162,7 +162,8 @@
     }
     const accessToken = "___CAPGO_PROXY_TOKEN___";
     const proxyRegexSource = "___CAPGO_PROXY_REGEX___";
-    const proxyBodyMethodFallback = false;
+    const proxyBodyMethodFallbackSource = "___CAPGO_PROXY_BODY_METHOD_FALLBACK___";
+    const proxyBodyMethodFallback = /^true$/i.test(proxyBodyMethodFallbackSource);
     let requestCounter = 0;
     let proxyRequestPattern = null;
     if (proxyRegexSource) {
