@@ -19,7 +19,7 @@ import org.junit.Test;
 public class ProxyRequestSupportTest {
 
     @Test
-    public void shouldInjectBridgeWhenRulesEnableNativeProxy() {
+    public void shouldInjectBridgeWhenOutboundRulesExist() {
         Options options = new Options();
         options.setOutboundProxyRules(
             List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.DELEGATE_TO_JS))
@@ -29,9 +29,9 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
-    public void shouldSkipBridgeForPurelyNativeRules() {
+    public void shouldSkipBridgeForInboundOnlyRules() {
         Options options = new Options();
-        options.setOutboundProxyRules(
+        options.setInboundProxyRules(
             List.of(
                 new NativeProxyRule(
                     null,
@@ -52,7 +52,7 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
-    public void buildBridgeUrlPatternIncludesOnlyBridgeBackedRules() {
+    public void buildBridgeUrlPatternIncludesAllOutboundRules() {
         Options options = new Options();
         options.setOutboundProxyRules(
             List.of(
@@ -83,7 +83,7 @@ public class ProxyRequestSupportTest {
             )
         );
 
-        assertEquals("(?:api\\.example\\.com)", ProxyRequestSupport.buildBridgeUrlPattern(options));
+        assertEquals("(?:api\\.example\\.com)|(?:cdn\\.example\\.com)", ProxyRequestSupport.buildBridgeUrlPattern(options));
     }
 
     @Test
@@ -266,8 +266,13 @@ public class ProxyRequestSupportTest {
         options.setOutboundProxyRules(
             List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CANCEL))
         );
+        Options inboundOnly = new Options();
+        inboundOnly.setInboundProxyRules(
+            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CANCEL))
+        );
 
         assertTrue(ProxyRequestSupport.shouldHandleNonBridgeRequest(options, "https://cdn.example.com/script.js"));
+        assertTrue(ProxyRequestSupport.shouldHandleNonBridgeRequest(inboundOnly, "https://cdn.example.com/script.js"));
         assertFalse(ProxyRequestSupport.shouldHandleNonBridgeRequest(new Options(), "https://cdn.example.com/script.js"));
     }
 

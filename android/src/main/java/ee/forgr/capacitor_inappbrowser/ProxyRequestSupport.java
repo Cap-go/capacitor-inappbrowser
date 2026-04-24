@@ -51,7 +51,7 @@ final class ProxyRequestSupport {
         if (options == null) {
             return false;
         }
-        return hasBridgeBackedOutboundRules(options.getOutboundProxyRules());
+        return hasOutboundProxyRules(options.getOutboundProxyRules());
     }
 
     static boolean shouldHandleNonBridgeRequest(Options options, String requestUrl) {
@@ -68,9 +68,6 @@ final class ProxyRequestSupport {
 
         StringBuilder combinedPattern = new StringBuilder();
         for (NativeProxyRule rule : options.getOutboundProxyRules()) {
-            if (!requiresBridgeCapture(rule)) {
-                continue;
-            }
             Pattern urlPattern = rule.getUrlPattern();
             if (urlPattern == null) {
                 return "";
@@ -501,23 +498,8 @@ final class ProxyRequestSupport {
         return !shouldDropRequestBody(method);
     }
 
-    private static boolean hasBridgeBackedOutboundRules(List<NativeProxyRule> outboundRules) {
-        if (outboundRules == null || outboundRules.isEmpty()) {
-            return false;
-        }
-        for (NativeProxyRule rule : outboundRules) {
-            if (requiresBridgeCapture(rule)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean requiresBridgeCapture(NativeProxyRule rule) {
-        if (rule == null) {
-            return false;
-        }
-        return rule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS || rule.getBodyPattern() != null;
+    private static boolean hasOutboundProxyRules(List<NativeProxyRule> outboundRules) {
+        return outboundRules != null && !outboundRules.isEmpty();
     }
 
     private static boolean shouldDropRequestBody(String method) {

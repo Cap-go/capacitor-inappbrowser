@@ -852,8 +852,8 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             options.setTextZoom(textZoom);
         }
 
-        if (call.getData().has("proxyRequests")) {
-            call.reject("proxyRequests has been removed. Use outboundProxyRules and inboundProxyRules.");
+        if (call.getData().has("proxyRequests") || call.getData().has("proxyRequestsPattern")) {
+            call.reject("proxyRequests and proxyRequestsPattern have been removed. Use outboundProxyRules and inboundProxyRules.");
             return;
         }
 

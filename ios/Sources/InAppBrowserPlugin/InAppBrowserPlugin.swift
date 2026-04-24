@@ -614,10 +614,14 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         if !self.isSetupDone {
             self.setup()
         }
-        self.currentPluginCall = call
 
         guard let urlString = call.getString("url") else {
             call.reject("Must provide a URL to open")
+            return
+        }
+
+        if call.options["proxyRequests"] != nil {
+            call.reject("proxyRequests has been removed. Use outboundProxyRules and inboundProxyRules.")
             return
         }
 
@@ -626,6 +630,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        self.currentPluginCall = call
         let webViewId = UUID().uuidString
         let showScreenshotButton = call.getBool("showScreenshotButton", false)
         let buttonNearDoneSettings = call.getObject("buttonNearDone")
@@ -842,10 +847,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
-        if call.options["proxyRequests"] != nil {
-            call.reject("proxyRequests has been removed. Use outboundProxyRules and inboundProxyRules.")
-            return
-        }
         let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
         let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
         let outboundProxyRules: [NativeProxyRule]

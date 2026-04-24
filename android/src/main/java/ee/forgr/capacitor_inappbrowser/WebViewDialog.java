@@ -2353,8 +2353,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         String httpBody = _options.getHttpBody();
 
         if (!_options.isPopupWindowMode()) {
-            if (supportsRequestBody(httpMethod) && httpBody != null) {
-                // For POST/PUT/PATCH requests with body
+            if ("POST".equalsIgnoreCase(httpMethod) && httpBody != null) {
+                // Android WebView only supports body-bearing initial navigations through POST.
                 // Note: Android WebView has limitations with custom headers on POST
                 // Headers may not be sent with the initial request when using postUrl
                 byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
@@ -2368,6 +2368,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             "Android WebView's postUrl method has limited header support."
                     );
                 }
+            } else if (httpBody != null && supportsRequestBody(httpMethod)) {
+                rejectOpenWebViewIfNeeded("Android WebView only supports POST for the initial body-bearing navigation");
+                return;
             } else {
                 // For GET and other methods, use loadUrl with headers
                 _webView.loadUrl(this._options.getUrl(), requestHeaders);

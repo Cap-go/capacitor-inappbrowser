@@ -3,6 +3,9 @@ import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@c
 
 const GRAILED_URL = "https://www.grailed.com/users/sign_up";
 const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";
+const GRAILED_OUTBOUND_PROXY_REGEX =
+  "^https://([^.]+\\.)*(grailed\\.com|google\\.com|gstatic\\.com|googleusercontent\\.com)/.*";
+const FACEBOOK_OUTBOUND_PROXY_REGEX = "^https://([^.]+\\.)*facebook\\.com/.*";
 const DESKTOP_CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36";
 
@@ -874,7 +877,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        outboundProxyRules: [{ action: "delegateToJs" }],
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
         toolbarType: ToolBarType.NAVIGATION,
         title: "Grailed stub proxy demo",
       });
@@ -944,7 +947,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        outboundProxyRules: [{ action: "delegateToJs" }],
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
         inboundProxyRules: [
           {
             urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
@@ -1226,7 +1229,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        outboundProxyRules: [{ action: "delegateToJs" }],
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
         inboundProxyRules: [
           {
             urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
@@ -1364,7 +1367,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: FACEBOOK_URL,
-        outboundProxyRules: [{ action: "delegateToJs" }],
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: FACEBOOK_OUTBOUND_PROXY_REGEX }],
         headers: {
           "user-agent": DESKTOP_CHROME_USER_AGENT,
         },
