@@ -6,6 +6,7 @@ const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";
 const GRAILED_OUTBOUND_PROXY_REGEX =
   "^https://([^.]+\\.)*(grailed\\.com|google\\.com|gstatic\\.com|googleusercontent\\.com)/.*";
 const FACEBOOK_OUTBOUND_PROXY_REGEX = "^https://([^.]+\\.)*facebook\\.com/.*";
+const GOOGLE_INBOUND_PROXY_REGEX = "^https://([^.]+\\.)*google\\.com/.*";
 const DESKTOP_CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36";
 
@@ -948,12 +949,7 @@ export function setupProxyDemoButtons(root) {
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
         outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
-        inboundProxyRules: [
-          {
-            urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
-            action: "delegateToJs",
-          },
-        ],
+        inboundProxyRules: [{ urlRegex: GOOGLE_INBOUND_PROXY_REGEX, action: "delegateToJs" }],
         headers: DESKTOP_CHROME_HEADERS,
         isPresentAfterPageLoad: true,
         preShowScript: GRAILED_GOOGLE_BROWSER_SPOOF,
@@ -1230,12 +1226,7 @@ export function setupProxyDemoButtons(root) {
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
         outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
-        inboundProxyRules: [
-          {
-            urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
-            action: "delegateToJs",
-          },
-        ],
+        inboundProxyRules: [{ urlRegex: GOOGLE_INBOUND_PROXY_REGEX, action: "delegateToJs" }],
         headers: DESKTOP_CHROME_HEADERS,
         hidden: true,
         hiddenPopupWindow: true,

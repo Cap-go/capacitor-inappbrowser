@@ -620,8 +620,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        if call.options["proxyRequests"] != nil {
-            call.reject("proxyRequests has been removed. Use outboundProxyRules and inboundProxyRules.")
+        if call.options["proxyRequests"] != nil || call.options["proxyRequestsPattern"] != nil {
+            call.reject("proxyRequests and proxyRequestsPattern have been removed. Use outboundProxyRules and inboundProxyRules.")
             return
         }
 

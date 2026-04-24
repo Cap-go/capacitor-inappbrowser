@@ -29,7 +29,7 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
-    public void shouldSkipBridgeForInboundOnlyRules() {
+    public void shouldInjectBridgeWhenInboundRulesExist() {
         Options options = new Options();
         options.setInboundProxyRules(
             List.of(
@@ -48,11 +48,11 @@ public class ProxyRequestSupportTest {
             )
         );
 
-        assertFalse(ProxyRequestSupport.shouldInjectBridge(options));
+        assertTrue(ProxyRequestSupport.shouldInjectBridge(options));
     }
 
     @Test
-    public void buildBridgeUrlPatternIncludesAllOutboundRules() {
+    public void buildBridgeUrlPatternIncludesOutboundAndInboundRules() {
         Options options = new Options();
         options.setOutboundProxyRules(
             List.of(
@@ -82,12 +82,31 @@ public class ProxyRequestSupportTest {
                 )
             )
         );
+        options.setInboundProxyRules(
+            List.of(
+                new NativeProxyRule(
+                    null,
+                    Pattern.compile("accounts\\.example\\.com"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    NativeProxyRule.Action.CONTINUE
+                )
+            )
+        );
 
-        assertEquals("(?:api\\.example\\.com)|(?:cdn\\.example\\.com)", ProxyRequestSupport.buildBridgeUrlPattern(options));
+        assertEquals(
+            "(?:api\\.example\\.com)|(?:cdn\\.example\\.com)|(?:accounts\\.example\\.com)",
+            ProxyRequestSupport.buildBridgeUrlPattern(options)
+        );
     }
 
     @Test
-    public void buildBridgeUrlPatternFallsBackToCatchAllWhenBridgeRuleHasNoUrlRegex() {
+    public void buildBridgeUrlPatternReturnsCatchAllWhenAnyProxyRuleHasNoUrlRegex() {
         Options options = new Options();
         options.setOutboundProxyRules(
             List.of(

@@ -822,6 +822,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         String url = call.getString("url");
         if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
         currentUrl = url;
         final String webViewId = UUID.randomUUID().toString();
