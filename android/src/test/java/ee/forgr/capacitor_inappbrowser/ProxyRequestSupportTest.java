@@ -29,6 +29,87 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void shouldSkipBridgeForPurelyNativeRules() {
+        Options options = new Options();
+        options.setOutboundProxyRules(
+            List.of(
+                new NativeProxyRule(
+                    null,
+                    Pattern.compile("grailed"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    NativeProxyRule.Action.CANCEL
+                )
+            )
+        );
+
+        assertFalse(ProxyRequestSupport.shouldInjectBridge(options));
+    }
+
+    @Test
+    public void buildBridgeUrlPatternIncludesOnlyBridgeBackedRules() {
+        Options options = new Options();
+        options.setOutboundProxyRules(
+            List.of(
+                new NativeProxyRule(
+                    null,
+                    Pattern.compile("api\\.example\\.com"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    NativeProxyRule.Action.DELEGATE_TO_JS
+                ),
+                new NativeProxyRule(
+                    null,
+                    Pattern.compile("cdn\\.example\\.com"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false,
+                    NativeProxyRule.Action.CANCEL
+                )
+            )
+        );
+
+        assertEquals("(?:api\\.example\\.com)", ProxyRequestSupport.buildBridgeUrlPattern(options));
+    }
+
+    @Test
+    public void buildBridgeUrlPatternFallsBackToCatchAllWhenBridgeRuleHasNoUrlRegex() {
+        Options options = new Options();
+        options.setOutboundProxyRules(
+            List.of(
+                new NativeProxyRule(
+                    null,
+                    null,
+                    null,
+                    null,
+                    Pattern.compile("token="),
+                    null,
+                    null,
+                    null,
+                    false,
+                    NativeProxyRule.Action.CONTINUE
+                )
+            )
+        );
+
+        assertEquals("", ProxyRequestSupport.buildBridgeUrlPattern(options));
+    }
+
+    @Test
     public void supportsNativeHttpRequestOnlyForHttpSchemes() throws Exception {
         assertTrue(ProxyRequestSupport.supportsNativeHttpRequest(new URL("https://example.com/path")));
         assertTrue(ProxyRequestSupport.supportsNativeHttpRequest(new URL("http://example.com/path")));
@@ -180,44 +261,8 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
-    public void usesLegacyJsProxyModeForRegexPatternWithoutNativeRules() {
+    public void shouldHandleNonBridgeRequestUsesRulePresenceOnly() {
         Options options = new Options();
-        options.setProxyRequestsPattern(Pattern.compile("grailed"));
-
-        assertTrue(ProxyRequestSupport.usesLegacyJsProxyMode(options));
-    }
-
-    @Test
-    public void compileProxyRequestsPatternIgnoresNonStringValues() {
-        assertNull(ProxyRequestSupport.compileProxyRequestsPattern(Boolean.TRUE));
-        assertNull(ProxyRequestSupport.compileProxyRequestsPattern(""));
-        assertEquals("grailed", ProxyRequestSupport.compileProxyRequestsPattern("grailed").pattern());
-    }
-
-    @Test
-    public void shouldDelegateLegacyJsProxyRequestHonorsRegexMatches() {
-        Options options = new Options();
-        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
-
-        assertTrue(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://api.example.com/login"));
-        assertFalse(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://cdn.example.com/script.js"));
-    }
-
-    @Test
-    public void shouldDelegateLegacyJsProxyRequestDisablesLegacyModeWhenNativeRulesExist() {
-        Options options = new Options();
-        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
-        options.setOutboundProxyRules(
-            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CONTINUE))
-        );
-
-        assertFalse(ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(options, "https://api.example.com/login"));
-    }
-
-    @Test
-    public void shouldHandleNonBridgeRequestKeepsNativeRulesActiveWhenLegacyRegexMisses() {
-        Options options = new Options();
-        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
         options.setOutboundProxyRules(
             List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CANCEL))
         );

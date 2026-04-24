@@ -88,11 +88,6 @@ struct NativeResponseData {
     var contentType: String
 }
 
-struct LegacyProxyRequestsConfiguration {
-    let isEnabled: Bool
-    let urlRegex: NSRegularExpression?
-}
-
 enum ProxySchemeRequestSupport {
     private static let httpMethodLocale = Locale(identifier: "en_US_POSIX")
     private static let crossOriginOverrideHeaderNames = [
@@ -271,24 +266,6 @@ enum ProxySchemeRequestSupport {
         return trimmedMethod.uppercased(with: httpMethodLocale)
     }
 
-    static func legacyProxyRequestsConfiguration(from rawValue: Any?) -> LegacyProxyRequestsConfiguration {
-        if let enabled = rawValue as? Bool {
-            return LegacyProxyRequestsConfiguration(isEnabled: enabled, urlRegex: nil)
-        }
-
-        // String regex mode is Android-only. iOS ignores it instead of rejecting cross-platform calls.
-        return LegacyProxyRequestsConfiguration(isEnabled: false, urlRegex: nil)
-    }
-
-    static func shouldUseLegacyCatchAllRule(
-        legacyProxyRequests: Bool,
-        hasOutboundRules: Bool,
-        hasInboundRules: Bool,
-        phase: String
-    ) -> Bool {
-        legacyProxyRequests && phase == "outbound" && !hasOutboundRules && !hasInboundRules
-    }
-
     static func decodedRequestBody(from base64Body: String?) throws -> Data? {
         guard let base64Body else {
             return nil
@@ -428,8 +405,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     private let taskLock = NSLock()
     private let webviewId: String
     private let proxyTimeoutSeconds: TimeInterval = 10
-    private let legacyProxyRequests: Bool
-    private let legacyProxyRequestURLRegex: NSRegularExpression?
     private let outboundRules: [NativeProxyRule]
     private let inboundRules: [NativeProxyRule]
 
@@ -438,15 +413,11 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     init(
         plugin: InAppBrowserPlugin,
         webviewId: String,
-        legacyProxyRequests: Bool,
-        legacyProxyRequestURLRegex: NSRegularExpression?,
         outboundRules: [NativeProxyRule],
         inboundRules: [NativeProxyRule]
     ) {
         self.plugin = plugin
         self.webviewId = webviewId
-        self.legacyProxyRequests = legacyProxyRequests
-        self.legacyProxyRequestURLRegex = legacyProxyRequestURLRegex
         self.outboundRules = outboundRules
         self.inboundRules = inboundRules
         super.init()
@@ -457,8 +428,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         return ProxySchemeHandler(
             plugin: plugin,
             webviewId: webviewId,
-            legacyProxyRequests: legacyProxyRequests,
-            legacyProxyRequestURLRegex: legacyProxyRequestURLRegex,
             outboundRules: outboundRules,
             inboundRules: inboundRules
         )
@@ -872,32 +841,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     }
 
     private func firstMatchingRule(for requestContext: NativeRequestContext, responseData: NativeResponseData?, phase: String) -> NativeProxyRule? {
-        let usesLegacyCatchAllRule = ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
-            legacyProxyRequests: legacyProxyRequests,
-            hasOutboundRules: !outboundRules.isEmpty,
-            hasInboundRules: !inboundRules.isEmpty,
-            phase: phase
-        )
-        let rules: [NativeProxyRule]
-
-        if usesLegacyCatchAllRule {
-            rules = [
-                NativeProxyRule(
-                    id: nil,
-                    urlRegex: legacyProxyRequestURLRegex,
-                    methodRegex: nil,
-                    headerRegex: nil,
-                    bodyRegex: nil,
-                    statusRegex: nil,
-                    responseHeaderRegex: nil,
-                    responseBodyRegex: nil,
-                    mainFrameOnly: false,
-                    action: .delegateToJs
-                )
-            ]
-        } else {
-            rules = phase == "outbound" ? outboundRules : inboundRules
-        }
+        let rules = phase == "outbound" ? outboundRules : inboundRules
 
         let serializedHeaders = serialize(headers: requestContext.headers)
         let decodedBody = decodeBase64Body(requestContext.base64Body)

@@ -874,7 +874,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs" }],
         toolbarType: ToolBarType.NAVIGATION,
         title: "Grailed stub proxy demo",
       });
@@ -944,7 +944,13 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs" }],
+        inboundProxyRules: [
+          {
+            urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
+            action: "delegateToJs",
+          },
+        ],
         headers: DESKTOP_CHROME_HEADERS,
         isPresentAfterPageLoad: true,
         preShowScript: GRAILED_GOOGLE_BROWSER_SPOOF,
@@ -1220,7 +1226,13 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs" }],
+        inboundProxyRules: [
+          {
+            urlRegex: "^https://([^.]+\\.)*google\\.com/.*",
+            action: "delegateToJs",
+          },
+        ],
         headers: DESKTOP_CHROME_HEADERS,
         hidden: true,
         hiddenPopupWindow: true,
@@ -1352,7 +1364,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: FACEBOOK_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs" }],
         headers: {
           "user-agent": DESKTOP_CHROME_USER_AGENT,
         },

@@ -84,7 +84,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.Principal;
@@ -192,19 +191,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         RedirectReplayResult(NativeRequestContext requestContext, NativeResponseData responseData) {
             this.requestContext = requestContext;
             this.responseData = responseData;
-        }
-    }
-
-    private static class LegacyInitialProxyResult {
-
-        private final boolean canceled;
-        private final NativeResponseData responseData;
-        private final String requestUrl;
-
-        LegacyInitialProxyResult(boolean canceled, NativeResponseData responseData, String requestUrl) {
-            this.canceled = canceled;
-            this.responseData = responseData;
-            this.requestUrl = requestUrl;
         }
     }
 
@@ -1826,7 +1812,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
         _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
         _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
-        if (_options.shouldEnableNativeProxy()) {
+        if (ProxyRequestSupport.shouldInjectBridge(_options)) {
             proxyAccessToken = UUID.randomUUID().toString();
             proxyBridge = new ProxyBridge(proxyAccessToken);
             _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
@@ -2346,6 +2332,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             });
         }
 
+        setupToolbar();
+        setWebViewClient();
+
         Map<String, String> requestHeaders = new HashMap<>();
         if (_options.getHeaders() != null) {
             Iterator<String> keys = _options.getHeaders().keys();
@@ -2364,9 +2353,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         String httpBody = _options.getHttpBody();
 
         if (!_options.isPopupWindowMode()) {
-            if (shouldBootstrapInitialLegacyProxyLoad()) {
-                loadInitialLegacyProxyContent(requestHeaders, httpMethod, httpBody);
-            } else if (supportsRequestBody(httpMethod) && httpBody != null) {
+            if (supportsRequestBody(httpMethod) && httpBody != null) {
                 // For POST/PUT/PATCH requests with body
                 // Note: Android WebView has limitations with custom headers on POST
                 // Headers may not be sent with the initial request when using postUrl
@@ -2404,9 +2391,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             });
         }
-
-        setupToolbar();
-        setWebViewClient();
 
         if (this._options.isHidden()) {
             if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
@@ -4249,17 +4233,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             return null;
                         }
 
-                        if (
-                            ProxyRequestSupport.usesLegacyJsProxyMode(_options) &&
-                            !ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, originalUrl)
-                        ) {
-                            if (proxyBridge != null) {
-                                proxyBridge.getAndRemove(requestId);
-                            }
-                            Log.w("InAppBrowserProxy", "Ignoring legacy regex miss for bridge-backed request: " + originalUrl);
-                            return createCanceledResponse();
-                        }
-
                         ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
                         if (stored == null) {
                             Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
@@ -4316,27 +4289,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         return null;
                     }
 
-                    boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
-                    boolean shouldDelegateLegacyRequest = ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(
-                        _options,
-                        requestContext.url
-                    );
-
-                    NativeProxyRule outboundRule =
-                        legacyProxyMode && shouldDelegateLegacyRequest
-                            ? new NativeProxyRule(
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  false,
-                                  NativeProxyRule.Action.DELEGATE_TO_JS
-                              )
-                            : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
+                    NativeProxyRule outboundRule = findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
 
                     if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
                         return createCanceledResponse();
@@ -5106,10 +5059,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return null;
         }
 
-        String proxyRegexSource = "";
-        if (ProxyRequestSupport.usesLegacyJsProxyMode(_options) && _options.getProxyRequestsPattern() != null) {
-            proxyRegexSource = _options.getProxyRequestsPattern().pattern();
-        }
+        String proxyRegexSource = ProxyRequestSupport.buildBridgeUrlPattern(_options);
 
         return proxyBridgeScript
             .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
@@ -5118,149 +5068,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     private boolean shouldUseNativeProxy() {
         return _options != null && _options.shouldEnableNativeProxy();
-    }
-
-    private boolean shouldBootstrapInitialLegacyProxyLoad() {
-        if (_options == null || _options.isPopupWindowMode()) {
-            return false;
-        }
-        return ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, _options.getUrl());
-    }
-
-    private void loadInitialLegacyProxyContent(Map<String, String> requestHeaders, String httpMethod, String httpBody) {
-        final String initialUrl = _options.getUrl();
-        final Map<String, String> initialHeaders = requestHeaders != null ? new HashMap<>(requestHeaders) : new HashMap<>();
-        final String initialMethod = httpMethod != null && !httpMethod.isBlank() ? httpMethod : "GET";
-        final String initialBody =
-            supportsRequestBody(initialMethod) && httpBody != null
-                ? Base64.encodeToString(httpBody.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP)
-                : "";
-
-        executorService.execute(() -> {
-            NativeRequestContext requestContext = new NativeRequestContext(
-                initialUrl,
-                initialMethod,
-                initialHeaders,
-                initialBody,
-                true,
-                "same-origin"
-            );
-
-            try {
-                LegacyInitialProxyResult proxyResult = resolveLegacyInitialProxyResponse(requestContext);
-                if (proxyResult.canceled) {
-                    rejectOpenWebViewIfNeeded("Initial legacy proxy request canceled");
-                    return;
-                }
-
-                NativeResponseData responseData = proxyResult.responseData;
-                if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
-                    rejectOpenWebViewIfNeeded("Initial legacy proxy request did not return bootstrap HTML");
-                    return;
-                }
-
-                ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
-                    responseData.contentType,
-                    responseData.headers
-                );
-                String encoding = metadata.encoding() != null && !metadata.encoding().isBlank() ? metadata.encoding() : "utf-8";
-                String body = decodeResponseBody(responseData.bodyBytes, encoding);
-                String bootstrapUrl = ProxyRequestSupport.resolveBootstrapBaseUrl(initialUrl, proxyResult.requestUrl);
-
-                if (_webView == null) {
-                    return;
-                }
-
-                _webView.post(() -> {
-                    if (_webView == null) {
-                        return;
-                    }
-                    _webView.loadDataWithBaseURL(bootstrapUrl, body, metadata.mimeType(), encoding, bootstrapUrl);
-                });
-            } catch (IOException error) {
-                Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
-                rejectOpenWebViewIfNeeded("Initial legacy proxy bootstrap failed: " + error.getMessage());
-            }
-        });
-    }
-
-    private LegacyInitialProxyResult resolveLegacyInitialProxyResponse(NativeRequestContext requestContext) throws IOException {
-        String proxyId = UUID.randomUUID().toString();
-        ProxiedRequest proxiedRequest = new ProxiedRequest();
-        proxiedRequest.requestContext = requestContext;
-        addProxiedRequest(proxyId, proxiedRequest);
-
-        String dialogId = instanceId != null ? instanceId : "";
-        _options
-            .getCallbacks()
-            .proxyRequestEvent(
-                proxyId,
-                "outbound",
-                requestContext.url,
-                requestContext.method,
-                serializeHeaders(requestContext.headers),
-                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
-                null,
-                null,
-                null,
-                dialogId
-            );
-
-        try {
-            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                if (proxiedRequest.canceled) {
-                    return new LegacyInitialProxyResult(true, null, requestContext.url);
-                }
-                if (proxiedRequest.nativeResponse != null) {
-                    return new LegacyInitialProxyResult(false, proxiedRequest.nativeResponse, requestContext.url);
-                }
-                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
-            } else {
-                synchronized (proxiedRequest) {
-                    proxiedRequest.timedOut = true;
-                }
-                removeProxiedRequest(proxyId);
-            }
-        } catch (InterruptedException error) {
-            removeProxiedRequest(proxyId);
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted while waiting for initial proxy response", error);
-        }
-
-        NativeResponseData nativeResponse = performNativeRequest(requestContext);
-        int redirectsFollowed = 0;
-        while (true) {
-            RedirectReplayResult redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
-            if (redirectReplay == null) {
-                return new LegacyInitialProxyResult(false, nativeResponse, requestContext.url);
-            }
-            requestContext = redirectReplay.requestContext;
-            nativeResponse = redirectReplay.responseData;
-            redirectsFollowed++;
-        }
-    }
-
-    private boolean canBootstrapHtmlResponse(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            return false;
-        }
-        String normalizedContentType = contentType.toLowerCase(Locale.US);
-        return (
-            normalizedContentType.startsWith("text/html") ||
-            normalizedContentType.startsWith("application/xhtml+xml") ||
-            normalizedContentType.startsWith("text/plain")
-        );
-    }
-
-    private String decodeResponseBody(byte[] bodyBytes, String encoding) {
-        if (bodyBytes == null || bodyBytes.length == 0) {
-            return "";
-        }
-        try {
-            return new String(bodyBytes, Charset.forName(encoding));
-        } catch (Exception _error) {
-            return new String(bodyBytes, StandardCharsets.UTF_8);
-        }
     }
 
     private String decodeBase64Body(String base64Body) {

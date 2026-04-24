@@ -289,7 +289,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = [], openBlankTargetInWebView: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = [], openBlankTargetInWebView: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -299,7 +299,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
         self.captureConsoleLogs = captureConsoleLogs
-        self.proxyRequests = proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
         self.openBlankTargetInWebView = openBlankTargetInWebView
         self.setHeaders(headers: headers)
@@ -358,7 +357,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var disableOverscroll: Bool = false
-    var proxyRequests: Bool = false
     var proxySchemeHandler: ProxySchemeHandler?
     var initialWebConfiguration: WKWebViewConfiguration?
     var waitsForPopupNavigation = false
@@ -1244,7 +1242,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
         userContentController.removeScriptMessageHandler(forName: "magicPrint")
 
-        if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
+        if let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
             if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
                 webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
@@ -1476,7 +1474,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.authorizedAppLinks = parent.authorizedAppLinks
         self.activeNativeNavigationForWebview = parent.activeNativeNavigationForWebview
         self.disableOverscroll = parent.disableOverscroll
-        self.proxyRequests = parent.proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
         self.initialWebConfiguration = configuration
         self.waitsForPopupNavigation = true

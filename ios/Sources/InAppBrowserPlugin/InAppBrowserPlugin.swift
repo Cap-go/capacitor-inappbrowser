@@ -842,7 +842,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
 
-        let legacyProxyRequests = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: call.options["proxyRequests"])
+        if call.options["proxyRequests"] != nil {
+            call.reject("proxyRequests has been removed. Use outboundProxyRules and inboundProxyRules.")
+            return
+        }
         let outboundProxyRulesRaw = call.getArray("outboundProxyRules", [])
         let inboundProxyRulesRaw = call.getArray("inboundProxyRules", [])
         let outboundProxyRules: [NativeProxyRule]
@@ -868,12 +871,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             var proxyHandler: ProxySchemeHandler?
-            if legacyProxyRequests.isEnabled || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+            if !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
                 proxyHandler = ProxySchemeHandler(
                     plugin: self,
                     webviewId: webViewId,
-                    legacyProxyRequests: legacyProxyRequests.isEnabled,
-                    legacyProxyRequestURLRegex: legacyProxyRequests.urlRegex,
                     outboundRules: outboundProxyRules,
                     inboundRules: inboundProxyRules
                 )
@@ -894,7 +895,6 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
                 allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
                 captureConsoleLogs: captureConsoleLogs,
-                proxyRequests: legacyProxyRequests.isEnabled,
                 proxySchemeHandler: proxyHandler,
                 documentStartUserScripts: self.documentStartUserScripts(
                     authorizedAppLinks: authorizedAppLinks,

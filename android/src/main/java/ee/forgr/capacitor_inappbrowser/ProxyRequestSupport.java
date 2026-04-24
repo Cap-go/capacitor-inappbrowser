@@ -48,54 +48,40 @@ final class ProxyRequestSupport {
     private ProxyRequestSupport() {}
 
     static boolean shouldInjectBridge(Options options) {
-        return options != null && options.shouldEnableNativeProxy();
-    }
-
-    static boolean usesLegacyJsProxyMode(Options options) {
         if (options == null) {
             return false;
         }
-        return (
-            (options.getProxyRequests() || options.getProxyRequestsPattern() != null) &&
-            options.getOutboundProxyRules().isEmpty() &&
-            options.getInboundProxyRules().isEmpty()
-        );
-    }
-
-    static Pattern compileProxyRequestsPattern(Object rawProxyRequests) {
-        if (!(rawProxyRequests instanceof String proxyRequestsPattern) || proxyRequestsPattern.isBlank()) {
-            return null;
-        }
-        return Pattern.compile(proxyRequestsPattern);
-    }
-
-    static boolean matchesProxyRequestsPattern(Pattern pattern, String requestUrl) {
-        if (pattern == null) {
-            return true;
-        }
-        if (requestUrl == null || requestUrl.isBlank()) {
-            return false;
-        }
-        return pattern.matcher(requestUrl).find();
-    }
-
-    static boolean shouldDelegateLegacyJsProxyRequest(Options options, String requestUrl) {
-        return usesLegacyJsProxyMode(options) && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+        return hasBridgeBackedOutboundRules(options.getOutboundProxyRules());
     }
 
     static boolean shouldHandleNonBridgeRequest(Options options, String requestUrl) {
         if (options == null) {
             return false;
         }
-        if (
-            !options.getProxyRequests() &&
-            options.getProxyRequestsPattern() == null &&
-            options.getOutboundProxyRules().isEmpty() &&
-            options.getInboundProxyRules().isEmpty()
-        ) {
-            return false;
+        return options.shouldEnableNativeProxy();
+    }
+
+    static String buildBridgeUrlPattern(Options options) {
+        if (options == null) {
+            return "";
         }
-        return !usesLegacyJsProxyMode(options) || matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+
+        StringBuilder combinedPattern = new StringBuilder();
+        for (NativeProxyRule rule : options.getOutboundProxyRules()) {
+            if (!requiresBridgeCapture(rule)) {
+                continue;
+            }
+            Pattern urlPattern = rule.getUrlPattern();
+            if (urlPattern == null) {
+                return "";
+            }
+            if (combinedPattern.length() > 0) {
+                combinedPattern.append("|");
+            }
+            combinedPattern.append("(?:").append(urlPattern.pattern()).append(")");
+        }
+
+        return combinedPattern.toString();
     }
 
     static boolean isBridgeMarkerRequestUrl(String requestUrl) {
@@ -513,6 +499,25 @@ final class ProxyRequestSupport {
 
     private static boolean requiresCapturedRequestBody(String method) {
         return !shouldDropRequestBody(method);
+    }
+
+    private static boolean hasBridgeBackedOutboundRules(List<NativeProxyRule> outboundRules) {
+        if (outboundRules == null || outboundRules.isEmpty()) {
+            return false;
+        }
+        for (NativeProxyRule rule : outboundRules) {
+            if (requiresBridgeCapture(rule)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean requiresBridgeCapture(NativeProxyRule rule) {
+        if (rule == null) {
+            return false;
+        }
+        return rule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS || rule.getBodyPattern() != null;
     }
 
     private static boolean shouldDropRequestBody(String method) {
