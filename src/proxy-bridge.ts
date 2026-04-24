@@ -7,7 +7,7 @@ import {
   replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
-  shouldProxyBridgeUrl,
+  shouldProxyBridgeRequest,
   shouldProxySubmitRequest,
 } from './proxy-bridge-support';
 
@@ -28,6 +28,7 @@ import {
 
   const accessToken = '___CAPGO_PROXY_TOKEN___';
   const proxyRegexSource = '___CAPGO_PROXY_REGEX___';
+  const proxyBodyMethodFallback = '___CAPGO_PROXY_BODY_METHOD_FALLBACK___' === 'true';
   let requestCounter = 0;
   let proxyRequestPattern: RegExp | null = null;
 
@@ -291,7 +292,9 @@ import {
       }
     }
 
-    if (!shouldProxyBridgeUrl(requestUrl, getDocumentBaseUrl(), proxyRequestPattern)) {
+    if (
+      !shouldProxyBridgeRequest(requestUrl, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)
+    ) {
       return false;
     }
 
@@ -361,7 +364,7 @@ import {
       return originalFetch.call(window, input, init);
     }
 
-    if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
+    if (!shouldProxyBridgeRequest(url, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)) {
       return originalFetch.call(window, input, init);
     }
 
@@ -441,7 +444,7 @@ import {
       originalXhrSend.call(xhr, null);
     }
 
-    if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
+    if (!shouldProxyBridgeRequest(url, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)) {
       originalXhrSend.call(xhr, body ?? null);
       return;
     }
@@ -493,6 +496,8 @@ import {
         requestUrl,
         getDocumentBaseUrl(),
         proxyRequestPattern,
+        method,
+        proxyBodyMethodFallback,
       )
     ) {
       return;

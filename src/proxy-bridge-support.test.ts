@@ -10,6 +10,7 @@ import {
   replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
+  shouldProxyBridgeRequest,
   resolveProxyBridgeUrl,
   shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
@@ -141,6 +142,7 @@ describe('proxy bridge submit helpers', () => {
         'https://cdn.example.com/login',
         'https://www.grailed.com/users/sign_up',
         /accounts\.example\.com/,
+        'POST',
       ),
     ).toBe(false);
     expect(
@@ -150,6 +152,7 @@ describe('proxy bridge submit helpers', () => {
         'https://accounts.example.com/login',
         'https://www.grailed.com/users/sign_up',
         /accounts\.example\.com/,
+        'POST',
       ),
     ).toBe(true);
   });
@@ -211,5 +214,26 @@ describe('proxy bridge url helpers', () => {
     expect(shouldProxyBridgeUrl('https://api.example.com/login', 'https://www.grailed.com', /api\.example\.com/)).toBe(
       true,
     );
+  });
+
+  it('falls back to body-bearing requests outside the regex when enabled', () => {
+    expect(
+      shouldProxyBridgeRequest(
+        'https://cdn.example.com/login',
+        'https://www.grailed.com',
+        /accounts\.example\.com/,
+        'POST',
+        true,
+      ),
+    ).toBe(true);
+    expect(
+      shouldProxyBridgeRequest(
+        'https://cdn.example.com/login',
+        'https://www.grailed.com',
+        /accounts\.example\.com/,
+        'GET',
+        true,
+      ),
+    ).toBe(false);
   });
 });

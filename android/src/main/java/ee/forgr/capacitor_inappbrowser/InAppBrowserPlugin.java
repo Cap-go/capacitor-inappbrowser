@@ -140,6 +140,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
 
             @Override
+            public void managedWebViewDiscarded() {
+                unregisterWebView(webViewId);
+            }
+
+            @Override
             public void pageLoaded() {
                 notifyListeners("browserPageLoaded", new JSObject().put("id", webViewId));
             }

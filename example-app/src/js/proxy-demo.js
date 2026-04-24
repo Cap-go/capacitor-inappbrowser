@@ -3,10 +3,9 @@ import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@c
 
 const GRAILED_URL = "https://www.grailed.com/users/sign_up";
 const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";
-const GRAILED_OUTBOUND_PROXY_REGEX =
-  "^https://([^.]+\\.)*(grailed\\.com|google\\.com|gstatic\\.com|googleusercontent\\.com)/.*";
-const FACEBOOK_OUTBOUND_PROXY_REGEX = "^https://([^.]+\\.)*facebook\\.com/.*";
-const GOOGLE_INBOUND_PROXY_REGEX = "^https://([^.]+\\.)*google\\.com/.*";
+const GRAILED_OUTBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*(grailed\.com|google\.com|gstatic\.com|googleusercontent\.com|facebook\.net|apple\.com|cdn-apple\.com)/.*`;
+const FACEBOOK_OUTBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*facebook\.com/.*`;
+const GOOGLE_INBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*google\.com/.*`;
 const DESKTOP_CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36";
 

@@ -70,6 +70,25 @@ export function shouldProxyBridgeUrl(rawUrl: string, baseUrl: string, urlRegex?:
   return !urlRegex || urlRegex.test(resolvedUrl);
 }
 
+function methodSupportsRequestBody(method: string | null | undefined): boolean {
+  const normalizedMethod = (method || 'GET').toUpperCase();
+  return normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';
+}
+
+export function shouldProxyBridgeRequest(
+  rawUrl: string,
+  baseUrl: string,
+  urlRegex: RegExp | null | undefined,
+  method: string | null | undefined,
+  captureBodyMethodsWithoutUrlMatch = false,
+): boolean {
+  if (shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex)) {
+    return true;
+  }
+
+  return captureBodyMethodsWithoutUrlMatch && methodSupportsRequestBody(method);
+}
+
 type SubmitEventLike = Event & { submitter?: unknown };
 
 export function getSubmitEventSubmitter(
@@ -103,8 +122,13 @@ export function shouldProxySubmitRequest(
   rawUrl: string,
   baseUrl: string,
   urlRegex?: RegExp | null,
+  method?: string | null,
+  captureBodyMethodsWithoutUrlMatch = false,
 ): boolean {
-  return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
+  return (
+    shouldProxySubmitEvent(defaultPrevented, canProxyTarget) &&
+    shouldProxyBridgeRequest(rawUrl, baseUrl, urlRegex, method, captureBodyMethodsWithoutUrlMatch)
+  );
 }
 
 type SubmitReplayForm = {

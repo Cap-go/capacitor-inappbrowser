@@ -2356,6 +2356,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (httpBody != null) {
                 if (!"POST".equalsIgnoreCase(httpMethod)) {
                     rejectOpenWebViewIfNeeded("Android WebView only supports POST for the initial body-bearing navigation");
+                    dismiss();
+                    if (_options != null && _options.getCallbacks() != null) {
+                        _options.getCallbacks().managedWebViewDiscarded();
+                    }
                     return;
                 }
 
@@ -5065,10 +5069,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         String proxyRegexSource = ProxyRequestSupport.buildBridgeUrlPattern(_options);
+        String proxyBodyMethodFallback = ProxyRequestSupport.shouldBridgeBodyMethodsWithoutUrlMatch(_options) ? "true" : "false";
 
         return proxyBridgeScript
             .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
-            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
+            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource))
+            .replace("___CAPGO_PROXY_BODY_METHOD_FALLBACK___", proxyBodyMethodFallback);
     }
 
     private boolean shouldUseNativeProxy() {

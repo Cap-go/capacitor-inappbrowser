@@ -74,6 +74,13 @@ final class ProxyRequestSupport {
         return combinedPattern.toString();
     }
 
+    static boolean shouldBridgeBodyMethodsWithoutUrlMatch(Options options) {
+        if (options == null) {
+            return false;
+        }
+        return options.getInboundProxyRules() != null && !options.getInboundProxyRules().isEmpty();
+    }
+
     static boolean isBridgeMarkerRequestUrl(String requestUrl) {
         if (requestUrl == null || requestUrl.isBlank()) {
             return false;

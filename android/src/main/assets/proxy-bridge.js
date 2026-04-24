@@ -85,6 +85,16 @@
     }
     return !urlRegex || urlRegex.test(resolvedUrl);
   }
+  function methodSupportsRequestBody(method) {
+    const normalizedMethod = (method || "GET").toUpperCase();
+    return normalizedMethod !== "GET" && normalizedMethod !== "HEAD";
+  }
+  function shouldProxyBridgeRequest(rawUrl, baseUrl, urlRegex, method, captureBodyMethodsWithoutUrlMatch = false) {
+    if (shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex)) {
+      return true;
+    }
+    return captureBodyMethodsWithoutUrlMatch && methodSupportsRequestBody(method);
+  }
   function getSubmitEventSubmitter(event, submitEventCtor) {
     var _a, _b;
     const resolvedSubmitEventCtor = submitEventCtor != null ? submitEventCtor : typeof SubmitEvent !== "undefined" ? SubmitEvent : void 0;
@@ -99,8 +109,8 @@
   function shouldProxySubmitEvent(defaultPrevented, canProxyTarget) {
     return !defaultPrevented && canProxyTarget;
   }
-  function shouldProxySubmitRequest(defaultPrevented, canProxyTarget, rawUrl, baseUrl, urlRegex) {
-    return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeUrl(rawUrl, baseUrl, urlRegex);
+  function shouldProxySubmitRequest(defaultPrevented, canProxyTarget, rawUrl, baseUrl, urlRegex, method, captureBodyMethodsWithoutUrlMatch = false) {
+    return shouldProxySubmitEvent(defaultPrevented, canProxyTarget) && shouldProxyBridgeRequest(rawUrl, baseUrl, urlRegex, method, captureBodyMethodsWithoutUrlMatch);
   }
   function consumeProxySubmitReplayBypass(form) {
     if (!form.__capgoSkipNextProxySubmit) {
@@ -152,6 +162,7 @@
     }
     const accessToken = "___CAPGO_PROXY_TOKEN___";
     const proxyRegexSource = "___CAPGO_PROXY_REGEX___";
+    const proxyBodyMethodFallback = false;
     let requestCounter = 0;
     let proxyRequestPattern = null;
     if (proxyRegexSource) {
@@ -204,7 +215,7 @@
       }
       return url;
     }
-    function methodSupportsRequestBody(method) {
+    function methodSupportsRequestBody2(method) {
       const normalizedMethod = normalizeMethod(method);
       return normalizedMethod !== "GET" && normalizedMethod !== "HEAD";
     }
@@ -249,12 +260,12 @@
           }
           normalizedBody = yield encoded.arrayBuffer();
         }
-        if (!methodSupportsRequestBody(normalizedMethod)) {
+        if (!methodSupportsRequestBody2(normalizedMethod)) {
           normalizedBody = null;
         }
         ensureInferredContentType(headers, normalizedBody);
         const base64Body = yield bodyToBase64(normalizedBody);
-        if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody(normalizedMethod)) {
+        if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody2(normalizedMethod)) {
           throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
         }
         proxyBridge.storeRequest(
@@ -366,7 +377,7 @@
             body = formDataToUrlSearchParams(formData);
           }
         }
-        if (!shouldProxyBridgeUrl(requestUrl, getDocumentBaseUrl(), proxyRequestPattern)) {
+        if (!shouldProxyBridgeRequest(requestUrl, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)) {
           return false;
         }
         const proxyUrl = yield storeInterceptedRequest(requestUrl, method, headers, body, "include");
@@ -432,7 +443,7 @@
         if (requestCloneError != null) {
           return originalFetch.call(window, input, init);
         }
-        if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
+        if (!shouldProxyBridgeRequest(url, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)) {
           return originalFetch.call(window, input, init);
         }
         const signal = (_a = init == null ? void 0 : init.signal) != null ? _a : input instanceof Request ? input.signal : void 0;
@@ -502,7 +513,7 @@
         restoreXhrReplayState(xhr, replayState);
         originalXhrSend.call(xhr, null);
       }
-      if (!shouldProxyBridgeUrl(url, getDocumentBaseUrl(), proxyRequestPattern)) {
+      if (!shouldProxyBridgeRequest(url, getDocumentBaseUrl(), proxyRequestPattern, method, proxyBodyMethodFallback)) {
         originalXhrSend.call(xhr, body != null ? body : null);
         return;
       }
@@ -542,7 +553,9 @@
         canProxyFormTarget(target),
         requestUrl,
         getDocumentBaseUrl(),
-        proxyRequestPattern
+        proxyRequestPattern,
+        method,
+        proxyBodyMethodFallback
       )) {
         return;
       }
