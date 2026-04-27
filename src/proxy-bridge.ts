@@ -197,14 +197,7 @@
     const credentialsMode: RequestCredentials = xhr.withCredentials ? 'include' : 'same-origin';
 
     function completeSend(base64Body: string) {
-      proxyBridge.storeRequest(
-        accessToken,
-        requestId,
-        method,
-        JSON.stringify(headers),
-        base64Body,
-        credentialsMode,
-      );
+      proxyBridge.storeRequest(accessToken, requestId, method, JSON.stringify(headers), base64Body, credentialsMode);
       const proxyUrl = '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
       originalXhrOpen.call(xhr, 'GET', proxyUrl, true);
       originalXhrSend.call(xhr, null);
