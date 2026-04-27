@@ -3,6 +3,9 @@ import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@c
 
 const GRAILED_URL = "https://www.grailed.com/users/sign_up";
 const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";
+const GRAILED_OUTBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*(grailed\.com|google\.com|gstatic\.com|googleusercontent\.com|facebook\.net|apple\.com|cdn-apple\.com)/.*`;
+const FACEBOOK_OUTBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*facebook\.com/.*`;
+const GOOGLE_INBOUND_PROXY_REGEX = String.raw`^https://([^.]+\.)*google\.com/.*`;
 const DESKTOP_CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36";
 
@@ -874,7 +877,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
         toolbarType: ToolBarType.NAVIGATION,
         title: "Grailed stub proxy demo",
       });
@@ -944,7 +947,8 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
+        inboundProxyRules: [{ urlRegex: GOOGLE_INBOUND_PROXY_REGEX, action: "delegateToJs" }],
         headers: DESKTOP_CHROME_HEADERS,
         isPresentAfterPageLoad: true,
         preShowScript: GRAILED_GOOGLE_BROWSER_SPOOF,
@@ -1220,7 +1224,8 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: GRAILED_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: GRAILED_OUTBOUND_PROXY_REGEX }],
+        inboundProxyRules: [{ urlRegex: GOOGLE_INBOUND_PROXY_REGEX, action: "delegateToJs" }],
         headers: DESKTOP_CHROME_HEADERS,
         hidden: true,
         hiddenPopupWindow: true,
@@ -1352,7 +1357,7 @@ export function setupProxyDemoButtons(root) {
 
       const result = await InAppBrowser.openWebView({
         url: FACEBOOK_URL,
-        proxyRequests: true,
+        outboundProxyRules: [{ action: "delegateToJs", urlRegex: FACEBOOK_OUTBOUND_PROXY_REGEX }],
         headers: {
           "user-agent": DESKTOP_CHROME_USER_AGENT,
         },

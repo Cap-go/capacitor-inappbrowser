@@ -72,6 +72,14 @@ public class NativeProxyRule {
         return action;
     }
 
+    public Pattern getUrlPattern() {
+        return urlPattern;
+    }
+
+    public Pattern getBodyPattern() {
+        return bodyPattern;
+    }
+
     public boolean matches(
         String url,
         String method,
