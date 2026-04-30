@@ -1648,6 +1648,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
         builder.enableUrlBarHiding();
         builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
+        builder.setEphemeralBrowsingEnabled(Boolean.TRUE.equals(call.getBoolean("prefersEphemeralWebBrowserSession", false)));
         CustomTabsIntent customTabsIntent = builder.build();
         customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         customTabsIntent.intent.putExtra(CustomTabsIntent.EXTRA_ENABLE_INSTANT_APPS, false);
