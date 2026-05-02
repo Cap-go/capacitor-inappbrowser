@@ -44,56 +44,6 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertTrue(script.contains("console.assert"))
     }
 
-    func testLegacyProxyRequestsConfigurationSupportsBooleanValues() {
-        let enabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: true)
-        XCTAssertTrue(enabled.isEnabled)
-        XCTAssertNil(enabled.urlRegex)
-
-        let disabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: false)
-        XCTAssertFalse(disabled.isEnabled)
-        XCTAssertNil(disabled.urlRegex)
-    }
-
-    func testLegacyProxyRequestsConfigurationIgnoresAndroidOnlyRegexStrings() {
-        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "api\\.example\\.com")
-
-        XCTAssertFalse(configuration.isEnabled)
-        XCTAssertNil(configuration.urlRegex)
-    }
-
-    func testLegacyProxyRequestsConfigurationTreatsBlankStringsAsDisabled() {
-        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "   ")
-
-        XCTAssertFalse(configuration.isEnabled)
-        XCTAssertNil(configuration.urlRegex)
-    }
-
-    func testLegacyProxyRequestsConfigurationIgnoresInvalidRegexStrings() {
-        let configuration = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: "[")
-
-        XCTAssertFalse(configuration.isEnabled)
-        XCTAssertNil(configuration.urlRegex)
-    }
-
-    func testLegacyCatchAllRuleOnlyAppliesToOutboundPhase() {
-        XCTAssertTrue(
-            ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
-                legacyProxyRequests: true,
-                hasOutboundRules: false,
-                hasInboundRules: false,
-                phase: "outbound"
-            )
-        )
-        XCTAssertFalse(
-            ProxySchemeRequestSupport.shouldUseLegacyCatchAllRule(
-                legacyProxyRequests: true,
-                hasOutboundRules: false,
-                hasInboundRules: false,
-                phase: "inbound"
-            )
-        )
-    }
-
     func testDelegatedRedirectFollowSkipsCanceledInboundResponses() {
         XCTAssertTrue(
             ProxySchemeRequestSupport.shouldFollowDelegatedRedirect(

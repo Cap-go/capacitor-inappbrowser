@@ -7,6 +7,8 @@ public interface WebViewCallbacks {
 
     public void closeEvent(String url);
 
+    default void managedWebViewDiscarded() {}
+
     public void pageLoaded();
 
     public void pageLoadError();
