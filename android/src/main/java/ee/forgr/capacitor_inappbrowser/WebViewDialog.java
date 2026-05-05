@@ -5403,7 +5403,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             conn.setRequestMethod(requestContext.method != null ? requestContext.method : "GET");
             conn.setInstanceFollowRedirects(false);
 
-            for (Map.Entry<String, String> entry : requestContext.headers.entrySet()) {
+            // Strip conditional cache validators on the wire so upstream cannot return 304/3xx,
+            // which WebResourceResponse.setStatusCodeAndReasonPhrase rejects (kills the renderer).
+            Map<String, String> wireHeaders = ProxyRequestSupport.stripCacheValidatorHeaders(requestContext.headers);
+            for (Map.Entry<String, String> entry : wireHeaders.entrySet()) {
                 conn.setRequestProperty(entry.getKey(), entry.getValue());
             }
 
