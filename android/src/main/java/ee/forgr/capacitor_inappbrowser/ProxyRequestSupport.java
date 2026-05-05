@@ -44,6 +44,21 @@ final class ProxyRequestSupport {
         "Proxy-Authorization",
         "Referer"
     };
+    /**
+     * Conditional cache headers that must be dropped before replaying a redirect through
+     * HttpURLConnection. If we forward them unchanged the upstream may answer with 304/3xx,
+     * which {@link android.webkit.WebResourceResponse#setStatusCodeAndReasonPhrase(int, String)}
+     * rejects (status code must not be in [300, 399]) and crashes the renderer.
+     */
+    private static final String[] CACHE_VALIDATOR_HEADER_NAMES = {
+        "If-None-Match",
+        "If-Modified-Since",
+        "If-Match",
+        "If-Unmodified-Since",
+        "If-Range",
+        "Cache-Control",
+        "Pragma"
+    };
 
     private ProxyRequestSupport() {}
 
@@ -273,6 +288,9 @@ final class ProxyRequestSupport {
         if (isCrossOriginRedirect(requestUrl, redirectUrl)) {
             dropHeadersIgnoreCase(redirectedHeaders, CROSS_ORIGIN_REDIRECT_HEADER_NAMES);
         }
+        // Always strip cache validators on redirect replay: a 304 response from the upstream
+        // would crash WebResourceResponse.setStatusCodeAndReasonPhrase (rejects [300, 399]).
+        dropHeadersIgnoreCase(redirectedHeaders, CACHE_VALIDATOR_HEADER_NAMES);
         if (preserveRequestBody) {
             return redirectedHeaders;
         }
