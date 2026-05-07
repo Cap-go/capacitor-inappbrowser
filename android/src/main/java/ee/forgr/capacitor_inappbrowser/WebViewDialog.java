@@ -4276,7 +4276,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
                             return createCanceledResponse();
                         }
-                        
                         String initiatorUrl = request.getRequestHeaders().get("Referer");
                         if (initiatorUrl == null || initiatorUrl.isBlank()) {
                             // FIX: Safely fetch the WebView URL on the Main Thread
@@ -4295,7 +4294,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 initiatorUrl = originalUrl; 
                             }
                         }
-                        
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (
                             targetCookies != null &&
