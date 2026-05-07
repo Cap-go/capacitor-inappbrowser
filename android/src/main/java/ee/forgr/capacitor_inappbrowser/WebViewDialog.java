@@ -4276,10 +4276,26 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
                             return createCanceledResponse();
                         }
+                        
                         String initiatorUrl = request.getRequestHeaders().get("Referer");
                         if (initiatorUrl == null || initiatorUrl.isBlank()) {
-                            initiatorUrl = _webView.getUrl();
+                            // FIX: Safely fetch the WebView URL on the Main Thread
+                            try {
+                                java.util.concurrent.FutureTask<String> task = new java.util.concurrent.FutureTask<>(new java.util.concurrent.Callable<String>() {
+                                    @Override
+                                    public String call() {
+                                        return _webView.getUrl();
+                                    }
+                                });
+                                new android.os.Handler(android.os.Looper.getMainLooper()).post(task);
+                                // Wait up to 1 second for the UI thread to return the URL
+                                initiatorUrl = task.get(1, java.util.concurrent.TimeUnit.SECONDS); 
+                            } catch (Exception e) {
+                                // Fallback to the original requested URL if the UI thread times out
+                                initiatorUrl = originalUrl; 
+                            }
                         }
+                        
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (
                             targetCookies != null &&
