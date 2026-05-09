@@ -5547,7 +5547,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 JSObject responseOverride = response.getJSObject("response");
-                if (responseOverride == null && response.get("status") != null) {
+                if (responseOverride == null && response.has("status")) {
                     responseOverride = response;
                 }
 
