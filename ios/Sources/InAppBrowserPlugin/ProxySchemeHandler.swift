@@ -1014,15 +1014,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     }
 
     private func syncResponseCookies(from response: URLResponse?, fallbackURL: String, completion: @escaping () -> Void) {
-        guard
-            let plugin,
-            let cookieStore = plugin.cookieStore(for: webviewId),
-            !fallbackURL.isEmpty
-        else {
+        guard !fallbackURL.isEmpty else {
             completion()
             return
         }
-
         let cookies = ProxySchemeRequestSupport.responseCookies(
             response: response,
             fallback: fallbackURL
@@ -1031,44 +1026,51 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             completion()
             return
         }
-
-        let group = DispatchGroup()
-        for cookie in cookies {
-            group.enter()
-            cookieStore.setCookie(cookie) {
-                group.leave()
-            }
-        }
-        group.notify(queue: .main) {
-            completion()
-        }
+        writeCookiesOnMain(cookies, completion: completion)
     }
 
     private func syncResponseCookies(from responseData: NativeResponseData, fallbackURL: String, completion: @escaping () -> Void) {
-        guard
-            let plugin,
-            let cookieStore = plugin.cookieStore(for: webviewId),
-            !fallbackURL.isEmpty
-        else {
+        guard !fallbackURL.isEmpty else {
             completion()
             return
         }
-
         let cookies = ProxySchemeRequestSupport.responseCookies(from: responseData.headers, fallback: fallbackURL)
         guard !cookies.isEmpty else {
             completion()
             return
         }
+        writeCookiesOnMain(cookies, completion: completion)
+    }
 
-        let group = DispatchGroup()
-        for cookie in cookies {
-            group.enter()
-            cookieStore.setCookie(cookie) {
-                group.leave()
+    /// Writes cookies into the WebView cookie store on the main thread.
+    ///
+    /// `WKWebsiteDataStore.httpCookieStore` and `WKHTTPCookieStore.setCookie` are both
+    /// `@MainActor`-only on iOS 17+. URLSession delegate callbacks (including
+    /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:)`) and the timeout
+    /// closure dispatched via `DispatchQueue.global().asyncAfter` run on background
+    /// queues, so reaching the cookie store from there triggers Main Thread Checker
+    /// warnings and risks runtime crashes in release builds. Hop to main here so all
+    /// `syncResponseCookies` callers stay correct regardless of their own thread context.
+    private func writeCookiesOnMain(_ cookies: [HTTPCookie], completion: @escaping () -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard
+                let self,
+                let plugin = self.plugin,
+                let cookieStore = plugin.cookieStore(for: self.webviewId)
+            else {
+                completion()
+                return
             }
-        }
-        group.notify(queue: .main) {
-            completion()
+            let group = DispatchGroup()
+            for cookie in cookies {
+                group.enter()
+                cookieStore.setCookie(cookie) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                completion()
+            }
         }
     }
 
