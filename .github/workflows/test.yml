@@ -43,6 +43,9 @@ jobs:
         id: build_code
         run: bun run verify:android
 
+      - name: Verify packed package in example app (Android)
+        shell: bash
+        run: bash ./.github/scripts/verify-packed-example.sh android
   maestro_android_proxy_regression:
     timeout-minutes: 45
     runs-on: ubuntu-latest
@@ -297,6 +300,9 @@ jobs:
         id: build_code
         run: bun run verify:ios
 
+      - name: Verify packed package in example app (iOS)
+        shell: bash
+        run: bash ./.github/scripts/verify-packed-example.sh ios
   web:
     timeout-minutes: 30
     runs-on: ubuntu-latest
@@ -314,6 +320,10 @@ jobs:
       - name: Build
         id: build_code
         run: bun run build
+
+      - name: Verify packed package in example app (Web)
+        shell: bash
+        run: bash ./.github/scripts/verify-packed-example.sh web
       - name: Verify
         id: verify_code
         run: bun run verify:web
