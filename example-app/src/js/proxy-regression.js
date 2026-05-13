@@ -247,7 +247,12 @@ export function setupProxyRegression(root, options = {}) {
     try {
       await InAppBrowser.openWebView({
         url: ENTRY_URL,
-        proxyRequests: true,
+        outboundProxyRules: [
+          {
+            urlRegex: "^https://proxy\\.capgo\\.test/.*",
+            action: "delegateToJs",
+          },
+        ],
         toolbarType: ToolBarType.BLANK,
       });
       browserOpened = true;

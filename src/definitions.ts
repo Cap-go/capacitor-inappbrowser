@@ -827,17 +827,6 @@ export interface OpenWebViewOptions {
    */
   preShowScriptInjectionTime?: 'documentStart' | 'pageLoad';
   /**
-   * Proxy interception mode.
-   *
-   * - `true`: legacy blanket mode, delegates all HTTP/HTTPS requests to JavaScript.
-   * - `string`: Android-only regex mode kept for backward compatibility.
-   *
-   * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
-   *
-   * @since 6.9.0
-   */
-  proxyRequests?: boolean | string;
-  /**
    * Native-first outbound proxy rules.
    *
    * @since 8.6.0

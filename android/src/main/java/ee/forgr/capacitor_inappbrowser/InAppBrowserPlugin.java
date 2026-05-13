@@ -140,6 +140,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
 
             @Override
+            public void managedWebViewDiscarded() {
+                unregisterWebView(webViewId);
+            }
+
+            @Override
             public void pageLoaded() {
                 notifyListeners("browserPageLoaded", new JSObject().put("id", webViewId));
             }
@@ -822,6 +827,7 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         String url = call.getString("url");
         if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
         currentUrl = url;
         final String webViewId = UUID.randomUUID().toString();
@@ -852,18 +858,9 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             options.setTextZoom(textZoom);
         }
 
-        options.setProxyRequests(Boolean.TRUE.equals(call.getBoolean("proxyRequests", false)));
-
-        Object rawProxyRequests = call.getData().opt("proxyRequests");
-        if (rawProxyRequests instanceof String proxyRequestsStr) {
-            try {
-                Pattern proxyRequestsPattern = ProxyRequestSupport.compileProxyRequestsPattern(rawProxyRequests);
-                if (proxyRequestsPattern != null) {
-                    options.setProxyRequestsPattern(proxyRequestsPattern);
-                }
-            } catch (PatternSyntaxException e) {
-                Log.e("WebViewDialog", String.format("Pattern '%s' is not a valid pattern", proxyRequestsStr));
-            }
+        if (call.getData().has("proxyRequests") || call.getData().has("proxyRequestsPattern")) {
+            call.reject("proxyRequests and proxyRequestsPattern have been removed. Use outboundProxyRules and inboundProxyRules.");
+            return;
         }
 
         List<NativeProxyRule> outboundProxyRules = parseProxyRules(call.getArray("outboundProxyRules"), "outboundProxyRules", call);

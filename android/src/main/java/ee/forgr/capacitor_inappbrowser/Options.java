@@ -171,8 +171,6 @@ public class Options {
     private boolean ignoreUntrustedSSLError;
     private String preShowScript;
     private String toolbarTextColor;
-    private Pattern proxyRequestsPattern = null;
-    private boolean proxyRequests = false;
     private List<NativeProxyRule> outboundProxyRules = new ArrayList<>();
     private List<NativeProxyRule> inboundProxyRules = new ArrayList<>();
     private boolean materialPicker = false;
@@ -306,22 +304,6 @@ public class Options {
         this.useTopInset = useTopInset;
     }
 
-    public Pattern getProxyRequestsPattern() {
-        return proxyRequestsPattern;
-    }
-
-    public void setProxyRequestsPattern(Pattern proxyRequestsPattern) {
-        this.proxyRequestsPattern = proxyRequestsPattern;
-    }
-
-    public boolean getProxyRequests() {
-        return proxyRequests;
-    }
-
-    public void setProxyRequests(boolean proxyRequests) {
-        this.proxyRequests = proxyRequests;
-    }
-
     public List<NativeProxyRule> getOutboundProxyRules() {
         return outboundProxyRules;
     }
@@ -339,7 +321,7 @@ public class Options {
     }
 
     public boolean shouldEnableNativeProxy() {
-        return proxyRequests || proxyRequestsPattern != null || !outboundProxyRules.isEmpty() || !inboundProxyRules.isEmpty();
+        return !outboundProxyRules.isEmpty() || !inboundProxyRules.isEmpty();
     }
 
     public PluginCall getPluginCall() {
@@ -693,8 +675,6 @@ public class Options {
         copy.setIgnoreUntrustedSSLError(ignoreUntrustedSSLError);
         copy.setPreShowScript(preShowScript);
         copy.setToolbarTextColor(toolbarTextColor);
-        copy.setProxyRequestsPattern(proxyRequestsPattern);
-        copy.setProxyRequests(proxyRequests);
         copy.setOutboundProxyRules(new ArrayList<>(outboundProxyRules));
         copy.setInboundProxyRules(new ArrayList<>(inboundProxyRules));
         copy.setMaterialPicker(materialPicker);
