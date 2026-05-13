@@ -619,6 +619,19 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             }
 
             let httpResponse = response as? HTTPURLResponse
+            // 3xx responses are the exclusive responsibility of
+            // urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:).
+            // When that delegate calls completionHandler(nil) to suppress URLSession's
+            // automatic redirect-following, URLSession still surfaces the 3xx body to
+            // this completion handler as a normal response. Without this guard, the
+            // willPerformHTTPRedirection path and this completion handler both race to
+            // mutate pendingTask.responseData and call executeInboundDecision; the late-
+            // firing one overwrites the redirect-target state and ends up handing the
+            // empty 3xx body to the WKURLSchemeTask via finish(), short-circuiting the
+            // actual redirect-target fetch.
+            if let httpResponse, (300...399).contains(httpResponse.statusCode) {
+                return
+            }
             let responseHeaders = ProxySchemeRequestSupport.normalizedResponseHeaders(from: httpResponse)
             pendingTask.requestContext.url = ProxySchemeRequestSupport.resolvedResponseURL(
                 response,
@@ -925,7 +938,18 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         }
         var request = URLRequest(url: url)
         request.httpMethod = context.method
-        request.allHTTPHeaderFields = context.headers
+        // URLSession will auto-decompress gzip/br/zstd responses only when
+        // Accept-Encoding is NOT present in the request headers (URLSession
+        // adds its own and owns the decompression in that case). If we forward
+        // an Accept-Encoding value supplied by the JS handler (or carried over
+        // by URLSession's own redirect-rewriting), URLSession assumes the
+        // caller will handle decompression and passes the raw compressed bytes
+        // through, which the WKURLSchemeTask then renders as gibberish in the
+        // WebView. Strip it so URLSession's transparent decompression kicks in.
+        let filteredHeaders = context.headers.filter { key, _ in
+            key.caseInsensitiveCompare("Accept-Encoding") != .orderedSame
+        }
+        request.allHTTPHeaderFields = filteredHeaders
         if
             ProxySchemeRequestSupport.supportsRequestBody(method: context.method),
             let bodyData = try ProxySchemeRequestSupport.decodedRequestBody(from: context.base64Body) {
