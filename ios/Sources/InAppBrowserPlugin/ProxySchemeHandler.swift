@@ -421,6 +421,13 @@ final class PendingProxyTask {
 
 // swiftlint:disable type_body_length
 public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDelegate {
+    /// HTTP status codes for which URLSession actually triggers
+    /// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`.
+    /// Scoped narrowly so other 3xx responses (300, 304, 305, 306) flow through the
+    /// dataTask completion handler normally — 304 Not Modified in particular must
+    /// still reach finish() or the scheme task strands.
+    static let redirectStatusCodes: Set<Int> = [301, 302, 303, 307, 308]
+
     weak var plugin: InAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
     private var stoppedRequests: [String: UUID] = [:]
@@ -619,17 +626,23 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             }
 
             let httpResponse = response as? HTTPURLResponse
-            // 3xx responses are the exclusive responsibility of
+            // Actual HTTP redirect status codes are the exclusive responsibility of
             // urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:).
             // When that delegate calls completionHandler(nil) to suppress URLSession's
-            // automatic redirect-following, URLSession still surfaces the 3xx body to
-            // this completion handler as a normal response. Without this guard, the
+            // automatic redirect-following, URLSession still surfaces the redirect body
+            // to this completion handler as a normal response. Without this guard, the
             // willPerformHTTPRedirection path and this completion handler both race to
             // mutate pendingTask.responseData and call executeInboundDecision; the late-
             // firing one overwrites the redirect-target state and ends up handing the
-            // empty 3xx body to the WKURLSchemeTask via finish(), short-circuiting the
-            // actual redirect-target fetch.
-            if let httpResponse, (300...399).contains(httpResponse.statusCode) {
+            // empty redirect body to the WKURLSchemeTask via finish(), short-circuiting
+            // the actual redirect-target fetch.
+            //
+            // Scoped narrowly to the codes that actually trigger willPerformHTTPRedirection
+            // (301, 302, 303, 307, 308). Other 3xx — 300, 304 Not Modified, 305, 306 — are
+            // NOT redirects and the delegate doesn't fire for them, so they must flow
+            // through this completion handler normally (a 304 in particular needs the
+            // scheme task to be didFinish()'d with the cached/empty body, not stranded).
+            if let httpResponse, ProxySchemeHandler.redirectStatusCodes.contains(httpResponse.statusCode) {
                 return
             }
             let responseHeaders = ProxySchemeRequestSupport.normalizedResponseHeaders(from: httpResponse)
