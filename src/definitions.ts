@@ -412,7 +412,7 @@ export interface OpenSecureWindowOptions {
   /**
    * If true, the browser session will be ephemeral (no cookies or browsing data are shared with the system browser).
    * On iOS, this sets `prefersEphemeralWebBrowserSession = true` on `ASWebAuthenticationSession`.
-   * On Android, ephemeral mode is always enabled via `FLAG_ACTIVITY_NO_HISTORY` regardless of this option.
+   * On Android, this enables Custom Tabs ephemeral browsing via `setEphemeralBrowsingEnabled(true)`.
    * @default false
    * @since 6.6.0
    */
