@@ -150,6 +150,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             }
 
             @Override
+            public void customSchemeIntercepted(String url, boolean opened) {
+                notifyListeners("customSchemeIntercepted", new JSObject().put("id", webViewId).put("url", url).put("opened", opened));
+            }
+
+            @Override
             public void buttonNearDoneClicked() {
                 notifyListeners("buttonNearDoneClick", new JSObject().put("id", webViewId));
             }
