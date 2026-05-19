@@ -3954,6 +3954,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
               };
 
               document.addEventListener('click', function(event) {
+                if (event.defaultPrevented) {
+                  return;
+                }
+
                 var element = event.target;
                 if (!element || typeof element.closest !== 'function') {
                   return;
@@ -3966,7 +3970,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                 var nextUrl;
                 try {
-                  nextUrl = new URL(anchor.getAttribute('href'), window.location.href);
+                  nextUrl = new URL(anchor.href);
                 } catch (_) {
                   return;
                 }
@@ -3984,7 +3988,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 setTimeout(function() {
                   window.location.assign(nextUrl.toString());
                 }, 0);
-              }, true);
+              });
             })();
             """,
             authorizedHostsJson,
