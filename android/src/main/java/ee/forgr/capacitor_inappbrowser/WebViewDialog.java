@@ -4119,11 +4119,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 _options.getCallbacks().customSchemeIntercepted(url, true);
                             }
                             return true;
-                        } catch (ActivityNotFoundException | URISyntaxException e) {
+                        } catch (ActivityNotFoundException e) {
                             Log.w("InAppBrowser", "No handler for external URL: " + url, e);
                             if (shouldEmitCustomSchemeEvent && _options.getCallbacks() != null) {
                                 _options.getCallbacks().customSchemeIntercepted(url, false);
                             }
+                            // Notify that a page load error occurred
+                            if (_options.getCallbacks() != null && request.isForMainFrame()) {
+                                _options.getCallbacks().pageLoadError();
+                                rejectOpenWebViewIfNeeded("No handler available for external URL: " + url);
+                            }
+                            return true; // prevent WebView from attempting to load the custom scheme
+                        } catch (URISyntaxException e) {
+                            Log.w("InAppBrowser", "No handler for external URL: " + url, e);
                             // Notify that a page load error occurred
                             if (_options.getCallbacks() != null && request.isForMainFrame()) {
                                 _options.getCallbacks().pageLoadError();
