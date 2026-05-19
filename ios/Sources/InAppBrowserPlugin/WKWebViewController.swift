@@ -14,9 +14,21 @@ private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
 
+enum CustomSchemeInterceptSupport {
+    static let standardHandledSchemes = ["tel", "mailto", "sms"]
+    private static let webSchemes = ["http", "https", "file"]
+
+    static func shouldEmitInterceptEvent(for url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), !scheme.isEmpty else {
+            return false
+        }
+        return !webSchemes.contains(scheme) && !standardHandledSchemes.contains(scheme)
+    }
+}
+
 private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
-    static var schemes = ["tel", "mailto", "sms"]
+    static var schemes = CustomSchemeInterceptSupport.standardHandledSchemes
 }
 
 private struct WKDownloadState {
@@ -2056,13 +2068,20 @@ fileprivate extension WKWebViewController {
 
     private func tryOpenCustomScheme(_ url: URL) -> Bool {
         let app = UIApplication.shared
+        let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
 
         if app.canOpenURL(url) {
             app.open(url, options: [:], completionHandler: nil)
+            if shouldEmitCustomSchemeEvent {
+                emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": true])
+            }
             return true // external app opened -> cancel WebView load
         }
 
         // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
+        if shouldEmitCustomSchemeEvent {
+            emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
+        }
         emit("pageLoadError")
         return true
     }
