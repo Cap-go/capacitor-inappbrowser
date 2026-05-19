@@ -392,6 +392,29 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         return webViewDialog;
     }
 
+    private ArrayList<WebView> cacheWebViewsFor(String targetId) {
+        ArrayList<WebView> targetWebViews = new ArrayList<>();
+        if (targetId != null) {
+            WebViewDialog dialog = webViewDialogs.get(targetId);
+            if (dialog != null && dialog.getManagedWebView() != null) {
+                targetWebViews.add(dialog.getManagedWebView());
+            }
+            return targetWebViews;
+        }
+
+        for (WebViewDialog dialog : webViewDialogs.values()) {
+            WebView managedWebView = dialog.getManagedWebView();
+            if (managedWebView != null) {
+                targetWebViews.add(managedWebView);
+            }
+        }
+
+        if (targetWebViews.isEmpty() && getBridge() != null && getBridge().getWebView() != null) {
+            targetWebViews.add(getBridge().getWebView());
+        }
+        return targetWebViews;
+    }
+
     private WebViewDialog findFileChooserDialog() {
         if (activeWebViewId != null) {
             WebViewDialog dialog = webViewDialogs.get(activeWebViewId);
@@ -703,10 +726,19 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
 
     @PluginMethod
     public void clearCache(PluginCall call) {
-        CookieManager cookieManager = CookieManager.getInstance();
-        cookieManager.removeAllCookies(null);
-        cookieManager.flush();
-        call.resolve();
+        String targetId = call.getString("id");
+        this.getActivity().runOnUiThread(() -> {
+            ArrayList<WebView> targetWebViews = cacheWebViewsFor(targetId);
+            if (targetWebViews.isEmpty()) {
+                call.reject("WebView is not initialized");
+                return;
+            }
+
+            for (WebView targetWebView : targetWebViews) {
+                targetWebView.clearCache(true);
+            }
+            call.resolve();
+        });
     }
 
     @PluginMethod
