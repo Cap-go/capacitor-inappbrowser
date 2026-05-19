@@ -73,7 +73,7 @@
     "rimraf": "^6.1.0",
     "rollup": "^4.53.2",
     "swiftlint": "^2.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.0",
     "prettier-pretty-check": "^0.2.0"
   },
   "peerDependencies": {
