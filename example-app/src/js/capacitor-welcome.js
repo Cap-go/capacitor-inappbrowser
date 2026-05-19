@@ -929,7 +929,7 @@ window.customElements.define(
               showReloadButton: false,
               activeNativeNavigationForWebview: false,
               enabledSafeBottomMargin: true,
-              openBlankTargetInWebView: true,
+              preventDeeplink: true,
             });
             blankTargetWebViewId = id;
           } catch (e) {
