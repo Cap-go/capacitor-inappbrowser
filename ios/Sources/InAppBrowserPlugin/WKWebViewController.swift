@@ -2438,7 +2438,7 @@ extension WKWebViewController: WKUIDelegate {
         }
     }
 
-    public func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+    public func webView(_: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame _: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
                 completionHandler(false)
@@ -2447,6 +2447,12 @@ extension WKWebViewController: WKUIDelegate {
 
             guard self.view.window != nil, !self.isBeingDismissed, !self.isMovingFromParent else {
                 print("[InAppBrowser] Cannot present confirm - view not in window hierarchy or being dismissed")
+                completionHandler(false)
+                return
+            }
+
+            guard self.presentedViewController == nil else {
+                print("[InAppBrowser] Cannot present confirm - another controller is already presented")
                 completionHandler(false)
                 return
             }
