@@ -106,6 +106,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -3313,6 +3314,28 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
+    private String getWebViewUrlOnMainThread(String fallbackUrl) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return getWebViewUrlOrFallback(fallbackUrl);
+        }
+
+        FutureTask<String> task = new FutureTask<>(() -> getWebViewUrlOrFallback(fallbackUrl));
+        mainHandler.post(task);
+        try {
+            return task.get(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return fallbackUrl;
+        } catch (Exception e) {
+            return fallbackUrl;
+        }
+    }
+
+    private String getWebViewUrlOrFallback(String fallbackUrl) {
+        String url = _webView != null ? _webView.getUrl() : null;
+        return TextUtils.isEmpty(url) ? fallbackUrl : url;
+    }
+
     public String getUrl() {
         try {
             WebView webView = _webView;
@@ -4278,21 +4301,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         }
                         String initiatorUrl = request.getRequestHeaders().get("Referer");
                         if (initiatorUrl == null || initiatorUrl.isBlank()) {
-                            // FIX: Safely fetch the WebView URL on the Main Thread
-                            try {
-                                java.util.concurrent.FutureTask<String> task = new java.util.concurrent.FutureTask<>(new java.util.concurrent.Callable<String>() {
-                                    @Override
-                                    public String call() {
-                                        return _webView.getUrl();
-                                    }
-                                });
-                                new android.os.Handler(android.os.Looper.getMainLooper()).post(task);
-                                // Wait up to 1 second for the UI thread to return the URL
-                                initiatorUrl = task.get(1, java.util.concurrent.TimeUnit.SECONDS); 
-                            } catch (Exception e) {
-                                // Fallback to the original requested URL if the UI thread times out
-                                initiatorUrl = originalUrl; 
-                            }
+                            initiatorUrl = getWebViewUrlOnMainThread(originalUrl);
                         }
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (

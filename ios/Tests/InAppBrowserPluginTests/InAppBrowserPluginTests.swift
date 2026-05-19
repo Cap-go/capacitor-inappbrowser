@@ -348,6 +348,9 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertEqual(headers["Cache-Control"], "no-cache")
     }
 
+}
+
+final class ProxySchemeTimeoutSupportTests: XCTestCase {
     func testProxySchemeTimeoutResolutionActionPrefersNativeFallbackForOutbound() {
         XCTAssertEqual(
             ProxySchemeRequestSupport.timeoutResolutionAction(
