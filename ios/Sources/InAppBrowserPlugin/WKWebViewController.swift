@@ -1185,6 +1185,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 window.webkit.messageHandlers.close.postMessage(null);
                         }\(extraControls)\(screenshotControls)
                 });
+                if (!window.__capgoInAppBrowserWindowCloseInstalled) {
+                        window.__capgoInAppBrowserWindowCloseInstalled = true;
+                        window.__capgoInAppBrowserOriginalClose = window.close;
+                        window.close = function() {
+                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
+                                        window.webkit.messageHandlers.close.postMessage(null);
+                                        return;
+                                }
+                                if (typeof window.__capgoInAppBrowserOriginalClose === 'function') {
+                                        return window.__capgoInAppBrowserOriginalClose.apply(window, arguments);
+                                }
+                        };
+                }
                 """
     }
 
@@ -2422,6 +2435,31 @@ extension WKWebViewController: WKUIDelegate {
                 print("[InAppBrowser] Error presenting alert: \(error)")
                 strongCompletionHandler()
             }
+        }
+    }
+
+    public func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                completionHandler(false)
+                return
+            }
+
+            guard self.view.window != nil, !self.isBeingDismissed, !self.isMovingFromParent else {
+                print("[InAppBrowser] Cannot present confirm - view not in window hierarchy or being dismissed")
+                completionHandler(false)
+                return
+            }
+
+            let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in
+                completionHandler(false)
+            }))
+            alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
+                completionHandler(true)
+            }))
+
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
