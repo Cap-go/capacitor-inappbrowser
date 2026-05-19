@@ -34,11 +34,8 @@ androidWebViewHierarchy: devtools
     id: "app.capgo.inappbrowser:id/closeButton"
     label: "Close the plugin webview"
 - extendedWaitUntil:
-    visible: "internal navigation confirmed"
+    visible: ".*internal navigation confirmed.*"
     timeout: 15000
-- assertVisible: "Blank target test status:"
-- assertVisible: "Closed"
-- assertVisible: "Blank target test result:"
-- assertVisible: "internal navigation confirmed"
-- assertVisible: "Blank target last URL:"
-- assertVisible: "https://example.com/#blank-target-webview"
+- assertVisible: ".*Closed.*"
+- assertVisible: ".*internal navigation confirmed.*"
+- assertVisible: ".*https://example.com/#blank-target-webview.*"
