@@ -9,6 +9,7 @@ import {
 import { setupProxyDemoButtons } from "./proxy-demo.js";
 import { setupProxyRegression } from "./proxy-regression.js";
 import { attachKeyboardRegressionHarness } from "./keyboard-regression.js";
+import { attachFeatureSmokeHarness } from "./feature-smoke.js";
 import { url as configuredTestWebappUrl } from "./url.js";
 
 // Default URL configuration
@@ -286,6 +287,7 @@ window.customElements.define(
       const self = this;
 
       attachKeyboardRegressionHarness();
+      attachFeatureSmokeHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {
