@@ -10,17 +10,22 @@ androidWebViewHierarchy: devtools
     label: "Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness"
 - launchApp:
     clearState: false
-- retry:
-    maxRetries: 3
+- repeat:
+    times: 16
+    while:
+      notVisible: "Maestro Ready"
     commands:
-      - runFlow:
-          when:
-            visible: "Wait"
-          commands:
-            - tapOn: "Wait"
+      - tapOn:
+          text: "Wait"
+          optional: true
+          label: "Dismiss the transient Pixel Launcher ANR dialog while waiting for the harness"
       - extendedWaitUntil:
           visible: "Maestro Ready"
-          timeout: 60000
+          timeout: 15000
+          optional: true
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 15000
 - tapOn:
     id: "maestro-run-blank-target"
     retryTapIfNoChange: true

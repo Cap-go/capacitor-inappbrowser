@@ -364,6 +364,14 @@ window.customElements.define(
       let closeOnNextDownloadEvent = false;
       const downloadStatusElement = () => self.shadowRoot.querySelector("#download-event-status");
       const downloadListenerButtonElement = () => self.shadowRoot.querySelector("#open-download-demo-listener");
+      const maestroRunDownloadButton = document.getElementById("maestro-run-download");
+      const maestroDownloadStatus = document.getElementById("maestro-download-status");
+
+      function setMaestroDownloadStatus(message) {
+        if (maestroDownloadStatus) {
+          maestroDownloadStatus.textContent = message;
+        }
+      }
 
       function setDownloadStatus(message, { backgroundColor = "#f8f9fa", color = "#495057" } = {}) {
         const statusElement = downloadStatusElement();
@@ -401,7 +409,12 @@ window.customElements.define(
 
         downloadListenerHandles = await Promise.all([
           InAppBrowser.addListener("downloadCompleted", (event) => {
-            setDownloadListenerButtonLabel(`Event OK: ${event.fileName}`);
+            const successLabel = `Event OK: ${event.fileName}`;
+            setDownloadListenerButtonLabel(successLabel);
+            setMaestroDownloadStatus(successLabel);
+            if (maestroRunDownloadButton) {
+              maestroRunDownloadButton.disabled = false;
+            }
             setDownloadStatus(
               `Download completed: ${event.fileName} via ${event.handledBy}`,
               { backgroundColor: "#dcfce7", color: "#166534" },
@@ -417,6 +430,10 @@ window.customElements.define(
           InAppBrowser.addListener("downloadFailed", (event) => {
             closeOnNextDownloadEvent = false;
             setDownloadListenerButtonLabel("Event Failed");
+            setMaestroDownloadStatus("Event Failed");
+            if (maestroRunDownloadButton) {
+              maestroRunDownloadButton.disabled = false;
+            }
             const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
             setDownloadStatus(
               `Download failed${fileLabel}: ${event.error}`,
@@ -431,22 +448,24 @@ window.customElements.define(
       async function openAutoDownloadDemo({ closeOnEvent = false } = {}) {
         const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
         closeOnNextDownloadEvent = closeOnEvent && handleDownloadsToggle.checked;
+        if (maestroRunDownloadButton) {
+          maestroRunDownloadButton.disabled = true;
+        }
         setDownloadListenerButtonLabel(
           closeOnEvent && handleDownloadsToggle.checked
             ? "Waiting For Download Event..."
             : "Open Auto Download Demo + Close On Event",
         );
-        setDownloadStatus(
-          handleDownloadsToggle.checked
-            ? closeOnEvent
-              ? "Waiting for native download event, then closing the webview..."
-              : "Waiting for native download event..."
-            : "Native download handling disabled for this run.",
-          {
-            backgroundColor: handleDownloadsToggle.checked ? "#e0f2fe" : "#f8f9fa",
-            color: handleDownloadsToggle.checked ? "#075985" : "#495057",
-          },
-        );
+        const downloadMessage = handleDownloadsToggle.checked
+          ? closeOnEvent
+            ? "Waiting for native download event, then closing the webview..."
+            : "Waiting for native download event..."
+          : "Native download handling disabled for this run.";
+        setMaestroDownloadStatus(downloadMessage);
+        setDownloadStatus(downloadMessage, {
+          backgroundColor: handleDownloadsToggle.checked ? "#e0f2fe" : "#f8f9fa",
+          color: handleDownloadsToggle.checked ? "#075985" : "#495057",
+        });
 
         try {
           await createDownloadListeners();
@@ -463,6 +482,10 @@ window.customElements.define(
           });
         } catch (error) {
           closeOnNextDownloadEvent = false;
+          if (maestroRunDownloadButton) {
+            maestroRunDownloadButton.disabled = false;
+          }
+          setMaestroDownloadStatus("Download open failed");
           console.error("Error opening auto download demo:", error);
         }
       }
@@ -1094,6 +1117,13 @@ window.customElements.define(
         .addEventListener("click", async function () {
           await openAutoDownloadDemo({ closeOnEvent: true });
         });
+
+      if (maestroRunDownloadButton) {
+        maestroRunDownloadButton.addEventListener("click", async function () {
+          await openAutoDownloadDemo({ closeOnEvent: true });
+        });
+        maestroRunDownloadButton.disabled = false;
+      }
 
       self.shadowRoot
         .querySelector("#system-bars-show-all")
