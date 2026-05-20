@@ -112,7 +112,7 @@ function textResponse(body, contentType) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
 function normalizeError(error) {
@@ -127,7 +127,7 @@ function isEntrySmokeUrl(url) {
 }
 
 function withMaestroNativeHarness(callback) {
-  const harness = window.MaestroNativeHarness;
+  const harness = globalThis.MaestroNativeHarness;
   if (!harness || typeof callback !== "function") {
     return;
   }
@@ -139,7 +139,7 @@ function withMaestroNativeHarness(callback) {
   }
 }
 
-async function waitUntil(label, predicate, timeout = TIMEOUT_MS) {
+async function waitUntil(label, predicate, timeout = TIMEOUT_MS, getTimeoutMessage) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeout) {
     const result = await predicate();
@@ -148,7 +148,8 @@ async function waitUntil(label, predicate, timeout = TIMEOUT_MS) {
     }
     await sleep(100);
   }
-  throw new Error(`Timed out waiting for ${label}`);
+  const timeoutMessage = typeof getTimeoutMessage === "function" ? getTimeoutMessage() : `Timed out waiting for ${label}`;
+  throw new Error(timeoutMessage);
 }
 
 function featureSmokeProxyResponse(request) {
@@ -409,13 +410,13 @@ async function verifyBackNavigation(ctx) {
     await sleep(500);
   }
 
-  try {
-    await waitUntil("entry page after goBack", () =>
+  await waitUntil(
+    "entry page after goBack",
+    () =>
       hasBackNavigationSignal(ctx, entryHistoryCountBeforeBack, historyUrlChangeCountBeforeBack),
-    );
-  } catch (_error) {
-    throw new Error(backNavigationTimeoutMessage(ctx));
-  }
+    TIMEOUT_MS,
+    () => backNavigationTimeoutMessage(ctx),
+  );
   ctx.markStep("urlChangeEvent and goBack");
 }
 
