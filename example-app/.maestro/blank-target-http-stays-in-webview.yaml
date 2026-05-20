@@ -25,11 +25,9 @@ androidWebViewHierarchy: devtools
 - extendedWaitUntil:
     visible: "Example Domain"
     timeout: 15000
-- back
 - tapOn:
-    text: "Navigate up"
-    optional: true
-    label: "Close the plugin webview if an external browser opened first"
+    id: "app.capgo.inappbrowser:id/closeButton"
+    label: "Close the plugin webview"
 - extendedWaitUntil:
     visible: "Blank target regression passed"
     timeout: 15000

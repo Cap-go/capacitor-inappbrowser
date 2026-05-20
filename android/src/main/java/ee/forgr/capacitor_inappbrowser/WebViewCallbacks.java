@@ -11,6 +11,8 @@ public interface WebViewCallbacks {
 
     public void pageLoadError();
 
+    public void customSchemeIntercepted(String url, boolean opened);
+
     public void javascriptCallback(String message);
 
     public void consoleMessage(String level, String message, String source, Integer line, Integer column);

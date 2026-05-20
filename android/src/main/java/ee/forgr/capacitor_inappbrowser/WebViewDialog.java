@@ -106,6 +106,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -2990,6 +2991,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 if (_webView != null) {
                     try {
                         _webView.evaluateJavascript(script, null);
+                        injectBlankTargetInCurrentWebViewScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
                     }
@@ -3311,6 +3313,28 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_webView != null) {
             _webView.destroy();
         }
+    }
+
+    private String getWebViewUrlOnMainThread(String fallbackUrl) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return getWebViewUrlOrFallback(fallbackUrl);
+        }
+
+        FutureTask<String> task = new FutureTask<>(() -> getWebViewUrlOrFallback(fallbackUrl));
+        mainHandler.post(task);
+        try {
+            return task.get(1, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return fallbackUrl;
+        } catch (Exception e) {
+            return fallbackUrl;
+        }
+    }
+
+    private String getWebViewUrlOrFallback(String fallbackUrl) {
+        String url = _webView != null ? _webView.getUrl() : null;
+        return TextUtils.isEmpty(url) ? fallbackUrl : url;
     }
 
     public String getUrl() {
@@ -3893,12 +3917,124 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return false;
     }
 
+    private String buildAuthorizedHostsJson(List<String> authorizedLinks) {
+        if (authorizedLinks == null || authorizedLinks.isEmpty()) {
+            return "[]";
+        }
+
+        StringBuilder hostsJson = new StringBuilder("[");
+        boolean hasHost = false;
+        for (String authorized : authorizedLinks) {
+            if (authorized == null) {
+                continue;
+            }
+
+            try {
+                URI authUri = new URI(authorized);
+                String host = authUri.getHost();
+                if (host == null) {
+                    continue;
+                }
+
+                if (host.startsWith("www.")) {
+                    host = host.substring(4);
+                }
+
+                if (hasHost) {
+                    hostsJson.append(",");
+                }
+                hostsJson.append(JSONObject.quote(host.toLowerCase(Locale.ROOT)));
+                hasHost = true;
+            } catch (URISyntaxException e) {
+                Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
+            }
+        }
+
+        hostsJson.append("]");
+        return hostsJson.toString();
+    }
+
+    private void injectBlankTargetInCurrentWebViewScript() {
+        if (_webView == null || _options == null || (!_options.getPreventDeeplink() && !_options.getOpenBlankTargetInWebView())) {
+            return;
+        }
+
+        String authorizedHostsJson = buildAuthorizedHostsJson(_options.getAuthorizedAppLinks());
+        String preventDeeplink = _options.getPreventDeeplink() ? "true" : "false";
+        String script = String.format(
+            Locale.US,
+            """
+            (function() {
+              if (window.__capgoInAppBrowserBlankTargetInCurrentWebView) {
+                return;
+              }
+              window.__capgoInAppBrowserBlankTargetInCurrentWebView = true;
+
+              var authorizedHosts = new Set(%s);
+              var preventDeeplink = %s;
+              var normalizeHost = function(host) {
+                return (host || '').replace(/^www\\./i, '').toLowerCase();
+              };
+
+              document.addEventListener('click', function(event) {
+                if (event.defaultPrevented) {
+                  return;
+                }
+
+                var element = event.target;
+                if (!element || typeof element.closest !== 'function') {
+                  return;
+                }
+
+                var anchor = element.closest('a[target][href]');
+                if (!anchor || (anchor.getAttribute('target') || '').toLowerCase() !== '_blank') {
+                  return;
+                }
+
+                var nextUrl;
+                try {
+                  nextUrl = new URL(anchor.href);
+                } catch (_) {
+                  return;
+                }
+
+                var protocol = nextUrl.protocol.toLowerCase();
+                if (protocol !== 'http:' && protocol !== 'https:') {
+                  return;
+                }
+
+                if (!preventDeeplink && authorizedHosts.has(normalizeHost(nextUrl.hostname))) {
+                  return;
+                }
+
+                event.preventDefault();
+                setTimeout(function() {
+                  window.location.assign(nextUrl.toString());
+                }, 0);
+              });
+            })();
+            """,
+            authorizedHostsJson,
+            preventDeeplink
+        );
+
+        _webView.post(() -> {
+            if (_webView != null) {
+                try {
+                    _webView.evaluateJavascript(script, null);
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error injecting blank target handler: " + e.getMessage());
+                }
+            }
+        });
+    }
+
     private boolean shouldLoadBlankTargetInCurrentWebView(String url) {
         if (!isHttpOrHttpsUrl(url)) {
             return false;
         }
 
-        if (isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
+        if (!_options.getPreventDeeplink() && isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
             return false;
         }
 
@@ -4105,6 +4241,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     if (isNotHttpOrHttps) {
+                        boolean shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(url);
                         try {
                             Intent intent;
                             if (url.startsWith("intent:")) {
@@ -4114,8 +4251,22 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             }
                             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                             context.startActivity(intent);
+                            if (shouldEmitCustomSchemeEvent && _options.getCallbacks() != null) {
+                                _options.getCallbacks().customSchemeIntercepted(url, true);
+                            }
                             return true;
-                        } catch (ActivityNotFoundException | URISyntaxException e) {
+                        } catch (ActivityNotFoundException e) {
+                            Log.w("InAppBrowser", "No handler for external URL: " + url, e);
+                            if (shouldEmitCustomSchemeEvent && _options.getCallbacks() != null) {
+                                _options.getCallbacks().customSchemeIntercepted(url, false);
+                            }
+                            // Notify that a page load error occurred
+                            if (_options.getCallbacks() != null && request.isForMainFrame()) {
+                                _options.getCallbacks().pageLoadError();
+                                rejectOpenWebViewIfNeeded("No handler available for external URL: " + url);
+                            }
+                            return true; // prevent WebView from attempting to load the custom scheme
+                        } catch (URISyntaxException e) {
                             Log.w("InAppBrowser", "No handler for external URL: " + url, e);
                             // Notify that a page load error occurred
                             if (_options.getCallbacks() != null && request.isForMainFrame()) {
@@ -4278,7 +4429,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         }
                         String initiatorUrl = request.getRequestHeaders().get("Referer");
                         if (initiatorUrl == null || initiatorUrl.isBlank()) {
-                            initiatorUrl = _webView.getUrl();
+                            initiatorUrl = getWebViewUrlOnMainThread(originalUrl);
                         }
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (

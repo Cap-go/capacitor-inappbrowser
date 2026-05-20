@@ -14,9 +14,21 @@ private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
 private let cookieKey = "Cookie"
 
+enum CustomSchemeInterceptSupport {
+    static let standardHandledSchemes = ["tel", "mailto", "sms"]
+    private static let webSchemes = ["http", "https", "file"]
+
+    static func shouldEmitInterceptEvent(for url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), !scheme.isEmpty else {
+            return false
+        }
+        return !webSchemes.contains(scheme) && !standardHandledSchemes.contains(scheme)
+    }
+}
+
 private struct UrlsHandledByApp {
     static var hosts = ["itunes.apple.com"]
-    static var schemes = ["tel", "mailto", "sms"]
+    static var schemes = CustomSchemeInterceptSupport.standardHandledSchemes
 }
 
 private struct WKDownloadState {
@@ -1185,6 +1197,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 window.webkit.messageHandlers.close.postMessage(null);
                         }\(extraControls)\(screenshotControls)
                 });
+                if (!window.__capgoInAppBrowserWindowCloseInstalled) {
+                        window.__capgoInAppBrowserWindowCloseInstalled = true;
+                        window.__capgoInAppBrowserOriginalClose = window.close;
+                        window.close = function() {
+                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
+                                        window.webkit.messageHandlers.close.postMessage(null);
+                                        return;
+                                }
+                                if (typeof window.__capgoInAppBrowserOriginalClose === 'function') {
+                                        return window.__capgoInAppBrowserOriginalClose.apply(window, arguments);
+                                }
+                        };
+                }
                 """
     }
 
@@ -2056,13 +2081,20 @@ fileprivate extension WKWebViewController {
 
     private func tryOpenCustomScheme(_ url: URL) -> Bool {
         let app = UIApplication.shared
+        let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
 
         if app.canOpenURL(url) {
             app.open(url, options: [:], completionHandler: nil)
+            if shouldEmitCustomSchemeEvent {
+                emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": true])
+            }
             return true // external app opened -> cancel WebView load
         }
 
         // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
+        if shouldEmitCustomSchemeEvent {
+            emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
+        }
         emit("pageLoadError")
         return true
     }
@@ -2422,6 +2454,37 @@ extension WKWebViewController: WKUIDelegate {
                 print("[InAppBrowser] Error presenting alert: \(error)")
                 strongCompletionHandler()
             }
+        }
+    }
+
+    public func webView(_: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame _: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                completionHandler(false)
+                return
+            }
+
+            guard self.view.window != nil, !self.isBeingDismissed, !self.isMovingFromParent else {
+                print("[InAppBrowser] Cannot present confirm - view not in window hierarchy or being dismissed")
+                completionHandler(false)
+                return
+            }
+
+            guard self.presentedViewController == nil else {
+                print("[InAppBrowser] Cannot present confirm - another controller is already presented")
+                completionHandler(false)
+                return
+            }
+
+            let alertController = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in
+                completionHandler(false)
+            }))
+            alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
+                completionHandler(true)
+            }))
+
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
