@@ -5,9 +5,15 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXAMPLE_DIR="$ROOT_DIR/example-app"
 APK_PATH="$EXAMPLE_DIR/android/app/build/outputs/apk/debug/app-debug.apk"
 RESULTS_DIR="$ROOT_DIR/maestro-results"
-FLOW_PATH="$ROOT_DIR/.maestro/download-handling-android.yaml"
+FLOW_PATH="${CAPGO_MAESTRO_FLOW_PATH:-$ROOT_DIR/.maestro/android/example-app-smoke.yaml}"
 APP_ID="app.capgo.inappbrowser"
 SKIP_BUILD="${CAPGO_MAESTRO_SKIP_BUILD:-0}"
+
+if [[ ! -f "$FLOW_PATH" ]]; then
+  echo "Maestro flow file not found: $FLOW_PATH" >&2
+  echo "Check CAPGO_MAESTRO_FLOW_PATH or use the default flow path." >&2
+  exit 1
+fi
 
 if ! command -v adb >/dev/null 2>&1; then
   echo "adb is required to run Android Maestro tests." >&2

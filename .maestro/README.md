@@ -1,6 +1,10 @@
 ## Maestro
 
-This folder contains Android regression coverage for the example app.
+This folder contains Maestro coverage for the example app.
+
+### Example app smoke test
+
+`android/example-app-smoke.yaml` runs the broader example app smoke test. It uses a self-contained feature harness in the app to exercise managed WebView APIs, proxy handling, JavaScript messaging, screenshots, visibility controls, dimensions, cookies, navigation, reload, popup handling, close events, and then runs the native download handling smoke test.
 
 ### Download handling smoke test
 

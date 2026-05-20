@@ -1,0 +1,26 @@
+appId: app.capgo.inappbrowser
+androidWebViewHierarchy: devtools
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    text: 'Wait'
+    optional: true
+    label: 'Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness'
+- extendedWaitUntil:
+    visible: 'Feature smoke ready'
+    timeout: 240000
+- tapOn:
+    id: 'maestro-run-feature-smoke'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Feature smoke passed'
+    timeout: 240000
+- tapOn:
+    id: 'maestro-run-download'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Event OK: capgo-download-demo(-\\d+)?\\.txt"
+    timeout: 30000
+- assertVisible: 'Feature smoke passed'
+- assertVisible: "Event OK: capgo-download-demo(-\\d+)?\\.txt"
