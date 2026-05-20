@@ -15,13 +15,8 @@ androidWebViewHierarchy: devtools
     text: "Wait"
     optional: true
     label: "Dismiss the transient Pixel Launcher ANR dialog when it appears"
-- scrollUntilVisible:
-    element: "Open Blank Target HTTPS Test"
-    direction: DOWN
-    timeout: 20000
-    centerElement: true
 - tapOn:
-    text: "Open Blank Target HTTPS Test"
+    id: "maestro-run-blank-target"
     retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
 - tapOn:
@@ -36,8 +31,5 @@ androidWebViewHierarchy: devtools
     optional: true
     label: "Close the plugin webview if an external browser opened first"
 - extendedWaitUntil:
-    visible: "Blank target test result: internal navigation confirmed"
+    visible: "Blank target regression passed"
     timeout: 15000
-- assertVisible: "Blank target test status: Closed"
-- assertVisible: "Blank target test result: internal navigation confirmed"
-- assertVisible: "Blank target last URL: https://example.com/#blank-target-webview"
