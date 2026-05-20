@@ -8,6 +8,8 @@ androidWebViewHierarchy: devtools
     text: "Wait"
     optional: true
     label: "Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness"
+- launchApp:
+    clearState: false
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
@@ -15,18 +17,17 @@ androidWebViewHierarchy: devtools
     text: "Wait"
     optional: true
     label: "Dismiss the transient Pixel Launcher ANR dialog when it appears"
-- scrollUntilVisible:
-    element: "Open Blank Target HTTPS Test"
-    direction: DOWN
-    timeout: 20000
-    centerElement: true
 - tapOn:
-    text: "Open Blank Target HTTPS Test"
+    id: "maestro-run-blank-target"
     retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
 - tapOn:
     text: "Open Example Domain"
     retryTapIfNoChange: true
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog after opening the blank target link"
 - extendedWaitUntil:
     visible: "Example Domain"
     timeout: 15000
@@ -34,8 +35,5 @@ androidWebViewHierarchy: devtools
     id: "app.capgo.inappbrowser:id/closeButton"
     label: "Close the plugin webview"
 - extendedWaitUntil:
-    visible: ".*internal navigation confirmed.*"
+    visible: "Blank target regression passed"
     timeout: 15000
-- assertVisible: ".*Closed.*"
-- assertVisible: ".*internal navigation confirmed.*"
-- assertVisible: ".*https://example.com/#blank-target-webview.*"

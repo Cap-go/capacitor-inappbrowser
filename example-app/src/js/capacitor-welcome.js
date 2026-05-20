@@ -501,17 +501,49 @@ window.customElements.define(
         </html>
       `;
       const blankTargetTestUrl = `data:text/html;charset=utf-8,${encodeURIComponent(blankTargetTestHtml)}`;
+      const blankTargetButton = self.shadowRoot.querySelector("#open-blank-target-test");
       const blankTargetStatusText = self.shadowRoot.querySelector("#blank-target-status-text");
       const blankTargetResultText = self.shadowRoot.querySelector("#blank-target-result-text");
       const blankTargetLastUrlText = self.shadowRoot.querySelector("#blank-target-last-url-text");
+      const maestroRunBlankTargetButton = document.getElementById("maestro-run-blank-target");
+      const maestroBlankTargetStatus = document.getElementById("maestro-blank-target-status");
+      const maestroBlankTargetDetails = document.getElementById("maestro-blank-target-details");
       let blankTargetTestActive = false;
       let blankTargetWebViewId = null;
       let blankTargetListenerHandles = [];
+
+      function setBlankTargetButtonsDisabled(disabled) {
+        if (blankTargetButton) {
+          blankTargetButton.disabled = disabled;
+        }
+        if (maestroRunBlankTargetButton) {
+          maestroRunBlankTargetButton.disabled = disabled;
+        }
+      }
+
+      function updateMaestroBlankTargetState({ status, result, lastUrl }) {
+        if (!maestroBlankTargetStatus || !maestroBlankTargetDetails) {
+          return;
+        }
+
+        if (status === "Closed" && result === "internal navigation confirmed" && lastUrl === blankTargetExpectedUrl) {
+          maestroBlankTargetStatus.textContent = "Blank target regression passed";
+        } else if (status === "Idle") {
+          maestroBlankTargetStatus.textContent = "Not started";
+        } else if (status === "Page load error" || (status === "Closed" && result !== "internal navigation confirmed")) {
+          maestroBlankTargetStatus.textContent = "Blank target regression failed";
+        } else {
+          maestroBlankTargetStatus.textContent = `Blank target regression: ${status}`;
+        }
+
+        maestroBlankTargetDetails.textContent = `${result}\n${lastUrl}`;
+      }
 
       function setBlankTargetState({ status, result, lastUrl }) {
         blankTargetStatusText.textContent = status;
         blankTargetResultText.textContent = result;
         blankTargetLastUrlText.textContent = lastUrl;
+        updateMaestroBlankTargetState({ status, result, lastUrl });
       }
 
       function isBlankTargetEvent(result) {
@@ -578,6 +610,7 @@ window.customElements.define(
                   : `closed on ${closedUrl}`,
               lastUrl: closedUrl,
             });
+            setBlankTargetButtonsDisabled(false);
 
             await clearBlankTargetListeners();
           }),
@@ -593,6 +626,7 @@ window.customElements.define(
               result: "page load error",
               lastUrl: blankTargetLastUrlText.textContent,
             });
+            setBlankTargetButtonsDisabled(false);
 
             await clearBlankTargetListeners();
           }),
@@ -919,46 +953,53 @@ window.customElements.define(
           }
         });
 
-      self.shadowRoot
-        .querySelector("#open-blank-target-test")
-        .addEventListener("click", async function () {
-          blankTargetTestActive = true;
+      blankTargetButton.addEventListener("click", async function () {
+        blankTargetTestActive = true;
+        blankTargetWebViewId = null;
+        setBlankTargetButtonsDisabled(true);
+        setBlankTargetState({
+          status: "Opening test webview...",
+          result: "waiting for navigation",
+          lastUrl: "none",
+        });
+
+        try {
+          await attachBlankTargetListeners();
+
+          const { id } = await InAppBrowser.openWebView({
+            url: blankTargetTestUrl,
+            toolbarType: ToolBarType.COMPACT,
+            backgroundColor: BackgroundColor.WHITE,
+            title: "Target Blank Test",
+            visibleTitle: true,
+            showReloadButton: false,
+            activeNativeNavigationForWebview: false,
+            enabledSafeBottomMargin: true,
+            preventDeeplink: true,
+          });
+          if (blankTargetTestActive) {
+            blankTargetWebViewId = id;
+          }
+        } catch (e) {
+          blankTargetTestActive = false;
           blankTargetWebViewId = null;
+          setBlankTargetButtonsDisabled(false);
+          await clearBlankTargetListeners();
+          console.error("Error opening blank target test:", e);
           setBlankTargetState({
-            status: "Opening test webview...",
-            result: "waiting for navigation",
+            status: "Error",
+            result: e.message,
             lastUrl: "none",
           });
+        }
+      });
 
-          try {
-            await attachBlankTargetListeners();
-
-            const { id } = await InAppBrowser.openWebView({
-              url: blankTargetTestUrl,
-              toolbarType: ToolBarType.COMPACT,
-              backgroundColor: BackgroundColor.WHITE,
-              title: "Target Blank Test",
-              visibleTitle: true,
-              showReloadButton: false,
-              activeNativeNavigationForWebview: false,
-              enabledSafeBottomMargin: true,
-              preventDeeplink: true,
-            });
-            if (blankTargetTestActive) {
-              blankTargetWebViewId = id;
-            }
-          } catch (e) {
-            blankTargetTestActive = false;
-            blankTargetWebViewId = null;
-            await clearBlankTargetListeners();
-            console.error("Error opening blank target test:", e);
-            setBlankTargetState({
-              status: "Error",
-              result: e.message,
-              lastUrl: "none",
-            });
-          }
+      if (maestroRunBlankTargetButton) {
+        maestroRunBlankTargetButton.addEventListener("click", () => {
+          blankTargetButton.click();
         });
+        maestroRunBlankTargetButton.disabled = false;
+      }
 
       // Add Enter key support for the input field
       self.shadowRoot

@@ -1970,8 +1970,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                         // Fixed JavaScript with proper error handling
                         String js = """
-                            try {
-                              (function() {
+                            (function() {
+                              try {
                                 var captureAttr = null;
                                 // Check active element first
                                 if (document.activeElement &&
@@ -2005,11 +2005,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                   }
                                 }
                                 return '';
-                              })();
-                            } catch(e) {
-                              console.error('Capture detection error:', e);
-                              return '';
-                            }
+                              } catch(e) {
+                                console.error('Capture detection error:', e);
+                                return '';
+                              }
+                            })();
                             """;
 
                         webView.evaluateJavascript(js, (value) -> {
