@@ -22,7 +22,7 @@ androidWebViewHierarchy: devtools
     timeout: 30000
     centerElement: true
 - tapOn:
-    text: "Open Auto Download Demo \\+ Close On Event"
+    id: "open-download-demo-listener"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Event OK: capgo-download-demo(-\\d+)?\\.txt"
