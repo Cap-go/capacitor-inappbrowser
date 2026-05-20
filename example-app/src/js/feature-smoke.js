@@ -134,7 +134,461 @@ function withMaestroNativeHarness(callback) {
 
   try {
     callback(harness);
-  } catch (_error) {}
+  } catch (error) {
+    console.warn("Unable to update Maestro native harness", error);
+  }
+}
+
+async function waitUntil(label, predicate, timeout = TIMEOUT_MS) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeout) {
+    const result = await predicate();
+    if (result) {
+      return result;
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+}
+
+function featureSmokeProxyResponse(request) {
+  if (request.url === ENTRY_URL || request.url === HISTORY_ENTRY_URL || request.url === SECOND_URL) {
+    return textResponse(ENTRY_HTML, "text/html");
+  }
+  if (request.url === POPUP_URL) {
+    return textResponse(POPUP_HTML, "text/html");
+  }
+  if (request.url === SCRIPT_URL) {
+    return textResponse(SMOKE_SCRIPT, "application/javascript");
+  }
+  return null;
+}
+
+function createSmokeContext(setStatus) {
+  const ctx = {
+    closeEvents: [],
+    consoleMessages: [],
+    handles: [],
+    messages: [],
+    pageLoads: [],
+    popupEvents: [],
+    popupId: null,
+    screenshots: [],
+    setStatus,
+    steps: [],
+    urlChanges: [],
+    webviewId: null,
+  };
+
+  ctx.markStep = (step) => {
+    ctx.steps.push(step);
+    ctx.setStatus(`Feature smoke running: ${step}`, ctx.steps.join("\n"));
+  };
+  ctx.waitForMessage = (step, timeout) =>
+    waitUntil(step, () => ctx.messages.find((message) => message.step === step), timeout);
+
+  return ctx;
+}
+
+function recordFeatureMessage(ctx, event) {
+  const detail = event.detail || {};
+  if (detail.type !== "featureSmoke") {
+    return;
+  }
+  ctx.messages.push({
+    id: event.id,
+    ...detail,
+  });
+}
+
+function recordPageLoadError(ctx, event) {
+  ctx.messages.push({
+    id: event.id,
+    step: "page-load-error",
+  });
+}
+
+async function setupSmokeHarness(ctx) {
+  await InAppBrowser.removeAllListeners();
+  await InAppBrowser.clearAllCookies();
+  await InAppBrowser.clearCache();
+
+  const listenerHandles = await Promise.all([
+    InAppBrowser.addListener("messageFromWebview", (event) => recordFeatureMessage(ctx, event)),
+    InAppBrowser.addListener("consoleMessage", (event) => ctx.consoleMessages.push(event)),
+    InAppBrowser.addListener("screenshotTaken", (event) => ctx.screenshots.push(event)),
+    InAppBrowser.addListener("popupWindowOpened", (event) => ctx.popupEvents.push(event)),
+    InAppBrowser.addListener("browserPageLoaded", (event) => ctx.pageLoads.push(event)),
+    InAppBrowser.addListener("urlChangeEvent", (event) => ctx.urlChanges.push(event)),
+    InAppBrowser.addListener("closeEvent", (event) => ctx.closeEvents.push(event)),
+    InAppBrowser.addListener("pageLoadError", (event) => recordPageLoadError(ctx, event)),
+  ]);
+  const proxyHandle = await addProxyHandler(featureSmokeProxyResponse);
+  ctx.handles.push(...listenerHandles, proxyHandle);
+}
+
+async function openSmokeWebview(ctx) {
+  ctx.markStep("open hidden proxied webview");
+  const openResult = await InAppBrowser.openWebView({
+    url: ENTRY_URL,
+    proxyRequests: true,
+    toolbarType: ToolBarType.BLANK,
+    backgroundColor: BackgroundColor.WHITE,
+    hidden: true,
+    invisibilityMode: InvisibilityMode.FAKE_VISIBLE,
+    captureConsoleLogs: true,
+    allowScreenshotsFromWebPage: true,
+    hiddenPopupWindow: true,
+    enableGooglePaySupport: true,
+    activeNativeNavigationForWebview: true,
+    enabledSafeBottomMargin: true,
+    enabledSafeTopMargin: true,
+    isPresentAfterPageLoad: true,
+    preShowScript: "window.__featureSmokePreShow = true;",
+    preShowScriptInjectionTime: "documentStart",
+    width: 360,
+    height: 640,
+    x: 0,
+    y: 0,
+  });
+  ctx.webviewId = openResult.id;
+}
+
+async function verifyStartup(ctx) {
+  const entryReady = await ctx.waitForMessage("entry-ready");
+  if (!entryReady.preShowFlag) {
+    throw new Error("preShowScript did not run before entry script");
+  }
+  await waitUntil("consoleMessage", () =>
+    ctx.consoleMessages.some((event) => String(event.message).includes("feature-smoke-console-ok")),
+  );
+  ctx.markStep("page load, proxy, console, preShowScript");
+}
+
+async function verifyCookies(ctx) {
+  const cookies = await InAppBrowser.getCookies({ url: SMOKE_ORIGIN });
+  if (cookies.featureSmokeCookie !== "enabled") {
+    throw new Error("featureSmokeCookie was not available through getCookies()");
+  }
+  ctx.markStep("getCookies");
+}
+
+async function verifyPostMessage(ctx) {
+  await InAppBrowser.postMessage({
+    id: ctx.webviewId,
+    detail: {
+      action: "native-ping",
+      marker: "post-message-ok",
+    },
+  });
+  const postMessage = await ctx.waitForMessage("post-message");
+  if (postMessage.payload?.marker !== "post-message-ok") {
+    throw new Error("postMessage payload was not echoed by the webview");
+  }
+  ctx.markStep("postMessage");
+}
+
+async function verifyExecuteScript(ctx) {
+  await InAppBrowser.executeScript({
+    id: ctx.webviewId,
+    code: `
+      window.mobileApp.postMessage({
+        detail: {
+          type: "featureSmoke",
+          step: "execute-script",
+          title: document.title
+        }
+      });
+    `,
+  });
+  const scriptMessage = await ctx.waitForMessage("execute-script");
+  if (scriptMessage.title !== "Feature Smoke Entry") {
+    throw new Error("executeScript returned the wrong document title");
+  }
+  ctx.markStep("executeScript");
+}
+
+async function verifySizingAndNativeScreenshot(ctx) {
+  await InAppBrowser.updateDimensions({ id: ctx.webviewId, width: 320, height: 560, x: 0, y: 0 });
+  await InAppBrowser.setEnabledSafeTopMargin({ id: ctx.webviewId, enabled: false });
+  await InAppBrowser.setEnabledSafeBottomMargin({ id: ctx.webviewId, enabled: true });
+  ctx.markStep("dimensions and safe margins");
+
+  await InAppBrowser.show({ id: ctx.webviewId });
+  await sleep(500);
+  const screenshot = await InAppBrowser.takeScreenshot({ id: ctx.webviewId });
+  if (!screenshot.base64 || !screenshot.width || !screenshot.height) {
+    throw new Error("takeScreenshot returned an empty result");
+  }
+  await waitUntil("screenshotTaken", () => ctx.screenshots.length > 0);
+  await InAppBrowser.hide({ id: ctx.webviewId });
+  ctx.markStep("show, takeScreenshot, hide");
+}
+
+async function verifyBridgeScreenshot(ctx) {
+  await InAppBrowser.executeScript({
+    id: ctx.webviewId,
+    code: `
+      window.mobileApp.takeScreenshot()
+        .then(function(result) {
+          window.mobileApp.postMessage({
+            detail: {
+              type: "featureSmoke",
+              step: "bridge-screenshot",
+              hasData: Boolean(result && result.base64),
+              width: result ? result.width : 0,
+              height: result ? result.height : 0
+            }
+          });
+        })
+        .catch(function(error) {
+          window.mobileApp.postMessage({
+            detail: {
+              type: "featureSmoke",
+              step: "bridge-screenshot-error",
+              error: error && error.message ? error.message : String(error)
+            }
+          });
+        });
+    `,
+  });
+  const result = await waitUntil("bridge screenshot result", () =>
+    ctx.messages.find(
+      (message) => message.step === "bridge-screenshot" || message.step === "bridge-screenshot-error",
+    ),
+  );
+  if (result.step === "bridge-screenshot-error") {
+    throw new Error(`window.mobileApp.takeScreenshot() failed: ${result.error || "unknown error"}`);
+  }
+  if (!result.hasData || !result.width || !result.height) {
+    throw new Error("window.mobileApp.takeScreenshot() returned an empty result");
+  }
+  ctx.markStep("webview screenshot bridge");
+}
+
+async function verifySetUrl(ctx) {
+  await InAppBrowser.setUrl({ id: ctx.webviewId, url: HISTORY_ENTRY_URL });
+  await waitUntil("setUrl history entry", () =>
+    ctx.messages.some((message) => message.step === "entry-ready" && message.href === HISTORY_ENTRY_URL),
+  );
+  await waitUntil("setUrl urlChangeEvent", () =>
+    ctx.urlChanges.some((event) => event.id === ctx.webviewId && event.url === HISTORY_ENTRY_URL),
+  );
+  ctx.markStep("setUrl");
+}
+
+async function navigateToSecondPage(ctx) {
+  await InAppBrowser.executeScript({
+    id: ctx.webviewId,
+    code: `
+      window.location.assign(${JSON.stringify(SECOND_URL)});
+    `,
+  });
+  const secondReady = await ctx.waitForMessage("second-ready");
+  if (secondReady.href !== SECOND_URL) {
+    throw new Error("Navigation did not reach the expected URL");
+  }
+  await waitUntil("second urlChangeEvent", () =>
+    ctx.urlChanges.some((event) => event.id === ctx.webviewId && event.url === SECOND_URL),
+  );
+}
+
+async function verifyBackNavigation(ctx) {
+  const entryHistoryCountBeforeBack = ctx.messages.filter(
+    (message) => message.step === "entry-history-ready" && isEntrySmokeUrl(message.href),
+  ).length;
+  const historyUrlChangeCountBeforeBack = ctx.urlChanges.filter(
+    (event) => event.id === ctx.webviewId && isEntrySmokeUrl(event.url),
+  ).length;
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const backResult = await InAppBrowser.goBack({ id: ctx.webviewId });
+    if (backResult.canGoBack) {
+      break;
+    }
+    await sleep(500);
+  }
+
+  try {
+    await waitUntil("entry page after goBack", () =>
+      hasBackNavigationSignal(ctx, entryHistoryCountBeforeBack, historyUrlChangeCountBeforeBack),
+    );
+  } catch (_error) {
+    throw new Error(backNavigationTimeoutMessage(ctx));
+  }
+  ctx.markStep("urlChangeEvent and goBack");
+}
+
+async function hasBackNavigationSignal(ctx, entryHistoryCountBeforeBack, historyUrlChangeCountBeforeBack) {
+  const hasPassiveBackSignal =
+    ctx.messages.filter((message) => message.step === "entry-history-ready" && isEntrySmokeUrl(message.href)).length >
+      entryHistoryCountBeforeBack ||
+    ctx.urlChanges.filter((event) => event.id === ctx.webviewId && isEntrySmokeUrl(event.url)).length >
+      historyUrlChangeCountBeforeBack;
+  if (hasPassiveBackSignal) {
+    return true;
+  }
+
+  await postCurrentLocation(ctx);
+  return ctx.messages.some((message) => message.step === "go-back-location" && isEntrySmokeUrl(message.href));
+}
+
+async function postCurrentLocation(ctx) {
+  try {
+    await InAppBrowser.executeScript({
+      id: ctx.webviewId,
+      code: `
+        window.mobileApp.postMessage({
+          detail: {
+            type: "featureSmoke",
+            step: "go-back-location",
+            href: window.location.href
+          }
+        });
+      `,
+    });
+  } catch (error) {
+    console.warn("Unable to probe webview location after goBack", error);
+  }
+}
+
+function backNavigationTimeoutMessage(ctx) {
+  const observedBackLocations = [
+    ...new Set(
+      ctx.messages
+        .filter((message) => message.step === "go-back-location" && message.href)
+        .map((message) => message.href),
+    ),
+  ];
+  return `Timed out waiting for entry page after goBack${
+    observedBackLocations.length ? `; observed ${observedBackLocations.join(", ")}` : ""
+  }`;
+}
+
+async function verifyReload(ctx) {
+  const pageLoadCountBeforeReload = ctx.pageLoads.filter((event) => event.id === ctx.webviewId).length;
+  await InAppBrowser.reload({ id: ctx.webviewId });
+  await waitUntil(
+    "reload page load",
+    () => ctx.pageLoads.filter((event) => event.id === ctx.webviewId).length > pageLoadCountBeforeReload,
+  );
+  ctx.markStep("reload");
+}
+
+async function verifyNavigationAndReload(ctx) {
+  await verifySetUrl(ctx);
+  await navigateToSecondPage(ctx);
+  await verifyBackNavigation(ctx);
+  await verifyReload(ctx);
+}
+
+async function verifyHiddenPopup(ctx) {
+  await InAppBrowser.executeScript({
+    id: ctx.webviewId,
+    code: `window.open(${JSON.stringify(POPUP_URL)}, "_blank");`,
+  });
+  const popupEvent = await waitUntil("popupWindowOpened", () =>
+    ctx.popupEvents.find((event) => event.parentId === ctx.webviewId || event.url === POPUP_URL),
+  );
+  if (!popupEvent?.id) {
+    throw new Error("popupWindowOpened did not include a popup id");
+  }
+  ctx.popupId = popupEvent.id;
+  await closeSmokeTarget(ctx, "popupId");
+  ctx.markStep("hidden popup window");
+}
+
+async function verifyPluginVersion(ctx) {
+  const version = await InAppBrowser.getPluginVersion();
+  if (!version.version) {
+    throw new Error("getPluginVersion() returned an empty version");
+  }
+  ctx.markStep(`getPluginVersion ${version.version}`);
+}
+
+async function verifyCookieClearing(ctx) {
+  await InAppBrowser.clearCookies({ id: ctx.webviewId, url: SMOKE_ORIGIN });
+  await InAppBrowser.clearAllCookies({ id: ctx.webviewId });
+  ctx.markStep("clearCookies and clearAllCookies");
+}
+
+async function closePrimaryWebview(ctx) {
+  const closingId = ctx.webviewId;
+  await InAppBrowser.close({ id: closingId });
+  await waitUntil("closeEvent", () => ctx.closeEvents.some((event) => event.id === closingId));
+  ctx.webviewId = null;
+}
+
+async function runFeatureSmokeFlow(ctx) {
+  await setupSmokeHarness(ctx);
+  await openSmokeWebview(ctx);
+  await verifyStartup(ctx);
+  await verifyCookies(ctx);
+  await verifyPostMessage(ctx);
+  await verifyExecuteScript(ctx);
+  await verifySizingAndNativeScreenshot(ctx);
+  await verifyBridgeScreenshot(ctx);
+  await verifyNavigationAndReload(ctx);
+  await verifyHiddenPopup(ctx);
+  await verifyPluginVersion(ctx);
+  await verifyCookieClearing(ctx);
+  await closePrimaryWebview(ctx);
+}
+
+async function closeSmokeTarget(ctx, targetKey) {
+  const targetId = ctx[targetKey];
+  if (!targetId) {
+    return;
+  }
+  try {
+    await InAppBrowser.close({ id: targetId });
+  } catch (error) {
+    console.warn(`Unable to close smoke target ${targetId}`, error);
+  }
+  ctx[targetKey] = null;
+}
+
+async function closeOpenSmokeTargets(ctx) {
+  await closeSmokeTarget(ctx, "popupId");
+  await closeSmokeTarget(ctx, "webviewId");
+}
+
+async function removeSmokeHandles(ctx) {
+  const handles = [...ctx.handles].reverse();
+  for (const handle of handles) {
+    await removeSmokeHandle(handle);
+  }
+  ctx.handles.length = 0;
+}
+
+async function removeSmokeHandle(handle) {
+  if (!handle || typeof handle.remove !== "function") {
+    return;
+  }
+  try {
+    await handle.remove();
+  } catch (error) {
+    console.warn("Unable to remove smoke test listener", error);
+  }
+}
+
+async function runFeatureSmokeClick(runButton, setRunning, setStatus) {
+  if (runButton.disabled) {
+    return;
+  }
+
+  setRunning(true);
+  const ctx = createSmokeContext(setStatus);
+  try {
+    await runFeatureSmokeFlow(ctx);
+    setStatus("Feature smoke passed", `Passed steps:\n${ctx.steps.join("\n")}`);
+  } catch (error) {
+    setStatus("Feature smoke failed", normalizeError(error));
+    await closeOpenSmokeTargets(ctx);
+  } finally {
+    await removeSmokeHandles(ctx);
+    setRunning(false);
+  }
 }
 
 export function attachFeatureSmokeHarness() {
@@ -165,408 +619,10 @@ export function attachFeatureSmokeHarness() {
     });
   };
 
-  const markReady = () => {
-    runButton.disabled = false;
-    setStatus("Feature smoke ready");
-  };
-
-  const markStep = (steps, step) => {
-    steps.push(step);
-    setStatus(`Feature smoke running: ${step}`, steps.join("\n"));
-  };
-
-  const waitUntil = async (label, predicate, timeout = TIMEOUT_MS) => {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeout) {
-      const result = await predicate();
-      if (result) {
-        return result;
-      }
-      await sleep(100);
-    }
-    throw new Error(`Timed out waiting for ${label}`);
-  };
-
-  runButton.addEventListener("click", async () => {
-    if (runButton.disabled) {
-      return;
-    }
-
-    setRunning(true);
-
-    const handles = [];
-    const messages = [];
-    const consoleMessages = [];
-    const screenshots = [];
-    const closeEvents = [];
-    const popupEvents = [];
-    const pageLoads = [];
-    const urlChanges = [];
-    const steps = [];
-    let webviewId = null;
-    let popupId = null;
-
-    const waitForMessage = (step, timeout) =>
-      waitUntil(
-        step,
-        () => messages.find((message) => message.step === step),
-        timeout,
-      );
-
-    try {
-      await InAppBrowser.removeAllListeners();
-      await InAppBrowser.clearAllCookies();
-      await InAppBrowser.clearCache();
-
-      handles.push(
-        await InAppBrowser.addListener("messageFromWebview", (event) => {
-          const detail = event.detail || {};
-          if (detail.type !== "featureSmoke") {
-            return;
-          }
-          messages.push({
-            id: event.id,
-            ...detail,
-          });
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("consoleMessage", (event) => {
-          consoleMessages.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("screenshotTaken", (event) => {
-          screenshots.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("popupWindowOpened", (event) => {
-          popupEvents.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("browserPageLoaded", (event) => {
-          pageLoads.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("urlChangeEvent", (event) => {
-          urlChanges.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("closeEvent", (event) => {
-          closeEvents.push(event);
-        }),
-      );
-      handles.push(
-        await InAppBrowser.addListener("pageLoadError", (event) => {
-          messages.push({
-            id: event.id,
-            step: "page-load-error",
-          });
-        }),
-      );
-
-      handles.push(
-        await addProxyHandler((request) => {
-          if (request.url === ENTRY_URL || request.url === HISTORY_ENTRY_URL || request.url === SECOND_URL) {
-            return textResponse(ENTRY_HTML, "text/html");
-          }
-          if (request.url === POPUP_URL) {
-            return textResponse(POPUP_HTML, "text/html");
-          }
-          if (request.url === SCRIPT_URL) {
-            return textResponse(SMOKE_SCRIPT, "application/javascript");
-          }
-          return null;
-        }),
-      );
-
-      markStep(steps, "open hidden proxied webview");
-      const openResult = await InAppBrowser.openWebView({
-        url: ENTRY_URL,
-        proxyRequests: true,
-        toolbarType: ToolBarType.BLANK,
-        backgroundColor: BackgroundColor.WHITE,
-        hidden: true,
-        invisibilityMode: InvisibilityMode.FAKE_VISIBLE,
-        captureConsoleLogs: true,
-        allowScreenshotsFromWebPage: true,
-        hiddenPopupWindow: true,
-        enableGooglePaySupport: true,
-        activeNativeNavigationForWebview: true,
-        enabledSafeBottomMargin: true,
-        enabledSafeTopMargin: true,
-        isPresentAfterPageLoad: true,
-        preShowScript: "window.__featureSmokePreShow = true;",
-        preShowScriptInjectionTime: "documentStart",
-        width: 360,
-        height: 640,
-        x: 0,
-        y: 0,
-      });
-      webviewId = openResult.id;
-
-      const entryReady = await waitForMessage("entry-ready");
-      if (!entryReady.preShowFlag) {
-        throw new Error("preShowScript did not run before entry script");
-      }
-      await waitUntil("consoleMessage", () =>
-        consoleMessages.some((event) => String(event.message).includes("feature-smoke-console-ok")),
-      );
-      markStep(steps, "page load, proxy, console, preShowScript");
-
-      const cookies = await InAppBrowser.getCookies({ url: SMOKE_ORIGIN });
-      if (cookies.featureSmokeCookie !== "enabled") {
-        throw new Error("featureSmokeCookie was not available through getCookies()");
-      }
-      markStep(steps, "getCookies");
-
-      await InAppBrowser.postMessage({
-        id: webviewId,
-        detail: {
-          action: "native-ping",
-          marker: "post-message-ok",
-        },
-      });
-      const postMessage = await waitForMessage("post-message");
-      if (postMessage.payload?.marker !== "post-message-ok") {
-        throw new Error("postMessage payload was not echoed by the webview");
-      }
-      markStep(steps, "postMessage");
-
-      await InAppBrowser.executeScript({
-        id: webviewId,
-        code: `
-          window.mobileApp.postMessage({
-            detail: {
-              type: "featureSmoke",
-              step: "execute-script",
-              title: document.title
-            }
-          });
-        `,
-      });
-      const scriptMessage = await waitForMessage("execute-script");
-      if (scriptMessage.title !== "Feature Smoke Entry") {
-        throw new Error("executeScript returned the wrong document title");
-      }
-      markStep(steps, "executeScript");
-
-      await InAppBrowser.updateDimensions({ id: webviewId, width: 320, height: 560, x: 0, y: 0 });
-      await InAppBrowser.setEnabledSafeTopMargin({ id: webviewId, enabled: false });
-      await InAppBrowser.setEnabledSafeBottomMargin({ id: webviewId, enabled: true });
-      markStep(steps, "dimensions and safe margins");
-
-      await InAppBrowser.show({ id: webviewId });
-      await sleep(500);
-      const screenshot = await InAppBrowser.takeScreenshot({ id: webviewId });
-      if (!screenshot.base64 || !screenshot.width || !screenshot.height) {
-        throw new Error("takeScreenshot returned an empty result");
-      }
-      await waitUntil("screenshotTaken", () => screenshots.length > 0);
-      await InAppBrowser.hide({ id: webviewId });
-      markStep(steps, "show, takeScreenshot, hide");
-
-      await InAppBrowser.executeScript({
-        id: webviewId,
-        code: `
-          window.mobileApp.takeScreenshot()
-            .then(function(result) {
-              window.mobileApp.postMessage({
-                detail: {
-                  type: "featureSmoke",
-                  step: "bridge-screenshot",
-                  hasData: Boolean(result && result.base64),
-                  width: result ? result.width : 0,
-                  height: result ? result.height : 0
-                }
-              });
-            })
-            .catch(function(error) {
-              window.mobileApp.postMessage({
-                detail: {
-                  type: "featureSmoke",
-                  step: "bridge-screenshot-error",
-                  error: error && error.message ? error.message : String(error)
-                }
-              });
-            });
-        `,
-      });
-      const bridgeScreenshotResult = await waitUntil("bridge screenshot result", () =>
-        messages.find(
-          (message) =>
-            message.step === "bridge-screenshot" || message.step === "bridge-screenshot-error",
-        ),
-      );
-      if (bridgeScreenshotResult.step === "bridge-screenshot-error") {
-        throw new Error(
-          `window.mobileApp.takeScreenshot() failed: ${bridgeScreenshotResult.error || "unknown error"}`,
-        );
-      }
-      if (
-        !bridgeScreenshotResult.hasData ||
-        !bridgeScreenshotResult.width ||
-        !bridgeScreenshotResult.height
-      ) {
-        throw new Error("window.mobileApp.takeScreenshot() returned an empty result");
-      }
-      markStep(steps, "webview screenshot bridge");
-
-      await InAppBrowser.setUrl({ id: webviewId, url: HISTORY_ENTRY_URL });
-      await waitUntil("setUrl history entry", () =>
-        messages.some((message) => message.step === "entry-ready" && message.href === HISTORY_ENTRY_URL),
-      );
-      await waitUntil("setUrl urlChangeEvent", () =>
-        urlChanges.some((event) => event.id === webviewId && event.url === HISTORY_ENTRY_URL),
-      );
-      markStep(steps, "setUrl");
-
-      await InAppBrowser.executeScript({
-        id: webviewId,
-        code: `
-          window.location.assign(${JSON.stringify(SECOND_URL)});
-        `,
-      });
-      const secondReady = await waitForMessage("second-ready");
-      if (secondReady.href !== SECOND_URL) {
-        throw new Error("Navigation did not reach the expected URL");
-      }
-      await waitUntil("second urlChangeEvent", () =>
-        urlChanges.some((event) => event.id === webviewId && event.url === SECOND_URL),
-      );
-      const entryHistoryCountBeforeBack = messages.filter(
-        (message) => message.step === "entry-history-ready" && isEntrySmokeUrl(message.href),
-      ).length;
-      const historyUrlChangeCountBeforeBack = urlChanges.filter(
-        (event) => event.id === webviewId && isEntrySmokeUrl(event.url),
-      ).length;
-      let backResult = { canGoBack: false };
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        backResult = await InAppBrowser.goBack({ id: webviewId });
-        if (backResult.canGoBack) {
-          break;
-        }
-        await sleep(500);
-      }
-      if (!backResult.canGoBack) {
-        throw new Error("goBack() reported that history was unavailable");
-      }
-      try {
-        await waitUntil(
-          "entry page after goBack",
-          async () => {
-            const hasPassiveBackSignal =
-              messages.filter((message) => message.step === "entry-history-ready" && isEntrySmokeUrl(message.href))
-                .length > entryHistoryCountBeforeBack ||
-              urlChanges.filter((event) => event.id === webviewId && isEntrySmokeUrl(event.url)).length >
-                historyUrlChangeCountBeforeBack;
-            if (hasPassiveBackSignal) {
-              return true;
-            }
-
-            try {
-              await InAppBrowser.executeScript({
-                id: webviewId,
-                code: `
-                  window.mobileApp.postMessage({
-                    detail: {
-                      type: "featureSmoke",
-                      step: "go-back-location",
-                      href: window.location.href
-                    }
-                  });
-                `,
-              });
-            } catch (_error) {}
-
-            return messages.some((message) => message.step === "go-back-location" && isEntrySmokeUrl(message.href));
-          },
-          30000,
-        );
-      } catch (_error) {
-        const observedBackLocations = [
-          ...new Set(
-            messages
-              .filter((message) => message.step === "go-back-location" && message.href)
-              .map((message) => message.href),
-          ),
-        ];
-        throw new Error(
-          `Timed out waiting for entry page after goBack${
-            observedBackLocations.length ? `; observed ${observedBackLocations.join(", ")}` : ""
-          }`,
-        );
-      }
-      markStep(steps, "urlChangeEvent and goBack");
-
-      const pageLoadCountBeforeReload = pageLoads.filter((event) => event.id === webviewId).length;
-      await InAppBrowser.reload({ id: webviewId });
-      await waitUntil(
-        "reload page load",
-        () => pageLoads.filter((event) => event.id === webviewId).length > pageLoadCountBeforeReload,
-      );
-      markStep(steps, "reload");
-
-      await InAppBrowser.executeScript({
-        id: webviewId,
-        code: `window.open(${JSON.stringify(POPUP_URL)}, "_blank");`,
-      });
-      const popupEvent = await waitUntil("popupWindowOpened", () =>
-        popupEvents.find((event) => event.parentId === webviewId || event.url === POPUP_URL),
-      );
-      if (!popupEvent?.id) {
-        throw new Error("popupWindowOpened did not include a popup id");
-      }
-      popupId = popupEvent.id;
-      if (popupId) {
-        await InAppBrowser.close({ id: popupId });
-        popupId = null;
-      }
-      markStep(steps, "hidden popup window");
-
-      const version = await InAppBrowser.getPluginVersion();
-      if (!version.version) {
-        throw new Error("getPluginVersion() returned an empty version");
-      }
-      markStep(steps, `getPluginVersion ${version.version}`);
-
-      await InAppBrowser.clearCookies({ id: webviewId, url: SMOKE_ORIGIN });
-      await InAppBrowser.clearAllCookies({ id: webviewId });
-      markStep(steps, "clearCookies and clearAllCookies");
-
-      await InAppBrowser.close({ id: webviewId });
-      await waitUntil("closeEvent", () => closeEvents.some((event) => event.id === webviewId));
-      webviewId = null;
-
-      setStatus("Feature smoke passed", `Passed steps:\n${steps.join("\n")}`);
-    } catch (error) {
-      setStatus("Feature smoke failed", normalizeError(error));
-      if (popupId) {
-        try {
-          await InAppBrowser.close({ id: popupId });
-        } catch (_cleanupError) {}
-      }
-      if (webviewId) {
-        try {
-          await InAppBrowser.close({ id: webviewId });
-        } catch (_cleanupError) {}
-      }
-    } finally {
-      for (const handle of handles.reverse()) {
-        if (!handle || typeof handle.remove !== "function") {
-          continue;
-        }
-        try {
-          await handle.remove();
-        } catch (_error) {}
-      }
-      setRunning(false);
-    }
+  runButton.addEventListener("click", () => {
+    void runFeatureSmokeClick(runButton, setRunning, setStatus);
   });
 
-  markReady();
+  runButton.disabled = false;
+  setStatus("Feature smoke ready");
 }
