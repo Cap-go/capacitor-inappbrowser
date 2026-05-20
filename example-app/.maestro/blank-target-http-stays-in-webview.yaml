@@ -8,6 +8,8 @@ androidWebViewHierarchy: devtools
     text: "Wait"
     optional: true
     label: "Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness"
+- launchApp:
+    clearState: false
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
@@ -22,6 +24,10 @@ androidWebViewHierarchy: devtools
 - tapOn:
     text: "Open Example Domain"
     retryTapIfNoChange: true
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog after opening the blank target link"
 - extendedWaitUntil:
     visible: "Example Domain"
     timeout: 15000
