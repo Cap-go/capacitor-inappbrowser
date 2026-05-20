@@ -2991,6 +2991,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 if (_webView != null) {
                     try {
                         _webView.evaluateJavascript(script, null);
+                        injectBlankTargetInCurrentWebViewScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
                     }
@@ -3916,12 +3917,124 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return false;
     }
 
+    private String buildAuthorizedHostsJson(List<String> authorizedLinks) {
+        if (authorizedLinks == null || authorizedLinks.isEmpty()) {
+            return "[]";
+        }
+
+        StringBuilder hostsJson = new StringBuilder("[");
+        boolean hasHost = false;
+        for (String authorized : authorizedLinks) {
+            if (authorized == null) {
+                continue;
+            }
+
+            try {
+                URI authUri = new URI(authorized);
+                String host = authUri.getHost();
+                if (host == null) {
+                    continue;
+                }
+
+                if (host.startsWith("www.")) {
+                    host = host.substring(4);
+                }
+
+                if (hasHost) {
+                    hostsJson.append(",");
+                }
+                hostsJson.append(JSONObject.quote(host.toLowerCase(Locale.ROOT)));
+                hasHost = true;
+            } catch (URISyntaxException e) {
+                Log.e("InAppBrowser", "Skipping invalid authorized app link: " + authorized, e);
+            }
+        }
+
+        hostsJson.append("]");
+        return hostsJson.toString();
+    }
+
+    private void injectBlankTargetInCurrentWebViewScript() {
+        if (_webView == null || _options == null || (!_options.getPreventDeeplink() && !_options.getOpenBlankTargetInWebView())) {
+            return;
+        }
+
+        String authorizedHostsJson = buildAuthorizedHostsJson(_options.getAuthorizedAppLinks());
+        String preventDeeplink = _options.getPreventDeeplink() ? "true" : "false";
+        String script = String.format(
+            Locale.US,
+            """
+            (function() {
+              if (window.__capgoInAppBrowserBlankTargetInCurrentWebView) {
+                return;
+              }
+              window.__capgoInAppBrowserBlankTargetInCurrentWebView = true;
+
+              var authorizedHosts = new Set(%s);
+              var preventDeeplink = %s;
+              var normalizeHost = function(host) {
+                return (host || '').replace(/^www\\./i, '').toLowerCase();
+              };
+
+              document.addEventListener('click', function(event) {
+                if (event.defaultPrevented) {
+                  return;
+                }
+
+                var element = event.target;
+                if (!element || typeof element.closest !== 'function') {
+                  return;
+                }
+
+                var anchor = element.closest('a[target][href]');
+                if (!anchor || (anchor.getAttribute('target') || '').toLowerCase() !== '_blank') {
+                  return;
+                }
+
+                var nextUrl;
+                try {
+                  nextUrl = new URL(anchor.href);
+                } catch (_) {
+                  return;
+                }
+
+                var protocol = nextUrl.protocol.toLowerCase();
+                if (protocol !== 'http:' && protocol !== 'https:') {
+                  return;
+                }
+
+                if (!preventDeeplink && authorizedHosts.has(normalizeHost(nextUrl.hostname))) {
+                  return;
+                }
+
+                event.preventDefault();
+                setTimeout(function() {
+                  window.location.assign(nextUrl.toString());
+                }, 0);
+              });
+            })();
+            """,
+            authorizedHostsJson,
+            preventDeeplink
+        );
+
+        _webView.post(() -> {
+            if (_webView != null) {
+                try {
+                    _webView.evaluateJavascript(script, null);
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error injecting blank target handler: " + e.getMessage());
+                }
+            }
+        });
+    }
+
     private boolean shouldLoadBlankTargetInCurrentWebView(String url) {
         if (!isHttpOrHttpsUrl(url)) {
             return false;
         }
 
-        if (isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
+        if (!_options.getPreventDeeplink() && isAuthorizedAppLink(url, _options.getAuthorizedAppLinks())) {
             return false;
         }
 

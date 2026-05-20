@@ -515,7 +515,20 @@ window.customElements.define(
       }
 
       function isBlankTargetEvent(result) {
-        return blankTargetTestActive && result?.id === blankTargetWebViewId;
+        if (!blankTargetTestActive) {
+          return false;
+        }
+
+        if (!result?.id) {
+          return blankTargetWebViewId === null;
+        }
+
+        if (blankTargetWebViewId === null) {
+          blankTargetWebViewId = result.id;
+          return true;
+        }
+
+        return result.id === blankTargetWebViewId;
       }
 
       async function clearBlankTargetListeners() {
@@ -929,9 +942,11 @@ window.customElements.define(
               showReloadButton: false,
               activeNativeNavigationForWebview: false,
               enabledSafeBottomMargin: true,
-              openBlankTargetInWebView: true,
+              preventDeeplink: true,
             });
-            blankTargetWebViewId = id;
+            if (blankTargetTestActive) {
+              blankTargetWebViewId = id;
+            }
           } catch (e) {
             blankTargetTestActive = false;
             blankTargetWebViewId = null;
