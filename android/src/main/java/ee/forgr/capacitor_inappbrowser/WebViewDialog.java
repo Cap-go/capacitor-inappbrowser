@@ -4430,6 +4430,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         _options,
                         requestContext.url
                     );
+                    NativeResponseData directResponseData = null;
 
                     NativeProxyRule outboundRule =
                         legacyProxyMode && shouldDelegateLegacyRequest
@@ -4481,7 +4482,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 if (proxiedRequest.response != null) {
                                     return proxiedRequest.response;
                                 }
-                                requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                                if (proxiedRequest.nativeResponse != null) {
+                                    directResponseData = proxiedRequest.nativeResponse;
+                                } else {
+                                    requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                                }
                             } else {
                                 synchronized (proxiedRequest) {
                                     proxiedRequest.timedOut = true;
@@ -4497,12 +4502,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         }
                     }
 
-                    NativeResponseData nativeResponse;
-                    try {
-                        nativeResponse = performNativeRequest(requestContext);
-                    } catch (IOException error) {
-                        Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
-                        return bridgeBackedRequest ? createCanceledResponse() : null;
+                    NativeResponseData nativeResponse = directResponseData;
+                    if (nativeResponse == null) {
+                        try {
+                            nativeResponse = performNativeRequest(requestContext);
+                        } catch (IOException error) {
+                            Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
+                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                        }
                     }
 
                     int redirectsFollowed = 0;
@@ -4522,7 +4529,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 redirectsFollowed++;
                                 continue;
                             }
-                            return buildWebResourceResponse(nativeResponse);
+                            return createWebResourceResponseOrFallback(nativeResponse, bridgeBackedRequest, requestContext.url);
                         }
                         if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
                             return createCanceledResponse();
@@ -4558,6 +4565,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 if (proxiedRequest.response != null) {
                                     return proxiedRequest.response;
                                 }
+                                if (proxiedRequest.nativeResponse != null) {
+                                    nativeResponse = proxiedRequest.nativeResponse;
+                                }
                             } else {
                                 synchronized (proxiedRequest) {
                                     proxiedRequest.timedOut = true;
@@ -4582,7 +4592,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             redirectsFollowed++;
                             continue;
                         }
-                        return buildWebResourceResponse(nativeResponse);
+                        return createWebResourceResponseOrFallback(nativeResponse, bridgeBackedRequest, requestContext.url);
                     }
                 }
 
@@ -5435,14 +5445,42 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return response;
     }
 
+    private WebResourceResponse createWebResourceResponseOrFallback(
+        NativeResponseData responseData,
+        boolean bridgeBackedRequest,
+        String requestUrl
+    ) {
+        WebResourceResponse response = buildWebResourceResponse(responseData);
+        if (response != null) {
+            return response;
+        }
+
+        // Android WebResourceResponse rejects 3xx statuses; let the original WebView request handle them.
+        if (ProxyRequestSupport.shouldFallbackToWebViewForUnsupportedStatus(bridgeBackedRequest, responseData.statusCode)) {
+            Log.w(
+                "InAppBrowserProxy",
+                "Allowing WebView to handle unsupported proxy response status " + responseData.statusCode + " for: " + requestUrl
+            );
+            return null;
+        }
+
+        Log.w("InAppBrowserProxy", "Canceling bridge proxy response with unsupported status: " + responseData.statusCode);
+        return createCanceledResponse();
+    }
+
     private WebResourceResponse buildWebResourceResponse(NativeResponseData responseData) {
+        if (!ProxyRequestSupport.supportsWebResourceResponseStatus(responseData.statusCode)) {
+            return null;
+        }
+
         ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
             responseData.contentType,
             responseData.headers
         );
+        boolean hasContentTypeHeader = ProxyRequestSupport.hasHeaderIgnoreCase(responseData.headers, "Content-Type");
         WebResourceResponse webResourceResponse = new WebResourceResponse(
-            metadata.mimeType(),
-            metadata.encoding(),
+            hasContentTypeHeader ? null : metadata.mimeType(),
+            hasContentTypeHeader ? null : metadata.encoding(),
             new ByteArrayInputStream(responseData.bodyBytes)
         );
         String reasonPhrase = getReasonPhrase(responseData.statusCode);
