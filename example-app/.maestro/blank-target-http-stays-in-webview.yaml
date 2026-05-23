@@ -10,6 +10,10 @@ androidWebViewHierarchy: devtools
     label: "Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness"
 - launchApp:
     clearState: false
+- tapOn:
+    text: "Wait"
+    optional: true
+    label: "Dismiss the transient Pixel Launcher ANR dialog after relaunching the harness"
 - repeat:
     times: 16
     while:
@@ -23,6 +27,13 @@ androidWebViewHierarchy: devtools
           visible: "Maestro Ready"
           timeout: 15000
           optional: true
+- repeat:
+    times: 4
+    commands:
+      - tapOn:
+          text: "Wait"
+          optional: true
+          label: "Dismiss the transient Pixel Launcher ANR dialog after the harness is ready"
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 15000
@@ -30,13 +41,35 @@ androidWebViewHierarchy: devtools
     id: "maestro-run-blank-target"
     retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
+# CI can show a transient Pixel Launcher ANR after opening this WebView; poll briefly instead of blocking for long waits.
+- repeat:
+    times: 8
+    commands:
+      - tapOn:
+          text: "Wait"
+          optional: true
+          label: "Dismiss the transient Pixel Launcher ANR dialog before tapping the blank target link"
+      - extendedWaitUntil:
+          visible: "Open Example Domain"
+          timeout: 5000
+          optional: true
 - tapOn:
     text: "Open Example Domain"
     retryTapIfNoChange: true
-- tapOn:
-    text: "Wait"
-    optional: true
-    label: "Dismiss the transient Pixel Launcher ANR dialog after opening the blank target link"
+# Keep post-click ANR dismissal bounded: ten 5s polls cover delayed dialogs without adding the long 15s harness wait each time.
+- repeat:
+    times: 10
+    while:
+      notVisible: "Example Domain"
+    commands:
+      - tapOn:
+          text: "Wait"
+          optional: true
+          label: "Dismiss the transient Pixel Launcher ANR dialog while waiting for the blank target link"
+      - extendedWaitUntil:
+          visible: "Example Domain"
+          timeout: 5000
+          optional: true
 - extendedWaitUntil:
     visible: "Example Domain"
     timeout: 15000
