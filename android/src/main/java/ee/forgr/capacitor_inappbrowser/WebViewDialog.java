@@ -66,7 +66,9 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
@@ -96,6 +98,7 @@ import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -435,22 +438,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         @JavascriptInterface
         public void postMessage(String message) {
-            try {
-                // Handle message from JavaScript safely
-                if (message == null || message.isEmpty()) {
-                    Log.e("InAppBrowser", "Received empty message from WebView");
-                    return;
-                }
-
-                if (_options == null || _options.getCallbacks() == null) {
-                    Log.e("InAppBrowser", "Cannot handle postMessage - options or callbacks are null");
-                    return;
-                }
-
-                _options.getCallbacks().javascriptCallback(message);
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
-            }
+            handleJavaScriptPostMessage(message);
         }
 
         @JavascriptInterface
@@ -1844,6 +1832,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.getSettings().setAllowFileAccessFromFileURLs(true);
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+        injectDocumentStartJavaScriptInterface();
 
         _webView.getSettings().setSupportMultipleWindows(true);
         if (_options.getEnableZoom()) {
@@ -2887,105 +2876,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         try {
-            String mobileAppExtras = "";
-            if (isJavaScriptControlAllowed()) {
-                mobileAppExtras = """
-                            , hide: function() {
-                              try {
-                                window.AndroidInterface.hide();
-                              } catch(e) {
-                                console.error('Error in mobileApp.hide:', e);
-                              }
-                            },
-                            show: function() {
-                              try {
-                                window.AndroidInterface.show();
-                              } catch(e) {
-                                console.error('Error in mobileApp.show:', e);
-                              }
-                            }
-                    """;
-            }
-
-            String screenshotBridge =
-                _options != null && _options.getAllowScreenshotsFromWebPage()
-                    ? """
-                          ,
-                          takeScreenshot: function() {
-                            return new Promise(function(resolve, reject) {
-                              try {
-                                if (!nativeBridge.takeScreenshot) {
-                                  reject(new Error('Screenshot bridge is not available'));
-                                  return;
-                                }
-                                var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-                                window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
-                                nativeBridge.takeScreenshot(requestId);
-                              } catch(e) {
-                                reject(e);
-                              }
-                            });
-                          }
-                      """
-                    : "";
-
-            String script = String.format(
-                """
-                (function() {
-                  window.__capgoInAppBrowserPendingScreenshots = window.__capgoInAppBrowserPendingScreenshots || {};
-                  window.__capgoInAppBrowserResolveScreenshot = window.__capgoInAppBrowserResolveScreenshot || function(payload) {
-                    var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
-                    if (!pending) {
-                      return;
-                    }
-                    delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
-                    pending.resolve(payload.result);
-                  };
-                  window.__capgoInAppBrowserRejectScreenshot = window.__capgoInAppBrowserRejectScreenshot || function(payload) {
-                    var pending = window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
-                    if (!pending) {
-                      return;
-                    }
-                    delete window.__capgoInAppBrowserPendingScreenshots[payload.requestId];
-                    pending.reject(new Error(payload.message));
-                  };
-                  // Prefer AndroidInterface when available, otherwise fall back to native window.mobileApp
-                  var nativeBridge = window.AndroidInterface || window.mobileApp;
-                  if (nativeBridge) {
-                    // Wrap native bridge to normalize behavior (stringify objects, expose close/hide/show)
-                    window.mobileApp = {
-                      postMessage: function(message) {
-                        try {
-                          var msg = typeof message === 'string' ? message : JSON.stringify(message);
-                          nativeBridge.postMessage(msg);
-                        } catch(e) {
-                          console.error('Error in mobileApp.postMessage:', e);
-                        }
-                      },
-                      close: function() {
-                        try {
-                          nativeBridge.close();
-                        } catch(e) {
-                          console.error('Error in mobileApp.close:', e);
-                        }
-                      }%s%s
-                    };
-                  }
-                  // Override window.print function to use our PrintInterface
-                  if (window.PrintInterface) {
-                    window.print = function() {
-                      try {
-                        window.PrintInterface.print();
-                      } catch(e) {
-                        console.error('Error in print:', e);
-                      }
-                    };
-                  }
-                })();
-                """,
-                mobileAppExtras,
-                screenshotBridge
-            );
+            String script = createMobileAppBridgeScript();
 
             _webView.post(() -> {
                 if (_webView != null) {
@@ -2999,6 +2890,73 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             });
         } catch (Exception e) {
             Log.e("InAppBrowser", "Error preparing JavaScript interface: " + e.getMessage());
+        }
+    }
+
+    private void injectDocumentStartJavaScriptInterface() {
+        if (_webView == null) {
+            Log.w("InAppBrowser", "Cannot inject document-start JavaScript interface - WebView is null");
+            return;
+        }
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            Log.d("InAppBrowser", "Document-start JavaScript injection is not supported; using navigation fallback");
+            return;
+        }
+
+        try {
+            injectDocumentStartPostMessageBridge();
+            WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error injecting document-start JavaScript interface: " + e.getMessage());
+        }
+    }
+
+    private void injectDocumentStartPostMessageBridge() {
+        if (_webView == null) {
+            return;
+        }
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            Log.d("InAppBrowser", "Document-start postMessage bridge is not supported; using JavaScript interface fallback");
+            return;
+        }
+
+        try {
+            WebViewCompat.addWebMessageListener(
+                _webView,
+                MobileAppBridgeScript.POST_MESSAGE_BRIDGE_NAME,
+                Collections.singleton("*"),
+                (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                    if (message == null || message.getType() != WebMessageCompat.TYPE_STRING) {
+                        Log.e("InAppBrowser", "Received unsupported postMessage payload from WebView");
+                        return;
+                    }
+                    handleJavaScriptPostMessage(message.getData());
+                }
+            );
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error injecting document-start postMessage bridge: " + e.getMessage());
+        }
+    }
+
+    private String createMobileAppBridgeScript() {
+        return MobileAppBridgeScript.create(isJavaScriptControlAllowed(), _options != null && _options.getAllowScreenshotsFromWebPage());
+    }
+
+    private void handleJavaScriptPostMessage(String message) {
+        try {
+            if (message == null || message.isEmpty()) {
+                Log.e("InAppBrowser", "Received empty message from WebView");
+                return;
+            }
+
+            if (_options == null || _options.getCallbacks() == null) {
+                Log.e("InAppBrowser", "Cannot handle postMessage - options or callbacks are null");
+                return;
+            }
+
+            _options.getCallbacks().javascriptCallback(message);
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error in postMessage: " + e.getMessage());
         }
     }
 
