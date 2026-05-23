@@ -5509,14 +5509,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return null;
         }
 
-        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata(
             responseData.contentType,
             responseData.headers
         );
-        boolean hasContentTypeHeader = ProxyRequestSupport.hasHeaderIgnoreCase(responseData.headers, "Content-Type");
         WebResourceResponse webResourceResponse = new WebResourceResponse(
-            hasContentTypeHeader ? null : metadata.mimeType(),
-            hasContentTypeHeader ? null : metadata.encoding(),
+            metadata.mimeType(),
+            metadata.encoding(),
             new ByteArrayInputStream(responseData.bodyBytes)
         );
         String reasonPhrase = getReasonPhrase(responseData.statusCode);

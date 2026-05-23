@@ -402,6 +402,16 @@ final class ProxyRequestSupport {
         return new WebResourceResponseMetadata(mimeType, encoding);
     }
 
+    static WebResourceResponseMetadata resolveWebResourceResponseConstructorMetadata(
+        String contentType,
+        Map<String, String> responseHeaders
+    ) {
+        if (hasHeaderIgnoreCase(responseHeaders, "Content-Type")) {
+            return new WebResourceResponseMetadata(null, null);
+        }
+        return resolveWebResourceResponseMetadata(contentType, responseHeaders);
+    }
+
     static ParsedResponseHeaders splitResponseHeaders(Map<String, List<String>> rawHeaders) {
         Map<String, String> responseHeaders = new HashMap<>();
         List<String> cookieHeaders = new java.util.ArrayList<>();

@@ -403,6 +403,23 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void resolveWebResourceResponseConstructorMetadataDefersToExistingContentTypeHeader() {
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata(
+            "multipart/mixed; boundary=fallback",
+            Map.of("content-type", "multipart/mixed; boundary=someboundary")
+        );
+
+        assertNull(metadata.mimeType());
+        assertNull(metadata.encoding());
+
+        ProxyRequestSupport.WebResourceResponseMetadata fallbackMetadata =
+            ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata("text/html; charset=utf-8", Map.of());
+
+        assertEquals("text/html", fallbackMetadata.mimeType());
+        assertEquals("utf-8", fallbackMetadata.encoding());
+    }
+
+    @Test
     public void hasHeaderIgnoreCaseFindsContentTypeWithOriginalCasing() {
         assertTrue(ProxyRequestSupport.hasHeaderIgnoreCase(Map.of("content-type", "multipart/mixed; boundary=test"), "Content-Type"));
         assertFalse(ProxyRequestSupport.hasHeaderIgnoreCase(Map.of("Accept", "application/json"), "Content-Type"));
