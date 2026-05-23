@@ -2568,9 +2568,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         // Check if we need Android 15+ specific fixes
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
 
-        // Get parent view
-        ViewGroup parent = (ViewGroup) _webView.getParent();
-
         // Find status bar color view and toolbar for Android 15+ specific handling
         View statusBarColorView = findViewById(R.id.status_bar_color_view);
         View toolbarView = findViewById(R.id.tool_bar);
@@ -2639,42 +2636,23 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         }
 
-        // Apply system insets to WebView content view (compatible with all Android versions)
-        ViewCompat.setOnApplyWindowInsetsListener(_webView, (v, windowInsets) -> {
+        View coordinatorView = findViewById(R.id.coordinator_layout);
+        final View insetsSourceView = coordinatorView != null ? coordinatorView : _webView;
+
+        // Resolve insets from the dialog root; child WebViews can receive already-fitted zero insets.
+        ViewCompat.setOnApplyWindowInsetsListener(insetsSourceView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
             Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
             Insets mandatoryGestures = windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
             Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
-            Boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
+            boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
-            ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) v.getLayoutParams();
+            applySafeAreaMargins(bars, navigationBars, systemGestures, mandatoryGestures, ime, keyboardVisible, isAndroid15Plus);
 
-            // Apply safe margin inset to bottom margin if enabled in options or fallback to 0px
-            int safeBottomInset = Math.max(
-                bars.bottom,
-                Math.max(navigationBars.bottom, Math.max(systemGestures.bottom, mandatoryGestures.bottom))
-            );
-            int navBottom = _options.getEnabledSafeMargin() ? safeBottomInset : 0;
-
-            // Apply top inset based on enabledSafeTopMargin and useTopInset options
-            // If enabledSafeTopMargin is false, force full screen (no top margin)
-            // Otherwise, use useTopInset to determine if system inset should be applied
-            int navTop = _options.getEnabledSafeTopMargin() && _options.getUseTopInset() ? bars.top : 0;
-
-            // Avoid double-applying top inset; AppBar/status bar handled above on Android 15+
-            mlp.topMargin = isAndroid15Plus ? 0 : navTop;
-
-            // Apply larger of navigation bar or keyboard inset to bottom margin
-            mlp.bottomMargin = Math.max(navBottom, ime.bottom);
-
-            mlp.leftMargin = bars.left;
-            mlp.rightMargin = bars.right;
-            v.setLayoutParams(mlp);
-
-            return WindowInsetsCompat.CONSUMED;
+            return windowInsets;
         });
-        ViewCompat.requestApplyInsets(_webView);
+        requestSafeAreaInsets();
 
         // Handle window decoration - version-specific handling
         if (getWindow() != null) {
@@ -2742,6 +2720,58 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             }
         }
+
+        requestSafeAreaInsets();
+    }
+
+    private void applySafeAreaMargins(
+        Insets bars,
+        Insets navigationBars,
+        Insets systemGestures,
+        Insets mandatoryGestures,
+        Insets ime,
+        boolean keyboardVisible,
+        boolean appBarHandlesTopInset
+    ) {
+        if (_webView == null || _options == null) {
+            return;
+        }
+
+        ViewGroup.LayoutParams layoutParams = _webView.getLayoutParams();
+        if (!(layoutParams instanceof ViewGroup.MarginLayoutParams mlp)) {
+            return;
+        }
+
+        int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInset(
+            bars.bottom,
+            navigationBars.bottom,
+            systemGestures.bottom,
+            mandatoryGestures.bottom
+        );
+        int imeBottom = keyboardVisible ? ime.bottom : 0;
+        int navTop = SafeAreaInsetsSupport.resolveTopMargin(
+            _options.getEnabledSafeTopMargin(),
+            _options.getUseTopInset(),
+            bars.top,
+            appBarHandlesTopInset
+        );
+
+        mlp.topMargin = navTop;
+        mlp.bottomMargin = SafeAreaInsetsSupport.resolveBottomMargin(_options.getEnabledSafeMargin(), safeBottomInset, imeBottom);
+        mlp.leftMargin = bars.left;
+        mlp.rightMargin = bars.right;
+        _webView.setLayoutParams(mlp);
+    }
+
+    private void requestSafeAreaInsets() {
+        View coordinatorView = findViewById(R.id.coordinator_layout);
+        View insetsSourceView = coordinatorView != null ? coordinatorView : _webView;
+        if (insetsSourceView == null) {
+            return;
+        }
+
+        ViewCompat.requestApplyInsets(insetsSourceView);
+        insetsSourceView.post(() -> ViewCompat.requestApplyInsets(insetsSourceView));
     }
 
     public void postMessageToJS(Object detail) {
@@ -5961,17 +5991,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     public void setEnabledSafeTopMargin(boolean enabled) {
         if (_options.getEnabledSafeTopMargin() == enabled) return;
         _options.setEnabledSafeTopMargin(enabled);
-        if (_webView != null) {
-            ViewCompat.requestApplyInsets(_webView);
-        }
+        requestSafeAreaInsets();
     }
 
     public void setEnabledSafeBottomMargin(boolean enabled) {
         if (_options.getEnabledSafeMargin() == enabled) return;
         _options.setEnabledSafeMargin(enabled);
-        if (_webView != null) {
-            ViewCompat.requestApplyInsets(_webView);
-        }
+        requestSafeAreaInsets();
     }
 
     /**
