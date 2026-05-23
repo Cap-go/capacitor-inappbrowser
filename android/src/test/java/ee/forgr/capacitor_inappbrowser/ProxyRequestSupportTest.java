@@ -44,6 +44,21 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void supportsWebResourceResponseStatusRejectsAndroidUnsupportedRedirectRange() {
+        assertTrue(ProxyRequestSupport.supportsWebResourceResponseStatus(200));
+        assertTrue(ProxyRequestSupport.supportsWebResourceResponseStatus(404));
+        assertFalse(ProxyRequestSupport.supportsWebResourceResponseStatus(302));
+        assertFalse(ProxyRequestSupport.supportsWebResourceResponseStatus(304));
+    }
+
+    @Test
+    public void shouldFallbackToWebViewOnlyForOriginalUnsupportedStatuses() {
+        assertTrue(ProxyRequestSupport.shouldFallbackToWebViewForUnsupportedStatus(false, 304));
+        assertFalse(ProxyRequestSupport.shouldFallbackToWebViewForUnsupportedStatus(true, 304));
+        assertFalse(ProxyRequestSupport.shouldFallbackToWebViewForUnsupportedStatus(false, 200));
+    }
+
+    @Test
     public void resolveRedirectMethodPreservesNonPostMethodsOnLegacyRedirects() {
         assertEquals("GET", ProxyRequestSupport.resolveRedirectMethod("POST", 302));
         assertEquals("PUT", ProxyRequestSupport.resolveRedirectMethod("PUT", 302));
@@ -138,6 +153,27 @@ public class ProxyRequestSupportTest {
         assertFalse(overrideHeaders.containsKey("Origin"));
         assertFalse(overrideHeaders.containsKey("Referer"));
         assertEquals("application/json", overrideHeaders.get("Accept"));
+    }
+
+    @Test
+    public void stripCacheValidatorHeadersRemovesOnlyRevalidationHeaders() {
+        Map<String, String> headers = ProxyRequestSupport.stripCacheValidatorHeaders(
+            Map.of(
+                "If-None-Match",
+                "\"abc\"",
+                "If-Modified-Since",
+                "Wed, 21 Oct 2015 07:28:00 GMT",
+                "If-Match",
+                "\"write-guard\"",
+                "Accept",
+                "application/json"
+            )
+        );
+
+        assertFalse(headers.containsKey("If-None-Match"));
+        assertFalse(headers.containsKey("If-Modified-Since"));
+        assertEquals("\"write-guard\"", headers.get("If-Match"));
+        assertEquals("application/json", headers.get("Accept"));
     }
 
     @Test
@@ -381,6 +417,12 @@ public class ProxyRequestSupportTest {
 
         assertEquals("text/html", fallbackMetadata.mimeType());
         assertEquals("utf-8", fallbackMetadata.encoding());
+    }
+
+    @Test
+    public void hasHeaderIgnoreCaseFindsContentTypeWithOriginalCasing() {
+        assertTrue(ProxyRequestSupport.hasHeaderIgnoreCase(Map.of("content-type", "multipart/mixed; boundary=test"), "Content-Type"));
+        assertFalse(ProxyRequestSupport.hasHeaderIgnoreCase(Map.of("Accept", "application/json"), "Content-Type"));
     }
 
     @Test

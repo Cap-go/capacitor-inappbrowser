@@ -217,6 +217,18 @@ final class ProxyRequestSupport {
         }
     }
 
+    static boolean supportsWebResourceResponseStatus(int statusCode) {
+        return (statusCode >= 100 && statusCode <= 299) || (statusCode >= 400 && statusCode <= 599);
+    }
+
+    static boolean shouldFallbackToWebViewForUnsupportedStatus(boolean bridgeBackedRequest, int statusCode) {
+        return !bridgeBackedRequest && !supportsWebResourceResponseStatus(statusCode);
+    }
+
+    static boolean hasHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
+        return findHeaderKeyIgnoreCase(headers, expectedKey) != null;
+    }
+
     static String resolveRedirectMethod(String method, int statusCode) {
         String normalizedMethod = normalizeMethod(method);
         if ("HEAD".equals(normalizedMethod)) {
@@ -743,10 +755,6 @@ final class ProxyRequestSupport {
     private static String findHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
         String resolvedKey = findHeaderKeyIgnoreCase(headers, expectedKey);
         return resolvedKey != null ? headers.get(resolvedKey) : null;
-    }
-
-    private static boolean hasHeaderIgnoreCase(Map<String, String> headers, String expectedKey) {
-        return findHeaderKeyIgnoreCase(headers, expectedKey) != null;
     }
 
     private static String findHeaderKeyIgnoreCase(Map<String, String> headers, String expectedKey) {
