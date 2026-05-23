@@ -2648,7 +2648,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
             boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
-            applySafeAreaMargins(bars, navigationBars, systemGestures, mandatoryGestures, ime, keyboardVisible, isAndroid15Plus);
+            boolean appBarHandlesTopInset =
+                isAndroid15Plus &&
+                !TextUtils.equals(_options.getToolbarType(), "blank") &&
+                toolbarView != null &&
+                toolbarView.getVisibility() == View.VISIBLE &&
+                toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
+            applySafeAreaMargins(bars, navigationBars, systemGestures, mandatoryGestures, ime, keyboardVisible, appBarHandlesTopInset);
 
             return windowInsets;
         });
