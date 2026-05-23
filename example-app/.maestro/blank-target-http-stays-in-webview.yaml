@@ -41,6 +41,7 @@ androidWebViewHierarchy: devtools
     id: "maestro-run-blank-target"
     retryTapIfNoChange: true
 - assertVisible: "Target Blank Test Page"
+# CI can show a transient Pixel Launcher ANR after opening this WebView; poll briefly instead of blocking for long waits.
 - repeat:
     times: 8
     commands:
@@ -55,6 +56,7 @@ androidWebViewHierarchy: devtools
 - tapOn:
     text: "Open Example Domain"
     retryTapIfNoChange: true
+# Keep post-click ANR dismissal bounded: ten 5s polls cover delayed dialogs without adding the long 15s harness wait each time.
 - repeat:
     times: 10
     while:
