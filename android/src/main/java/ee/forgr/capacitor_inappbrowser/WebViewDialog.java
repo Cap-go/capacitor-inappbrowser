@@ -5478,7 +5478,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private WebResourceResponse buildWebResourceResponse(NativeResponseData responseData) {
-        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseMetadata(
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata(
             responseData.contentType,
             responseData.headers
         );

@@ -367,6 +367,23 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void resolveWebResourceResponseConstructorMetadataDefersToExistingContentTypeHeader() {
+        ProxyRequestSupport.WebResourceResponseMetadata metadata = ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata(
+            "multipart/mixed; boundary=fallback",
+            Map.of("content-type", "multipart/mixed; boundary=someboundary")
+        );
+
+        assertNull(metadata.mimeType());
+        assertNull(metadata.encoding());
+
+        ProxyRequestSupport.WebResourceResponseMetadata fallbackMetadata =
+            ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata("text/html; charset=utf-8", Map.of());
+
+        assertEquals("text/html", fallbackMetadata.mimeType());
+        assertEquals("utf-8", fallbackMetadata.encoding());
+    }
+
+    @Test
     public void splitResponseHeadersPreservesAllCookieValuesSeparately() {
         ProxyRequestSupport.ParsedResponseHeaders parsedHeaders = ProxyRequestSupport.splitResponseHeaders(
             Map.of(
