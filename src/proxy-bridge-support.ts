@@ -8,6 +8,22 @@ export function findCapturedHeaderKey(headers: Record<string, string>, headerNam
   return null;
 }
 
+export const NATIVE_PROXY_ERROR_STATUS = 599;
+export const NATIVE_PROXY_ERROR_HEADER = 'x-capgo-proxy-error';
+
+export function isNativeProxyErrorResponse(response: Pick<Response, 'status' | 'headers'>): boolean {
+  return response.status === 599 && response.headers.get('x-capgo-proxy-error') !== null;
+}
+
+export function nativeProxyErrorMessage(response: Pick<Response, 'headers'>): string {
+  const nativeErrorHeader = response.headers.get('x-capgo-proxy-error');
+  if (!nativeErrorHeader) {
+    return 'Network request failed';
+  }
+  const nativeMessage = nativeErrorHeader.trim();
+  return nativeMessage || 'Network request failed';
+}
+
 export function replaceCapturedHeader(headers: Record<string, string>, name: string, value: string): void {
   const existingKey = findCapturedHeaderKey(headers, name);
   if (existingKey && existingKey !== name) {

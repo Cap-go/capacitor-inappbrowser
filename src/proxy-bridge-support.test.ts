@@ -7,6 +7,8 @@ import {
   ensureInferredContentType,
   getSubmitEventSubmitter,
   inferContentTypeFromBody,
+  isNativeProxyErrorResponse,
+  nativeProxyErrorMessage,
   replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
@@ -42,6 +44,25 @@ describe('proxy bridge header helpers', () => {
 
     expect(inferredHeaders).toEqual({ 'content-type': 'application/x-www-form-urlencoded;charset=UTF-8' });
     expect(explicitHeaders).toEqual({ 'Content-Type': 'application/json' });
+  });
+});
+
+describe('proxy bridge native error helpers', () => {
+  it('detects synthetic native proxy failures', () => {
+    const response = new Response('', {
+      status: 599,
+      headers: { 'X-Capgo-Proxy-Error': 'Unable to resolve host' },
+    });
+
+    expect(isNativeProxyErrorResponse(response)).toBe(true);
+    expect(nativeProxyErrorMessage(response)).toBe('Unable to resolve host');
+  });
+
+  it('ignores ordinary 599 responses without the native proxy marker header', () => {
+    const response = new Response('', { status: 599 });
+
+    expect(isNativeProxyErrorResponse(response)).toBe(false);
+    expect(nativeProxyErrorMessage(response)).toBe('Network request failed');
   });
 });
 

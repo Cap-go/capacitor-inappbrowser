@@ -4,6 +4,8 @@ import {
   consumeProxySubmitReplayBypass,
   ensureInferredContentType,
   getSubmitEventSubmitter,
+  isNativeProxyErrorResponse,
+  nativeProxyErrorMessage,
   replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
   restoreXhrReplayState,
@@ -372,10 +374,14 @@ import {
     } catch (_error) {
       return originalFetch.call(window, input, init);
     }
-    return originalFetch.call(window, proxyUrl, {
+    const proxyResponse = await originalFetch.call(globalThis, proxyUrl, {
       method: 'GET',
       signal,
     });
+    if (isNativeProxyErrorResponse(proxyResponse)) {
+      throw new TypeError(nativeProxyErrorMessage(proxyResponse));
+    }
+    return proxyResponse;
   };
 
   const originalXhrOpen = XMLHttpRequest.prototype.open;
