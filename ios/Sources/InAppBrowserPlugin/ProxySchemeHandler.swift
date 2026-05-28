@@ -403,6 +403,7 @@ enum ProxySchemeRequestSupport {
 }
 
 final class PendingProxyTask {
+    let requestId: String
     let schemeTask: WKURLSchemeTask
     var requestContext: NativeRequestContext
     var responseData: NativeResponseData?
@@ -421,7 +422,8 @@ final class PendingProxyTask {
     /// race to finish the same request.
     private var isComplete = false
 
-    init(schemeTask: WKURLSchemeTask, requestContext: NativeRequestContext, phase: String) {
+    init(requestId: String, schemeTask: WKURLSchemeTask, requestContext: NativeRequestContext, phase: String) {
+        self.requestId = requestId
         self.schemeTask = schemeTask
         self.requestContext = requestContext
         self.phase = phase
@@ -510,7 +512,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             base64Body: extractBody(from: urlSchemeTask.request),
             isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
         )
-        let pendingTask = PendingProxyTask(schemeTask: urlSchemeTask, requestContext: requestContext, phase: "outbound")
+        let pendingTask = PendingProxyTask(requestId: requestId, schemeTask: urlSchemeTask, requestContext: requestContext, phase: "outbound")
 
         taskLock.lock()
         pendingTasks[requestId] = pendingTask
@@ -593,7 +595,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
 
         if pendingTask.canceled {
             finishWithCanceledResponse(task: pendingTask)
-            removePendingTask(requestId: requestId)
             return
         }
 
@@ -603,7 +604,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         ) {
         case .finishCachedResponse:
             guard let responseData = pendingTask.responseData else { return }
-            removePendingTask(requestId: requestId)
             syncResponseCookies(from: responseData, fallbackURL: pendingTask.requestContext.url) {
                 self.finish(task: pendingTask, with: responseData)
             }
@@ -628,7 +628,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                     userInfo: [NSLocalizedDescriptionKey: error.localizedDescription]
                 )
             )
-            removePendingTask(requestId: requestId)
             return
         }
         let task = session.dataTask(with: request) { [weak self] data, response, error in
@@ -636,13 +635,17 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             guard let pendingTask = self.pendingTask(for: requestId) else { return }
 
             if let error {
-                if (error as NSError).code == NSURLErrorCancelled, pendingTask.redirectRequest != nil {
+                if (error as NSError).code == NSURLErrorCancelled {
+                    // A cancellation with a pending redirect is the expected signal that
+                    // willPerformHTTPRedirection suppressed automatic following; the task
+                    // continues via the redirect, so leave it tracked. Otherwise no
+                    // terminal scheme-task call happens here, so remove it explicitly.
+                    if pendingTask.redirectRequest == nil {
+                        self.removePendingTask(requestId: requestId)
+                    }
                     return
                 }
-                if (error as NSError).code != NSURLErrorCancelled {
-                    self.failSchemeTask(pendingTask, with: error)
-                }
-                self.removePendingTask(requestId: requestId)
+                self.failSchemeTask(pendingTask, with: error)
                 return
             }
 
@@ -701,13 +704,11 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             switch inboundRule.action {
             case .cancel:
                 finishWithCanceledResponse(task: pendingTask)
-                removePendingTask(requestId: requestId)
             case .continue:
                 if pendingTask.redirectRequest != nil {
                     followPendingRedirect(requestId: requestId)
                 } else {
                     finish(task: pendingTask, with: responseData)
-                    removePendingTask(requestId: requestId)
                 }
             case .delegateToJs:
                 emitProxyEvent(requestId: requestId, pendingTask: pendingTask)
@@ -718,7 +719,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                 followPendingRedirect(requestId: requestId)
             } else {
                 finish(task: pendingTask, with: responseData)
-                removePendingTask(requestId: requestId)
             }
         }
     }
@@ -780,7 +780,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                 self.fallbackToNativePipeline(requestId: requestId)
                 return
             case .finishCachedResponse:
-                self.pendingTasks.removeValue(forKey: requestId)
                 self.taskLock.unlock()
                 guard let responseData else { return }
                 self.syncResponseCookies(from: responseData, fallbackURL: pendingTask.requestContext.url) {
@@ -788,7 +787,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
                 }
                 return
             case .failRequest:
-                self.pendingTasks.removeValue(forKey: requestId)
                 self.taskLock.unlock()
             }
 
@@ -864,7 +862,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             switch outboundRule.action {
             case .cancel:
                 finishWithCanceledResponse(task: pendingTask)
-                removePendingTask(requestId: requestId)
             case .continue:
                 executeNativePipeline(requestId: requestId)
             case .delegateToJs:
@@ -1055,11 +1052,22 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     /// helper funnels every terminal call onto the main thread (the same queue WebKit
     /// uses for `start`/`stop`) and gates it behind `beginCompletionIfLive()`, so the
     /// liveness check and the actual call cannot be separated by a `stop`.
+    ///
+    /// This helper is also the single owner of task removal. Callers MUST NOT remove
+    /// the task from `pendingTasks` eagerly on a background thread before calling a
+    /// terminal method: doing so creates a window where `webView(_:stop:)` (which only
+    /// finds tasks via `pendingTasks`) can no longer mark the task stopped, so a queued
+    /// completion would then call `didReceive`/`didFinish`/`didFailWithError` on an
+    /// already-stopped task and crash. Keeping the task tracked until this main-queue
+    /// block runs lets a racing `stop` win the liveness claim.
     private func completeSchemeTask(_ task: PendingProxyTask, _ body: @escaping (WKURLSchemeTask) -> Void) {
         let runBody: () -> Void = { [weak self] in
             guard let self else { return }
             self.taskLock.lock()
             let isLive = task.beginCompletionIfLive()
+            self.pendingTasks.removeValue(forKey: task.requestId)
+            self.stoppedRequests.removeValue(forKey: task.requestId)
+            self.timedOutRequests.removeValue(forKey: task.requestId)
             self.taskLock.unlock()
             guard isLive else { return }
             body(task.schemeTask)
@@ -1195,7 +1203,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     func cancelAllPendingTasks() {
         taskLock.lock()
         let pending = pendingTasks
-        pendingTasks.removeAll()
+        // Do not clear pendingTasks here. completeSchemeTask removes each task on the
+        // main queue once its failure is claimed, so a concurrent webView(_:stop:) can
+        // still find and mark the task stopped before the queued failure runs. Clearing
+        // eagerly would reopen the post-stop completion crash this fix closes.
         stoppedRequests.removeAll()
         taskLock.unlock()
         session.invalidateAndCancel()
