@@ -14,7 +14,7 @@ let package = Package(
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.0.0"),
         .package(name: "CapacitorCamera", path: "../../../node_modules/.bun/@capacitor+camera@8.0.0+15e98482558ccfe6/node_modules/@capacitor/camera"),
         .package(name: "CapacitorSplashScreen", path: "../../../node_modules/.bun/@capacitor+splash-screen@8.0.0+15e98482558ccfe6/node_modules/@capacitor/splash-screen"),
-        .package(name: "CapgoInappbrowser", path: "../../../node_modules/.bun/@capgo+inappbrowser@file+../node_modules/@capgo/inappbrowser")
+        .package(name: "CapgoCapacitorInappbrowser", path: "../../../node_modules/.bun/@capgo+capacitor-inappbrowser@file+../node_modules/@capgo/capacitor-inappbrowser")
     ],
     targets: [
         .target(
@@ -24,7 +24,7 @@ let package = Package(
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapacitorCamera", package: "CapacitorCamera"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
-                .product(name: "CapgoInappbrowser", package: "CapgoInappbrowser")
+                .product(name: "CapgoCapacitorInappbrowser", package: "CapgoCapacitorInappbrowser")
             ]
         )
     ]

@@ -5,7 +5,7 @@ import {
   ToolBarType,
   BackgroundColor,
   InvisibilityMode,
-} from "@capgo/inappbrowser";
+} from "@capgo/capacitor-inappbrowser";
 import { setupProxyDemoButtons } from "./proxy-demo.js";
 import { setupProxyRegression } from "./proxy-regression.js";
 import { attachKeyboardRegressionHarness } from "./keyboard-regression.js";
