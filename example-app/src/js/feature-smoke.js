@@ -4,7 +4,7 @@ import {
   BackgroundColor,
   InvisibilityMode,
   addProxyHandler,
-} from "@capgo/inappbrowser";
+} from "@capgo/capacitor-inappbrowser";
 
 const SMOKE_ORIGIN = "https://feature-smoke.capgo.test";
 const ENTRY_URL = `${SMOKE_ORIGIN}/entry`;

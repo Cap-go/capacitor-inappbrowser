@@ -8,5 +8,5 @@ project(':capacitor-camera').projectDir = new File('../node_modules/.bun/@capaci
 include ':capacitor-splash-screen'
 project(':capacitor-splash-screen').projectDir = new File('../node_modules/.bun/@capacitor+splash-screen@8.0.0+15e98482558ccfe6/node_modules/@capacitor/splash-screen/android')
 
-include ':capgo-inappbrowser'
-project(':capgo-inappbrowser').projectDir = new File('../node_modules/.bun/@capgo+inappbrowser@file+../node_modules/@capgo/inappbrowser/android')
+include ':capgo-capacitor-inappbrowser'
+project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/.bun/@capgo+capacitor-inappbrowser@file+../node_modules/@capgo/capacitor-inappbrowser/android')

@@ -1,4 +1,4 @@
-import { InAppBrowser, ToolBarType, BackgroundColor } from "@capgo/inappbrowser";
+import { InAppBrowser, ToolBarType, BackgroundColor } from "@capgo/capacitor-inappbrowser";
 
 const KEYBOARD_OPEN_THRESHOLD_PX = 120;
 const KEYBOARD_RESTORE_TOLERANCE_PX = 32;

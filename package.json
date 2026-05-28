@@ -1,5 +1,5 @@
 {
-  "name": "@capgo/inappbrowser",
+  "name": "@capgo/capacitor-inappbrowser",
   "version": "8.6.14",
   "description": "Capacitor plugin in app browser",
   "main": "dist/plugin.cjs.js",
@@ -12,7 +12,7 @@
     "dist/",
     "ios/Sources/",
     "Package.swift",
-    "CapgoInappbrowser.podspec"
+    "CapgoCapacitorInappbrowser.podspec"
   ],
   "author": "Martin Donadieu <martin@capgo.app>",
   "license": "MPL-2.0",
@@ -32,7 +32,7 @@
   ],
   "scripts": {
     "verify": "bun run verify:ios && bun run verify:android && bun run verify:web",
-    "verify:ios": "xcodebuild -scheme CapgoInappbrowser -destination generic/platform=iOS",
+    "verify:ios": "xcodebuild -scheme CapgoCapacitorInappbrowser -destination generic/platform=iOS",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "bun run build && bun run test:web",
     "test:web": "bun test src/proxy-bridge-support.test.ts",
@@ -86,12 +86,12 @@
   "prettier": "@ionic/prettier-config",
   "swiftlint": {
     "excluded": [
-      "${PWD}/.build",
-      "${PWD}/node_modules",
-      "${PWD}/ios/Pods",
-      "${PWD}/example-app",
-      "${PWD}/ios/Sources/InAppBrowserPlugin/InAppBrowserPlugin.swift",
-      "${PWD}/ios/Sources/InAppBrowserPlugin/WKWebViewController.swift"
+      "**/.build",
+      "**/node_modules",
+      "**/ios/Pods",
+      "**/example-app",
+      "**/ios/Sources/InAppBrowserPlugin/InAppBrowserPlugin.swift",
+      "**/ios/Sources/InAppBrowserPlugin/WKWebViewController.swift"
     ],
     "opt_in_rules": [
       "implicitly_unwrapped_optional",
@@ -110,6 +110,22 @@
       "ignores_comments": true,
       "ignores_interpolated_strings": true,
       "ignores_urls": true
+    },
+    "file_length": {
+      "warning": 3000,
+      "error": 4000
+    },
+    "function_body_length": {
+      "warning": 500,
+      "error": 600
+    },
+    "type_body_length": {
+      "warning": 1500,
+      "error": 2000
+    },
+    "cyclomatic_complexity": {
+      "warning": 80,
+      "error": 100
     }
   },
   "capacitor": {

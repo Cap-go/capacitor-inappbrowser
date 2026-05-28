@@ -1,5 +1,5 @@
 import { CapacitorHttp } from "@capacitor/core";
-import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@capgo/inappbrowser";
+import { InAppBrowser, InvisibilityMode, ToolBarType, addProxyHandler } from "@capgo/capacitor-inappbrowser";
 
 const GRAILED_URL = "https://www.grailed.com/users/sign_up";
 const FACEBOOK_URL = "https://www.facebook.com/marketplace/create";

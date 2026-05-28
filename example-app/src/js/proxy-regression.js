@@ -1,4 +1,4 @@
-import { InAppBrowser, ToolBarType, addProxyHandler } from "@capgo/inappbrowser";
+import { InAppBrowser, ToolBarType, addProxyHandler } from "@capgo/capacitor-inappbrowser";
 
 const ENTRY_URL = "https://proxy.capgo.test/entry";
 const SCRIPT_URL = "https://proxy.capgo.test/app.js";

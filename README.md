@@ -1,4 +1,4 @@
-# @capgo/inappbrowser
+# @capgo/capacitor-inappbrowser
 
 <a href="https://capgo.app/"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-inappbrowser" alt="Capgo - Instant updates for Capacitor" /></a>
 
@@ -48,14 +48,14 @@ The most complete doc is available here: https://capgo.app/docs/plugins/inappbro
 ## Install
 
 ```bash
-npm install @capgo/inappbrowser
+npm install @capgo/capacitor-inappbrowser
 npx cap sync
 ```
 
 ## Usage
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 InAppBrowser.open({ url: 'YOUR_URL' });
 ```
@@ -65,7 +65,7 @@ InAppBrowser.open({ url: 'YOUR_URL' });
 The `open()` method launches a Chrome Custom Tab on Android. You can customize its appearance to blend with your app:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 InAppBrowser.open({
   url: 'https://example.com',
@@ -86,7 +86,7 @@ All CCT options are Android-only and safely ignored on iOS. See [`OpenOptions`](
 By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 // Open with custom dimensions (400x600 at position 50,100)
 const { id } = await InAppBrowser.openWebView({
@@ -115,7 +115,7 @@ This enables picture-in-picture style experiences where the InAppBrowser floats 
 To create a webView with a 20px bottom margin (safe margin area outside the browser):
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 InAppBrowser.openWebView({
   url: 'YOUR_URL',
@@ -130,7 +130,7 @@ Web platform is not supported. Use `window.open` instead.
 To open the webview in true full screen mode (content extends behind the status bar), set `enabledSafeTopMargin` to `false`:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 InAppBrowser.openWebView({
   url: 'YOUR_URL',
@@ -164,7 +164,7 @@ Perfect for immersive experiences like video players, games, or full-screen web 
 Use a native rule when you just want to stop a request without round-tripping through JavaScript:
 
 ```js
-import { InAppBrowser } from '@capgo/inappbrowser';
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 await InAppBrowser.openWebView({
   url: 'https://example.com',
@@ -182,7 +182,7 @@ await InAppBrowser.openWebView({
 Use `delegateToJs` when you want native matching, but still want JavaScript to replace the response:
 
 ```js
-import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
+import { InAppBrowser, addProxyHandler } from '@capgo/capacitor-inappbrowser';
 
 const proxyHandle = await addProxyHandler(async (request) => {
   if (request.phase === 'inbound' && request.url.includes('connect.facebook.net')) {
@@ -216,7 +216,7 @@ await proxyHandle.remove();
 When a request must be modified before it leaves the webview, return a `request` override:
 
 ```js
-import { InAppBrowser, addProxyHandler } from '@capgo/inappbrowser';
+import { InAppBrowser, addProxyHandler } from '@capgo/capacitor-inappbrowser';
 
 const proxyHandle = await addProxyHandler(async (request) => {
   if (request.phase === 'outbound' && request.url.includes('/api/private')) {

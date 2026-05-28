@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "CapgoInappbrowser",
+    name: "CapgoCapacitorInappbrowser",
     platforms: [.iOS(.v15)],
     products: [
         .library(
-            name: "CapgoInappbrowser",
+            name: "CapgoCapacitorInappbrowser",
             targets: ["InappbrowserPlugin"])
     ],
     dependencies: [
