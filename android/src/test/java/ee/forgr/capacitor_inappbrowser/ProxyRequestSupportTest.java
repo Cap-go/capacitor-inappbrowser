@@ -47,8 +47,25 @@ public class ProxyRequestSupportTest {
     public void supportsWebResourceResponseStatusRejectsAndroidUnsupportedRedirectRange() {
         assertTrue(ProxyRequestSupport.supportsWebResourceResponseStatus(200));
         assertTrue(ProxyRequestSupport.supportsWebResourceResponseStatus(404));
+        assertTrue(ProxyRequestSupport.supportsWebResourceResponseStatus(599));
         assertFalse(ProxyRequestSupport.supportsWebResourceResponseStatus(302));
         assertFalse(ProxyRequestSupport.supportsWebResourceResponseStatus(304));
+    }
+
+    @Test
+    public void createNativeRequestFailureResponsePayloadMarksSyntheticNetworkErrors() {
+        IOException error = new IOException("Unable to resolve host\nexample.test");
+
+        Map<String, String> headers = ProxyRequestSupport.createNativeRequestFailureHeaders(error);
+        String body = new String(
+            ProxyRequestSupport.createNativeRequestFailureBody("https://example.test/api", error),
+            StandardCharsets.UTF_8
+        );
+
+        assertEquals("Unable to resolve host example.test", headers.get(ProxyRequestSupport.SYNTHETIC_NATIVE_FAILURE_HEADER));
+        assertEquals("no-store", headers.get("Cache-Control"));
+        assertTrue(body.contains("https://example.test/api"));
+        assertTrue(body.contains("Unable to resolve host example.test"));
     }
 
     @Test

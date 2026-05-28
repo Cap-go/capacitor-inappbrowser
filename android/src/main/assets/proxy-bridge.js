@@ -31,6 +31,17 @@
     }
     return null;
   }
+  function isNativeProxyErrorResponse(response) {
+    return response.status === 599 && response.headers.get("x-capgo-proxy-error") !== null;
+  }
+  function nativeProxyErrorMessage(response) {
+    const nativeErrorHeader = response.headers.get("x-capgo-proxy-error");
+    if (!nativeErrorHeader) {
+      return "Network request failed";
+    }
+    const nativeMessage = nativeErrorHeader.trim();
+    return nativeMessage || "Network request failed";
+  }
   function replaceCapturedHeader(headers, name, value) {
     const existingKey = findCapturedHeaderKey(headers, name);
     if (existingKey && existingKey !== name) {
@@ -442,10 +453,14 @@
         } catch (_error) {
           return originalFetch.call(window, input, init);
         }
-        return originalFetch.call(window, proxyUrl, {
+        const proxyResponse = yield originalFetch.call(globalThis, proxyUrl, {
           method: "GET",
           signal
         });
+        if (isNativeProxyErrorResponse(proxyResponse)) {
+          throw new TypeError(nativeProxyErrorMessage(proxyResponse));
+        }
+        return proxyResponse;
       });
     };
     const originalXhrOpen = XMLHttpRequest.prototype.open;

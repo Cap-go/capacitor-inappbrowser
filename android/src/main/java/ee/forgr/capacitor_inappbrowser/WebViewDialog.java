@@ -4544,7 +4544,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             nativeResponse = performNativeRequest(requestContext);
                         } catch (IOException error) {
                             Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
-                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                            return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
                         }
                     }
 
@@ -4557,7 +4557,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
                             } catch (IOException error) {
                                 Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
-                                return bridgeBackedRequest ? createCanceledResponse() : null;
+                                return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
                             }
                             if (redirectReplay != null) {
                                 requestContext = redirectReplay.requestContext;
@@ -4620,7 +4620,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
                         } catch (IOException error) {
                             Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
-                            return bridgeBackedRequest ? createCanceledResponse() : null;
+                            return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
                         }
                         if (redirectReplay != null) {
                             requestContext = redirectReplay.requestContext;
@@ -4923,6 +4923,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             case (504) -> "Gateway Timeout";
             case (505) -> "HTTP Version Not Supported";
             case (507) -> "Insufficient Storage";
+            case (599) -> "Network Error";
             default -> "";
         };
     }
@@ -5479,6 +5480,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         response.setStatusCodeAndReasonPhrase(204, "No Content");
         response.setResponseHeaders(new HashMap<>());
         return response;
+    }
+
+    private WebResourceResponse createNativeFailureResponse(String requestUrl, IOException error) {
+        NativeResponseData responseData = new NativeResponseData(
+            ProxyRequestSupport.SYNTHETIC_NATIVE_FAILURE_STATUS,
+            "text/plain; charset=utf-8",
+            ProxyRequestSupport.createNativeRequestFailureHeaders(error),
+            ProxyRequestSupport.createNativeRequestFailureBody(requestUrl, error)
+        );
+        WebResourceResponse response = buildWebResourceResponse(responseData);
+        return response != null ? response : createCanceledResponse();
     }
 
     private WebResourceResponse createWebResourceResponseOrFallback(
