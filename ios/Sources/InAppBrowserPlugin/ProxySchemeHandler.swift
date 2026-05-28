@@ -636,13 +636,14 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
 
             if let error {
                 if (error as NSError).code == NSURLErrorCancelled {
-                    // A cancellation with a pending redirect is the expected signal that
-                    // willPerformHTTPRedirection suppressed automatic following; the task
-                    // continues via the redirect, so leave it tracked. Otherwise no
-                    // terminal scheme-task call happens here, so remove it explicitly.
-                    if pendingTask.redirectRequest == nil {
-                        self.removePendingTask(requestId: requestId)
-                    }
+                    // The data task is only canceled by webView(_:stop:) or
+                    // cancelAllPendingTasks(), and both own the task's lifecycle: stop has
+                    // already removed it (and marked it stopped) before canceling, while
+                    // cancelAll routes a terminal failSchemeTask through completeSchemeTask,
+                    // which removes it on the main queue. Removing it here on the URLSession
+                    // background queue would unhook it from pendingTasks before a racing
+                    // stop could mark it stopped, reopening the post-stop completion crash.
+                    // So just stop processing and let the owning path complete it.
                     return
                 }
                 self.failSchemeTask(pendingTask, with: error)
@@ -843,14 +844,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         let task = pendingTasks[requestId]
         taskLock.unlock()
         return task
-    }
-
-    private func removePendingTask(requestId: String) {
-        taskLock.lock()
-        pendingTasks.removeValue(forKey: requestId)
-        stoppedRequests.removeValue(forKey: requestId)
-        timedOutRequests.removeValue(forKey: requestId)
-        taskLock.unlock()
     }
 
     private func routeCurrentRequest(requestId: String) {
