@@ -11,7 +11,8 @@ on:
 jobs:
   guard_swiftpm_version:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
+    timeout-minutes: 10
     steps:
       - name: Check out
         uses: actions/checkout@v6
@@ -24,7 +25,8 @@ jobs:
           fi
   build_android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
+    timeout-minutes: 10
     steps:
       - name: Check out
         uses: actions/checkout@v6
@@ -51,7 +53,8 @@ jobs:
         run: bash ./.github/scripts/verify-packed-example.sh android
   build_ios:
     runs-on: macOS-latest
-    timeout-minutes: 30
+    # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
+    timeout-minutes: 10
     steps:
       - name: Check out
         uses: actions/checkout@v6
@@ -73,7 +76,8 @@ jobs:
         run: bash ./.github/scripts/verify-packed-example.sh ios
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
+    timeout-minutes: 10
     name: 'Build code and test'
     steps:
       - name: Check out
