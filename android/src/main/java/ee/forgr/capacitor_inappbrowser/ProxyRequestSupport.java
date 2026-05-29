@@ -16,61 +16,68 @@ import org.json.JSONObject;
 
 final class ProxyRequestSupport {
 
-    private record ParsedJsonString(String value, int nextIndex) {}
+    private record ParsedJsonString(String value, int nextIndex) {
+    }
 
-    record WebResourceResponseMetadata(String mimeType, String encoding) {}
+    record WebResourceResponseMetadata(String mimeType, String encoding) {
+    }
 
-    record ParsedResponseHeaders(Map<String, String> responseHeaders, List<String> cookieHeaders) {}
+    record ParsedResponseHeaders(Map<String, String> responseHeaders, List<String> cookieHeaders) {
+    }
 
     static final int SYNTHETIC_NATIVE_FAILURE_STATUS = 599;
     static final String SYNTHETIC_NATIVE_FAILURE_HEADER = "X-Capgo-Proxy-Error";
 
     private static final String[] SAFE_MARKER_HEADER_NAMES = {
-        "Accept",
-        "Accept-Encoding",
-        "Accept-Language",
-        "Cache-Control",
-        "Pragma",
-        "If-Modified-Since",
-        "If-None-Match",
-        "If-Match",
-        "If-Unmodified-Since",
-        "If-Range",
-        "Range",
-        "User-Agent"
+            "Accept",
+            "Accept-Encoding",
+            "Accept-Language",
+            "Cache-Control",
+            "Pragma",
+            "If-Modified-Since",
+            "If-None-Match",
+            "If-Match",
+            "If-Unmodified-Since",
+            "If-Range",
+            "Range",
+            "User-Agent"
     };
     private static final String[] CROSS_ORIGIN_REDIRECT_HEADER_NAMES = {
-        "Authorization",
-        "Cookie",
-        "Cookie2",
-        "Origin",
-        "Proxy-Authorization",
-        "Referer"
+            "Authorization",
+            "Cookie",
+            "Cookie2",
+            "Origin",
+            "Proxy-Authorization",
+            "Referer"
     };
     /**
-     * Revalidation headers that can make the upstream answer with 304 Not Modified, which
-     * {@link android.webkit.WebResourceResponse#setStatusCodeAndReasonPhrase(int, String)} rejects
-     * (status code must not be in [300, 399]) and crashes the renderer. Scoped intentionally
-     * narrow: {@code If-Match} / {@code If-Unmodified-Since} guard writes (return 412 on mismatch,
-     * not 304) and {@code If-Range} downgrades to a full 200, so they must NOT be stripped here.
+     * Revalidation headers that can make the upstream answer with 304 Not Modified,
+     * which
+     * {@link android.webkit.WebResourceResponse#setStatusCodeAndReasonPhrase(int, String)}
+     * rejects
+     * (status code must not be in [300, 399]) and crashes the renderer. Scoped
+     * intentionally
+     * narrow: {@code If-Match} / {@code If-Unmodified-Since} guard writes (return
+     * 412 on mismatch,
+     * not 304) and {@code If-Range} downgrades to a full 200, so they must NOT be
+     * stripped here.
      */
     private static final String[] CACHE_VALIDATOR_HEADER_NAMES = { "If-None-Match", "If-Modified-Since" };
 
-    private ProxyRequestSupport() {}
+    private ProxyRequestSupport() {
+    }
 
     static boolean shouldInjectBridge(Options options) {
-        return options != null && options.shouldEnableNativeProxy();
+        return options != null && usesLegacyJsProxyMode(options);
     }
 
     static boolean usesLegacyJsProxyMode(Options options) {
         if (options == null) {
             return false;
         }
-        return (
-            (options.getProxyRequests() || options.getProxyRequestsPattern() != null) &&
-            options.getOutboundProxyRules().isEmpty() &&
-            options.getInboundProxyRules().isEmpty()
-        );
+        return ((options.getProxyRequests() || options.getProxyRequestsPattern() != null) &&
+                options.getOutboundProxyRules().isEmpty() &&
+                options.getInboundProxyRules().isEmpty());
     }
 
     static Pattern compileProxyRequestsPattern(Object rawProxyRequests) {
@@ -91,22 +98,22 @@ final class ProxyRequestSupport {
     }
 
     static boolean shouldDelegateLegacyJsProxyRequest(Options options, String requestUrl) {
-        return usesLegacyJsProxyMode(options) && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+        return usesLegacyJsProxyMode(options)
+                && matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
     }
 
     static boolean shouldHandleNonBridgeRequest(Options options, String requestUrl) {
         if (options == null) {
             return false;
         }
-        if (
-            !options.getProxyRequests() &&
-            options.getProxyRequestsPattern() == null &&
-            options.getOutboundProxyRules().isEmpty() &&
-            options.getInboundProxyRules().isEmpty()
-        ) {
+        if (!options.getProxyRequests() &&
+                options.getProxyRequestsPattern() == null &&
+                options.getOutboundProxyRules().isEmpty() &&
+                options.getInboundProxyRules().isEmpty()) {
             return false;
         }
-        return !usesLegacyJsProxyMode(options) || matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
+        return !usesLegacyJsProxyMode(options)
+                || matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
     }
 
     static boolean isBridgeMarkerRequestUrl(String requestUrl) {
@@ -115,13 +122,15 @@ final class ProxyRequestSupport {
         }
         try {
             URL parsedUrl = new URL(requestUrl);
-            return "/_capgo_proxy_".equals(parsedUrl.getPath()) && parsedUrl.getQuery() != null && !parsedUrl.getQuery().isBlank();
+            return "/_capgo_proxy_".equals(parsedUrl.getPath()) && parsedUrl.getQuery() != null
+                    && !parsedUrl.getQuery().isBlank();
         } catch (Exception error) {
             return false;
         }
     }
 
-    static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson) throws JSONException {
+    static Map<String, String> mergeRequestHeaders(Map<String, String> nativeHeaders, String storedHeadersJson)
+            throws JSONException {
         Map<String, String> mergedHeaders = new LinkedHashMap<>();
         if (nativeHeaders != null) {
             mergedHeaders.putAll(nativeHeaders);
@@ -156,7 +165,8 @@ final class ProxyRequestSupport {
         return safeHeaders;
     }
 
-    static Map<String, String> mergeMissingHeaders(Map<String, String> primaryHeaders, Map<String, String> fallbackHeaders) {
+    static Map<String, String> mergeMissingHeaders(Map<String, String> primaryHeaders,
+            Map<String, String> fallbackHeaders) {
         Map<String, String> mergedHeaders = new LinkedHashMap<>();
         if (primaryHeaders != null) {
             mergedHeaders.putAll(primaryHeaders);
@@ -180,7 +190,8 @@ final class ProxyRequestSupport {
         return mergedHeaders;
     }
 
-    static boolean shouldInjectCookies(String credentialsMode, String initiatorUrl, String requestUrl, Map<String, String> requestHeaders) {
+    static boolean shouldInjectCookies(String credentialsMode, String initiatorUrl, String requestUrl,
+            Map<String, String> requestHeaders) {
         if (findHeaderKeyIgnoreCase(requestHeaders, "Cookie") != null) {
             return false;
         }
@@ -284,11 +295,10 @@ final class ProxyRequestSupport {
     }
 
     static Map<String, String> prepareRedirectHeaders(
-        Map<String, String> originalHeaders,
-        boolean preserveRequestBody,
-        String requestUrl,
-        String redirectUrl
-    ) {
+            Map<String, String> originalHeaders,
+            boolean preserveRequestBody,
+            String requestUrl,
+            String redirectUrl) {
         Map<String, String> redirectedHeaders = new LinkedHashMap<>();
         if (originalHeaders != null) {
             redirectedHeaders.putAll(originalHeaders);
@@ -311,10 +321,14 @@ final class ProxyRequestSupport {
 
     /**
      * Returns a copy of {@code headers} with revalidation headers removed
-     * ({@code If-None-Match}, {@code If-Modified-Since}). Used to keep proxied native requests
-     * fresh so the upstream cannot answer with 304, which would crash WebResourceResponse on
-     * Android. Other preconditions ({@code If-Match}, {@code If-Unmodified-Since}, {@code If-Range})
-     * are deliberately preserved because dropping them would change semantics — e.g., turning a
+     * ({@code If-None-Match}, {@code If-Modified-Since}). Used to keep proxied
+     * native requests
+     * fresh so the upstream cannot answer with 304, which would crash
+     * WebResourceResponse on
+     * Android. Other preconditions ({@code If-Match}, {@code If-Unmodified-Since},
+     * {@code If-Range})
+     * are deliberately preserved because dropping them would change semantics —
+     * e.g., turning a
      * guarded write into an unconditional one.
      */
     static Map<String, String> stripCacheValidatorHeaders(Map<String, String> headers) {
@@ -326,7 +340,8 @@ final class ProxyRequestSupport {
         return copy;
     }
 
-    static Map<String, String> prepareOverrideHeaders(Map<String, String> originalHeaders, String requestUrl, String overrideUrl) {
+    static Map<String, String> prepareOverrideHeaders(Map<String, String> originalHeaders, String requestUrl,
+            String overrideUrl) {
         Map<String, String> overrideHeaders = new LinkedHashMap<>();
         if (originalHeaders != null) {
             overrideHeaders.putAll(originalHeaders);
@@ -337,7 +352,8 @@ final class ProxyRequestSupport {
         return overrideHeaders;
     }
 
-    static String resolveOverrideBody(String currentBase64Body, String method, boolean hasBodyOverride, String overrideBody) {
+    static String resolveOverrideBody(String currentBase64Body, String method, boolean hasBodyOverride,
+            String overrideBody) {
         if (shouldDropRequestBody(method)) {
             return "";
         }
@@ -369,7 +385,8 @@ final class ProxyRequestSupport {
         return base64Body == null || base64Body.isEmpty();
     }
 
-    static WebResourceResponseMetadata resolveWebResourceResponseMetadata(String contentType, Map<String, String> responseHeaders) {
+    static WebResourceResponseMetadata resolveWebResourceResponseMetadata(String contentType,
+            Map<String, String> responseHeaders) {
         String resolvedContentType = firstNonEmpty(contentType, findHeaderIgnoreCase(responseHeaders, "Content-Type"));
         if (resolvedContentType == null || resolvedContentType.isBlank()) {
             return new WebResourceResponseMetadata("application/octet-stream", null);
@@ -406,9 +423,8 @@ final class ProxyRequestSupport {
     }
 
     static WebResourceResponseMetadata resolveWebResourceResponseConstructorMetadata(
-        String contentType,
-        Map<String, String> responseHeaders
-    ) {
+            String contentType,
+            Map<String, String> responseHeaders) {
         if (hasHeaderIgnoreCase(responseHeaders, "Content-Type")) {
             return new WebResourceResponseMetadata(null, null);
         }
@@ -439,10 +455,10 @@ final class ProxyRequestSupport {
             }
 
             String headerValue = headerValues
-                .stream()
-                .filter((value) -> value != null && !value.isBlank())
-                .reduce((first, second) -> first + ", " + second)
-                .orElse(null);
+                    .stream()
+                    .filter((value) -> value != null && !value.isBlank())
+                    .reduce((first, second) -> first + ", " + second)
+                    .orElse(null);
             if (headerValue == null) {
                 continue;
             }
@@ -511,21 +527,17 @@ final class ProxyRequestSupport {
         }
 
         normalizedResponse.put(
-            "status",
-            normalizeLegacySyntheticStatus(
-                legacyResponse.has("status") ? legacyResponse.optInt("status") : null,
-                legacyResponse.has("code") ? legacyResponse.optInt("code") : null
-            )
-        );
+                "status",
+                normalizeLegacySyntheticStatus(
+                        legacyResponse.has("status") ? legacyResponse.optInt("status") : null,
+                        legacyResponse.has("code") ? legacyResponse.optInt("code") : null));
         normalizedResponse.put(
-            "body",
-            normalizeLegacySyntheticBody(
-                legacyResponse.opt("body"),
-                legacyResponse.optBoolean("base64Encoded", false) ||
-                    legacyResponse.optBoolean("bodyIsBase64", false) ||
-                    legacyResponse.optBoolean("isBase64", false)
-            )
-        );
+                "body",
+                normalizeLegacySyntheticBody(
+                        legacyResponse.opt("body"),
+                        legacyResponse.optBoolean("base64Encoded", false) ||
+                                legacyResponse.optBoolean("bodyIsBase64", false) ||
+                                legacyResponse.optBoolean("isBase64", false)));
 
         JSONObject headers = legacyResponse.optJSONObject("headers");
         if (headers != null) {
@@ -640,11 +652,9 @@ final class ProxyRequestSupport {
         try {
             URL request = new URL(requestUrl);
             URL redirect = new URL(redirectUrl);
-            return (
-                !request.getProtocol().equalsIgnoreCase(redirect.getProtocol()) ||
-                !request.getHost().equalsIgnoreCase(redirect.getHost()) ||
-                effectivePort(request) != effectivePort(redirect)
-            );
+            return (!request.getProtocol().equalsIgnoreCase(redirect.getProtocol()) ||
+                    !request.getHost().equalsIgnoreCase(redirect.getHost()) ||
+                    effectivePort(request) != effectivePort(redirect));
         } catch (Exception error) {
             return true;
         }
@@ -831,18 +841,16 @@ final class ProxyRequestSupport {
             return false;
         }
         String normalizedMimeType = mimeType.trim().toLowerCase(Locale.US);
-        return (
-            normalizedMimeType.startsWith("text/") ||
-            normalizedMimeType.equals("application/json") ||
-            normalizedMimeType.equals("application/javascript") ||
-            normalizedMimeType.equals("application/x-javascript") ||
-            normalizedMimeType.equals("application/xml") ||
-            normalizedMimeType.equals("application/xhtml+xml") ||
-            normalizedMimeType.equals("application/x-www-form-urlencoded") ||
-            normalizedMimeType.endsWith("+json") ||
-            normalizedMimeType.endsWith("+xml") ||
-            normalizedMimeType.endsWith("+javascript")
-        );
+        return (normalizedMimeType.startsWith("text/") ||
+                normalizedMimeType.equals("application/json") ||
+                normalizedMimeType.equals("application/javascript") ||
+                normalizedMimeType.equals("application/x-javascript") ||
+                normalizedMimeType.equals("application/xml") ||
+                normalizedMimeType.equals("application/xhtml+xml") ||
+                normalizedMimeType.equals("application/x-www-form-urlencoded") ||
+                normalizedMimeType.endsWith("+json") ||
+                normalizedMimeType.endsWith("+xml") ||
+                normalizedMimeType.endsWith("+javascript"));
     }
 
     private static boolean isCookieResponseHeader(String headerName) {
