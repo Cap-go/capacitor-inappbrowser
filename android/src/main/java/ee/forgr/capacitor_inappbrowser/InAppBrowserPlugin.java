@@ -1730,7 +1730,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
         builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
         builder.setEphemeralBrowsingEnabled(Boolean.TRUE.equals(call.getBoolean("prefersEphemeralWebBrowserSession", false)));
         CustomTabsIntent customTabsIntent = builder.build();
-        customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_NO_HISTORY | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // Note: FLAG_ACTIVITY_NO_HISTORY is intentionally omitted. With it set, backgrounding the app
+        // (e.g. to copy an OTP/password) finishes the Custom Tab, which then resumes the host activity
+        // and trips the cancel heuristic in handleOnResume(), aborting the auth flow. Without it, the
+        // tab is restored on return instead of being destroyed.
+        customTabsIntent.intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         customTabsIntent.intent.putExtra(CustomTabsIntent.EXTRA_ENABLE_INSTANT_APPS, false);
         customTabsIntent.intent.putExtra(CustomTabsIntent.EXTRA_DISABLE_BACKGROUND_INTERACTION, false);
         customTabsIntent.launchUrl(getActivity(), Uri.parse(authEndpoint));
