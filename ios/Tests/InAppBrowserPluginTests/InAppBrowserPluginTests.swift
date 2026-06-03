@@ -2,6 +2,34 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class InAppBrowserPluginTests: XCTestCase {
+    func testViewportRefreshIgnoresZeroSizeBeforeLayout() {
+        XCTAssertFalse(
+            WebViewViewportLayoutSupport.shouldRefreshViewport(
+                previousSize: nil,
+                currentSize: .zero
+            )
+        )
+    }
+
+    func testViewportRefreshRunsWhenWebViewSizeChanges() {
+        XCTAssertTrue(
+            WebViewViewportLayoutSupport.shouldRefreshViewport(
+                previousSize: CGSize(width: 390, height: 500),
+                currentSize: CGSize(width: 390, height: 844)
+            )
+        )
+    }
+
+    func testViewportRefreshCanBeForcedAfterKeyboardHide() {
+        XCTAssertTrue(
+            WebViewViewportLayoutSupport.shouldRefreshViewport(
+                previousSize: CGSize(width: 390, height: 844),
+                currentSize: CGSize(width: 390, height: 844),
+                force: true
+            )
+        )
+    }
+
     func testLegacyProxyRequestsConfigurationSupportsBooleanValues() {
         let enabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: true)
         XCTAssertTrue(enabled.isEnabled)
