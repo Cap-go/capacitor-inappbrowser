@@ -342,10 +342,16 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        dismissActiveKeyboard()
         let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
         presenter?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
+    }
+
+    private func dismissActiveKeyboard() {
+        self.bridge?.webView?.endEditing(true)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func activeWindow() -> UIWindow? {

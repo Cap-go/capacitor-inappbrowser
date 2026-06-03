@@ -226,6 +226,16 @@ enum ConsoleMessageSupport {
     }
 }
 
+enum WebViewViewportLayoutSupport {
+    static func shouldRefreshViewport(previousSize: CGSize?, currentSize: CGSize, force: Bool = false) -> Bool {
+        guard currentSize.width > 0, currentSize.height > 0 else {
+            return false
+        }
+
+        return force || previousSize != currentSize
+    }
+}
+
 open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     public init() {
@@ -343,9 +353,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var shareDisclaimer: [String: Any]?
     var shareSubject: String?
     var didpageInit = false
-    var viewHeightLandscape: CGFloat?
-    var viewHeightPortrait: CGFloat?
-    var currentViewHeight: CGFloat?
     open var closeModal = false
     open var closeModalTitle = ""
     open var closeModalDescription = ""
@@ -386,6 +393,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     internal var preShowSemaphore: DispatchSemaphore?
     internal var preShowError: String?
     private var isWebViewInitialized = false
+    private var isObservingKeyboardViewportChanges = false
+    private var lastViewportRefreshSize: CGSize?
     private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
     private var previewItemURL: URL?
 
@@ -432,10 +441,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func attachmentDispositionType(_ response: URLResponse) -> String? {
         guard let disposition = attachmentDisposition(response)?
-            .split(separator: ";", maxSplits: 1)
-            .first?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased(),
+                .split(separator: ";", maxSplits: 1)
+                .first?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased(),
               !disposition.isEmpty else {
             return nil
         }
@@ -527,7 +536,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             "application/download",
             "application/x-download",
             "application/binary",
-            "application/x-binary",
+            "application/x-binary"
         ]
 
         if let candidate, !candidate.isEmpty, !genericMimeTypes.contains(candidate) {
@@ -590,7 +599,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             "fileName": fileURL.lastPathComponent,
             "path": fileURL.path,
             "localUrl": fileURL.absoluteString,
-            "handledBy": handledBy,
+            "handledBy": handledBy
         ]
         if let sourceURL {
             data["sourceUrl"] = sourceURL
@@ -842,6 +851,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
             webView?.removeObserver(self, forKeyPath: titleKeyPath)
@@ -884,6 +894,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 self?.navigationController?.navigationBar.setNeedsLayout()
             }
         }
+    }
+
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        refreshWebViewViewportIfNeeded()
     }
 
     func updateButtonTintColors() {
@@ -984,6 +999,63 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func emit(_ eventName: String, data: [String: Any] = [:]) {
         capBrowserPlugin?.notifyListeners(eventName, data: payload(with: data))
+    }
+
+    private func startObservingKeyboardViewportChanges() {
+        guard !isObservingKeyboardViewportChanges else {
+            return
+        }
+
+        isObservingKeyboardViewportChanges = true
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(keyboardViewportDidChange(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+        center.addObserver(self, selector: #selector(keyboardViewportDidChange(_:)), name: UIResponder.keyboardDidHideNotification, object: nil)
+        center.addObserver(self, selector: #selector(keyboardViewportDidChange(_:)), name: UIResponder.keyboardDidChangeFrameNotification, object: nil)
+    }
+
+    @objc private func keyboardViewportDidChange(_ notification: Notification) {
+        scheduleWebViewViewportRefresh(force: true, delay: viewportRefreshDelay(from: notification))
+    }
+
+    private func viewportRefreshDelay(from notification: Notification) -> TimeInterval {
+        guard let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber else {
+            return 0.05
+        }
+
+        return max(0.05, duration.doubleValue)
+    }
+
+    private func scheduleWebViewViewportRefresh(force: Bool = false, delay: TimeInterval = 0.05) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.refreshWebViewViewportIfNeeded(force: force)
+        }
+    }
+
+    private func refreshWebViewViewportIfNeeded(force: Bool = false) {
+        guard let webView = self.webView, webView.superview != nil else {
+            return
+        }
+
+        if force {
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
+        }
+
+        let currentSize = webView.bounds.size
+        guard WebViewViewportLayoutSupport.shouldRefreshViewport(
+            previousSize: lastViewportRefreshSize,
+            currentSize: currentSize,
+            force: force
+        ) else {
+            return
+        }
+
+        lastViewportRefreshSize = currentSize
+        webView.setNeedsLayout()
+        webView.layoutIfNeeded()
+        webView.scrollView.setNeedsLayout()
+        webView.scrollView.layoutIfNeeded()
+        webView.evaluateJavaScript("window.dispatchEvent(new Event('resize'));", completionHandler: nil)
     }
 
     private func jsonString(from object: Any) -> String? {
@@ -1251,6 +1323,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
         self.isWebViewInitialized = true
+        self.startObservingKeyboardViewportChanges()
         self.view.backgroundColor = UIColor.white
 
         self.extendedLayoutIncludesOpaqueBars = true
@@ -1540,47 +1613,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         return self.capableWebView
     }
 
-    @objc func restateViewHeight() {
-        var bottomPadding = CGFloat(0.0)
-        var topPadding = CGFloat(0.0)
-        let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow })
-        bottomPadding = window?.safeAreaInsets.bottom ?? 0.0
-        topPadding = window?.safeAreaInsets.top ?? 0.0
-        if UIDevice.current.orientation.isPortrait {
-            // Don't force toolbar visibility
-            if self.viewHeightPortrait == nil {
-                self.viewHeightPortrait = self.view.safeAreaLayoutGuide.layoutFrame.size.height
-                self.viewHeightPortrait! += bottomPadding
-                if self.navigationController?.navigationBar.isHidden == true {
-                    self.viewHeightPortrait! += topPadding
-                }
-            }
-            self.currentViewHeight = self.viewHeightPortrait
-        } else if UIDevice.current.orientation.isLandscape {
-            // Don't force toolbar visibility
-            if self.viewHeightLandscape == nil {
-                self.viewHeightLandscape = self.view.safeAreaLayoutGuide.layoutFrame.size.height
-                self.viewHeightLandscape! += bottomPadding
-                if self.navigationController?.navigationBar.isHidden == true {
-                    self.viewHeightLandscape! += topPadding
-                }
-            }
-            self.currentViewHeight = self.viewHeightLandscape
-        }
-    }
-
-    override open func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
-        //        self.view.frame.size.height = self.currentViewHeight!
-    }
-
-    override open func viewWillLayoutSubviews() {
-        restateViewHeight()
-        // Don't override frame height when enabledSafeBottomMargin is true, as it would override our constraints
-        if self.currentViewHeight != nil && !self.enabledSafeBottomMargin {
-            self.view.frame.size.height = self.currentViewHeight!
-        }
-    }
-
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if !self.viewWasPresented {
@@ -1620,6 +1652,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        refreshWebViewViewportIfNeeded(force: true)
+        scheduleWebViewViewportRefresh(force: true, delay: 0.25)
 
         // Force add buttonNearDone if it's not visible yet
         if buttonNearDoneIcon != nil {
@@ -2907,6 +2941,7 @@ extension WKWebViewController: WKNavigationDelegate {
             webView.topAnchor.constraint(equalTo: topAnchor)
         ])
         self.view.layoutIfNeeded()
+        refreshWebViewViewportIfNeeded(force: true)
     }
 
     open func updateSafeBottomMargin(_ enabled: Bool) {
@@ -2927,6 +2962,7 @@ extension WKWebViewController: WKNavigationDelegate {
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         self.view.layoutIfNeeded()
+        refreshWebViewViewportIfNeeded(force: true)
     }
 }
 
