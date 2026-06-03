@@ -43,6 +43,10 @@ function resolvePluginName(): string {
     return LEGACY_PLUGIN_NAME;
   }
 
+  console.warn(
+    `[InAppBrowser] Neither '${CAPGO_PLUGIN_NAME}' nor legacy '${LEGACY_PLUGIN_NAME}' native plugin detected. ` +
+      'Ensure @capgo/capacitor-inappbrowser native code is installed.',
+  );
   return CAPGO_PLUGIN_NAME;
 }
 
