@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
+import type { CapacitorInstance, PluginHeader } from '@capacitor/core/types/definitions-internal';
 
 import type {
   InAppBrowserPlugin,
@@ -9,23 +10,12 @@ import type {
   ProxyResponse,
 } from './definitions';
 
-type CapacitorPluginHeader = {
-  readonly name: string;
-  readonly methods: readonly {
-    readonly name: string;
-  }[];
-};
-
-type CapacitorWithPluginHeaders = typeof Capacitor & {
-  readonly PluginHeaders?: readonly CapacitorPluginHeader[];
-};
-
 const CAPGO_PLUGIN_NAME = 'CapgoInAppBrowser';
 const LEGACY_PLUGIN_NAME = 'InAppBrowser';
 const LEGACY_CAPGO_METHOD = 'openWebView';
 
 function hasNativePluginMethod(pluginName: string, methodName: string): boolean {
-  const headers = (Capacitor as CapacitorWithPluginHeaders).PluginHeaders ?? [];
+  const headers: readonly PluginHeader[] = (Capacitor as CapacitorInstance).PluginHeaders ?? [];
   const header = headers.find((pluginHeader) => pluginHeader.name === pluginName);
   return header?.methods.some((method) => method.name === methodName) ?? false;
 }
