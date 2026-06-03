@@ -50,10 +50,7 @@ const inAppBrowserImplementations = {
   web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
 };
 
-const InAppBrowser =
-  resolvePluginName() === CAPGO_PLUGIN_NAME
-    ? registerPlugin<InAppBrowserPlugin>('CapgoInAppBrowser', inAppBrowserImplementations)
-    : registerPlugin<InAppBrowserPlugin>('InAppBrowser', inAppBrowserImplementations);
+const InAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);

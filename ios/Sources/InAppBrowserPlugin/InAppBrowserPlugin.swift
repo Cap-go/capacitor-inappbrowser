@@ -1931,6 +1931,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
+@available(*, deprecated, renamed: "CapgoInAppBrowserPlugin")
+public typealias InAppBrowserPlugin = CapgoInAppBrowserPlugin
+
 extension CapgoInAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()

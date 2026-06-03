@@ -61,7 +61,7 @@ import org.json.JSONObject;
     },
     requestCodes = { WebViewDialog.FILE_CHOOSER_REQUEST_CODE }
 )
-public class InAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
+public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
     private final String pluginVersion = "8.6.17";
 
@@ -301,11 +301,11 @@ public class InAppBrowserPlugin extends Plugin implements WebViewDialog.Permissi
             getContext(),
             android.R.style.Theme_NoTitleBar,
             options,
-            InAppBrowserPlugin.this,
+            CapgoInAppBrowserPlugin.this,
             getBridge().getWebView()
         );
         dialog.setInstanceId(webViewId);
-        dialog.activity = InAppBrowserPlugin.this.getActivity();
+        dialog.activity = CapgoInAppBrowserPlugin.this.getActivity();
         registerWebView(webViewId, dialog, makeActive);
         return dialog;
     }

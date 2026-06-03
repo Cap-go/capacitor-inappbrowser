@@ -86,6 +86,12 @@ function uniq(arr) {
   return out;
 }
 
+function parseStringConstant(txt, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\bconst\\s+${escapedName}\\s*=\\s*['"]([^'"]+)['"]`);
+  return re.exec(txt)?.[1] || "";
+}
+
 function parseArgs(argv) {
   const out = { dir: process.cwd() };
   for (let i = 2; i < argv.length; i++) {
@@ -132,10 +138,15 @@ if (exists(jsSrcDir)) {
   const jsFiles = walkFiles(jsSrcDir, [".ts", ".js"]);
   const reRegister = /registerPlugin(?:<[^>]*>)?\(\s*['"]([^'"]+)['"]/;
   for (const f of jsFiles) {
-    const m = reRegister.exec(readText(f));
+    const txt = readText(f);
+    const m = reRegister.exec(txt);
     if (m) {
       jsName = m[1];
       break;
+    }
+    if (txt.includes("registerPlugin") && txt.includes("CAPGO_PLUGIN_NAME")) {
+      jsName = parseStringConstant(txt, "CAPGO_PLUGIN_NAME");
+      if (jsName) break;
     }
   }
 }
