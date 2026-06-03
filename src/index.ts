@@ -1,6 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
-import type { CapacitorInstance, PluginHeader } from '@capacitor/core/types/definitions-internal';
 
 import type {
   InAppBrowserPlugin,
@@ -11,14 +10,7 @@ import type {
 } from './definitions';
 
 const CAPGO_PLUGIN_NAME = 'CapgoInAppBrowser';
-const LEGACY_PLUGIN_NAME = 'InAppBrowser';
-const LEGACY_CAPGO_METHOD = 'openWebView';
-
-function hasNativePluginMethod(pluginName: string, methodName: string): boolean {
-  const headers: readonly PluginHeader[] = (Capacitor as CapacitorInstance).PluginHeaders ?? [];
-  const header = headers.find((pluginHeader) => pluginHeader.name === pluginName);
-  return header?.methods.some((method) => method.name === methodName) ?? false;
-}
+const PREVIOUS_PLUGIN_NAME = 'InAppBrowser';
 
 function resolvePluginName(): string {
   if (!Capacitor.isNativePlatform()) {
@@ -29,12 +21,12 @@ function resolvePluginName(): string {
     return CAPGO_PLUGIN_NAME;
   }
 
-  if (hasNativePluginMethod(LEGACY_PLUGIN_NAME, LEGACY_CAPGO_METHOD)) {
-    return LEGACY_PLUGIN_NAME;
+  if (Capacitor.isPluginAvailable(PREVIOUS_PLUGIN_NAME)) {
+    return PREVIOUS_PLUGIN_NAME;
   }
 
   console.warn(
-    `[InAppBrowser] Neither '${CAPGO_PLUGIN_NAME}' nor legacy '${LEGACY_PLUGIN_NAME}' native plugin detected. ` +
+    `[InAppBrowser] Neither '${CAPGO_PLUGIN_NAME}' nor '${PREVIOUS_PLUGIN_NAME}' native plugin detected. ` +
       'Ensure @capgo/capacitor-inappbrowser native code is installed.',
   );
   return CAPGO_PLUGIN_NAME;
