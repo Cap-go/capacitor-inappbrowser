@@ -449,7 +449,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     /// still reach finish() or the scheme task strands.
     static let redirectStatusCodes: Set<Int> = [301, 302, 303, 307, 308]
 
-    weak var plugin: InAppBrowserPlugin?
+    weak var plugin: CapgoInAppBrowserPlugin?
     private var pendingTasks: [String: PendingProxyTask] = [:]
     private var stoppedRequests: [String: UUID] = [:]
     private var timedOutRequests: [String: String] = [:]
@@ -464,7 +464,7 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
 
     init(
-        plugin: InAppBrowserPlugin,
+        plugin: CapgoInAppBrowserPlugin,
         webviewId: String,
         legacyProxyRequests: Bool,
         legacyProxyRequestURLRegex: NSRegularExpression?,

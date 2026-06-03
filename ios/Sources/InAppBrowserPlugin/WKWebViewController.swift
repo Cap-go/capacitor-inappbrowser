@@ -348,7 +348,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var headers: [String: String]?
     open var httpMethod: String?
     open var httpBody: String?
-    open var capBrowserPlugin: InAppBrowserPlugin?
+    open var capBrowserPlugin: CapgoInAppBrowserPlugin?
     var instanceId: String = ""
     var shareDisclaimer: [String: Any]?
     var shareSubject: String?

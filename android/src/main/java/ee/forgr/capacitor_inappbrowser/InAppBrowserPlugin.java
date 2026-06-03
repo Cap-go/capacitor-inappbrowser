@@ -53,7 +53,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 @CapacitorPlugin(
-    name = "InAppBrowser",
+    name = "CapgoInAppBrowser",
     permissions = {
         @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
         @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO }),

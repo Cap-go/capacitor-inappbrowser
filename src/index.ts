@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
 import type {
@@ -9,9 +9,51 @@ import type {
   ProxyResponse,
 } from './definitions';
 
-const InAppBrowser = registerPlugin<InAppBrowserPlugin>('InAppBrowser', {
+type CapacitorPluginHeader = {
+  readonly name: string;
+  readonly methods: readonly {
+    readonly name: string;
+  }[];
+};
+
+type CapacitorWithPluginHeaders = typeof Capacitor & {
+  readonly PluginHeaders?: readonly CapacitorPluginHeader[];
+};
+
+const CAPGO_PLUGIN_NAME = 'CapgoInAppBrowser';
+const LEGACY_PLUGIN_NAME = 'InAppBrowser';
+const LEGACY_CAPGO_METHOD = 'openWebView';
+
+function hasNativePluginMethod(pluginName: string, methodName: string): boolean {
+  const headers = (Capacitor as CapacitorWithPluginHeaders).PluginHeaders ?? [];
+  const header = headers.find((pluginHeader) => pluginHeader.name === pluginName);
+  return header?.methods.some((method) => method.name === methodName) ?? false;
+}
+
+function resolvePluginName(): string {
+  if (!Capacitor.isNativePlatform()) {
+    return CAPGO_PLUGIN_NAME;
+  }
+
+  if (Capacitor.isPluginAvailable(CAPGO_PLUGIN_NAME)) {
+    return CAPGO_PLUGIN_NAME;
+  }
+
+  if (hasNativePluginMethod(LEGACY_PLUGIN_NAME, LEGACY_CAPGO_METHOD)) {
+    return LEGACY_PLUGIN_NAME;
+  }
+
+  return CAPGO_PLUGIN_NAME;
+}
+
+const inAppBrowserImplementations = {
   web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
-});
+};
+
+const InAppBrowser =
+  resolvePluginName() === CAPGO_PLUGIN_NAME
+    ? registerPlugin<InAppBrowserPlugin>('CapgoInAppBrowser', inAppBrowserImplementations)
+    : registerPlugin<InAppBrowserPlugin>('InAppBrowser', inAppBrowserImplementations);
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
