@@ -71,15 +71,15 @@ extension UIColor {
  * Please read the Capacitor iOS Plugin Development Guide
  * here: https://capacitorjs.com/docs/plugins/ios
  */
-@objc(InAppBrowserPlugin)
-public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
+@objc(CapgoInAppBrowserPlugin)
+public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     enum InvisibilityMode: String {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
     private let pluginVersion: String = "8.6.17"
-    public let identifier = "InAppBrowserPlugin"
-    public let jsName = "InAppBrowser"
+    public let identifier = "CapgoInAppBrowserPlugin"
+    public let jsName = "CapgoInAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "goBack", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
@@ -325,7 +325,7 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         try rawRules.enumerated().map { index, item in
             guard let dictionary = item as? [String: Any] else {
                 throw NSError(
-                    domain: "InAppBrowserPlugin",
+                    domain: "CapgoInAppBrowserPlugin",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: "Proxy rule at index \(index) must be an object"]
                 )
@@ -1931,7 +1931,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 }
 
-extension InAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
+@available(*, deprecated, renamed: "CapgoInAppBrowserPlugin")
+public typealias InAppBrowserPlugin = CapgoInAppBrowserPlugin
+
+extension CapgoInAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()
     }

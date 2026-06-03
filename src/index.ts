@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
 import type {
@@ -9,9 +9,34 @@ import type {
   ProxyResponse,
 } from './definitions';
 
-const InAppBrowser = registerPlugin<InAppBrowserPlugin>('InAppBrowser', {
+const CAPGO_PLUGIN_NAME = 'CapgoInAppBrowser';
+const PREVIOUS_PLUGIN_NAME = 'InAppBrowser';
+
+function resolvePluginName(): string {
+  if (!Capacitor.isNativePlatform()) {
+    return CAPGO_PLUGIN_NAME;
+  }
+
+  if (Capacitor.isPluginAvailable(CAPGO_PLUGIN_NAME)) {
+    return CAPGO_PLUGIN_NAME;
+  }
+
+  if (Capacitor.isPluginAvailable(PREVIOUS_PLUGIN_NAME)) {
+    return PREVIOUS_PLUGIN_NAME;
+  }
+
+  console.warn(
+    `[InAppBrowser] Neither '${CAPGO_PLUGIN_NAME}' nor '${PREVIOUS_PLUGIN_NAME}' native plugin detected. ` +
+      'Ensure @capgo/capacitor-inappbrowser native code is installed.',
+  );
+  return CAPGO_PLUGIN_NAME;
+}
+
+const inAppBrowserImplementations = {
   web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
-});
+};
+
+const InAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
