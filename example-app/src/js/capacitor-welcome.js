@@ -1,35 +1,35 @@
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { Capacitor } from '@capacitor/core';
-import { SplashScreen } from "@capacitor/splash-screen";
-import { SystemBars, SystemBarType } from "@capacitor/core";
+import { SplashScreen } from '@capacitor/splash-screen';
+import { SystemBars, SystemBarType } from '@capacitor/core';
 import {
   InAppBrowser,
   ToolBarType,
   BackgroundColor,
   InvisibilityMode,
-} from "@capgo/capacitor-inappbrowser";
-import { setupProxyDemoButtons } from "./proxy-demo.js";
-import { setupProxyRegression } from "./proxy-regression.js";
-import { attachKeyboardRegressionHarness } from "./keyboard-regression.js";
-import { attachFeatureSmokeHarness } from "./feature-smoke.js";
-import { url as configuredTestWebappUrl } from "./url.js";
+} from '@capgo/capacitor-inappbrowser';
+import { setupProxyDemoButtons } from './proxy-demo.js';
+import { setupProxyRegression } from './proxy-regression.js';
+import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
+import { attachFeatureSmokeHarness } from './feature-smoke.js';
+import { url as configuredTestWebappUrl } from './url.js';
 
 // Default URL configuration
-let testWebappUrl = "http://localhost:8000/index.php";
+let testWebappUrl = 'http://localhost:8000/index.php';
 
 function getConfiguredTestWebappUrl() {
   return configuredTestWebappUrl || testWebappUrl;
 }
 
 window.customElements.define(
-  "capacitor-welcome",
+  'capacitor-welcome',
   class extends HTMLElement {
     constructor() {
       super();
 
       SplashScreen.hide();
 
-      const root = this.attachShadow({ mode: "open" });
+      const root = this.attachShadow({ mode: 'open' });
 
       root.innerHTML = `
     <style>
@@ -303,9 +303,9 @@ window.customElements.define(
 
       function createAutoDownloadDemoUrl() {
         const content = [
-          "Capgo download demo successful.",
-          "This file was downloaded natively by InAppBrowser.",
-        ].join("\\n");
+          'Capgo download demo successful.',
+          'This file was downloaded natively by InAppBrowser.',
+        ].join('\\n');
 
         const downloadDemoHtml = `<!doctype html>
 <html lang="en">
@@ -364,10 +364,11 @@ window.customElements.define(
       }
 
       let closeOnNextDownloadEvent = false;
-      const downloadStatusElement = () => self.shadowRoot.querySelector("#download-event-status");
-      const downloadListenerButtonElement = () => self.shadowRoot.querySelector("#open-download-demo-listener");
-      const maestroRunDownloadButton = document.getElementById("maestro-run-download");
-      const maestroDownloadStatus = document.getElementById("maestro-download-status");
+      const downloadStatusElement = () => self.shadowRoot.querySelector('#download-event-status');
+      const downloadListenerButtonElement = () =>
+        self.shadowRoot.querySelector('#open-download-demo-listener');
+      const maestroRunDownloadButton = document.getElementById('maestro-run-download');
+      const maestroDownloadStatus = document.getElementById('maestro-download-status');
 
       function setMaestroDownloadStatus(message) {
         if (maestroDownloadStatus) {
@@ -375,7 +376,7 @@ window.customElements.define(
         }
       }
 
-      function setDownloadStatus(message, { backgroundColor = "#f8f9fa", color = "#495057" } = {}) {
+      function setDownloadStatus(message, { backgroundColor = '#f8f9fa', color = '#495057' } = {}) {
         const statusElement = downloadStatusElement();
         if (!statusElement) {
           return;
@@ -399,48 +400,48 @@ window.customElements.define(
       async function createDownloadListeners() {
         while (downloadListenerHandles.length > 0) {
           const listenerHandle = downloadListenerHandles.pop();
-          if (!listenerHandle || typeof listenerHandle.remove !== "function") {
+          if (!listenerHandle || typeof listenerHandle.remove !== 'function') {
             continue;
           }
           try {
             await listenerHandle.remove();
           } catch (error) {
-            console.warn("Could not remove stale download listener:", error);
+            console.warn('Could not remove stale download listener:', error);
           }
         }
 
         downloadListenerHandles = await Promise.all([
-          InAppBrowser.addListener("downloadCompleted", (event) => {
+          InAppBrowser.addListener('downloadCompleted', (event) => {
             const successLabel = `Event OK: ${event.fileName}`;
             setDownloadListenerButtonLabel(successLabel);
             setMaestroDownloadStatus(successLabel);
             if (maestroRunDownloadButton) {
               maestroRunDownloadButton.disabled = false;
             }
-            setDownloadStatus(
-              `Download completed: ${event.fileName} via ${event.handledBy}`,
-              { backgroundColor: "#dcfce7", color: "#166534" },
-            );
+            setDownloadStatus(`Download completed: ${event.fileName} via ${event.handledBy}`, {
+              backgroundColor: '#dcfce7',
+              color: '#166534',
+            });
 
             if (closeOnNextDownloadEvent && event.id) {
               closeOnNextDownloadEvent = false;
               InAppBrowser.close({ id: event.id }).catch((error) => {
-                console.warn("Could not close webview after download event:", error);
+                console.warn('Could not close webview after download event:', error);
               });
             }
           }),
-          InAppBrowser.addListener("downloadFailed", (event) => {
+          InAppBrowser.addListener('downloadFailed', (event) => {
             closeOnNextDownloadEvent = false;
-            setDownloadListenerButtonLabel("Event Failed");
-            setMaestroDownloadStatus("Event Failed");
+            setDownloadListenerButtonLabel('Event Failed');
+            setMaestroDownloadStatus('Event Failed');
             if (maestroRunDownloadButton) {
               maestroRunDownloadButton.disabled = false;
             }
-            const fileLabel = event.fileName ? ` for ${event.fileName}` : "";
-            setDownloadStatus(
-              `Download failed${fileLabel}: ${event.error}`,
-              { backgroundColor: "#fee2e2", color: "#991b1b" },
-            );
+            const fileLabel = event.fileName ? ` for ${event.fileName}` : '';
+            setDownloadStatus(`Download failed${fileLabel}: ${event.error}`, {
+              backgroundColor: '#fee2e2',
+              color: '#991b1b',
+            });
           }),
         ]);
 
@@ -448,33 +449,33 @@ window.customElements.define(
       }
 
       async function openAutoDownloadDemo({ closeOnEvent = false } = {}) {
-        const handleDownloadsToggle = self.shadowRoot.querySelector("#handle-downloads-toggle");
+        const handleDownloadsToggle = self.shadowRoot.querySelector('#handle-downloads-toggle');
         closeOnNextDownloadEvent = closeOnEvent && handleDownloadsToggle.checked;
         if (maestroRunDownloadButton) {
           maestroRunDownloadButton.disabled = true;
         }
         setDownloadListenerButtonLabel(
           closeOnEvent && handleDownloadsToggle.checked
-            ? "Waiting For Download Event..."
-            : "Open Auto Download Demo + Close On Event",
+            ? 'Waiting For Download Event...'
+            : 'Open Auto Download Demo + Close On Event',
         );
         const downloadMessage = handleDownloadsToggle.checked
           ? closeOnEvent
-            ? "Waiting for native download event, then closing the webview..."
-            : "Waiting for native download event..."
-          : "Native download handling disabled for this run.";
+            ? 'Waiting for native download event, then closing the webview...'
+            : 'Waiting for native download event...'
+          : 'Native download handling disabled for this run.';
         setMaestroDownloadStatus(downloadMessage);
         setDownloadStatus(downloadMessage, {
-          backgroundColor: handleDownloadsToggle.checked ? "#e0f2fe" : "#f8f9fa",
-          color: handleDownloadsToggle.checked ? "#075985" : "#495057",
+          backgroundColor: handleDownloadsToggle.checked ? '#e0f2fe' : '#f8f9fa',
+          color: handleDownloadsToggle.checked ? '#075985' : '#495057',
         });
 
         try {
           await createDownloadListeners();
           await InAppBrowser.openWebView({
             url: createAutoDownloadDemoUrl(),
-            title: "Auto Download Demo",
-            toolbarColor: "#198754",
+            title: 'Auto Download Demo',
+            toolbarColor: '#198754',
             toolbarType: ToolBarType.NAVIGATION,
             backgroundColor: BackgroundColor.WHITE,
             visibleTitle: true,
@@ -487,12 +488,12 @@ window.customElements.define(
           if (maestroRunDownloadButton) {
             maestroRunDownloadButton.disabled = false;
           }
-          setMaestroDownloadStatus("Download open failed");
-          console.error("Error opening auto download demo:", error);
+          setMaestroDownloadStatus('Download open failed');
+          console.error('Error opening auto download demo:', error);
         }
       }
 
-      const blankTargetExpectedUrl = "https://example.com/#blank-target-webview";
+      const blankTargetExpectedUrl = 'https://example.com/#blank-target-webview';
       const blankTargetTestHtml = `
         <!doctype html>
         <html lang="en">
@@ -528,13 +529,13 @@ window.customElements.define(
         </html>
       `;
       const blankTargetTestUrl = `data:text/html;charset=utf-8,${encodeURIComponent(blankTargetTestHtml)}`;
-      const blankTargetButton = self.shadowRoot.querySelector("#open-blank-target-test");
-      const blankTargetStatusText = self.shadowRoot.querySelector("#blank-target-status-text");
-      const blankTargetResultText = self.shadowRoot.querySelector("#blank-target-result-text");
-      const blankTargetLastUrlText = self.shadowRoot.querySelector("#blank-target-last-url-text");
-      const maestroRunBlankTargetButton = document.getElementById("maestro-run-blank-target");
-      const maestroBlankTargetStatus = document.getElementById("maestro-blank-target-status");
-      const maestroBlankTargetDetails = document.getElementById("maestro-blank-target-details");
+      const blankTargetButton = self.shadowRoot.querySelector('#open-blank-target-test');
+      const blankTargetStatusText = self.shadowRoot.querySelector('#blank-target-status-text');
+      const blankTargetResultText = self.shadowRoot.querySelector('#blank-target-result-text');
+      const blankTargetLastUrlText = self.shadowRoot.querySelector('#blank-target-last-url-text');
+      const maestroRunBlankTargetButton = document.getElementById('maestro-run-blank-target');
+      const maestroBlankTargetStatus = document.getElementById('maestro-blank-target-status');
+      const maestroBlankTargetDetails = document.getElementById('maestro-blank-target-details');
       let blankTargetTestActive = false;
       let blankTargetWebViewId = null;
       let blankTargetListenerHandles = [];
@@ -553,12 +554,19 @@ window.customElements.define(
           return;
         }
 
-        if (status === "Closed" && result === "internal navigation confirmed" && lastUrl === blankTargetExpectedUrl) {
-          maestroBlankTargetStatus.textContent = "Blank target regression passed";
-        } else if (status === "Idle") {
-          maestroBlankTargetStatus.textContent = "Not started";
-        } else if (status === "Page load error" || (status === "Closed" && result !== "internal navigation confirmed")) {
-          maestroBlankTargetStatus.textContent = "Blank target regression failed";
+        if (
+          status === 'Closed' &&
+          result === 'internal navigation confirmed' &&
+          lastUrl === blankTargetExpectedUrl
+        ) {
+          maestroBlankTargetStatus.textContent = 'Blank target regression passed';
+        } else if (status === 'Idle') {
+          maestroBlankTargetStatus.textContent = 'Not started';
+        } else if (
+          status === 'Page load error' ||
+          (status === 'Closed' && result !== 'internal navigation confirmed')
+        ) {
+          maestroBlankTargetStatus.textContent = 'Blank target regression failed';
         } else {
           maestroBlankTargetStatus.textContent = `Blank target regression: ${status}`;
         }
@@ -596,7 +604,7 @@ window.customElements.define(
 
         await Promise.all(
           handles.map((handle) => {
-            if (!handle || typeof handle.remove !== "function") {
+            if (!handle || typeof handle.remove !== 'function') {
               return Promise.resolve();
             }
 
@@ -609,31 +617,31 @@ window.customElements.define(
         await clearBlankTargetListeners();
 
         blankTargetListenerHandles = [
-          await InAppBrowser.addListener("urlChangeEvent", (result) => {
+          await InAppBrowser.addListener('urlChangeEvent', (result) => {
             if (!isBlankTargetEvent(result)) {
               return;
             }
 
             setBlankTargetState({
-              status: result.url === blankTargetExpectedUrl ? "Linked page loaded" : "Navigating",
+              status: result.url === blankTargetExpectedUrl ? 'Linked page loaded' : 'Navigating',
               result: blankTargetResultText.textContent,
               lastUrl: result.url,
             });
           }),
-          await InAppBrowser.addListener("closeEvent", async (result) => {
+          await InAppBrowser.addListener('closeEvent', async (result) => {
             if (!isBlankTargetEvent(result)) {
               return;
             }
 
-            const closedUrl = result.url || "unknown";
+            const closedUrl = result.url || 'unknown';
             blankTargetTestActive = false;
             blankTargetWebViewId = null;
 
             setBlankTargetState({
-              status: "Closed",
+              status: 'Closed',
               result:
                 closedUrl === blankTargetExpectedUrl
-                  ? "internal navigation confirmed"
+                  ? 'internal navigation confirmed'
                   : `closed on ${closedUrl}`,
               lastUrl: closedUrl,
             });
@@ -641,7 +649,7 @@ window.customElements.define(
 
             await clearBlankTargetListeners();
           }),
-          await InAppBrowser.addListener("pageLoadError", async (result) => {
+          await InAppBrowser.addListener('pageLoadError', async (result) => {
             if (!isBlankTargetEvent(result)) {
               return;
             }
@@ -649,8 +657,8 @@ window.customElements.define(
             blankTargetTestActive = false;
             blankTargetWebViewId = null;
             setBlankTargetState({
-              status: "Page load error",
-              result: "page load error",
+              status: 'Page load error',
+              result: 'page load error',
               lastUrl: blankTargetLastUrlText.textContent,
             });
             setBlankTargetButtonsDisabled(false);
@@ -661,13 +669,13 @@ window.customElements.define(
       }
 
       setBlankTargetState({
-        status: "Idle",
-        result: "not run",
-        lastUrl: "none",
+        status: 'Idle',
+        result: 'not run',
+        lastUrl: 'none',
       });
 
       async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
-        statusText.textContent = "Refreshing DOM content...";
+        statusText.textContent = 'Refreshing DOM content...';
         try {
           await InAppBrowser.executeScript({
             code: `
@@ -690,25 +698,25 @@ window.customElements.define(
                   console.error('No message interface available');
                 }
               })();
-            `
+            `,
           });
-          statusText.textContent = "DOM refresh triggered. Waiting for content...";
+          statusText.textContent = 'DOM refresh triggered. Waiting for content...';
         } catch (scriptError) {
-          console.error("Script execution error:", scriptError);
-          statusText.textContent = "Error refreshing DOM: " + scriptError.message;
-          resultDiv.style.display = "none";
-          domOutput.textContent = "";
+          console.error('Script execution error:', scriptError);
+          statusText.textContent = 'Error refreshing DOM: ' + scriptError.message;
+          resultDiv.style.display = 'none';
+          domOutput.textContent = '';
         }
       }
 
-      const maestroReadyBanner = document.getElementById("maestro-ready-banner");
-      const maestroRunProxyButton = document.getElementById("maestro-run-proxy");
-      const maestroProxyStatus = document.getElementById("maestro-proxy-status");
-      const maestroProxyDetails = document.getElementById("maestro-proxy-details");
+      const maestroReadyBanner = document.getElementById('maestro-ready-banner');
+      const maestroRunProxyButton = document.getElementById('maestro-run-proxy');
+      const maestroProxyStatus = document.getElementById('maestro-proxy-status');
+      const maestroProxyDetails = document.getElementById('maestro-proxy-details');
 
       const withMaestroNativeHarness = (callback) => {
         const harness = window.MaestroNativeHarness;
-        if (!harness || typeof callback !== "function") {
+        if (!harness || typeof callback !== 'function') {
           return;
         }
         try {
@@ -718,7 +726,7 @@ window.customElements.define(
 
       const syncMaestroNativeReady = (ready) => {
         withMaestroNativeHarness((harness) => {
-          if (typeof harness.setReady === "function") {
+          if (typeof harness.setReady === 'function') {
             harness.setReady(Boolean(ready));
           }
         });
@@ -726,21 +734,21 @@ window.customElements.define(
 
       const syncMaestroNativeRunning = (running) => {
         withMaestroNativeHarness((harness) => {
-          if (typeof harness.setRunning === "function") {
+          if (typeof harness.setRunning === 'function') {
             harness.setRunning(Boolean(running));
           }
         });
       };
 
-      const syncMaestroNativeStatus = (message, details = "") => {
+      const syncMaestroNativeStatus = (message, details = '') => {
         withMaestroNativeHarness((harness) => {
-          if (typeof harness.setStatus === "function") {
+          if (typeof harness.setStatus === 'function') {
             harness.setStatus(message, details);
           }
         });
       };
 
-      const updateMaestroStatus = (message, details = "") => {
+      const updateMaestroStatus = (message, details = '') => {
         if (maestroProxyStatus) {
           maestroProxyStatus.textContent = message;
         }
@@ -765,19 +773,19 @@ window.customElements.define(
       if (proxyRegressionControls?.run && maestroRunProxyButton) {
         window.__capgoRunMaestroProxy = () => {
           proxyRegressionControls.run({
-            keepBrowserOpenOnFinish: typeof window.MaestroNativeHarness === "undefined",
+            keepBrowserOpenOnFinish: typeof window.MaestroNativeHarness === 'undefined',
           });
         };
-        maestroRunProxyButton.addEventListener("click", () => {
+        maestroRunProxyButton.addEventListener('click', () => {
           proxyRegressionControls.run({ keepBrowserOpenOnFinish: true });
         });
         maestroRunProxyButton.disabled = false;
         if (maestroReadyBanner) {
-          maestroReadyBanner.textContent = "Maestro Ready";
+          maestroReadyBanner.textContent = 'Maestro Ready';
         }
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
-        maestroReadyBanner.textContent = "Maestro Unavailable";
+        maestroReadyBanner.textContent = 'Maestro Unavailable';
         window.__capgoRunMaestroProxy = undefined;
         syncMaestroNativeReady(false);
       }
@@ -786,39 +794,41 @@ window.customElements.define(
 
       // Custom URL handler
       self.shadowRoot
-        .querySelector("#open-custom-url")
-        .addEventListener("click", async function (e) {
-          const input = self.shadowRoot.querySelector("#custom-url-input");
-          const preventDeeplinkToggle = self.shadowRoot.querySelector("#prevent-deeplink-toggle");
-          const spoofFirebaseToggle = self.shadowRoot.querySelector("#spoof-firebase-toggle");
-          const spoofUserAgentToggle = self.shadowRoot.querySelector("#spoof-useragent-toggle");
-          const enableGooglePayToggle = self.shadowRoot.querySelector("#enable-google-pay-toggle");
+        .querySelector('#open-custom-url')
+        .addEventListener('click', async function (e) {
+          const input = self.shadowRoot.querySelector('#custom-url-input');
+          const preventDeeplinkToggle = self.shadowRoot.querySelector('#prevent-deeplink-toggle');
+          const spoofFirebaseToggle = self.shadowRoot.querySelector('#spoof-firebase-toggle');
+          const spoofUserAgentToggle = self.shadowRoot.querySelector('#spoof-useragent-toggle');
+          const enableGooglePayToggle = self.shadowRoot.querySelector('#enable-google-pay-toggle');
           const enableGooglePay = enableGooglePayToggle.checked;
-          const toolbarTypeSelect = self.shadowRoot.querySelector("#toolbar-type-select");
-          const nativeNavigationGesturesToggle = self.shadowRoot.querySelector("#native-navigation-gestures-toggle");
+          const toolbarTypeSelect = self.shadowRoot.querySelector('#toolbar-type-select');
+          const nativeNavigationGesturesToggle = self.shadowRoot.querySelector(
+            '#native-navigation-gestures-toggle',
+          );
           const url = input.value.trim();
           const preventDeeplink = preventDeeplinkToggle.checked;
           const spoofFirebase = spoofFirebaseToggle.checked;
           const spoofUserAgent = spoofUserAgentToggle.checked;
           const toolbarType = toolbarTypeSelect.value;
           const nativeNavigationGestures = nativeNavigationGesturesToggle.checked;
-          
+
           if (!url) {
-            alert("Please enter a URL");
+            alert('Please enter a URL');
             return;
           }
-          
+
           // Auto-prepend https:// if no protocol is specified
           let urlToOpen = url;
           if (!url.startsWith('http://') && !url.startsWith('https://')) {
             urlToOpen = 'https://' + url;
           }
-          
+
           if (!isValidUrl(urlToOpen)) {
-            alert("Please enter a valid URL (e.g., https://example.com)");
+            alert('Please enter a valid URL (e.g., https://example.com)');
             return;
           }
-          
+
           // Firebase polyfill script
           const firebasePolyfill = `
             (function() {
@@ -915,13 +925,13 @@ window.customElements.define(
               console.log('[InAppBrowser] Firebase polyfill injection complete');
             })();
           `;
-          
+
           const options = {
             url: urlToOpen,
-            toolbarColor: "#007bff",
+            toolbarColor: '#007bff',
             toolbarType: toolbarType,
             backgroundColor: BackgroundColor.WHITE,
-            title: "Custom URL",
+            title: 'Custom URL',
             showReloadButton: toolbarType === 'navigation',
             visibleTitle: true,
             enabledSafeBottomMargin: true,
@@ -930,64 +940,65 @@ window.customElements.define(
             activeNativeNavigationForWebview: nativeNavigationGestures,
             buttonNearDone: {
               ios: {
-                iconType: "sf-symbol",
-                icon: "eye.slash",
+                iconType: 'sf-symbol',
+                icon: 'eye.slash',
               },
               android: {
-                iconType: "vector",
-                icon: "ic_launcher_foreground",
+                iconType: 'vector',
+                icon: 'ic_launcher_foreground',
                 width: 24,
                 height: 24,
               },
             },
           };
-          
+
           if (spoofUserAgent) {
             options.headers = {
-              'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
+              'User-Agent':
+                'Mozilla/5.0 (Linux; Android 11; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36',
             };
           }
-          
+
           // Add Firebase spoofing if enabled
           if (spoofFirebase) {
             options.isPresentAfterPageLoad = true;
             options.preShowScript = firebasePolyfill;
             options.preShowScriptInjectionTime = 'documentStart';
           }
-          
+
           try {
             await InAppBrowser.openWebView(options);
 
             // Add event listeners after opening the browser
-            InAppBrowser.addListener("urlChangeEvent", (result) => {
-              console.log("URL changed:", result.url);
+            InAppBrowser.addListener('urlChangeEvent', (result) => {
+              console.log('URL changed:', result.url);
             });
 
-            InAppBrowser.addListener("closeEvent", () => {
-              console.log("Close button pressed");
+            InAppBrowser.addListener('closeEvent', () => {
+              console.log('Close button pressed');
             });
 
-            InAppBrowser.addListener("browserPageLoaded", () => {
-              console.log("Page loaded");
+            InAppBrowser.addListener('browserPageLoaded', () => {
+              console.log('Page loaded');
             });
 
-            InAppBrowser.addListener("pageLoadError", () => {
-              console.log("Page load error");
+            InAppBrowser.addListener('pageLoadError', () => {
+              console.log('Page load error');
             });
           } catch (e) {
-            console.error("Error opening custom URL:", e);
-            alert("Error opening URL. Please check the URL and try again.");
+            console.error('Error opening custom URL:', e);
+            alert('Error opening URL. Please check the URL and try again.');
           }
         });
 
-      blankTargetButton.addEventListener("click", async function () {
+      blankTargetButton.addEventListener('click', async function () {
         blankTargetTestActive = true;
         blankTargetWebViewId = null;
         setBlankTargetButtonsDisabled(true);
         setBlankTargetState({
-          status: "Opening test webview...",
-          result: "waiting for navigation",
-          lastUrl: "none",
+          status: 'Opening test webview...',
+          result: 'waiting for navigation',
+          lastUrl: 'none',
         });
 
         try {
@@ -997,7 +1008,7 @@ window.customElements.define(
             url: blankTargetTestUrl,
             toolbarType: ToolBarType.COMPACT,
             backgroundColor: BackgroundColor.WHITE,
-            title: "Target Blank Test",
+            title: 'Target Blank Test',
             visibleTitle: true,
             showReloadButton: false,
             activeNativeNavigationForWebview: false,
@@ -1012,17 +1023,17 @@ window.customElements.define(
           blankTargetWebViewId = null;
           setBlankTargetButtonsDisabled(false);
           await clearBlankTargetListeners();
-          console.error("Error opening blank target test:", e);
+          console.error('Error opening blank target test:', e);
           setBlankTargetState({
-            status: "Error",
+            status: 'Error',
             result: e.message,
-            lastUrl: "none",
+            lastUrl: 'none',
           });
         }
       });
 
       if (maestroRunBlankTargetButton) {
-        maestroRunBlankTargetButton.addEventListener("click", () => {
+        maestroRunBlankTargetButton.addEventListener('click', () => {
           blankTargetButton.click();
         });
         maestroRunBlankTargetButton.disabled = false;
@@ -1030,316 +1041,309 @@ window.customElements.define(
 
       // Add Enter key support for the input field
       self.shadowRoot
-        .querySelector("#custom-url-input")
-        .addEventListener("keypress", async function (e) {
+        .querySelector('#custom-url-input')
+        .addEventListener('keypress', async function (e) {
           if (e.key === 'Enter') {
-            const button = self.shadowRoot.querySelector("#open-custom-url");
+            const button = self.shadowRoot.querySelector('#open-custom-url');
             button.click();
           }
         });
 
       // Add clear button handler
-      self.shadowRoot
-        .querySelector("#clear-url-button")
-        .addEventListener("click", function (e) {
-          const input = self.shadowRoot.querySelector("#custom-url-input");
-          input.value = '';
-          input.focus();
-        });
+      self.shadowRoot.querySelector('#clear-url-button').addEventListener('click', function (e) {
+        const input = self.shadowRoot.querySelector('#custom-url-input');
+        input.value = '';
+        input.focus();
+      });
+
+      self.shadowRoot.querySelector('#open-browser').addEventListener('click', async function (e) {
+        try {
+          await InAppBrowser.openWebView({
+            url: 'https://github.com/Cap-go/capacitor-inappbrowser',
+            toolbarColor: '#000000',
+            toolbarType: ToolBarType.NAVIGATION,
+            backgroundColor: BackgroundColor.BLACK,
+            title: 'Capacitor InAppBrowser',
+            enabledSafeBottomMargin: true,
+          });
+
+          // Add event listeners after opening the browser
+          InAppBrowser.addListener('urlChange', (result) => {
+            console.log('URL changed:', result.url);
+          });
+
+          InAppBrowser.addListener('closePressed', () => {
+            console.log('Close button pressed');
+          });
+
+          InAppBrowser.addListener('sharePressed', () => {
+            console.log('Share button pressed');
+          });
+        } catch (e) {
+          console.error('Error opening in-app browser:', e);
+        }
+      });
 
       self.shadowRoot
-        .querySelector("#open-browser")
-        .addEventListener("click", async function (e) {
+        .querySelector('#open-browser-with-blocked-host')
+        .addEventListener('click', async function (e) {
           try {
             await InAppBrowser.openWebView({
-              url: "https://github.com/Cap-go/capacitor-inappbrowser",
-              toolbarColor: "#000000",
+              url: 'https://github.com/Cap-go/capacitor-inappbrowser',
+              toolbarColor: '#000000',
               toolbarType: ToolBarType.NAVIGATION,
               backgroundColor: BackgroundColor.BLACK,
-              title: "Capacitor InAppBrowser",
+              title: 'Capacitor InAppBrowser, blocked GitHub host',
               enabledSafeBottomMargin: true,
+              blockedHosts: ['github.com'],
             });
 
             // Add event listeners after opening the browser
-            InAppBrowser.addListener("urlChange", (result) => {
-              console.log("URL changed:", result.url);
+            InAppBrowser.addListener('urlChange', (result) => {
+              console.log('URL changed:', result.url);
             });
 
-            InAppBrowser.addListener("closePressed", () => {
-              console.log("Close button pressed");
+            InAppBrowser.addListener('closePressed', () => {
+              console.log('Close button pressed');
             });
 
-            InAppBrowser.addListener("sharePressed", () => {
-              console.log("Share button pressed");
+            InAppBrowser.addListener('sharePressed', () => {
+              console.log('Share button pressed');
             });
           } catch (e) {
-            console.error("Error opening in-app browser:", e);
+            console.error('Error opening in-app browser:', e);
           }
         });
 
       self.shadowRoot
-        .querySelector("#open-browser-with-blocked-host")
-        .addEventListener("click", async function (e) {
-          try {
-            await InAppBrowser.openWebView({
-              url: "https://github.com/Cap-go/capacitor-inappbrowser",
-              toolbarColor: "#000000",
-              toolbarType: ToolBarType.NAVIGATION,
-              backgroundColor: BackgroundColor.BLACK,
-              title: "Capacitor InAppBrowser, blocked GitHub host",
-              enabledSafeBottomMargin: true,
-              blockedHosts: ["github.com"],
-            });
-
-            // Add event listeners after opening the browser
-            InAppBrowser.addListener("urlChange", (result) => {
-              console.log("URL changed:", result.url);
-            });
-
-            InAppBrowser.addListener("closePressed", () => {
-              console.log("Close button pressed");
-            });
-
-            InAppBrowser.addListener("sharePressed", () => {
-              console.log("Share button pressed");
-            });
-          } catch (e) {
-            console.error("Error opening in-app browser:", e);
-          }
-        });
-
-      self.shadowRoot
-        .querySelector("#open-download-demo")
-        .addEventListener("click", async function () {
+        .querySelector('#open-download-demo')
+        .addEventListener('click', async function () {
           await openAutoDownloadDemo({ closeOnEvent: false });
         });
 
       self.shadowRoot
-        .querySelector("#open-download-demo-listener")
-        .addEventListener("click", async function () {
+        .querySelector('#open-download-demo-listener')
+        .addEventListener('click', async function () {
           await openAutoDownloadDemo({ closeOnEvent: true });
         });
 
       if (maestroRunDownloadButton) {
-        maestroRunDownloadButton.addEventListener("click", async function () {
+        maestroRunDownloadButton.addEventListener('click', async function () {
           await openAutoDownloadDemo({ closeOnEvent: true });
         });
         maestroRunDownloadButton.disabled = false;
       }
 
       self.shadowRoot
-        .querySelector("#system-bars-show-all")
-        .addEventListener("click", async function () {
+        .querySelector('#system-bars-show-all')
+        .addEventListener('click', async function () {
           try {
             await SystemBars.show();
           } catch (e) {
-            console.error("Error showing system bars:", e);
+            console.error('Error showing system bars:', e);
           }
         });
 
       self.shadowRoot
-        .querySelector("#system-bars-show-status")
-        .addEventListener("click", async function () {
+        .querySelector('#system-bars-show-status')
+        .addEventListener('click', async function () {
           try {
             await SystemBars.show({ bar: SystemBarType.StatusBar });
           } catch (e) {
-            console.error("Error showing status bar:", e);
+            console.error('Error showing status bar:', e);
           }
         });
 
       self.shadowRoot
-        .querySelector("#system-bars-show-navigation")
-        .addEventListener("click", async function () {
+        .querySelector('#system-bars-show-navigation')
+        .addEventListener('click', async function () {
           try {
             await SystemBars.show({ bar: SystemBarType.NavigationBar });
           } catch (e) {
-            console.error("Error showing navigation bar:", e);
+            console.error('Error showing navigation bar:', e);
           }
         });
 
       self.shadowRoot
-        .querySelector("#system-bars-hide-navigation")
-        .addEventListener("click", async function () {
+        .querySelector('#system-bars-hide-navigation')
+        .addEventListener('click', async function () {
           try {
             await SystemBars.hide({ bar: SystemBarType.NavigationBar });
           } catch (e) {
-            console.error("Error hiding navigation bar:", e);
+            console.error('Error hiding navigation bar:', e);
           }
         });
 
-      self.shadowRoot
-        .querySelector("#webview-hide")
-        .addEventListener("click", async function () {
-          try {
-            await InAppBrowser.hide();
-          } catch (e) {
-            console.error("Error hiding webview:", e);
-          }
-        });
-
-      self.shadowRoot
-        .querySelector("#webview-show")
-        .addEventListener("click", async function () {
-          try {
-            await InAppBrowser.show();
-          } catch (e) {
-            console.error("Error showing webview:", e);
-          }
-        });
-
-      InAppBrowser.addListener("buttonNearDoneClick", async () => {
+      self.shadowRoot.querySelector('#webview-hide').addEventListener('click', async function () {
         try {
           await InAppBrowser.hide();
         } catch (e) {
-          console.error("Error hiding webview from toolbar button:", e);
+          console.error('Error hiding webview:', e);
+        }
+      });
+
+      self.shadowRoot.querySelector('#webview-show').addEventListener('click', async function () {
+        try {
+          await InAppBrowser.show();
+        } catch (e) {
+          console.error('Error showing webview:', e);
+        }
+      });
+
+      InAppBrowser.addListener('buttonNearDoneClick', async () => {
+        try {
+          await InAppBrowser.hide();
+        } catch (e) {
+          console.error('Error hiding webview from toolbar button:', e);
         }
       });
 
       // Test webapp with navigation toolbar (main test for back button issue)
       self.shadowRoot
-        .querySelector("#open-test-webapp")
-        .addEventListener("click", async function (e) {
+        .querySelector('#open-test-webapp')
+        .addEventListener('click', async function (e) {
           try {
             const urlToUse = getConfiguredTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,
-              toolbarColor: "#ffffff",
-              toolbarTextColor: "#000000",
+              toolbarColor: '#ffffff',
+              toolbarTextColor: '#000000',
               toolbarType: ToolBarType.NAVIGATION,
               backgroundColor: BackgroundColor.WHITE,
-              title: "Back Button Test - Navigation Mode",
+              title: 'Back Button Test - Navigation Mode',
               showReloadButton: true,
               visibleTitle: true,
               showArrow: false,
             });
 
             // Add comprehensive event listeners for debugging
-            InAppBrowser.addListener("urlChangeEvent", (result) => {
-              console.log("🔄 URL changed:", result.url);
+            InAppBrowser.addListener('urlChangeEvent', (result) => {
+              console.log('🔄 URL changed:', result.url);
             });
 
-            InAppBrowser.addListener("closeEvent", () => {
-              console.log("❌ Close button pressed");
+            InAppBrowser.addListener('closeEvent', () => {
+              console.log('❌ Close button pressed');
             });
 
-            InAppBrowser.addListener("browserPageLoaded", () => {
-              console.log("✅ Page loaded");
+            InAppBrowser.addListener('browserPageLoaded', () => {
+              console.log('✅ Page loaded');
             });
 
-            InAppBrowser.addListener("pageLoadError", () => {
-              console.log("❌ Page load error");
+            InAppBrowser.addListener('pageLoadError', () => {
+              console.log('❌ Page load error');
             });
 
-            InAppBrowser.addListener("messageFromWebview", (event) => {
-              console.log("💬 Message from webview:", event.detail);
+            InAppBrowser.addListener('messageFromWebview', (event) => {
+              console.log('💬 Message from webview:', event.detail);
             });
           } catch (e) {
-            console.error("Error opening test webapp:", e);
+            console.error('Error opening test webapp:', e);
             alert(
-              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+              'Error opening test webapp. Make sure your local server is running and url.js is configured correctly.',
             );
           }
         });
 
       // Hidden WebView Test
       self.shadowRoot
-        .querySelector("#test-hidden-webview")
-        .addEventListener("click", async function (e) {
-          const statusText = self.shadowRoot.querySelector("#hidden-status-text");
-          const resultDiv = self.shadowRoot.querySelector("#hidden-webview-result");
-          const metricsDiv = self.shadowRoot.querySelector("#hidden-webview-metrics");
-          const domOutput = self.shadowRoot.querySelector("#dom-content-output");
-          const metricsOutput = self.shadowRoot.querySelector("#metrics-output");
-          const fakeVisibleToggle = self.shadowRoot.querySelector("#hidden-fake-visible-toggle");
-          
+        .querySelector('#test-hidden-webview')
+        .addEventListener('click', async function (e) {
+          const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          const resultDiv = self.shadowRoot.querySelector('#hidden-webview-result');
+          const metricsDiv = self.shadowRoot.querySelector('#hidden-webview-metrics');
+          const domOutput = self.shadowRoot.querySelector('#dom-content-output');
+          const metricsOutput = self.shadowRoot.querySelector('#metrics-output');
+          const fakeVisibleToggle = self.shadowRoot.querySelector('#hidden-fake-visible-toggle');
+
           try {
-            statusText.textContent = "Opening hidden webview...";
-            resultDiv.style.display = "none";
-            metricsDiv.style.display = "none";
+            statusText.textContent = 'Opening hidden webview...';
+            resultDiv.style.display = 'none';
+            metricsDiv.style.display = 'none';
 
             await InAppBrowser.removeAllListeners();
             downloadListenerHandles = [];
             await InAppBrowser.openWebView({
-              url: "https://example.com",
+              url: 'https://example.com',
               hidden: true,
-              invisibilityMode: fakeVisibleToggle && fakeVisibleToggle.checked
-                ? InvisibilityMode.FAKE_VISIBLE
-                : InvisibilityMode.AWARE,
+              invisibilityMode:
+                fakeVisibleToggle && fakeVisibleToggle.checked
+                  ? InvisibilityMode.FAKE_VISIBLE
+                  : InvisibilityMode.AWARE,
               buttonNearDone: {
                 ios: {
-                  iconType: "sf-symbol",
-                  icon: "eye.slash",
+                  iconType: 'sf-symbol',
+                  icon: 'eye.slash',
                 },
                 android: {
-                  iconType: "vector",
-                  icon: "ic_launcher_foreground",
+                  iconType: 'vector',
+                  icon: 'ic_launcher_foreground',
                   width: 24,
                   height: 24,
                 },
               },
             });
-            
-            statusText.textContent = "WebView opened (hidden). Waiting for page load...";
-           
-            InAppBrowser.addListener("messageFromWebview", (event) => {
-              console.log("Message from hidden webview:", event);
+
+            statusText.textContent = 'WebView opened (hidden). Waiting for page load...';
+
+            InAppBrowser.addListener('messageFromWebview', (event) => {
+              console.log('Message from hidden webview:', event);
               if (event.detail && event.detail.type === 'domContent') {
                 statusText.textContent = `DOM extracted from: ${event.detail.title} (${event.detail.url})`;
                 domOutput.textContent = event.detail.content;
-                resultDiv.style.display = "block";
+                resultDiv.style.display = 'block';
               } else if (event.detail && event.detail.type === 'visibilityState') {
                 statusText.textContent = `document.visibilityState: ${event.detail.state}`;
               } else if (event.detail && event.detail.type === 'dimensions') {
-                statusText.textContent = "Dimensions received.";
+                statusText.textContent = 'Dimensions received.';
                 metricsOutput.textContent = JSON.stringify(event.detail.data, null, 2);
-                metricsDiv.style.display = "block";
+                metricsDiv.style.display = 'block';
               }
             });
 
-            InAppBrowser.addListener("buttonNearDoneClick", async () => {
+            InAppBrowser.addListener('buttonNearDoneClick', async () => {
               try {
                 await InAppBrowser.hide();
               } catch (e) {
-                console.error("Error hiding webview from toolbar button:", e);
+                console.error('Error hiding webview from toolbar button:', e);
               }
             });
 
-            InAppBrowser.addListener("browserPageLoaded", async () => {
-              statusText.textContent = "Page loaded! Extracting DOM content...";
-            
+            InAppBrowser.addListener('browserPageLoaded', async () => {
+              statusText.textContent = 'Page loaded! Extracting DOM content...';
+
               setTimeout(async () => {
                 await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
               }, 500);
-            });          
+            });
           } catch (e) {
-            console.error("Error with hidden webview:", e);
-            statusText.textContent = "Error: " + e.message;
+            console.error('Error with hidden webview:', e);
+            statusText.textContent = 'Error: ' + e.message;
           }
         });
 
       // Close Hidden WebView
-        self.shadowRoot
-          .querySelector("#close-hidden-webview")
-          .addEventListener("click", async function (e) {
-            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
-            try {
-              await InAppBrowser.close();
-              statusText.textContent = "Hidden webview closed.";
-            } catch (e) {
-              console.error("Error closing hidden webview:", e);
-              statusText.textContent = "Error closing: " + e.message;
-            }
-          });
+      self.shadowRoot
+        .querySelector('#close-hidden-webview')
+        .addEventListener('click', async function (e) {
+          const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          try {
+            await InAppBrowser.close();
+            statusText.textContent = 'Hidden webview closed.';
+          } catch (e) {
+            console.error('Error closing hidden webview:', e);
+            statusText.textContent = 'Error closing: ' + e.message;
+          }
+        });
 
-        self.shadowRoot
-          .querySelector("#check-hidden-visibility")
-          .addEventListener("click", async function (e) {
-            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
-            try {
-              statusText.textContent = "Checking document.visibilityState...";
-              await InAppBrowser.executeScript({
-                code: `
+      self.shadowRoot
+        .querySelector('#check-hidden-visibility')
+        .addEventListener('click', async function (e) {
+          const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          try {
+            statusText.textContent = 'Checking document.visibilityState...';
+            await InAppBrowser.executeScript({
+              code: `
                   (function() {
                     var state = document.visibilityState;
                     var payload = JSON.stringify({
@@ -1356,22 +1360,22 @@ window.customElements.define(
                       console.error('No message interface available');
                     }
                   })();
-                `
-              });
-            } catch (e) {
-              console.error("Error checking visibility:", e);
-              statusText.textContent = "Hidden webview not open or script failed.";
-            }
-          });
+                `,
+            });
+          } catch (e) {
+            console.error('Error checking visibility:', e);
+            statusText.textContent = 'Hidden webview not open or script failed.';
+          }
+        });
 
-        self.shadowRoot
-          .querySelector("#check-hidden-dimensions")
-          .addEventListener("click", async function (e) {
-            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
-            try {
-              statusText.textContent = "Checking dimensions...";
-              await InAppBrowser.executeScript({
-                code: `
+      self.shadowRoot
+        .querySelector('#check-hidden-dimensions')
+        .addEventListener('click', async function (e) {
+          const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          try {
+            statusText.textContent = 'Checking dimensions...';
+            await InAppBrowser.executeScript({
+              code: `
                   (function() {
                     var data = {
                       window: {
@@ -1411,54 +1415,54 @@ window.customElements.define(
                       console.error('No message interface available');
                     }
                   })();
-                `
-              });
-            } catch (e) {
-              console.error("Error checking dimensions:", e);
-              statusText.textContent = "Hidden webview not open or script failed.";
-            }
-          });
+                `,
+            });
+          } catch (e) {
+            console.error('Error checking dimensions:', e);
+            statusText.textContent = 'Hidden webview not open or script failed.';
+          }
+        });
 
-        self.shadowRoot
-          .querySelector("#refresh-hidden-dom")
-          .addEventListener("click", async function () {
-            const statusText = self.shadowRoot.querySelector("#hidden-status-text");
-            const resultDiv = self.shadowRoot.querySelector("#hidden-webview-result");
-            const domOutput = self.shadowRoot.querySelector("#dom-content-output");
-            await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
-          });
+      self.shadowRoot
+        .querySelector('#refresh-hidden-dom')
+        .addEventListener('click', async function () {
+          const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          const resultDiv = self.shadowRoot.querySelector('#hidden-webview-result');
+          const domOutput = self.shadowRoot.querySelector('#dom-content-output');
+          await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
+        });
 
       // Test webapp with activity toolbar (comparison test)
       self.shadowRoot
-        .querySelector("#open-test-webapp-activity")
-        .addEventListener("click", async function (e) {
+        .querySelector('#open-test-webapp-activity')
+        .addEventListener('click', async function (e) {
           try {
             const urlToUse = getConfiguredTestWebappUrl();
 
             await InAppBrowser.openWebView({
               url: urlToUse,
-              toolbarColor: "#ffc107",
-              toolbarTextColor: "#212529",
+              toolbarColor: '#ffc107',
+              toolbarTextColor: '#212529',
               toolbarType: ToolBarType.ACTIVITY,
               backgroundColor: BackgroundColor.WHITE,
-              title: "Back Button Test - Activity Mode",
+              title: 'Back Button Test - Activity Mode',
               showReloadButton: false,
               visibleTitle: true,
               showArrow: true,
             });
 
             // Add event listeners for comparison
-            InAppBrowser.addListener("urlChangeEvent", (result) => {
-              console.log("🔄 [Activity Mode] URL changed:", result.url);
+            InAppBrowser.addListener('urlChangeEvent', (result) => {
+              console.log('🔄 [Activity Mode] URL changed:', result.url);
             });
 
-            InAppBrowser.addListener("closeEvent", () => {
-              console.log("❌ [Activity Mode] Close button pressed");
+            InAppBrowser.addListener('closeEvent', () => {
+              console.log('❌ [Activity Mode] Close button pressed');
             });
           } catch (e) {
-            console.error("Error opening test webapp in activity mode:", e);
+            console.error('Error opening test webapp in activity mode:', e);
             alert(
-              "Error opening test webapp. Make sure your local server is running and url.js is configured correctly.",
+              'Error opening test webapp. Make sure your local server is running and url.js is configured correctly.',
             );
           }
         });
@@ -1467,11 +1471,11 @@ window.customElements.define(
 );
 
 window.customElements.define(
-  "capacitor-welcome-titlebar",
+  'capacitor-welcome-titlebar',
   class extends HTMLElement {
     constructor() {
       super();
-      const root = this.attachShadow({ mode: "open" });
+      const root = this.attachShadow({ mode: 'open' });
       root.innerHTML = `
     <style>
       :host {
