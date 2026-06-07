@@ -1,3 +1,5 @@
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { Capacitor } from '@capacitor/core';
 import { SplashScreen } from "@capacitor/splash-screen";
 import { SystemBars, SystemBarType } from "@capacitor/core";
 import {
@@ -1492,3 +1494,9 @@ window.customElements.define(
     }
   },
 );
+
+if (Capacitor.isNativePlatform()) {
+  CapacitorUpdater.notifyAppReady().catch((error) => {
+    console.error('Capgo notifyAppReady failed', error);
+  });
+}
