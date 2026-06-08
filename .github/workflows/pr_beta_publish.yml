@@ -155,7 +155,7 @@ jobs:
             });
 
       - name: Check out PR head
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
         with:
           ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
