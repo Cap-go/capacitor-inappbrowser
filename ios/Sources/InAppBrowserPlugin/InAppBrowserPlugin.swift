@@ -51,6 +51,27 @@ enum ProxyResponseRoutingSupport {
     }
 }
 
+enum CustomWebViewFrameSupport {
+    static func resolvedFrame(
+        width: CGFloat?,
+        height: CGFloat?,
+        x: CGFloat?,
+        y: CGFloat?,
+        fallbackSize: CGSize
+    ) -> CGRect? {
+        guard let height else {
+            return nil
+        }
+
+        return CGRect(
+            x: x ?? 0,
+            y: y ?? 0,
+            width: width ?? fallbackSize.width,
+            height: height
+        )
+    }
+}
+
 extension UIColor {
 
     convenience init(hexString: String) {
@@ -1153,29 +1174,29 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 // Create a pass-through container
                 let containerView = PassThroughView()
                 containerView.backgroundColor = .clear
+                containerView.frame = UIScreen.main.bounds
+                containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
-                // Calculate dimensions - use screen width if only height is provided
-                let finalWidth = width.map { CGFloat($0) } ?? UIScreen.main.bounds.width
-                let finalHeight = height.map { CGFloat($0) } ?? UIScreen.main.bounds.height
-
-                containerView.targetFrame = CGRect(
-                    x: CGFloat(xPos ?? 0),
-                    y: CGFloat(yPos ?? 0),
-                    width: finalWidth,
-                    height: finalHeight
+                let targetFrame = CustomWebViewFrameSupport.resolvedFrame(
+                    width: width.map { CGFloat($0) },
+                    height: height.map { CGFloat($0) },
+                    x: xPos.map { CGFloat($0) },
+                    y: yPos.map { CGFloat($0) },
+                    fallbackSize: UIScreen.main.bounds.size
                 )
+                containerView.targetFrame = targetFrame
 
                 // Replace the navigation controller's view with our pass-through container
                 if let navController = self.navigationWebViewController,
                    let originalView = navController.view {
                     navController.view = containerView
                     containerView.addSubview(originalView)
-                    originalView.frame = CGRect(
-                        x: CGFloat(xPos ?? 0),
-                        y: CGFloat(yPos ?? 0),
-                        width: finalWidth,
-                        height: finalHeight
-                    )
+                    containerView.framedContentView = originalView
+                    originalView.translatesAutoresizingMaskIntoConstraints = true
+                    originalView.autoresizingMask = []
+                    if let targetFrame {
+                        originalView.frame = targetFrame
+                    }
                 }
             } else {
                 self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
