@@ -1845,6 +1845,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let xPos = call.getFloat("x")
         let yPos = call.getFloat("y")
 
+        if width != nil && height == nil {
+            call.reject("Height must be specified when width is provided")
+            return
+        }
+
         DispatchQueue.main.async {
             let targetId = call.getString("id") ?? self.activeWebViewId
             guard let webViewController = self.resolveWebViewController(for: targetId) else {
