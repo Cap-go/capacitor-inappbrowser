@@ -1416,6 +1416,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void downloadUrlToFile(String url, String userAgent, String contentDisposition, String mimeType) {
+        // WebView methods must run on the main thread; capture the page URL before the background download starts.
+        final String pageUrl = currentManagedDownloadPageUrl();
         executorService.execute(() -> {
             HttpURLConnection connection = null;
             InputStream inputStream = null;
@@ -1423,7 +1425,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             boolean downloadSucceeded = false;
 
             try {
-                String pageUrl = currentManagedDownloadPageUrl();
                 String currentUrl = url;
                 int redirectsFollowed = 0;
                 while (true) {
