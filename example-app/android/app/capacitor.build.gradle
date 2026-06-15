@@ -12,6 +12,7 @@ dependencies {
     implementation project(':capacitor-camera')
     implementation project(':capacitor-splash-screen')
     implementation project(':capgo-capacitor-inappbrowser')
+    implementation project(':capgo-capacitor-updater')
 
 }
 
