@@ -1,7 +1,76 @@
+import UIKit
 import XCTest
 @testable import InappbrowserPlugin
 
 final class InAppBrowserPluginTests: XCTestCase {
+    func testCustomWebViewFrameUsesExplicitDimensions() {
+        XCTAssertEqual(
+            CustomWebViewFrameSupport.resolvedFrame(
+                width: 320,
+                height: 480,
+                x: 12,
+                y: 24,
+                fallbackSize: CGSize(width: 390, height: 844)
+            ),
+            CGRect(x: 12, y: 24, width: 320, height: 480)
+        )
+    }
+
+    func testCustomWebViewFrameUsesFallbackWidthForHeightOnly() {
+        XCTAssertEqual(
+            CustomWebViewFrameSupport.resolvedFrame(
+                width: nil,
+                height: 480,
+                x: nil,
+                y: 32,
+                fallbackSize: CGSize(width: 390, height: 844)
+            ),
+            CGRect(x: 0, y: 32, width: 390, height: 480)
+        )
+    }
+
+    func testCustomWebViewFrameIgnoresMissingDimensions() {
+        XCTAssertNil(
+            CustomWebViewFrameSupport.resolvedFrame(
+                width: nil,
+                height: nil,
+                x: 12,
+                y: 24,
+                fallbackSize: CGSize(width: 390, height: 844)
+            )
+        )
+    }
+
+    func testCustomWebViewFrameIgnoresWidthWithoutHeight() {
+        XCTAssertNil(
+            CustomWebViewFrameSupport.resolvedFrame(
+                width: 320,
+                height: nil,
+                x: 12,
+                y: 24,
+                fallbackSize: CGSize(width: 390, height: 844)
+            )
+        )
+    }
+
+    func testPassThroughViewKeepsContentOnTargetFrameAfterLayout() {
+        let targetFrame = CGRect(x: 12, y: 24, width: 320, height: 480)
+        let container = PassThroughView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let contentView = UIView(frame: .zero)
+
+        container.addSubview(contentView)
+        container.framedContentView = contentView
+        container.targetFrame = targetFrame
+        container.layoutIfNeeded()
+
+        XCTAssertEqual(contentView.frame, targetFrame)
+
+        container.frame = CGRect(x: 0, y: 0, width: 430, height: 932)
+        container.layoutIfNeeded()
+
+        XCTAssertEqual(contentView.frame, targetFrame)
+    }
+
     func testViewportRefreshIgnoresZeroSizeBeforeLayout() {
         XCTAssertFalse(
             WebViewViewportLayoutSupport.shouldRefreshViewport(

@@ -2881,26 +2881,32 @@ extension WKWebViewController: WKNavigationDelegate {
 
     /// Apply custom dimensions to the view if specified
     open func applyCustomDimensions() {
-        guard let navigationController = navigationController else { return }
-
-        // Apply custom dimensions if both width and height are specified
-        if let width = customWidth, let height = customHeight {
-            let xPos = customX ?? 0
-            let yPos = customY ?? 0
-
-            // Set the frame for the navigation controller's view
-            navigationController.view.frame = CGRect(x: xPos, y: yPos, width: width, height: height)
+        guard let navigationController = navigationController,
+              let targetFrame = CustomWebViewFrameSupport.resolvedFrame(
+                width: customWidth,
+                height: customHeight,
+                x: customX,
+                y: customY,
+                fallbackSize: UIScreen.main.bounds.size
+              ) else {
+            return
         }
-        // If only height is specified, use fullscreen width
-        else if let height = customHeight, customWidth == nil {
-            let xPos = customX ?? 0
-            let yPos = customY ?? 0
-            let screenWidth = UIScreen.main.bounds.width
 
-            // Set the frame with fullscreen width and custom height
-            navigationController.view.frame = CGRect(x: xPos, y: yPos, width: screenWidth, height: height)
+        if let passThroughView = navigationController.view as? PassThroughView {
+            passThroughView.targetFrame = targetFrame
+            let contentView = passThroughView.framedContentView ?? passThroughView.subviews.first
+            contentView?.frame = targetFrame
+            contentView?.setNeedsLayout()
+            contentView?.layoutIfNeeded()
+            passThroughView.setNeedsLayout()
+            passThroughView.layoutIfNeeded()
+        } else {
+            navigationController.view.frame = targetFrame
+            navigationController.view.setNeedsLayout()
+            navigationController.view.layoutIfNeeded()
         }
-        // Otherwise, use default fullscreen behavior (no action needed)
+
+        refreshWebViewViewportIfNeeded(force: true)
     }
 
     /// Update dimensions at runtime
@@ -3035,7 +3041,22 @@ class BlockBarButtonItem: UIBarButtonItem {
 
 /// Custom view that passes touches outside a target frame to the underlying view
 class PassThroughView: UIView {
-    var targetFrame: CGRect?
+    var targetFrame: CGRect? {
+        didSet {
+            setNeedsLayout()
+        }
+    }
+    weak var framedContentView: UIView?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+
+        guard let targetFrame, let framedContentView else {
+            return
+        }
+
+        framedContentView.frame = targetFrame
+    }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         // If we have a target frame and the touch is outside it, pass through
