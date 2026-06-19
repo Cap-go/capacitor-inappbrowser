@@ -33,6 +33,7 @@ import android.text.TextUtils;
 import android.util.Base64;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -5990,12 +5991,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             params.height = (int) getPixels(height);
             params.x = (x != null) ? (int) getPixels(x) : 0;
             params.y = (y != null) ? (int) getPixels(y) : 0;
+            params.gravity = Gravity.TOP | Gravity.START;
         } else if (height != null && width == null) {
             // If only height is specified, use custom height with fullscreen width
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = (int) getPixels(height);
             params.x = 0;
             params.y = (y != null) ? (int) getPixels(y) : 0;
+            params.gravity = Gravity.TOP | Gravity.START;
         } else {
             // Default to fullscreen
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
