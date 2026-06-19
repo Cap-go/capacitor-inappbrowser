@@ -12,6 +12,27 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void safeBottomInsetUsesFallbackWhenInsetsAreZeroAndOptionEnabled() {
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 48, true));
+    }
+
+    @Test
+    public void safeBottomInsetIgnoresFallbackWhenInsetsArePresent() {
+        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 48, true));
+    }
+
+    @Test
+    public void safeBottomInsetIgnoresFallbackWhenOptionDisabled() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 48, false));
+    }
+
+    @Test
+    public void safeBottomInsetSkipsFallbackWhenNavigationBarIsOnTheSide() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 48, 0, 0, 0, 48, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 48, 0, 0, 48, true));
+    }
+
+    @Test
     public void bottomMarginFollowsSafeBottomOptionAndKeyboardInset() {
         assertEquals(16, SafeAreaInsetsSupport.resolveBottomMargin(true, 16, 0));
         assertEquals(0, SafeAreaInsetsSupport.resolveBottomMargin(false, 16, 0));

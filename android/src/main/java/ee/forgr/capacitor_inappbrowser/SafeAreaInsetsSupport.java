@@ -13,6 +13,34 @@ final class SafeAreaInsetsSupport {
         return Math.max(systemBarsBottom, Math.max(navigationBarsBottom, Math.max(systemGesturesBottom, mandatoryGesturesBottom)));
     }
 
+    static int resolveSafeBottomInsetWithFallback(
+        int systemBarsBottom,
+        int navigationBarsBottom,
+        int systemGesturesBottom,
+        int mandatoryGesturesBottom,
+        int systemBarsLeft,
+        int systemBarsRight,
+        int navigationBarsLeft,
+        int navigationBarsRight,
+        int fallbackBottomInset,
+        boolean applyFallbackWhenZero
+    ) {
+        int inset = resolveSafeBottomInset(systemBarsBottom, navigationBarsBottom, systemGesturesBottom, mandatoryGesturesBottom);
+        if (inset > 0 || !applyFallbackWhenZero || fallbackBottomInset <= 0) {
+            return inset;
+        }
+
+        if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight)) {
+            return 0;
+        }
+
+        return fallbackBottomInset;
+    }
+
+    static boolean hasSideNavigationBarInsets(int systemBarsLeft, int systemBarsRight, int navigationBarsLeft, int navigationBarsRight) {
+        return systemBarsLeft > 0 || systemBarsRight > 0 || navigationBarsLeft > 0 || navigationBarsRight > 0;
+    }
+
     static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
         int bottomInset = enabledSafeBottomMargin ? safeBottomInset : 0;
         return Math.max(bottomInset, imeBottom);

@@ -2626,10 +2626,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         }
 
-        View coordinatorView = findViewById(R.id.coordinator_layout);
-        final View insetsSourceView = coordinatorView != null ? coordinatorView : _webView;
+        // Resolve insets from the dialog window root; layout children can receive already-fitted zero insets.
+        final View insetsSourceView = resolveSafeAreaInsetsSourceView();
 
-        // Resolve insets from the dialog root; child WebViews can receive already-fitted zero insets.
         ViewCompat.setOnApplyWindowInsetsListener(insetsSourceView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
@@ -2738,11 +2737,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInset(
+        int fallbackBottomInset = _options.getEnabledSafeMargin() ? getSystemNavigationBarHeight() : 0;
+        int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
             bars.bottom,
             navigationBars.bottom,
             systemGestures.bottom,
-            mandatoryGestures.bottom
+            mandatoryGestures.bottom,
+            bars.left,
+            bars.right,
+            navigationBars.left,
+            navigationBars.right,
+            fallbackBottomInset,
+            _options.getEnabledSafeMargin()
         );
         int imeBottom = keyboardVisible ? ime.bottom : 0;
         int navTop = SafeAreaInsetsSupport.resolveTopMargin(
@@ -2759,9 +2765,30 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.setLayoutParams(mlp);
     }
 
-    private void requestSafeAreaInsets() {
+    private View resolveSafeAreaInsetsSourceView() {
+        Window window = getWindow();
+        if (window != null) {
+            View decorView = window.getDecorView();
+            if (decorView != null) {
+                return decorView;
+            }
+        }
+
         View coordinatorView = findViewById(R.id.coordinator_layout);
-        View insetsSourceView = coordinatorView != null ? coordinatorView : _webView;
+        return coordinatorView != null ? coordinatorView : _webView;
+    }
+
+    private int getSystemNavigationBarHeight() {
+        int resourceId = getContext().getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId <= 0) {
+            return 0;
+        }
+
+        return getContext().getResources().getDimensionPixelSize(resourceId);
+    }
+
+    private void requestSafeAreaInsets() {
+        View insetsSourceView = resolveSafeAreaInsetsSourceView();
         if (insetsSourceView == null) {
             return;
         }
