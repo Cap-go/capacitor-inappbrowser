@@ -2743,6 +2743,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             navigationBars.bottom,
             systemGestures.bottom,
             mandatoryGestures.bottom,
+            bars.left,
+            bars.right,
+            navigationBars.left,
+            navigationBars.right,
             fallbackBottomInset,
             _options.getEnabledSafeMargin()
         );
