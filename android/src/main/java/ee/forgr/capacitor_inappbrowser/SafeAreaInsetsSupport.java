@@ -47,10 +47,25 @@ final class SafeAreaInsetsSupport {
     }
 
     static int resolveTopMargin(boolean enabledSafeTopMargin, boolean useTopInset, int systemBarsTop, boolean appBarHandlesTopInset) {
+        return resolveTopMarginWithFallback(enabledSafeTopMargin, useTopInset, systemBarsTop, appBarHandlesTopInset, 0, false);
+    }
+
+    static int resolveTopMarginWithFallback(
+        boolean enabledSafeTopMargin,
+        boolean useTopInset,
+        int systemBarsTop,
+        boolean appBarHandlesTopInset,
+        int fallbackTopInset,
+        boolean applyFallbackWhenZero
+    ) {
         if (!enabledSafeTopMargin || !useTopInset || appBarHandlesTopInset) {
             return 0;
         }
 
-        return systemBarsTop;
+        if (systemBarsTop > 0 || !applyFallbackWhenZero || fallbackTopInset <= 0) {
+            return systemBarsTop;
+        }
+
+        return fallbackTopInset;
     }
 }
