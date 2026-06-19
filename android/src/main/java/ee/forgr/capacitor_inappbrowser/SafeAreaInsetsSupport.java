@@ -13,6 +13,27 @@ final class SafeAreaInsetsSupport {
         return Math.max(systemBarsBottom, Math.max(navigationBarsBottom, Math.max(systemGesturesBottom, mandatoryGesturesBottom)));
     }
 
+    static int resolveSafeBottomInsetWithFallback(
+        int systemBarsBottom,
+        int navigationBarsBottom,
+        int systemGesturesBottom,
+        int mandatoryGesturesBottom,
+        int fallbackBottomInset,
+        boolean applyFallbackWhenZero
+    ) {
+        int inset = resolveSafeBottomInset(
+            systemBarsBottom,
+            navigationBarsBottom,
+            systemGesturesBottom,
+            mandatoryGesturesBottom
+        );
+        if (inset > 0 || !applyFallbackWhenZero || fallbackBottomInset <= 0) {
+            return inset;
+        }
+
+        return fallbackBottomInset;
+    }
+
     static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
         int bottomInset = enabledSafeBottomMargin ? safeBottomInset : 0;
         return Math.max(bottomInset, imeBottom);
