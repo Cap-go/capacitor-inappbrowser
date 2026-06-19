@@ -47,4 +47,21 @@ public class SafeAreaInsetsSupportTest {
         assertEquals(0, SafeAreaInsetsSupport.resolveTopMargin(true, false, 48, false));
         assertEquals(0, SafeAreaInsetsSupport.resolveTopMargin(true, true, 48, true));
     }
+
+    @Test
+    public void topMarginUsesFallbackWhenInsetsAreZeroAndOptionEnabled() {
+        assertEquals(48, SafeAreaInsetsSupport.resolveTopMarginWithFallback(true, true, 0, false, 48, true));
+    }
+
+    @Test
+    public void topMarginIgnoresFallbackWhenInsetsArePresent() {
+        assertEquals(32, SafeAreaInsetsSupport.resolveTopMarginWithFallback(true, true, 32, false, 48, true));
+    }
+
+    @Test
+    public void topMarginIgnoresFallbackWhenOptionDisabled() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveTopMarginWithFallback(true, true, 0, false, 48, false));
+        assertEquals(0, SafeAreaInsetsSupport.resolveTopMarginWithFallback(false, true, 0, false, 48, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveTopMarginWithFallback(true, false, 0, false, 48, true));
+    }
 }

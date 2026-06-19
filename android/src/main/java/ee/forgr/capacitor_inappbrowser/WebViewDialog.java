@@ -62,6 +62,7 @@ import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -2576,8 +2577,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         }
 
+        boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
+        if (isBlankToolbar) {
+            configureBlankToolbarLayout();
+        }
+
         // Special handling for Android 15+
-        if (isAndroid15Plus) {
+        if (isAndroid15Plus && !isBlankToolbar) {
             // Get AppBarLayout which contains the toolbar
             if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
                 // Remove elevation to eliminate shadows (only on Android 15+)
@@ -2752,18 +2758,76 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _options.getEnabledSafeMargin()
         );
         int imeBottom = keyboardVisible ? ime.bottom : 0;
-        int navTop = SafeAreaInsetsSupport.resolveTopMargin(
+        boolean applyTopFallback = _options.getEnabledSafeTopMargin() && _options.getUseTopInset();
+        int fallbackTopInset = applyTopFallback ? getSystemStatusBarHeight() : 0;
+        int navTop = SafeAreaInsetsSupport.resolveTopMarginWithFallback(
             _options.getEnabledSafeTopMargin(),
             _options.getUseTopInset(),
             bars.top,
-            appBarHandlesTopInset
+            appBarHandlesTopInset,
+            fallbackTopInset,
+            applyTopFallback
         );
+        int bottomMargin = SafeAreaInsetsSupport.resolveBottomMargin(_options.getEnabledSafeMargin(), safeBottomInset, imeBottom);
 
         mlp.topMargin = navTop;
-        mlp.bottomMargin = SafeAreaInsetsSupport.resolveBottomMargin(_options.getEnabledSafeMargin(), safeBottomInset, imeBottom);
+        mlp.bottomMargin = bottomMargin;
         mlp.leftMargin = bars.left;
         mlp.rightMargin = bars.right;
         _webView.setLayoutParams(mlp);
+        injectSafeAreaCssVariables(navTop, bottomMargin, bars.left, bars.right);
+    }
+
+    private void configureBlankToolbarLayout() {
+        View appBarLayout = findViewById(R.id.app_bar_layout);
+        if (appBarLayout != null) {
+            appBarLayout.setVisibility(View.GONE);
+        }
+
+        View statusBarColorView = findViewById(R.id.status_bar_color_view);
+        if (statusBarColorView != null) {
+            statusBarColorView.setVisibility(View.GONE);
+        }
+
+        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+        if (contentBrowserLayout != null && contentBrowserLayout.getLayoutParams() instanceof CoordinatorLayout.LayoutParams) {
+            CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams) contentBrowserLayout.getLayoutParams();
+            layoutParams.setBehavior(null);
+            contentBrowserLayout.setLayoutParams(layoutParams);
+        }
+    }
+
+    private int getSystemStatusBarHeight() {
+        int resourceId = getContext().getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId <= 0) {
+            return 0;
+        }
+
+        return getContext().getResources().getDimensionPixelSize(resourceId);
+    }
+
+    private void injectSafeAreaCssVariables(int top, int bottom, int left, int right) {
+        if (_webView == null) {
+            return;
+        }
+
+        String script = String.format(
+            Locale.US,
+            "(function(){var root=document.documentElement;" +
+                "root.style.setProperty('--safe-area-inset-top','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-bottom','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-left','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-right','%dpx');})();",
+            top,
+            bottom,
+            left,
+            right
+        );
+        _webView.post(() -> {
+            if (_webView != null) {
+                _webView.evaluateJavascript(script, null);
+            }
+        });
     }
 
     private View resolveSafeAreaInsetsSourceView() {
@@ -3595,6 +3659,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             // Status bar color is already set at the top of this method, no need to set again
         } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
             _toolbar.setVisibility(View.GONE);
+            configureBlankToolbarLayout();
+            requestSafeAreaInsets();
 
             // Also set window background color to match status bar for blank toolbar
             View statusBarColorView = findViewById(R.id.status_bar_color_view);
