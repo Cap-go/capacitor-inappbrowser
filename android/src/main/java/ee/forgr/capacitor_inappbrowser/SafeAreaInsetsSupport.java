@@ -21,12 +21,7 @@ final class SafeAreaInsetsSupport {
         int fallbackBottomInset,
         boolean applyFallbackWhenZero
     ) {
-        int inset = resolveSafeBottomInset(
-            systemBarsBottom,
-            navigationBarsBottom,
-            systemGesturesBottom,
-            mandatoryGesturesBottom
-        );
+        int inset = resolveSafeBottomInset(systemBarsBottom, navigationBarsBottom, systemGesturesBottom, mandatoryGesturesBottom);
         if (inset > 0 || !applyFallbackWhenZero || fallbackBottomInset <= 0) {
             return inset;
         }
