@@ -2813,10 +2813,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         String script = String.format(
             Locale.US,
             "(function(){var root=document.documentElement;" +
-            "root.style.setProperty('--safe-area-inset-top','%dpx');" +
-            "root.style.setProperty('--safe-area-inset-bottom','%dpx');" +
-            "root.style.setProperty('--safe-area-inset-left','%dpx');" +
-            "root.style.setProperty('--safe-area-inset-right','%dpx');})();",
+                "root.style.setProperty('--safe-area-inset-top','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-bottom','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-left','%dpx');" +
+                "root.style.setProperty('--safe-area-inset-right','%dpx');})();",
             top,
             bottom,
             left,
