@@ -99,6 +99,72 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testSafeAreaLayoutDisablesAutomaticBottomInsetByDefault() {
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.contentInsetAdjustmentBehavior(enabledSafeBottomMargin: false),
+            .never
+        )
+        XCTAssertFalse(
+            WebViewSafeAreaLayoutSupport.shouldInsetLayoutMarginsFromSafeArea(enabledSafeBottomMargin: false)
+        )
+    }
+
+    func testSafeAreaLayoutKeepsAutomaticBottomInsetWhenEnabled() {
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.contentInsetAdjustmentBehavior(enabledSafeBottomMargin: true),
+            .automatic
+        )
+        XCTAssertTrue(
+            WebViewSafeAreaLayoutSupport.shouldInsetLayoutMarginsFromSafeArea(enabledSafeBottomMargin: true)
+        )
+    }
+
+    func testSafeAreaLayoutNegatesBottomInsetWhenDisabled() {
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.additionalBottomSafeAreaOffset(
+                enabledSafeBottomMargin: false,
+                safeAreaBottomInset: 34
+            ),
+            -34
+        )
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.cssBottomInset(
+                enabledSafeBottomMargin: false,
+                safeAreaBottomInset: 34
+            ),
+            0
+        )
+    }
+
+    func testSafeAreaLayoutPreservesBottomInsetWhenEnabled() {
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.additionalBottomSafeAreaOffset(
+                enabledSafeBottomMargin: true,
+                safeAreaBottomInset: 34
+            ),
+            0
+        )
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.cssBottomInset(
+                enabledSafeBottomMargin: true,
+                safeAreaBottomInset: 34
+            ),
+            34
+        )
+    }
+
+    func testSafeAreaCssVariablesScriptUsesRoundedPixelValues() {
+        let script = WebViewSafeAreaLayoutSupport.safeAreaCssVariablesScript(
+            top: 59.4,
+            bottom: 0,
+            left: 0,
+            right: 0
+        )
+
+        XCTAssertTrue(script.contains("--safe-area-inset-top','59px'"))
+        XCTAssertTrue(script.contains("--safe-area-inset-bottom','0px'"))
+    }
+
     func testLegacyProxyRequestsConfigurationSupportsBooleanValues() {
         let enabled = ProxySchemeRequestSupport.legacyProxyRequestsConfiguration(from: true)
         XCTAssertTrue(enabled.isEnabled)
