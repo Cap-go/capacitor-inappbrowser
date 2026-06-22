@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -763,7 +764,25 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             tabsIntent.intent.putExtra("isPresentAfterPageLoad", true);
         }
 
-        tabsIntent.launchUrl(getContext(), Uri.parse(url));
+        Uri targetUri = Uri.parse(url);
+        try {
+            tabsIntent.launchUrl(getContext(), targetUri);
+        } catch (ActivityNotFoundException e) {
+            Intent fallback = new Intent(Intent.ACTION_VIEW, targetUri);
+            Bundle extras = tabsIntent.intent.getExtras();
+            if (extras != null) {
+                fallback.putExtras(extras);
+            }
+            if (tabsIntent.intent.getPackage() != null) {
+                fallback.setPackage(tabsIntent.intent.getPackage());
+            }
+            try {
+                getContext().startActivity(fallback);
+            } catch (ActivityNotFoundException e2) {
+                call.reject("No browser found to open URL: " + url);
+                return;
+            }
+        }
 
         call.resolve();
     }
