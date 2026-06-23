@@ -236,6 +236,49 @@ enum WebViewViewportLayoutSupport {
     }
 }
 
+enum WebViewSafeAreaLayoutSupport {
+    static func contentInsetAdjustmentBehavior(enabledSafeBottomMargin: Bool) -> UIScrollView.ContentInsetAdjustmentBehavior {
+        enabledSafeBottomMargin ? .automatic : .never
+    }
+
+    static func shouldInsetLayoutMarginsFromSafeArea(enabledSafeBottomMargin: Bool) -> Bool {
+        enabledSafeBottomMargin
+    }
+
+    static func rawSystemBottomInset(effectiveBottomInset: CGFloat, additionalBottomInset: CGFloat) -> CGFloat {
+        max(0, effectiveBottomInset - additionalBottomInset)
+    }
+
+    static func additionalBottomSafeAreaOffset(enabledSafeBottomMargin: Bool, safeAreaBottomInset: CGFloat) -> CGFloat {
+        guard !enabledSafeBottomMargin, safeAreaBottomInset > 0 else {
+            return 0
+        }
+
+        return -safeAreaBottomInset
+    }
+
+    static func cssBottomInset(enabledSafeBottomMargin: Bool, safeAreaBottomInset: CGFloat) -> CGFloat {
+        enabledSafeBottomMargin ? safeAreaBottomInset : 0
+    }
+
+    static func cssTopInset(enabledSafeTopMargin: Bool, safeAreaTopInset: CGFloat) -> CGFloat {
+        enabledSafeTopMargin ? safeAreaTopInset : 0
+    }
+
+    static func safeAreaCssVariablesScript(top: CGFloat, bottom: CGFloat, left: CGFloat, right: CGFloat) -> String {
+        let topValue = Int(top.rounded())
+        let bottomValue = Int(bottom.rounded())
+        let leftValue = Int(left.rounded())
+        let rightValue = Int(right.rounded())
+
+        return "(function(){var root=document.documentElement;" +
+            "root.style.setProperty('--safe-area-inset-top','\(topValue)px');" +
+            "root.style.setProperty('--safe-area-inset-bottom','\(bottomValue)px');" +
+            "root.style.setProperty('--safe-area-inset-left','\(leftValue)px');" +
+            "root.style.setProperty('--safe-area-inset-right','\(rightValue)px');})();"
+    }
+}
+
 open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     public init() {
@@ -395,6 +438,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     private var isWebViewInitialized = false
     private var isObservingKeyboardViewportChanges = false
     private var lastViewportRefreshSize: CGSize?
+    private struct InjectedSafeAreaInsets: Equatable {
+        let top: Int
+        let bottom: Int
+        let left: Int
+        let right: Int
+    }
+
+    private var lastInjectedSafeAreaInsets: InjectedSafeAreaInsets?
     private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
     private var previewItemURL: URL?
 
@@ -904,7 +955,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        syncWebViewSafeAreaLayout()
         refreshWebViewViewportIfNeeded()
+    }
+
+    override open func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        syncWebViewSafeAreaLayout()
     }
 
     func updateButtonTintColors() {
@@ -1062,6 +1119,72 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webView.scrollView.setNeedsLayout()
         webView.scrollView.layoutIfNeeded()
         webView.evaluateJavaScript("window.dispatchEvent(new Event('resize'));", completionHandler: nil)
+    }
+
+    private func configureWebViewScrollViewSafeArea(_ webView: WKWebView) {
+        if #available(iOS 11.0, *) {
+            webView.scrollView.contentInsetAdjustmentBehavior = WebViewSafeAreaLayoutSupport
+                .contentInsetAdjustmentBehavior(enabledSafeBottomMargin: enabledSafeBottomMargin)
+        }
+
+        webView.insetsLayoutMarginsFromSafeArea = WebViewSafeAreaLayoutSupport
+            .shouldInsetLayoutMarginsFromSafeArea(enabledSafeBottomMargin: enabledSafeBottomMargin)
+
+        if !enabledSafeBottomMargin {
+            webView.scrollView.contentInset = .zero
+            webView.scrollView.scrollIndicatorInsets = .zero
+        }
+    }
+
+    private func syncWebViewSafeAreaLayout() {
+        guard let webView = self.webView, webView.superview != nil else {
+            return
+        }
+
+        let rawSafeAreaBottomInset = WebViewSafeAreaLayoutSupport.rawSystemBottomInset(
+            effectiveBottomInset: view.safeAreaInsets.bottom,
+            additionalBottomInset: additionalSafeAreaInsets.bottom
+        )
+
+        let bottomOffset = WebViewSafeAreaLayoutSupport.additionalBottomSafeAreaOffset(
+            enabledSafeBottomMargin: enabledSafeBottomMargin,
+            safeAreaBottomInset: rawSafeAreaBottomInset
+        )
+        if additionalSafeAreaInsets.bottom != bottomOffset {
+            additionalSafeAreaInsets.bottom = bottomOffset
+        }
+
+        configureWebViewScrollViewSafeArea(webView)
+
+        let topInset = WebViewSafeAreaLayoutSupport.cssTopInset(
+            enabledSafeTopMargin: enabledSafeTopMargin,
+            safeAreaTopInset: view.safeAreaInsets.top
+        )
+        let bottomInset = WebViewSafeAreaLayoutSupport.cssBottomInset(
+            enabledSafeBottomMargin: enabledSafeBottomMargin,
+            safeAreaBottomInset: rawSafeAreaBottomInset
+        )
+        let leftInset = view.safeAreaInsets.left
+        let rightInset = view.safeAreaInsets.right
+
+        let roundedInsets = InjectedSafeAreaInsets(
+            top: Int(topInset.rounded()),
+            bottom: Int(bottomInset.rounded()),
+            left: Int(leftInset.rounded()),
+            right: Int(rightInset.rounded())
+        )
+        if lastInjectedSafeAreaInsets == roundedInsets {
+            return
+        }
+        lastInjectedSafeAreaInsets = roundedInsets
+
+        let script = WebViewSafeAreaLayoutSupport.safeAreaCssVariablesScript(
+            top: topInset,
+            bottom: bottomInset,
+            left: leftInset,
+            right: rightInset
+        )
+        webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
     private func jsonString(from object: Any) -> String? {
@@ -1504,6 +1627,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Disable bounce effect by setting scrollView.bounces to false when disableOverscroll is true
         webView.scrollView.bounces = !self.disableOverscroll
+        configureWebViewScrollViewSafeArea(webView)
 
         webView.addObserver(self, forKeyPath: estimatedProgressKeyPath, options: .new, context: nil)
         if websiteTitleInNavigationBar {
@@ -2075,10 +2199,10 @@ fileprivate extension WKWebViewController {
     }
 
     func setUpState() {
-        navigationController?.setNavigationBarHidden(false, animated: true)
+        navigationController?.setNavigationBarHidden(blankNavigationTab, animated: false)
 
         // Always hide toolbar since we never want it
-        navigationController?.setToolbarHidden(true, animated: true)
+        navigationController?.setToolbarHidden(true, animated: false)
 
         // Set tint colors but don't override specific colors
         if tintColor == nil {
@@ -2730,6 +2854,8 @@ extension WKWebViewController: WKNavigationDelegate {
             delegate?.webViewController?(self, didFinish: url)
         }
         self.injectJavaScriptInterface()
+        lastInjectedSafeAreaInsets = nil
+        syncWebViewSafeAreaLayout()
         emit("browserPageLoaded")
     }
 
@@ -2944,6 +3070,7 @@ extension WKWebViewController: WKNavigationDelegate {
             webView.topAnchor.constraint(equalTo: topAnchor)
         ])
         self.view.layoutIfNeeded()
+        syncWebViewSafeAreaLayout()
         refreshWebViewViewportIfNeeded(force: true)
     }
 
@@ -2965,6 +3092,7 @@ extension WKWebViewController: WKNavigationDelegate {
             webView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         self.view.layoutIfNeeded()
+        syncWebViewSafeAreaLayout()
         refreshWebViewViewportIfNeeded(force: true)
     }
 }
