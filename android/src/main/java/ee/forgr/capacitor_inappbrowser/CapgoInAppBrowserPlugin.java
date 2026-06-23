@@ -769,6 +769,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             tabsIntent.launchUrl(getContext(), targetUri);
         } catch (ActivityNotFoundException e) {
             Intent fallback = new Intent(Intent.ACTION_VIEW, targetUri);
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Bundle extras = tabsIntent.intent.getExtras();
             if (extras != null) {
                 fallback.putExtras(extras);
