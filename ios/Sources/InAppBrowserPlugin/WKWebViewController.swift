@@ -438,7 +438,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     private var isWebViewInitialized = false
     private var isObservingKeyboardViewportChanges = false
     private var lastViewportRefreshSize: CGSize?
-    private var lastInjectedSafeAreaInsets: (top: Int, bottom: Int, left: Int, right: Int)?
+    private struct InjectedSafeAreaInsets: Equatable {
+        let top: Int
+        let bottom: Int
+        let left: Int
+        let right: Int
+    }
+
+    private var lastInjectedSafeAreaInsets: InjectedSafeAreaInsets?
     private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
     private var previewItemURL: URL?
 
@@ -1154,7 +1161,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let leftInset = view.safeAreaInsets.left
         let rightInset = view.safeAreaInsets.right
 
-        let roundedInsets = (
+        let roundedInsets = InjectedSafeAreaInsets(
             top: Int(topInset.rounded()),
             bottom: Int(bottomInset.rounded()),
             left: Int(leftInset.rounded()),
