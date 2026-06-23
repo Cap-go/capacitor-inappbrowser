@@ -6053,6 +6053,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         // If both width and height are specified, use custom dimensions
         if (width != null && height != null) {
+            params.gravity = Gravity.TOP | Gravity.LEFT;
             params.width = (int) getPixels(width);
             params.height = (int) getPixels(height);
             params.x = (x != null) ? (int) getPixels(x) : 0;
@@ -6060,6 +6061,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             params.gravity = Gravity.TOP | Gravity.START;
         } else if (height != null && width == null) {
             // If only height is specified, use custom height with fullscreen width
+            params.gravity = Gravity.TOP | Gravity.LEFT;
             params.width = WindowManager.LayoutParams.MATCH_PARENT;
             params.height = (int) getPixels(height);
             params.x = 0;
