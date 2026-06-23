@@ -1160,7 +1160,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             left: Int(leftInset.rounded()),
             right: Int(rightInset.rounded())
         )
-        guard roundedInsets != lastInjectedSafeAreaInsets else {
+        if lastInjectedSafeAreaInsets == roundedInsets {
             return
         }
         lastInjectedSafeAreaInsets = roundedInsets
@@ -2850,6 +2850,8 @@ extension WKWebViewController: WKNavigationDelegate {
             delegate?.webViewController?(self, didFinish: url)
         }
         self.injectJavaScriptInterface()
+        lastInjectedSafeAreaInsets = nil
+        syncWebViewSafeAreaLayout()
         emit("browserPageLoaded")
     }
 

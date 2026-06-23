@@ -168,6 +168,13 @@ final class InAppBrowserPluginTests: XCTestCase {
             ),
             6
         )
+        XCTAssertEqual(
+            WebViewSafeAreaLayoutSupport.rawSystemBottomInset(
+                effectiveBottomInset: 10,
+                additionalBottomInset: 20
+            ),
+            0
+        )
     }
 
     func testSafeAreaCssVariablesScriptUsesRoundedPixelValues() {
