@@ -687,7 +687,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     // Status bar height
     private var statusBarHeight: CGFloat {
-        return UIApplication.shared.windows.first?.windowScene?.statusBarManager?.statusBarFrame.height ?? 0
+        let windowScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first
+        return windowScene?.statusBarManager?.statusBarFrame.height ?? 0
     }
 
     // Make status bar background with colored view underneath
@@ -1405,9 +1411,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
         // Enable background task processing
-        if initialWebConfiguration == nil {
-            webConfiguration.processPool = WKProcessPool()
-        }
+        // WKProcessPool is shared automatically on iOS 15+; explicit assignment is deprecated.
 
         // Enable JavaScript to run automatically (needed for preShowScript and Firebase polyfill)
         webConfiguration.preferences.javaScriptCanOpenWindowsAutomatically = true
@@ -1629,7 +1633,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Ensure status bar appearance is correct when view appears
         // Make sure we have the latest tint color
-        if let tintColor = self.tintColor {
+        if self.tintColor != nil {
             // Update the status bar background if needed
             if let navController = navigationController, let backgroundColor = navController.navigationBar.backgroundColor ?? statusBarBackgroundView?.backgroundColor {
                 setupStatusBarBackground(color: backgroundColor)
@@ -1735,6 +1739,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 // MARK: - Public Methods
 public extension WKWebViewController {
 
+    func goBack() -> Bool {
+        if webView?.canGoBack ?? false {
+            webView?.goBack()
+            return true
+        }
+        return false
+    }
+
+
     func load(source sourceValue: WKWebSource) {
         switch sourceValue {
         case .remote(let url):
@@ -1816,7 +1829,7 @@ public extension WKWebViewController {
         self.webView?.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
     }
 
-    open func cleanupWebView() {
+    func cleanupWebView() {
         guard let webView = self.webView else { return }
         webView.stopLoading()
         previewItemURL = nil
@@ -2264,14 +2277,6 @@ fileprivate extension WKWebViewController {
     }
 
     // Public method for safe back navigation
-    public func goBack() -> Bool {
-        if webView?.canGoBack ?? false {
-            webView?.goBack()
-            return true
-        }
-        return false
-    }
-
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
     }
@@ -2422,7 +2427,7 @@ fileprivate extension WKWebViewController {
         dismiss(animated: true, completion: nil)
     }
 
-    open func setUpNavigationBarAppearance() {
+    func setUpNavigationBarAppearance() {
         // Set up basic bar appearance
         if let navBar = navigationController?.navigationBar {
             // Make navigation bar transparent
@@ -2479,15 +2484,7 @@ extension WKWebViewController: WKUIDelegate {
                 strongCompletionHandler()
             }))
 
-            // Try to present the alert
-            do {
-                self.present(alertController, animated: true, completion: nil)
-            } catch {
-                // This won't typically be triggered as present doesn't throw,
-                // but adding as a safeguard
-                print("[InAppBrowser] Error presenting alert: \(error)")
-                strongCompletionHandler()
-            }
+            self.present(alertController, animated: true, completion: nil)
         }
     }
 
@@ -2880,7 +2877,7 @@ extension WKWebViewController: WKNavigationDelegate {
     // MARK: - Dimension Management
 
     /// Apply custom dimensions to the view if specified
-    open func applyCustomDimensions() {
+    func applyCustomDimensions() {
         guard let navigationController = navigationController,
               let targetFrame = CustomWebViewFrameSupport.resolvedFrame(
                 width: customWidth,
@@ -2910,7 +2907,7 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     /// Update dimensions at runtime
-    open func updateDimensions(width: CGFloat?, height: CGFloat?, xPos: CGFloat?, yPos: CGFloat?) {
+    func updateDimensions(width: CGFloat?, height: CGFloat?, xPos: CGFloat?, yPos: CGFloat?) {
         // Update stored dimensions
         if let width = width {
             customWidth = width
@@ -2929,7 +2926,7 @@ extension WKWebViewController: WKNavigationDelegate {
         applyCustomDimensions()
     }
 
-    open func updateSafeTopMargin(_ enabled: Bool) {
+    func updateSafeTopMargin(_ enabled: Bool) {
         guard enabled != self.enabledSafeTopMargin else { return }
         self.enabledSafeTopMargin = enabled
         guard let webView = self.webView else { return }
@@ -2950,7 +2947,7 @@ extension WKWebViewController: WKNavigationDelegate {
         refreshWebViewViewportIfNeeded(force: true)
     }
 
-    open func updateSafeBottomMargin(_ enabled: Bool) {
+    func updateSafeBottomMargin(_ enabled: Bool) {
         guard enabled != self.enabledSafeBottomMargin else { return }
         self.enabledSafeBottomMargin = enabled
         guard let webView = self.webView else { return }

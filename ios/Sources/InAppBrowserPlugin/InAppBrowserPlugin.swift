@@ -250,9 +250,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     ) -> WKWebView? {
         let popupId = UUID().uuidString
         let shouldHidePopup = parentController.hiddenPopupWindow
-        if let parentWebView = parentController.capableWebView {
-            configuration.processPool = parentWebView.configuration.processPool
-        }
+        // WKProcessPool sharing is automatic on iOS 15+; explicit assignment is deprecated.
         if let dataStore = parentController.websiteDataStore() {
             configuration.websiteDataStore = dataStore
         }
