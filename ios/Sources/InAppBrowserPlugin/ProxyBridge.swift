@@ -8,7 +8,7 @@ struct ProxyBridgeStoredRequest {
     let storedAt: Date
 }
 
-final class ProxyBridge {
+public final class ProxyBridge {
     static let storedRequestTTL: TimeInterval = 120
 
     private let accessToken: String

@@ -184,10 +184,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private func unregisterWebView(id: String) {
         if let webView = webViewControllers[id]?.capableWebView {
             cleanupHiddenWebViewContainer(for: webView)
+        }
         proxySchemeHandlers[id]?.cancelAllPendingTasks()
         proxySchemeHandlers[id] = nil
         proxyBridges[id] = nil
-        proxySchemeHandlers[id] = nil
+        webViewControllers[id] = nil
         webViewControllers[id] = nil
         navigationControllers[id] = nil
         webViewStack.removeAll { $0 == id }
