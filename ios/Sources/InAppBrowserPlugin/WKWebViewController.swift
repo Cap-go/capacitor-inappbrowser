@@ -354,7 +354,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initWebview(isInspectable: isInspectable)
     }
 
-    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, documentStartUserScripts: [String] = [], openBlankTargetInWebView: Bool = false) {
+    public init(url: URL, headers: [String: String], isInspectable: Bool, credentials: WKWebViewCredentials? = nil, preventDeeplink: Bool, blankNavigationTab: Bool, enabledSafeBottomMargin: Bool, enabledSafeTopMargin: Bool = true, blockedHosts: [String], authorizedAppLinks: [String], allowWebViewJsVisibilityControl: Bool = false, allowScreenshotsFromWebPage: Bool = false, captureConsoleLogs: Bool = false, proxyRequests: Bool = false, proxySchemeHandler: ProxySchemeHandler? = nil, proxyBridge: ProxyBridge? = nil, proxyBridgeAccessToken: String? = nil, legacyProxyRequestURLRegexPattern: String? = nil, documentStartUserScripts: [String] = [], openBlankTargetInWebView: Bool = false) {
         super.init(nibName: nil, bundle: nil)
         self.blankNavigationTab = blankNavigationTab
         self.enabledSafeBottomMargin = enabledSafeBottomMargin
@@ -366,6 +366,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.captureConsoleLogs = captureConsoleLogs
         self.proxyRequests = proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
+        self.proxyBridge = proxyBridge
+        self.proxyBridgeAccessToken = proxyBridgeAccessToken
+        self.legacyProxyRequestURLRegexPattern = legacyProxyRequestURLRegexPattern
         self.openBlankTargetInWebView = openBlankTargetInWebView
         self.setHeaders(headers: headers)
         self.setPreventDeeplink(preventDeeplink: preventDeeplink)
@@ -374,11 +377,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.documentStartUserScripts = documentStartUserScripts
         self.initWebview(isInspectable: isInspectable)
     }
+    }
 
     open var hasDynamicTitle = false
     open var source: WKWebSource?
-    /// use `source` instead
-    open internal(set) var url: URL?
     open var tintColor: UIColor?
     open var allowsFileURL = true
     open var allowWebViewJsVisibilityControl = false
@@ -422,6 +424,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
     var proxySchemeHandler: ProxySchemeHandler?
+    var proxyBridge: ProxyBridge?
+    var proxyBridgeAccessToken: String?
+    var legacyProxyRequestURLRegexPattern: String?
     var initialWebConfiguration: WKWebViewConfiguration?
     var waitsForPopupNavigation = false
     var hiddenPopupWindow = false
@@ -1298,6 +1303,25 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             print("[InAppBrowser - preShowScriptError]: Error!!!!")
             semaphore.signal()
+        } else if message.name == "capgoProxyBridge" {
+            guard let messageBody = message.body as? [String: Any],
+                  let token = messageBody["token"] as? String,
+                  let requestId = messageBody["requestId"] as? String,
+                  let method = messageBody["method"] as? String,
+                  let headersJson = messageBody["headersJson"] as? String else {
+                return
+            }
+
+            let base64Body = messageBody["base64Body"] as? String ?? ""
+            let credentialsMode = messageBody["credentialsMode"] as? String ?? "same-origin"
+            proxyBridge?.storeRequest(
+                token: token,
+                requestId: requestId,
+                method: method,
+                headersJson: headersJson,
+                base64Body: base64Body,
+                credentialsMode: credentialsMode
+            )
         } else if message.name == "close" {
             closeView()
         } else if message.name == "hide" {
@@ -1432,6 +1456,35 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.addUserScript(script)
     }
 
+    private func addProxyBridgeUserScripts(to userContentController: WKUserContentController) {
+        guard let accessToken = proxyBridgeAccessToken else {
+            return
+        }
+
+        let bootstrapScript = WKUserScript(
+            source: ProxyBridgeSupport.bootstrapScriptSource(),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(bootstrapScript)
+
+        let proxyRegexSource = legacyProxyRequestURLRegexPattern ?? ""
+        guard let bridgeScriptSource = ProxyBridgeSupport.loadBundledBridgeScript(
+            accessToken: accessToken,
+            proxyRegexSource: proxyRegexSource
+        ) else {
+            print("[InAppBrowser][Proxy] WARNING: Failed to load proxy-bridge.js for iOS injection")
+            return
+        }
+
+        let bridgeScript = WKUserScript(
+            source: bridgeScriptSource,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        userContentController.addUserScript(bridgeScript)
+    }
+
     func injectJavaScriptInterface() {
         let script = mobileAppScriptSource()
         DispatchQueue.main.async {
@@ -1470,6 +1523,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
         userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
         userContentController.removeScriptMessageHandler(forName: "magicPrint")
+        userContentController.removeScriptMessageHandler(forName: "capgoProxyBridge")
 
         if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
@@ -1479,6 +1533,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             } else {
                 print("[InAppBrowser][Proxy] WARNING: handlesURLScheme swizzle failed; proxy scheme handler not registered")
             }
+        }
+
+        if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
+            addProxyBridgeUserScripts(to: userContentController)
         }
 
         let weakHandler = WeakScriptMessageHandler(self)
@@ -1515,6 +1573,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                     forMainFrameOnly: false
                 )
             )
+        }
+        if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
+            userContentController.add(weakHandler, name: "capgoProxyBridge")
         }
         userContentController.add(weakHandler, name: "magicPrint")
 
@@ -1704,7 +1765,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.disableOverscroll = parent.disableOverscroll
         self.proxyRequests = parent.proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
-        self.initialWebConfiguration = configuration
+        self.proxyBridge = parent.proxyBridge
+        self.proxyBridgeAccessToken = parent.proxyBridgeAccessToken
+        self.legacyProxyRequestURLRegexPattern = parent.legacyProxyRequestURLRegexPattern
         self.waitsForPopupNavigation = true
         self.hiddenPopupWindow = parent.hiddenPopupWindow
         self.opensHidden = parent.hiddenPopupWindow
@@ -1984,6 +2047,7 @@ public extension WKWebViewController {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "capgoProxyBridge")
 
         webView.removeFromSuperview()
         // Also clean progress bar view if present

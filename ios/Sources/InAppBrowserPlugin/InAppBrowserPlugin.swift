@@ -135,6 +135,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     var webViewController: WKWebViewController?
     private var webViewControllers: [String: WKWebViewController] = [:]
     private var proxySchemeHandlers: [String: ProxySchemeHandler] = [:]
+    private var proxyBridges: [String: ProxyBridge] = [:]
     private var webViewStack: [String] = []
     private var activeWebViewId: String?
     private weak var presentationContainerView: UIView?
@@ -183,8 +184,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private func unregisterWebView(id: String) {
         if let webView = webViewControllers[id]?.capableWebView {
             cleanupHiddenWebViewContainer(for: webView)
-        }
         proxySchemeHandlers[id]?.cancelAllPendingTasks()
+        proxySchemeHandlers[id] = nil
+        proxyBridges[id] = nil
         proxySchemeHandlers[id] = nil
         webViewControllers[id] = nil
         navigationControllers[id] = nil
@@ -893,16 +895,23 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             var proxyHandler: ProxySchemeHandler?
+            var proxyBridge: ProxyBridge?
+            var proxyBridgeAccessToken: String?
             if legacyProxyRequests.isEnabled || !outboundProxyRules.isEmpty || !inboundProxyRules.isEmpty {
+                let bridgeAccessToken = UUID().uuidString
+                proxyBridgeAccessToken = bridgeAccessToken
+                proxyBridge = ProxyBridge(accessToken: bridgeAccessToken)
                 proxyHandler = ProxySchemeHandler(
                     plugin: self,
                     webviewId: webViewId,
                     legacyProxyRequests: legacyProxyRequests.isEnabled,
                     legacyProxyRequestURLRegex: legacyProxyRequests.urlRegex,
                     outboundRules: outboundProxyRules,
-                    inboundRules: inboundProxyRules
+                    inboundRules: inboundProxyRules,
+                    proxyBridge: proxyBridge
                 )
                 self.proxySchemeHandlers[webViewId] = proxyHandler
+                self.proxyBridges[webViewId] = proxyBridge
             }
 
             self.webViewController = WKWebViewController.init(
@@ -921,6 +930,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 captureConsoleLogs: captureConsoleLogs,
                 proxyRequests: legacyProxyRequests.isEnabled,
                 proxySchemeHandler: proxyHandler,
+                proxyBridge: proxyBridge,
+                proxyBridgeAccessToken: proxyBridgeAccessToken,
+                legacyProxyRequestURLRegexPattern: legacyProxyRequests.urlRegex?.pattern,
                 documentStartUserScripts: self.documentStartUserScripts(
                     authorizedAppLinks: authorizedAppLinks,
                     openBlankTargetInWebView: openBlankTargetInWebView

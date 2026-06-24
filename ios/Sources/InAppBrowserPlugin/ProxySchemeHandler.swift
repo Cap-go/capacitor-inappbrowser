@@ -460,16 +460,17 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
     private let legacyProxyRequestURLRegex: NSRegularExpression?
     private let outboundRules: [NativeProxyRule]
     private let inboundRules: [NativeProxyRule]
+    private weak var proxyBridge: ProxyBridge?
 
     private lazy var session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
-
     init(
         plugin: CapgoInAppBrowserPlugin,
         webviewId: String,
         legacyProxyRequests: Bool,
         legacyProxyRequestURLRegex: NSRegularExpression?,
         outboundRules: [NativeProxyRule],
-        inboundRules: [NativeProxyRule]
+        inboundRules: [NativeProxyRule],
+        proxyBridge: ProxyBridge? = nil
     ) {
         self.plugin = plugin
         self.webviewId = webviewId
@@ -477,9 +478,8 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         self.legacyProxyRequestURLRegex = legacyProxyRequestURLRegex
         self.outboundRules = outboundRules
         self.inboundRules = inboundRules
+        self.proxyBridge = proxyBridge
         super.init()
-    }
-
     func duplicate(for webviewId: String) -> ProxySchemeHandler? {
         guard let plugin else { return nil }
         return ProxySchemeHandler(
@@ -488,7 +488,8 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
             legacyProxyRequests: legacyProxyRequests,
             legacyProxyRequestURLRegex: legacyProxyRequestURLRegex,
             outboundRules: outboundRules,
-            inboundRules: inboundRules
+            inboundRules: inboundRules,
+            proxyBridge: proxyBridge
         )
     }
 
@@ -505,13 +506,10 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         }
 
         let requestId = UUID().uuidString
-        let requestContext = NativeRequestContext(
-            url: url.absoluteString,
-            method: ProxySchemeRequestSupport.normalizedRequestMethod(urlSchemeTask.request.httpMethod),
-            headers: urlSchemeTask.request.allHTTPHeaderFields ?? [:],
-            base64Body: extractBody(from: urlSchemeTask.request),
-            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
-        )
+        guard let requestContext = makeInitialRequestContext(from: urlSchemeTask, requestURL: url) else {
+            finishCanceledSchemeTask(urlSchemeTask)
+            return
+        }
         let pendingTask = PendingProxyTask(requestId: requestId, schemeTask: urlSchemeTask, requestContext: requestContext, phase: "outbound")
 
         taskLock.lock()
@@ -1169,6 +1167,80 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         }
     }
 
+
+    private func makeInitialRequestContext(from urlSchemeTask: WKURLSchemeTask, requestURL: URL) -> NativeRequestContext? {
+        let requestURLString = requestURL.absoluteString
+
+        if let bridgeRequest = ProxyBridgeSupport.parseBridgeMarkerRequest(requestURLString) {
+            if ProxyBridgeSupport.usesLegacyJsProxyMode(
+                legacyProxyRequests: legacyProxyRequests,
+                legacyProxyRequestURLRegex: legacyProxyRequestURLRegex,
+                hasOutboundRules: !outboundRules.isEmpty,
+                hasInboundRules: !inboundRules.isEmpty
+            ),
+            !ProxyBridgeSupport.shouldDelegateLegacyJsProxyRequest(
+                legacyProxyRequests: legacyProxyRequests,
+                legacyProxyRequestURLRegex: legacyProxyRequestURLRegex,
+                hasOutboundRules: !outboundRules.isEmpty,
+                hasInboundRules: !inboundRules.isEmpty,
+                requestURL: bridgeRequest.originalURL
+            ) {
+                _ = proxyBridge?.getAndRemove(requestId: bridgeRequest.requestId)
+                return nil
+            }
+
+            guard let stored = proxyBridge?.getAndRemove(requestId: bridgeRequest.requestId) else {
+                return nil
+            }
+
+            var headers = ProxyBridgeSupport.decodeStoredHeaders(stored.headersJson)
+            let markerHeaders = urlSchemeTask.request.allHTTPHeaderFields ?? [:]
+            for (key, value) in markerHeaders where headers[key] == nil {
+                headers[key] = value
+            }
+
+            let base64Body = stored.base64Body.isEmpty ? nil : stored.base64Body
+            return NativeRequestContext(
+                url: bridgeRequest.originalURL,
+                method: ProxySchemeRequestSupport.normalizedRequestMethod(stored.method),
+                headers: headers,
+                base64Body: base64Body,
+                isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
+            )
+        }
+
+        return NativeRequestContext(
+            url: requestURLString,
+            method: ProxySchemeRequestSupport.normalizedRequestMethod(urlSchemeTask.request.httpMethod),
+            headers: urlSchemeTask.request.allHTTPHeaderFields ?? [:],
+            base64Body: extractBody(from: urlSchemeTask.request),
+            isMainFrame: ProxySchemeRequestSupport.isMainFrameRequest(urlSchemeTask.request)
+        )
+    }
+
+    private func finishCanceledSchemeTask(_ schemeTask: WKURLSchemeTask) {
+        guard let url = schemeTask.request.url,
+              let httpResponse = HTTPURLResponse(
+                url: url,
+                statusCode: 204,
+                httpVersion: "HTTP/1.1",
+                headerFields: [:]
+              )
+        else {
+            schemeTask.didFailWithError(
+                NSError(
+                    domain: "ProxySchemeHandler",
+                    code: -4,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to create canceled response"]
+                )
+            )
+            return
+        }
+
+        schemeTask.didReceive(httpResponse)
+        schemeTask.didReceive(Data())
+        schemeTask.didFinish()
+    }
     private func extractBody(from request: URLRequest) -> String? {
         if let body = request.httpBody {
             return body.base64EncodedString()
