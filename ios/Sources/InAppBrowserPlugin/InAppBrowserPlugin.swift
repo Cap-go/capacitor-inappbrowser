@@ -189,7 +189,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         proxySchemeHandlers[id] = nil
         proxyBridges[id] = nil
         webViewControllers[id] = nil
-        webViewControllers[id] = nil
         navigationControllers[id] = nil
         webViewStack.removeAll { $0 == id }
         activeWebViewId = webViewStack.last
