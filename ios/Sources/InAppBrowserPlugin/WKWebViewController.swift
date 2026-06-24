@@ -377,10 +377,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.documentStartUserScripts = documentStartUserScripts
         self.initWebview(isInspectable: isInspectable)
     }
-    }
 
     open var hasDynamicTitle = false
     open var source: WKWebSource?
+    /// use `source` instead
+    open internal(set) var url: URL?
     open var tintColor: UIColor?
     open var allowsFileURL = true
     open var allowWebViewJsVisibilityControl = false

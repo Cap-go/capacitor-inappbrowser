@@ -480,6 +480,8 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         self.inboundRules = inboundRules
         self.proxyBridge = proxyBridge
         super.init()
+    }
+
     func duplicate(for webviewId: String) -> ProxySchemeHandler? {
         guard let plugin else { return nil }
         return ProxySchemeHandler(
