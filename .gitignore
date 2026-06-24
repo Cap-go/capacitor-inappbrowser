@@ -17,6 +17,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
+# Generated iOS proxy bridge bundle (copied from build:proxy-bridge)
+ios/Sources/InAppBrowserPlugin/Resources/proxy-bridge.js
+
 
 # macOS files
 .DS_Store

@@ -19,7 +19,8 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
-            path: "ios/Sources/InAppBrowserPlugin"),
+            path: "ios/Sources/InAppBrowserPlugin",
+            resources: [.process("Resources")]),
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],

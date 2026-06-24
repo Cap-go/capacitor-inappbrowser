@@ -3,3 +3,4 @@ dist
 example-app
 docs
 android/src/main/assets/proxy-bridge.js
+ios/Sources/InAppBrowserPlugin/Resources/proxy-bridge.js

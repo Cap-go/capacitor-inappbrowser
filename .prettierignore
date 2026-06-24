@@ -1,2 +1,3 @@
 example-app
 android/src/main/assets/proxy-bridge.js
+ios/Sources/InAppBrowserPlugin/Resources/proxy-bridge.js
