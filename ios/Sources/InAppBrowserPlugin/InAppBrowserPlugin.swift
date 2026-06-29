@@ -189,7 +189,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         if let webView = webViewControllers[id]?.capableWebView {
             cleanupHiddenWebViewContainer(for: webView)
         }
-        dismissNavigationControllerIfPresented(navigationControllers[id])
         proxySchemeHandlers[id]?.cancelAllPendingTasks()
         proxySchemeHandlers[id] = nil
         proxyBridges[id] = nil
