@@ -138,9 +138,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var proxyBridges: [String: ProxyBridge] = [:]
     private var webViewStack: [String] = []
     private var activeWebViewId: String?
-    private weak var presentationContainerView: UIView?
-    private var presentationContainerWasInteractive = true
-    private var presentationContainerPreviousAlpha: CGFloat = 1
     private var hiddenWebViewContainers: [ObjectIdentifier: UIView] = [:]
     private var closeModalTitle: String?
     private var closeModalDescription: String?
@@ -181,10 +178,18 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    private func dismissNavigationControllerIfPresented(_ navigationController: UINavigationController?) {
+        guard let navigationController, navigationController.presentingViewController != nil else {
+            return
+        }
+        navigationController.dismiss(animated: false)
+    }
+
     private func unregisterWebView(id: String) {
         if let webView = webViewControllers[id]?.capableWebView {
             cleanupHiddenWebViewContainer(for: webView)
         }
+        dismissNavigationControllerIfPresented(navigationControllers[id])
         proxySchemeHandlers[id]?.cancelAllPendingTasks()
         proxySchemeHandlers[id] = nil
         proxyBridges[id] = nil
@@ -1334,24 +1339,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.isHidden = hidden
 
             if hidden {
-                if let navController = navigationController, navController.presentingViewController != nil {
-                    navController.view.isHidden = true
-                    navController.view.isUserInteractionEnabled = false
-                    if let containerView = navController.view.superview {
-                        if self.presentationContainerView == nil || self.presentationContainerView !== containerView {
-                            self.presentationContainerView = containerView
-                            self.presentationContainerWasInteractive = containerView.isUserInteractionEnabled
-                            self.presentationContainerPreviousAlpha = containerView.alpha
-                        }
-                        containerView.isUserInteractionEnabled = false
-                        containerView.alpha = 0
-                    }
-                }
-
                 if !self.attachWebViewToWindow(webView) {
                     call?.reject("Failed to get active window for hidden webview")
                     return
                 }
+                self.dismissNavigationControllerIfPresented(navigationController)
             } else {
                 if webView.superview !== webViewController.view {
                     self.attachWebViewToController(webViewController, webView: webView)
@@ -1360,15 +1352,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let navController = navigationController {
                     if let resolvedId {
                         self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
-                    }
-                    navController.view.isHidden = false
-                    navController.view.isUserInteractionEnabled = true
-                    if let containerView = self.presentationContainerView {
-                        containerView.isUserInteractionEnabled = self.presentationContainerWasInteractive
-                        containerView.alpha = self.presentationContainerPreviousAlpha
-                        self.presentationContainerView = nil
-                        self.presentationContainerWasInteractive = true
-                        self.presentationContainerPreviousAlpha = 1
                     }
 
                     if navController.presentingViewController == nil {
