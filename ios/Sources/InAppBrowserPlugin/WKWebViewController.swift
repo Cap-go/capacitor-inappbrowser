@@ -387,6 +387,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
     open var captureConsoleLogs = false
+    open var persistWebViewData = true
     open var handleDownloads = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
@@ -748,8 +749,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
             ?? UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .first
+            .compactMap { $0 as? UIWindowScene }
+            .first
         return windowScene?.statusBarManager?.statusBarFrame.height ?? 0
     }
 
@@ -1513,6 +1514,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.edgesForExtendedLayout = [.bottom]
 
         let webConfiguration = initialWebConfiguration ?? WKWebViewConfiguration()
+        if !persistWebViewData {
+            webConfiguration.websiteDataStore = .nonPersistent()
+        }
         let userContentController = webConfiguration.userContentController
         userContentController.removeAllUserScripts()
         userContentController.removeScriptMessageHandler(forName: "messageHandler")
@@ -1763,6 +1767,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.blockedHosts = parent.blockedHosts
         self.authorizedAppLinks = parent.authorizedAppLinks
         self.activeNativeNavigationForWebview = parent.activeNativeNavigationForWebview
+        self.initialWebConfiguration = configuration
+        self.persistWebViewData = parent.persistWebViewData
         self.disableOverscroll = parent.disableOverscroll
         self.proxyRequests = parent.proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
@@ -1934,7 +1940,6 @@ public extension WKWebViewController {
         }
         return false
     }
-
 
     func load(source sourceValue: WKWebSource) {
         switch sourceValue {

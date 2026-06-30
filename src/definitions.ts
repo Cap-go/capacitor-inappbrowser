@@ -48,9 +48,18 @@ export interface BtnEvent {
   url: string;
 }
 
+export interface ButtonNearDoneEvent {
+  /**
+   * Webview instance id.
+   *
+   * @since 8.6.36
+   */
+  id: string;
+}
+
 export type UrlChangeListener = (state: UrlEvent) => void;
 export type ConfirmBtnListener = (state: BtnEvent) => void;
-export type ButtonNearListener = (state: object) => void;
+export type ButtonNearListener = (state: ButtonNearDoneEvent) => void;
 export type CustomSchemeInterceptedListener = (state: CustomSchemeInterceptedEvent) => void;
 
 export enum BackgroundColor {
@@ -622,6 +631,18 @@ export interface OpenWebViewOptions {
    * @since 8.6.0
    */
   captureConsoleLogs?: boolean;
+  /**
+   * Controls whether the webview should persist website data such as cache, cookies, local storage,
+   * IndexedDB, and session data.
+   *
+   * When false, iOS uses a non-persistent `WKWebsiteDataStore`. Android disables per-view cache and
+   * DOM/database storage where the system WebView supports it. Android cookies use the shared
+   * WebView cookie store, so call `clearAllBrowsingData()` to remove cookies and other global data.
+   *
+   * @default true
+   * @since 8.6.36
+   */
+  persistWebViewData?: boolean;
   /**
    * Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge.
    *
@@ -1199,6 +1220,16 @@ export interface InAppBrowserPlugin {
   clearCache(options?: { id?: string }): Promise<any>;
 
   /**
+   * Clear all browsing data from the default store and any opened managed webviews.
+   *
+   * This removes cookies, disk cache, memory cache, local storage, session storage, IndexedDB,
+   * WebSQL where supported, form data, and HTTP auth data where the platform exposes it.
+   *
+   * @since 8.6.36
+   */
+  clearAllBrowsingData(): Promise<any>;
+
+  /**
    * Get cookies for a specific URL.
    * @param options The options, including the URL to get cookies for.
    * @returns A promise that resolves with the cookies.
@@ -1269,6 +1300,13 @@ export interface InAppBrowserPlugin {
    */
   addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
 
+  /**
+   * Listen for buttonNearDone clicks.
+   *
+   * The event payload contains the webview `id`.
+   *
+   * @since 0.0.1
+   */
   addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener): Promise<PluginListenerHandle>;
 
   /**

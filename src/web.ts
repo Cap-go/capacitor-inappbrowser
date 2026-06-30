@@ -21,6 +21,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log('clearCache');
     return Promise.resolve();
   }
+  clearAllBrowsingData(): Promise<any> {
+    console.log('clearAllBrowsingData');
+    return Promise.resolve();
+  }
   async open(options: OpenOptions): Promise<any> {
     console.log('open', options);
     return options;

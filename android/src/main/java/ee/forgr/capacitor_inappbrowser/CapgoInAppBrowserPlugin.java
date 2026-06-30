@@ -19,7 +19,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
+import android.webkit.WebStorage;
 import android.webkit.WebView;
+import android.webkit.WebViewDatabase;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -814,6 +816,41 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     @PluginMethod
+    public void clearAllBrowsingData(PluginCall call) {
+        this.getActivity().runOnUiThread(() -> {
+            try {
+                ArrayList<WebView> targetWebViews = cacheWebViewsFor(null);
+                WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
+                if (bridgeWebView != null && !targetWebViews.contains(bridgeWebView)) {
+                    targetWebViews.add(bridgeWebView);
+                }
+
+                for (WebView targetWebView : targetWebViews) {
+                    targetWebView.stopLoading();
+                    targetWebView.clearCache(true);
+                    targetWebView.clearHistory();
+                    targetWebView.clearFormData();
+                    targetWebView.clearSslPreferences();
+                }
+
+                WebStorage.getInstance().deleteAllData();
+                WebViewDatabase webViewDatabase = WebViewDatabase.getInstance(getContext());
+                webViewDatabase.clearFormData();
+                webViewDatabase.clearHttpAuthUsernamePassword();
+
+                CookieManager cookieManager = CookieManager.getInstance();
+                cookieManager.removeAllCookies((value) -> {
+                    cookieManager.flush();
+                    call.resolve();
+                });
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error clearing browsing data: " + e.getMessage());
+                call.reject("Failed to clear browsing data: " + e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
     public void clearCookies(PluginCall call) {
         String url = call.getString("url", currentUrl);
         if (url == null || TextUtils.isEmpty(url)) {
@@ -942,6 +979,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         options.setCaptureConsoleLogs(Boolean.TRUE.equals(call.getBoolean("captureConsoleLogs", false)));
         options.setHandleDownloads(Boolean.TRUE.equals(call.getBoolean("handleDownloads", false)));
 
+        options.setPersistWebViewData(call.getBoolean("persistWebViewData", true));
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");
         if (textZoom != null) {

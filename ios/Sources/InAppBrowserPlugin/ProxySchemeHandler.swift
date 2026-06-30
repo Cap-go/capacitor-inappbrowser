@@ -1169,7 +1169,6 @@ public class ProxySchemeHandler: NSObject, WKURLSchemeHandler, URLSessionTaskDel
         }
     }
 
-
     private func makeInitialRequestContext(from urlSchemeTask: WKURLSchemeTask, requestURL: URL) -> NativeRequestContext? {
         let requestURLString = requestURL.absoluteString
 
