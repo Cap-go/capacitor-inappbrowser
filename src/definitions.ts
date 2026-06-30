@@ -53,7 +53,8 @@ export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: object) => void;
 export type CustomSchemeInterceptedListener = (state: CustomSchemeInterceptedEvent) => void;
 
-export type WebViewInputEventType = 'click' | 'scroll' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel';
+export type WebViewPointerInputEventType = 'click' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel';
+export type WebViewInputEventType = WebViewPointerInputEventType | 'scroll';
 
 export enum BackgroundColor {
   WHITE = 'white',
@@ -129,7 +130,7 @@ export interface LayerOptions {
   transparentBackground?: boolean;
 }
 
-export interface DispatchInputEventOptions {
+export interface DispatchPointerInputEventOptions {
   /**
    * Target webview id. If omitted, targets the active webview.
    */
@@ -137,24 +138,45 @@ export interface DispatchInputEventOptions {
   /**
    * Input event to dispatch to the webview.
    */
-  type: WebViewInputEventType;
+  type: WebViewPointerInputEventType;
   /**
    * X coordinate in CSS pixels from the webview's left edge.
    */
-  x?: number;
+  x: number;
   /**
    * Y coordinate in CSS pixels from the webview's top edge.
    */
-  y?: number;
+  y: number;
+}
+
+export interface DispatchScrollInputEventOptions {
+  /**
+   * Target webview id. If omitted, targets the active webview.
+   */
+  id?: string;
+  /**
+   * Input event to dispatch to the webview.
+   */
+  type: 'scroll';
+  /**
+   * X coordinate in CSS pixels from the webview's left edge.
+   */
+  x: number;
+  /**
+   * Y coordinate in CSS pixels from the webview's top edge.
+   */
+  y: number;
   /**
    * Horizontal scroll delta in CSS pixels. Used when `type` is `scroll`.
    */
-  deltaX?: number;
+  deltaX: number;
   /**
    * Vertical scroll delta in CSS pixels. Used when `type` is `scroll`.
    */
-  deltaY?: number;
+  deltaY: number;
 }
+
+export type DispatchInputEventOptions = DispatchPointerInputEventOptions | DispatchScrollInputEventOptions;
 
 /**
  * Represents an intercepted HTTP request from the in-app browser webview.

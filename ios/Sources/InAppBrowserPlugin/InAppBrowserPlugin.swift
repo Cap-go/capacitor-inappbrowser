@@ -148,7 +148,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var hasStoredHostWebViewAppearance = false
     private var originalHostWebViewBackgroundColor: UIColor?
     private var originalHostWebViewIsOpaque = true
-    private var originalHostSubviewBackgrounds: [(UIView, UIColor?)] = []
+    private var originalHostSubviewBackgrounds: [(UIView, UIColor?, Bool)] = []
     private var originalHostSuperviewBackgroundColor: UIColor?
     private var originalHostSuperviewIsOpaque = true
     private var closeModalDescription: String?
@@ -371,23 +371,23 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
+    @discardableResult
+    func presentView(webViewId: String? = nil, isAnimated: Bool = true) -> Bool {
         let resolvedId = webViewId ?? activeWebViewId
         let navigationController = resolvedId.flatMap { navigationControllers[$0] } ?? self.navigationWebViewController
         guard let navigationController else {
             self.currentPluginCall?.reject("Navigation controller is not initialized")
-            return
+            return false
         }
 
         if let resolvedId,
            let webViewController = webViewControllers[resolvedId],
            webViewController.isLayeredBehind {
-            if sendNavigationControllerToBack(id: resolvedId, transparentBackground: webViewController.transparentHostBackground) {
-                self.currentPluginCall?.resolve()
-            } else {
+            if !sendNavigationControllerToBack(id: resolvedId, transparentBackground: webViewController.transparentHostBackground) {
                 self.currentPluginCall?.reject("Failed to send webview to back")
+                return false
             }
-            return
+            return true
         }
 
         if let resolvedId {
@@ -398,6 +398,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         presenter?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
+        return true
     }
 
     private func targetFrame(for webViewController: WKWebViewController, in hostWebView: UIView) -> CGRect {
@@ -458,7 +459,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func storeSubviewBackgrounds(from view: UIView) {
         for subview in view.subviews {
-            originalHostSubviewBackgrounds.append((subview, subview.backgroundColor))
+            originalHostSubviewBackgrounds.append((subview, subview.backgroundColor, subview.isOpaque))
             storeSubviewBackgrounds(from: subview)
         }
     }
@@ -507,8 +508,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             hostWebView.isOpaque = originalHostWebViewIsOpaque
             hostWebView.superview?.backgroundColor = originalHostSuperviewBackgroundColor
             hostWebView.superview?.isOpaque = originalHostSuperviewIsOpaque
-            for (view, backgroundColor) in originalHostSubviewBackgrounds {
+            for (view, backgroundColor, isOpaque) in originalHostSubviewBackgrounds {
                 view.backgroundColor = backgroundColor
+                view.isOpaque = isOpaque
             }
             hostWebView.setNeedsLayout()
             hostWebView.layoutIfNeeded()
@@ -1422,7 +1424,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
             } else if !self.isPresentAfterPageLoad {
-                self.presentView(webViewId: webViewId, isAnimated: isAnimated)
+                guard self.presentView(webViewId: webViewId, isAnimated: isAnimated) else {
+                    return
+                }
             }
             call.resolve(["id": webViewId])
         }
@@ -1609,12 +1613,15 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func dispatchInputScript(type: String, x: Float?, y: Float?, deltaX: Float?, deltaY: Float?) -> String? {
-        let xLiteral = jsNumber(x, fallback: "null")
-        let yLiteral = jsNumber(y, fallback: "null")
-        let deltaXLiteral = jsNumber(deltaX)
-        let deltaYLiteral = jsNumber(deltaY)
-
         if type == "scroll" {
+            guard let x, let y, let deltaX, let deltaY,
+                  x.isFinite, y.isFinite, deltaX.isFinite, deltaY.isFinite else {
+                return nil
+            }
+            let xLiteral = jsNumber(x)
+            let yLiteral = jsNumber(y)
+            let deltaXLiteral = jsNumber(deltaX)
+            let deltaYLiteral = jsNumber(deltaY)
             return """
             (function() {
               const x = \(xLiteral);
@@ -1663,6 +1670,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             mouseEvents = []
             touchEvents = ["touchcancel"]
         default:
+            return nil
+        }
+
+        guard let x, let y, x.isFinite, y.isFinite else {
             return nil
         }
 
@@ -1721,7 +1732,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             deltaX: call.getFloat("deltaX"),
             deltaY: call.getFloat("deltaY")
         ) else {
-            call.reject("Unsupported input event type: \(type)")
+            call.reject("Unsupported input event type or invalid input payload: \(type)")
             return
         }
 

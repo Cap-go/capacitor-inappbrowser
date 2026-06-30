@@ -352,6 +352,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private ViewGroup backLayerParent;
     private boolean backLayerActive = false;
     private boolean usingHostTransparency = false;
+    private Runnable hostTransparencyApplyRunnable;
     private long forwardedInputDownTime = 0L;
     private static int hostTransparencyUseCount = 0;
     private static Drawable originalCapacitorWebViewBackground;
@@ -523,7 +524,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             usingHostTransparency = true;
         }
 
+        final Runnable[] applyRef = new Runnable[1];
         Runnable apply = () -> {
+            synchronized (WebViewDialog.class) {
+                if (!usingHostTransparency || hostTransparencyApplyRunnable != applyRef[0]) {
+                    return;
+                }
+            }
             boolean fullStackWorkaround = usesFullStackTransparentBackgroundWorkaround();
             if (window != null && fullStackWorkaround) {
                 window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
@@ -538,6 +545,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         };
 
+        applyRef[0] = apply;
+        hostTransparencyApplyRunnable = apply;
         apply.run();
         if (isMiuiDevice()) {
             mainHandler.postDelayed(apply, 50);
@@ -551,6 +560,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
         ViewGroup capacitorParent = capacitorWebView.getParent() instanceof ViewGroup ? (ViewGroup) capacitorWebView.getParent() : null;
         Window window = activity != null ? activity.getWindow() : null;
+        if (hostTransparencyApplyRunnable != null) {
+            mainHandler.removeCallbacks(hostTransparencyApplyRunnable);
+            hostTransparencyApplyRunnable = null;
+        }
         synchronized (WebViewDialog.class) {
             hostTransparencyUseCount = Math.max(0, hostTransparencyUseCount - 1);
             usingHostTransparency = false;
@@ -645,10 +658,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         applyDimensions();
     }
 
-    private void showAccordingToLayerMode() {
+    private boolean showAccordingToLayerMode() {
         if (_options != null && _options.isToBack()) {
-            sendToBack(_options.getTransparentBackground());
-        } else {
+            return sendToBack(_options.getTransparentBackground());
+        }
+        bringToFrontLayer();
+        return true;
+    }
+
+    private void showAccordingToLayerModeOrFallback() {
+        if (!showAccordingToLayerMode()) {
+            Log.w("InAppBrowser", "Unable to send webview to back; showing it in front");
             bringToFrontLayer();
         }
     }
@@ -688,11 +708,46 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             case "touchcancel":
                 return dispatchMotionEvent(MotionEvent.ACTION_CANCEL, x, y);
             case "scroll":
-                _webView.scrollBy((int) getPixels(deltaX), (int) getPixels(deltaY));
-                return true;
+                return dispatchScrollEvent(x, y, deltaX, deltaY);
             default:
                 return false;
         }
+    }
+
+    private boolean dispatchScrollEvent(double x, double y, double deltaX, double deltaY) {
+        if (_webView == null) {
+            return false;
+        }
+        String script =
+            "(function() {" +
+            "  const x = " +
+            Double.toString(x) +
+            ";" +
+            "  const y = " +
+            Double.toString(y) +
+            ";" +
+            "  const dx = " +
+            Double.toString(deltaX) +
+            ";" +
+            "  const dy = " +
+            Double.toString(deltaY) +
+            ";" +
+            "  let target = Number.isFinite(x) && Number.isFinite(y) ? document.elementFromPoint(x, y) : null;" +
+            "  while (target && target !== document.body && target !== document.documentElement) {" +
+            "    const style = window.getComputedStyle(target);" +
+            "    const canScroll = /(auto|scroll)/.test(style.overflow + style.overflowX + style.overflowY) &&" +
+            "      (target.scrollHeight > target.clientHeight || target.scrollWidth > target.clientWidth);" +
+            "    if (canScroll && typeof target.scrollBy === 'function') {" +
+            "      target.scrollBy(dx, dy);" +
+            "      return true;" +
+            "    }" +
+            "    target = target.parentElement;" +
+            "  }" +
+            "  window.scrollBy(dx, dy);" +
+            "  return true;" +
+            "})();";
+        _webView.evaluateJavascript(script, null);
+        return true;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -789,7 +844,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
             activity.runOnUiThread(() -> {
                 setHidden(false);
-                showAccordingToLayerMode();
+                showAccordingToLayerModeOrFallback();
             });
         }
 
@@ -2703,9 +2758,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
             resolveOpenWebViewIfNeeded();
         } else if (_options.isPopupWindowMode()) {
-            showAccordingToLayerMode();
+            showAccordingToLayerModeOrFallback();
         } else if (!this._options.isPresentAfterPageLoad()) {
-            showAccordingToLayerMode();
+            showAccordingToLayerModeOrFallback();
             resolveOpenWebViewIfNeeded();
         }
     }
@@ -5139,7 +5194,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         if (_options.isPresentAfterPageLoad()) {
                             boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
                             if (!usePreShowScript) {
-                                showAccordingToLayerMode();
+                                showAccordingToLayerModeOrFallback();
                                 resolveOpenWebViewIfNeeded();
                             } else {
                                 executorService.execute(
@@ -5154,7 +5209,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                                 new Runnable() {
                                                     @Override
                                                     public void run() {
-                                                        showAccordingToLayerMode();
+                                                        showAccordingToLayerModeOrFallback();
                                                         resolveOpenWebViewIfNeeded();
                                                     }
                                                 }

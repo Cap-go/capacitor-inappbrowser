@@ -1284,16 +1284,26 @@ And in the AndroidManifest.xml file:
 | **`transparentBackground`** | <code>boolean</code> | Makes the Capacitor host WebView transparent while this native webview is behind it. | <code>true</code> |
 
 
-#### DispatchInputEventOptions
+#### DispatchPointerInputEventOptions
 
-| Prop         | Type                                                                    | Description                                                          |
-| ------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **`id`**     | <code>string</code>                                                     | Target webview id. If omitted, targets the active webview.           |
-| **`type`**   | <code><a href="#webviewinputeventtype">WebViewInputEventType</a></code> | Input event to dispatch to the webview.                              |
-| **`x`**      | <code>number</code>                                                     | X coordinate in CSS pixels from the webview's left edge.             |
-| **`y`**      | <code>number</code>                                                     | Y coordinate in CSS pixels from the webview's top edge.              |
-| **`deltaX`** | <code>number</code>                                                     | Horizontal scroll delta in CSS pixels. Used when `type` is `scroll`. |
-| **`deltaY`** | <code>number</code>                                                     | Vertical scroll delta in CSS pixels. Used when `type` is `scroll`.   |
+| Prop       | Type                                                                                  | Description                                                |
+| ---------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **`id`**   | <code>string</code>                                                                   | Target webview id. If omitted, targets the active webview. |
+| **`type`** | <code><a href="#webviewpointerinputeventtype">WebViewPointerInputEventType</a></code> | Input event to dispatch to the webview.                    |
+| **`x`**    | <code>number</code>                                                                   | X coordinate in CSS pixels from the webview's left edge.   |
+| **`y`**    | <code>number</code>                                                                   | Y coordinate in CSS pixels from the webview's top edge.    |
+
+
+#### DispatchScrollInputEventOptions
+
+| Prop         | Type                  | Description                                                          |
+| ------------ | --------------------- | -------------------------------------------------------------------- |
+| **`id`**     | <code>string</code>   | Target webview id. If omitted, targets the active webview.           |
+| **`type`**   | <code>'scroll'</code> | Input event to dispatch to the webview.                              |
+| **`x`**      | <code>number</code>   | X coordinate in CSS pixels from the webview's left edge.             |
+| **`y`**      | <code>number</code>   | Y coordinate in CSS pixels from the webview's top edge.              |
+| **`deltaX`** | <code>number</code>   | Horizontal scroll delta in CSS pixels. Used when `type` is `scroll`. |
+| **`deltaY`** | <code>number</code>   | Vertical scroll delta in CSS pixels. Used when `type` is `scroll`.   |
 
 
 #### OpenWebViewOptions
@@ -1634,9 +1644,14 @@ Construct a type with a set of properties K of type T
 <code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
 
 
-#### WebViewInputEventType
+#### DispatchInputEventOptions
 
-<code>'click' | 'scroll' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel'</code>
+<code><a href="#dispatchpointerinputeventoptions">DispatchPointerInputEventOptions</a> | <a href="#dispatchscrollinputeventoptions">DispatchScrollInputEventOptions</a></code>
+
+
+#### WebViewPointerInputEventType
+
+<code>'click' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel'</code>
 
 
 #### UrlChangeListener

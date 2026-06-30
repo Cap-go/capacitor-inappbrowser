@@ -413,6 +413,27 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return defaultValue;
     }
 
+    private Double getFiniteNumberOption(PluginCall call, String name) {
+        Object value = call.getData().opt(name);
+        if (value instanceof Number numberValue) {
+            double doubleValue = numberValue.doubleValue();
+            if (Double.isFinite(doubleValue)) {
+                return doubleValue;
+            }
+        }
+        return null;
+    }
+
+    private boolean isPointerInputEvent(String type) {
+        return (
+            "click".equals(type) ||
+            "touchstart".equals(type) ||
+            "touchmove".equals(type) ||
+            "touchend".equals(type) ||
+            "touchcancel".equals(type)
+        );
+    }
+
     private ArrayList<WebView> cacheWebViewsFor(String targetId) {
         ArrayList<WebView> targetWebViews = new ArrayList<>();
         if (targetId != null) {
@@ -1406,10 +1427,29 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        double x = getNumberOption(call, "x", 0d);
-        double y = getNumberOption(call, "y", 0d);
-        double deltaX = getNumberOption(call, "deltaX", 0d);
-        double deltaY = getNumberOption(call, "deltaY", 0d);
+        Double xValue = getFiniteNumberOption(call, "x");
+        Double yValue = getFiniteNumberOption(call, "y");
+        Double deltaXValue = getFiniteNumberOption(call, "deltaX");
+        Double deltaYValue = getFiniteNumberOption(call, "deltaY");
+        if ("scroll".equals(type)) {
+            if (xValue == null || yValue == null || deltaXValue == null || deltaYValue == null) {
+                call.reject("dispatchInputEvent scroll requires finite x, y, deltaX, and deltaY");
+                return;
+            }
+        } else if (isPointerInputEvent(type)) {
+            if (xValue == null || yValue == null) {
+                call.reject("dispatchInputEvent " + type + " requires finite x and y");
+                return;
+            }
+        } else {
+            call.reject("Unsupported input event type: " + type);
+            return;
+        }
+
+        double x = xValue;
+        double y = yValue;
+        double deltaX = deltaXValue != null ? deltaXValue : 0d;
+        double deltaY = deltaYValue != null ? deltaYValue : 0d;
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
@@ -1420,7 +1460,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         return;
                     }
                     if (!dialog.dispatchInputEvent(type, x, y, deltaX, deltaY)) {
-                        call.reject("Unsupported input event type: " + type);
+                        call.reject("Unsupported input event type or invalid input payload: " + type);
                         return;
                     }
                     call.resolve();
