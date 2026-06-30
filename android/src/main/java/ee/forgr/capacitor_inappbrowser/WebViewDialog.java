@@ -16,6 +16,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.net.http.SslError;
@@ -23,6 +24,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
@@ -35,6 +37,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -55,6 +58,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -345,6 +349,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private ViewGroup.LayoutParams previousWebViewLayoutParams;
     private float previousDecorAlpha = 1f;
     private int previousDecorVisibility = View.VISIBLE;
+    private View browserContentView;
+    private ViewGroup backLayerParent;
+    private boolean backLayerActive = false;
+    private boolean usingHostTransparency = false;
+    private Runnable hostTransparencyApplyRunnable;
+    private long forwardedInputDownTime = 0L;
+    private static int hostTransparencyUseCount = 0;
+    private static Drawable originalCapacitorWebViewBackground;
+    private static boolean originalCapacitorWebViewBackgroundCaptured = false;
+    private static Drawable originalCapacitorParentBackground;
+    private static boolean originalCapacitorParentBackgroundCaptured = false;
+    private static Drawable originalCapacitorWindowBackground;
+    private static boolean originalCapacitorWindowBackgroundCaptured = false;
+    private static float originalCapacitorWebViewAlpha = 1f;
+    private static float originalCapacitorParentAlpha = 1f;
     private float previousWebViewAlpha = 1f;
     private int previousWebViewVisibility = View.VISIBLE;
 
@@ -399,6 +418,337 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     public WebView getManagedWebView() {
         return _webView;
+    }
+
+    private View getBrowserContentView() {
+        if (browserContentView == null) {
+            browserContentView = findViewById(R.id.coordinator_layout);
+        }
+        return browserContentView;
+    }
+
+    private ViewGroup getBackLayerParent() {
+        if (capacitorWebView != null && capacitorWebView.getParent() instanceof ViewGroup viewGroup) {
+            return viewGroup;
+        }
+        if (activity != null && activity.getWindow() != null) {
+            View content = activity.getWindow().getDecorView().findViewById(android.R.id.content);
+            if (content instanceof ViewGroup viewGroup) {
+                return viewGroup;
+            }
+        }
+        return null;
+    }
+
+    private ViewGroup.LayoutParams createBackLayerLayoutParams(ViewGroup parent) {
+        int width =
+            _options != null && _options.getWidth() != null ? (int) getPixels(_options.getWidth()) : ViewGroup.LayoutParams.MATCH_PARENT;
+        int height =
+            _options != null && _options.getHeight() != null ? (int) getPixels(_options.getHeight()) : ViewGroup.LayoutParams.MATCH_PARENT;
+        int leftMargin = _options != null && _options.getX() != null ? (int) getPixels(_options.getX()) : 0;
+        int topMargin = _options != null && _options.getY() != null ? (int) getPixels(_options.getY()) : 0;
+
+        if (parent instanceof FrameLayout) {
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.START);
+            params.leftMargin = leftMargin;
+            params.topMargin = topMargin;
+            return params;
+        }
+        if (parent instanceof RelativeLayout) {
+            RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(width, height);
+            params.leftMargin = leftMargin;
+            params.topMargin = topMargin;
+            return params;
+        }
+        if (parent instanceof CoordinatorLayout) {
+            CoordinatorLayout.LayoutParams params = new CoordinatorLayout.LayoutParams(width, height);
+            params.leftMargin = leftMargin;
+            params.topMargin = topMargin;
+            return params;
+        }
+
+        ViewGroup.MarginLayoutParams params = new ViewGroup.MarginLayoutParams(width, height);
+        params.leftMargin = leftMargin;
+        params.topMargin = topMargin;
+        return params;
+    }
+
+    private void applyBackLayerDimensions() {
+        View contentView = getBrowserContentView();
+        if (!backLayerActive || contentView == null || backLayerParent == null) {
+            return;
+        }
+        contentView.setLayoutParams(createBackLayerLayoutParams(backLayerParent));
+        contentView.requestLayout();
+    }
+
+    private boolean isMiuiDevice() {
+        String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toLowerCase(Locale.US) : "";
+        String brand = Build.BRAND != null ? Build.BRAND.toLowerCase(Locale.US) : "";
+        return manufacturer.contains("xiaomi") || brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco");
+    }
+
+    private boolean usesFullStackTransparentBackgroundWorkaround() {
+        String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toLowerCase(Locale.US) : "";
+        String brand = Build.BRAND != null ? Build.BRAND.toLowerCase(Locale.US) : "";
+        return (
+            isMiuiDevice() ||
+            manufacturer.contains("huawei") ||
+            manufacturer.contains("honor") ||
+            brand.contains("huawei") ||
+            brand.contains("honor")
+        );
+    }
+
+    private void applyHostTransparency(boolean enabled) {
+        if (!enabled || capacitorWebView == null || usingHostTransparency) {
+            return;
+        }
+        ViewGroup capacitorParent = capacitorWebView.getParent() instanceof ViewGroup ? (ViewGroup) capacitorWebView.getParent() : null;
+        Window window = activity != null ? activity.getWindow() : null;
+        synchronized (WebViewDialog.class) {
+            if (hostTransparencyUseCount == 0) {
+                originalCapacitorWebViewBackground = capacitorWebView.getBackground();
+                originalCapacitorWebViewBackgroundCaptured = true;
+                originalCapacitorWebViewAlpha = capacitorWebView.getAlpha();
+                if (capacitorParent != null) {
+                    originalCapacitorParentBackground = capacitorParent.getBackground();
+                    originalCapacitorParentBackgroundCaptured = true;
+                    originalCapacitorParentAlpha = capacitorParent.getAlpha();
+                }
+                if (window != null) {
+                    originalCapacitorWindowBackground = window.getDecorView().getBackground();
+                    originalCapacitorWindowBackgroundCaptured = true;
+                }
+            }
+            hostTransparencyUseCount++;
+            usingHostTransparency = true;
+        }
+
+        final Runnable[] applyRef = new Runnable[1];
+        Runnable apply = () -> {
+            synchronized (WebViewDialog.class) {
+                if (!usingHostTransparency || hostTransparencyApplyRunnable != applyRef[0]) {
+                    return;
+                }
+            }
+            boolean fullStackWorkaround = usesFullStackTransparentBackgroundWorkaround();
+            if (window != null && fullStackWorkaround) {
+                window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+            if (capacitorParent != null && fullStackWorkaround) {
+                capacitorParent.setBackgroundColor(Color.TRANSPARENT);
+            }
+            capacitorWebView.setBackgroundColor(isMiuiDevice() ? Color.argb(1, 255, 255, 255) : Color.TRANSPARENT);
+            capacitorWebView.setAlpha(isMiuiDevice() ? 0.99f : originalCapacitorWebViewAlpha);
+            if (capacitorParent != null) {
+                capacitorParent.requestTransparentRegion(capacitorWebView);
+            }
+        };
+
+        applyRef[0] = apply;
+        hostTransparencyApplyRunnable = apply;
+        apply.run();
+        if (isMiuiDevice()) {
+            mainHandler.postDelayed(apply, 50);
+            mainHandler.postDelayed(apply, 250);
+        }
+    }
+
+    private void restoreHostTransparency() {
+        if (!usingHostTransparency || capacitorWebView == null) {
+            return;
+        }
+        ViewGroup capacitorParent = capacitorWebView.getParent() instanceof ViewGroup ? (ViewGroup) capacitorWebView.getParent() : null;
+        Window window = activity != null ? activity.getWindow() : null;
+        if (hostTransparencyApplyRunnable != null) {
+            mainHandler.removeCallbacks(hostTransparencyApplyRunnable);
+            hostTransparencyApplyRunnable = null;
+        }
+        synchronized (WebViewDialog.class) {
+            hostTransparencyUseCount = Math.max(0, hostTransparencyUseCount - 1);
+            usingHostTransparency = false;
+            if (hostTransparencyUseCount > 0) {
+                return;
+            }
+            if (originalCapacitorWebViewBackgroundCaptured) {
+                capacitorWebView.setBackground(originalCapacitorWebViewBackground);
+            }
+            capacitorWebView.setAlpha(originalCapacitorWebViewAlpha);
+            if (capacitorParent != null && originalCapacitorParentBackgroundCaptured) {
+                capacitorParent.setBackground(originalCapacitorParentBackground);
+                capacitorParent.setAlpha(originalCapacitorParentAlpha);
+            }
+            if (window != null && originalCapacitorWindowBackgroundCaptured) {
+                window.setBackgroundDrawable(originalCapacitorWindowBackground);
+            }
+            originalCapacitorWebViewBackground = null;
+            originalCapacitorWebViewBackgroundCaptured = false;
+            originalCapacitorParentBackground = null;
+            originalCapacitorParentBackgroundCaptured = false;
+            originalCapacitorWindowBackground = null;
+            originalCapacitorWindowBackgroundCaptured = false;
+            originalCapacitorWebViewAlpha = 1f;
+            originalCapacitorParentAlpha = 1f;
+        }
+    }
+
+    private void detachBackLayer() {
+        View contentView = getBrowserContentView();
+        if (contentView != null && contentView.getParent() instanceof ViewGroup parent) {
+            if (parent == backLayerParent || backLayerActive) {
+                parent.removeView(contentView);
+            }
+        }
+        backLayerActive = false;
+        backLayerParent = null;
+        restoreHostTransparency();
+    }
+
+    private void attachContentToDialogWindow() {
+        View contentView = getBrowserContentView();
+        if (contentView == null) {
+            return;
+        }
+        if (contentView.getParent() instanceof ViewGroup parent) {
+            parent.removeView(contentView);
+        }
+        setContentView(contentView);
+    }
+
+    public boolean sendToBack(boolean transparentBackground) {
+        if (_options != null) {
+            _options.setToBack(true);
+            _options.setTransparentBackground(transparentBackground);
+        }
+        View contentView = getBrowserContentView();
+        ViewGroup parent = getBackLayerParent();
+        if (contentView == null || parent == null) {
+            Log.w("InAppBrowser", "Unable to send webview to back: missing content or parent view");
+            return false;
+        }
+        if (contentView.getParent() instanceof ViewGroup currentParent) {
+            currentParent.removeView(contentView);
+        }
+        if (transparentBackground) {
+            applyHostTransparency(true);
+        } else {
+            restoreHostTransparency();
+        }
+        int targetIndex = capacitorWebView != null ? parent.indexOfChild(capacitorWebView) : 0;
+        parent.addView(contentView, Math.max(0, targetIndex), createBackLayerLayoutParams(parent));
+        contentView.setVisibility(View.VISIBLE);
+        contentView.setAlpha(1f);
+        backLayerParent = parent;
+        backLayerActive = true;
+        if (isShowing()) {
+            super.hide();
+        }
+        return true;
+    }
+
+    public void bringToFrontLayer() {
+        if (_options != null) {
+            _options.setToBack(false);
+        }
+        detachBackLayer();
+        attachContentToDialogWindow();
+        if (!isShowing()) {
+            show();
+        }
+        applyDimensions();
+    }
+
+    private boolean showAccordingToLayerMode() {
+        if (_options != null && _options.isToBack()) {
+            return sendToBack(_options.getTransparentBackground());
+        }
+        bringToFrontLayer();
+        return true;
+    }
+
+    private void showAccordingToLayerModeOrFallback() {
+        if (!showAccordingToLayerMode()) {
+            Log.w("InAppBrowser", "Unable to send webview to back; showing it in front");
+            bringToFrontLayer();
+        }
+    }
+
+    private boolean dispatchMotionEvent(int action, double x, double y) {
+        if (_webView == null) {
+            return false;
+        }
+        long now = SystemClock.uptimeMillis();
+        if (action == MotionEvent.ACTION_DOWN || forwardedInputDownTime == 0L) {
+            forwardedInputDownTime = now;
+        }
+        MotionEvent event = MotionEvent.obtain(forwardedInputDownTime, now, action, getPixels(x), getPixels(y), 0);
+        boolean handled = _webView.dispatchTouchEvent(event);
+        event.recycle();
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            forwardedInputDownTime = 0L;
+        }
+        return handled;
+    }
+
+    public boolean dispatchInputEvent(String type, double x, double y, double deltaX, double deltaY) {
+        if (_webView == null || type == null) {
+            return false;
+        }
+        switch (type) {
+            case "click":
+                forwardedInputDownTime = SystemClock.uptimeMillis();
+                dispatchMotionEvent(MotionEvent.ACTION_DOWN, x, y);
+                return dispatchMotionEvent(MotionEvent.ACTION_UP, x, y);
+            case "touchstart":
+                return dispatchMotionEvent(MotionEvent.ACTION_DOWN, x, y);
+            case "touchmove":
+                return dispatchMotionEvent(MotionEvent.ACTION_MOVE, x, y);
+            case "touchend":
+                return dispatchMotionEvent(MotionEvent.ACTION_UP, x, y);
+            case "touchcancel":
+                return dispatchMotionEvent(MotionEvent.ACTION_CANCEL, x, y);
+            case "scroll":
+                return dispatchScrollEvent(x, y, deltaX, deltaY);
+            default:
+                return false;
+        }
+    }
+
+    private boolean dispatchScrollEvent(double x, double y, double deltaX, double deltaY) {
+        if (_webView == null) {
+            return false;
+        }
+        String script =
+            "(function() {" +
+            "  const x = " +
+            Double.toString(x) +
+            ";" +
+            "  const y = " +
+            Double.toString(y) +
+            ";" +
+            "  const dx = " +
+            Double.toString(deltaX) +
+            ";" +
+            "  const dy = " +
+            Double.toString(deltaY) +
+            ";" +
+            "  let target = Number.isFinite(x) && Number.isFinite(y) ? document.elementFromPoint(x, y) : null;" +
+            "  while (target && target !== document.body && target !== document.documentElement) {" +
+            "    const style = window.getComputedStyle(target);" +
+            "    const canScroll = /(auto|scroll)/.test(style.overflow + style.overflowX + style.overflowY) &&" +
+            "      (target.scrollHeight > target.clientHeight || target.scrollWidth > target.clientWidth);" +
+            "    if (canScroll && typeof target.scrollBy === 'function') {" +
+            "      target.scrollBy(dx, dy);" +
+            "      return true;" +
+            "    }" +
+            "    target = target.parentElement;" +
+            "  }" +
+            "  window.scrollBy(dx, dy);" +
+            "  return true;" +
+            "})();";
+        _webView.evaluateJavascript(script, null);
+        return true;
     }
 
     private void resolveOpenWebViewIfNeeded() {
@@ -494,10 +844,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 return;
             }
             activity.runOnUiThread(() -> {
-                if (!isShowing()) {
-                    WebViewDialog.this.show();
-                }
                 setHidden(false);
+                showAccordingToLayerModeOrFallback();
             });
         }
 
@@ -2422,9 +2770,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
             resolveOpenWebViewIfNeeded();
         } else if (_options.isPopupWindowMode()) {
-            show();
+            showAccordingToLayerModeOrFallback();
         } else if (!this._options.isPresentAfterPageLoad()) {
-            show();
+            showAccordingToLayerModeOrFallback();
             resolveOpenWebViewIfNeeded();
         }
     }
@@ -2524,6 +2872,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (!isHiddenModeActive) {
                 if (getWindow() == null) {
                     try {
+                        if (backLayerActive) {
+                            detachBackLayer();
+                            attachContentToDialogWindow();
+                        }
                         show();
                         Window window = getWindow();
                         if (window == null) {
@@ -4854,7 +5206,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         if (_options.isPresentAfterPageLoad()) {
                             boolean usePreShowScript = _options.getPreShowScript() != null && !_options.getPreShowScript().isEmpty();
                             if (!usePreShowScript) {
-                                show();
+                                showAccordingToLayerModeOrFallback();
                                 resolveOpenWebViewIfNeeded();
                             } else {
                                 executorService.execute(
@@ -4869,7 +5221,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                                 new Runnable() {
                                                     @Override
                                                     public void run() {
-                                                        show();
+                                                        showAccordingToLayerModeOrFallback();
                                                         resolveOpenWebViewIfNeeded();
                                                     }
                                                 }
@@ -5038,6 +5390,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     @Override
     public void dismiss() {
         scheduleHostWebViewInsetRestore();
+        detachBackLayer();
 
         // First, stop any ongoing operations and disable further interactions
         if (_webView != null) {
@@ -6116,7 +6469,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         // Apply new dimensions
-        applyDimensions();
+        if (backLayerActive) {
+            applyBackLayerDimensions();
+        } else {
+            applyDimensions();
+        }
     }
 
     public void setEnabledSafeTopMargin(boolean enabled) {
@@ -6136,5 +6493,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
      */
     private float getPixels(int dp) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, _context.getResources().getDisplayMetrics());
+    }
+
+    private float getPixels(double dp) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, (float) dp, _context.getResources().getDisplayMetrics());
     }
 }

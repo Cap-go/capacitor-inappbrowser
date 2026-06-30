@@ -407,6 +407,35 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return webViewDialog;
     }
 
+    private double getNumberOption(PluginCall call, String name, double defaultValue) {
+        Object value = call.getData().opt(name);
+        if (value instanceof Number numberValue) {
+            return numberValue.doubleValue();
+        }
+        return defaultValue;
+    }
+
+    private Double getFiniteNumberOption(PluginCall call, String name) {
+        Object value = call.getData().opt(name);
+        if (value instanceof Number numberValue) {
+            double doubleValue = numberValue.doubleValue();
+            if (Double.isFinite(doubleValue)) {
+                return doubleValue;
+            }
+        }
+        return null;
+    }
+
+    private boolean isPointerInputEvent(String type) {
+        return (
+            "click".equals(type) ||
+            "touchstart".equals(type) ||
+            "touchmove".equals(type) ||
+            "touchend".equals(type) ||
+            "touchcancel".equals(type)
+        );
+    }
+
     private ArrayList<WebView> cacheWebViewsFor(String targetId) {
         ArrayList<WebView> targetWebViews = new ArrayList<>();
         if (targetId != null) {
@@ -1211,6 +1240,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
 
         options.setHidden(Boolean.TRUE.equals(call.getBoolean("hidden", false)));
+        options.setToBack(Boolean.TRUE.equals(call.getBoolean("toBack", false)));
+        options.setTransparentBackground(call.getBoolean("transparentBackground", true));
         boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
@@ -1341,12 +1372,134 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         call.reject("WebView is not initialized");
                         return;
                     }
-                    if (!dialog.isShowing()) {
-                        dialog.show();
-                    }
                     dialog.setHidden(false);
+                    Options options = dialog.getOptions();
+                    if (options != null && options.isToBack()) {
+                        if (!dialog.sendToBack(options.getTransparentBackground())) {
+                            call.reject("Failed to send webview to back");
+                            return;
+                        }
+                    } else {
+                        dialog.bringToFrontLayer();
+                    }
                     if (dialog.getInstanceId() != null) {
                         setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void sendToBack(PluginCall call) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        boolean transparentBackground = call.getBoolean("transparentBackground", true);
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!dialog.sendToBack(transparentBackground)) {
+                        call.reject("Failed to send webview to back");
+                        return;
+                    }
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void bringToFront(PluginCall call) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    dialog.bringToFrontLayer();
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void dispatchInputEvent(PluginCall call) {
+        String type = call.getString("type");
+        if (type == null || type.trim().isEmpty()) {
+            call.reject("Input event type is required");
+            return;
+        }
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        Double xValue = getFiniteNumberOption(call, "x");
+        Double yValue = getFiniteNumberOption(call, "y");
+        Double deltaXValue = getFiniteNumberOption(call, "deltaX");
+        Double deltaYValue = getFiniteNumberOption(call, "deltaY");
+        if ("scroll".equals(type)) {
+            if (xValue == null || yValue == null || deltaXValue == null || deltaYValue == null) {
+                call.reject("dispatchInputEvent scroll requires finite x, y, deltaX, and deltaY");
+                return;
+            }
+        } else if (isPointerInputEvent(type)) {
+            if (xValue == null || yValue == null) {
+                call.reject("dispatchInputEvent " + type + " requires finite x and y");
+                return;
+            }
+        } else {
+            call.reject("Unsupported input event type: " + type);
+            return;
+        }
+
+        double x = xValue;
+        double y = yValue;
+        double deltaX = deltaXValue != null ? deltaXValue : 0d;
+        double deltaY = deltaYValue != null ? deltaYValue : 0d;
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!dialog.dispatchInputEvent(type, x, y, deltaX, deltaY)) {
+                        call.reject("Unsupported input event type or invalid input payload: " + type);
+                        return;
                     }
                     call.resolve();
                 }

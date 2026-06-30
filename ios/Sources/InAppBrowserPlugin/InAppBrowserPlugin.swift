@@ -114,6 +114,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hide", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendToBack", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "bringToFront", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dispatchInputEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
@@ -141,6 +144,14 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var activeWebViewId: String?
     private var hiddenWebViewContainers: [ObjectIdentifier: UIView] = [:]
     private var closeModalTitle: String?
+    private var layeredWebViewIds = Set<String>()
+    private var transparentHostWebViewIds = Set<String>()
+    private var hasStoredHostWebViewAppearance = false
+    private var originalHostWebViewBackgroundColor: UIColor?
+    private var originalHostWebViewIsOpaque = true
+    private var originalHostSubviewBackgrounds: [(UIView, UIColor?, Bool)] = []
+    private var originalHostSuperviewBackgroundColor: UIColor?
+    private var originalHostSuperviewIsOpaque = true
     private var closeModalDescription: String?
     private var closeModalOk: String?
     private var closeModalCancel: String?
@@ -187,6 +198,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func unregisterWebView(id: String) {
+        detachLayeredWebView(id: id)
         if let webView = webViewControllers[id]?.capableWebView {
             cleanupHiddenWebViewContainer(for: webView)
         }
@@ -380,19 +392,155 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    func presentView(webViewId: String? = nil, isAnimated: Bool = true) {
+    @discardableResult
+    func presentView(webViewId: String? = nil, isAnimated: Bool = true) -> Bool {
         let resolvedId = webViewId ?? activeWebViewId
         let navigationController = resolvedId.flatMap { navigationControllers[$0] } ?? self.navigationWebViewController
         guard let navigationController else {
             self.currentPluginCall?.reject("Navigation controller is not initialized")
-            return
+            return false
         }
 
+        if let resolvedId,
+           let webViewController = webViewControllers[resolvedId],
+           webViewController.isLayeredBehind {
+            if !sendNavigationControllerToBack(id: resolvedId, transparentBackground: webViewController.transparentHostBackground) {
+                self.currentPluginCall?.reject("Failed to send webview to back")
+                return false
+            }
+            return true
+        }
+
+        if let resolvedId {
+            detachLayeredWebView(id: resolvedId)
+        }
         dismissActiveKeyboard()
         let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
         presenter?.present(navigationController, animated: isAnimated, completion: {
             self.currentPluginCall?.resolve()
         })
+        return true
+    }
+
+    private func targetFrame(for webViewController: WKWebViewController, in hostWebView: UIView) -> CGRect {
+        return CustomWebViewFrameSupport.resolvedFrame(
+            width: webViewController.customWidth,
+            height: webViewController.customHeight,
+            x: webViewController.customX,
+            y: webViewController.customY,
+            fallbackSize: hostWebView.bounds.size
+        ) ?? hostWebView.bounds
+    }
+
+    @discardableResult
+    private func sendNavigationControllerToBack(id: String, transparentBackground: Bool) -> Bool {
+        guard let navigationController = navigationControllers[id],
+              let webViewController = webViewControllers[id],
+              let hostWebView = self.bridge?.webView else {
+            return false
+        }
+
+        if let webView = webViewController.capableWebView, webView.superview !== webViewController.view {
+            cleanupHiddenWebViewContainer(for: webView)
+            attachWebViewToController(webViewController, webView: webView)
+        }
+
+        dismissActiveKeyboard()
+        dismissNavigationControllerIfPresented(navigationController)
+        navigationController.view.removeFromSuperview()
+        if transparentBackground {
+            makeHostWebViewTransparent(for: id)
+        } else {
+            restoreHostWebViewBackgroundIfNeeded(for: id)
+        }
+        navigationController.view.frame = targetFrame(for: webViewController, in: hostWebView)
+        navigationController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        navigationController.view.isUserInteractionEnabled = false
+        hostWebView.addSubview(navigationController.view)
+        hostWebView.sendSubviewToBack(navigationController.view)
+        navigationController.view.setNeedsLayout()
+        navigationController.view.layoutIfNeeded()
+
+        layeredWebViewIds.insert(id)
+        webViewController.isLayeredBehind = true
+        webViewController.transparentHostBackground = transparentBackground
+        return true
+    }
+
+    private func detachLayeredWebView(id: String) {
+        if let navigationController = navigationControllers[id] {
+            if navigationController.view.superview === self.bridge?.webView {
+                navigationController.view.removeFromSuperview()
+            }
+            navigationController.view.isUserInteractionEnabled = true
+        }
+        layeredWebViewIds.remove(id)
+        restoreHostWebViewBackgroundIfNeeded(for: id)
+    }
+
+    private func storeSubviewBackgrounds(from view: UIView) {
+        for subview in view.subviews {
+            originalHostSubviewBackgrounds.append((subview, subview.backgroundColor, subview.isOpaque))
+            storeSubviewBackgrounds(from: subview)
+        }
+    }
+
+    private func clearBackgrounds(in view: UIView) {
+        view.isOpaque = false
+        view.backgroundColor = .clear
+        view.subviews.forEach { clearBackgrounds(in: $0) }
+    }
+
+    private func makeHostWebViewTransparent(for id: String) {
+        guard let hostWebView = self.bridge?.webView else {
+            return
+        }
+
+        transparentHostWebViewIds.insert(id)
+        if !hasStoredHostWebViewAppearance {
+            hasStoredHostWebViewAppearance = true
+            originalHostWebViewBackgroundColor = hostWebView.backgroundColor
+            originalHostWebViewIsOpaque = hostWebView.isOpaque
+            originalHostSuperviewBackgroundColor = hostWebView.superview?.backgroundColor
+            originalHostSuperviewIsOpaque = hostWebView.superview?.isOpaque ?? true
+            originalHostSubviewBackgrounds.removeAll()
+            storeSubviewBackgrounds(from: hostWebView)
+        }
+
+        clearBackgrounds(in: hostWebView)
+        hostWebView.superview?.isOpaque = false
+        hostWebView.superview?.backgroundColor = .clear
+        hostWebView.setNeedsLayout()
+        hostWebView.layoutIfNeeded()
+    }
+
+    private func restoreHostWebViewBackgroundIfNeeded(for id: String? = nil) {
+        if let id {
+            transparentHostWebViewIds.remove(id)
+        } else {
+            transparentHostWebViewIds.removeAll()
+        }
+        guard transparentHostWebViewIds.isEmpty, hasStoredHostWebViewAppearance else {
+            return
+        }
+
+        if let hostWebView = self.bridge?.webView {
+            hostWebView.backgroundColor = originalHostWebViewBackgroundColor
+            hostWebView.isOpaque = originalHostWebViewIsOpaque
+            hostWebView.superview?.backgroundColor = originalHostSuperviewBackgroundColor
+            hostWebView.superview?.isOpaque = originalHostSuperviewIsOpaque
+            for (view, backgroundColor, isOpaque) in originalHostSubviewBackgrounds {
+                view.backgroundColor = backgroundColor
+                view.isOpaque = isOpaque
+            }
+            hostWebView.setNeedsLayout()
+            hostWebView.layoutIfNeeded()
+        }
+
+        hasStoredHostWebViewAppearance = false
+        originalHostWebViewBackgroundColor = nil
+        originalHostSuperviewBackgroundColor = nil
+        originalHostSubviewBackgrounds.removeAll()
     }
 
     private func dismissActiveKeyboard() {
@@ -810,6 +958,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
         let enabledSafeTopMargin = call.getBool("enabledSafeTopMargin", true)
         let hidden = call.getBool("hidden", false)
+        let toBack = call.getBool("toBack", false)
+        let transparentBackground = call.getBool("transparentBackground", true)
         self.isHidden = hidden
         let hiddenPopupWindow = call.getBool("hiddenPopupWindow", false)
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
@@ -986,6 +1136,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.webViewController = webViewController
 
             webViewController.instanceId = webViewId
+            webViewController.isLayeredBehind = toBack
+            webViewController.transparentHostBackground = transparentBackground
 
             // Set HTTP method and body if provided
             if let method = httpMethod {
@@ -1218,7 +1370,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             // Configure modal presentation for touch passthrough if custom dimensions are set
-            if width != nil || height != nil {
+            if (width != nil || height != nil) && !toBack {
                 self.navigationWebViewController?.modalPresentationStyle = .overFullScreen
 
                 // Create a pass-through container
@@ -1308,7 +1460,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
             } else if !self.isPresentAfterPageLoad {
-                self.presentView(webViewId: webViewId, isAnimated: isAnimated)
+                guard self.presentView(webViewId: webViewId, isAnimated: isAnimated) else {
+                    return
+                }
             }
             call.resolve(["id": webViewId])
         }
@@ -1374,6 +1528,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.isHidden = hidden
 
             if hidden {
+                if let resolvedId {
+                    self.detachLayeredWebView(id: resolvedId)
+                }
                 if !self.attachWebViewToWindow(webView) {
                     call?.reject("Failed to get active window for hidden webview")
                     return
@@ -1382,6 +1539,18 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             } else {
                 if webView.superview !== webViewController.view {
                     self.attachWebViewToController(webViewController, webView: webView)
+                }
+
+                if webViewController.isLayeredBehind, let resolvedId {
+                    if self.sendNavigationControllerToBack(id: resolvedId, transparentBackground: webViewController.transparentHostBackground) {
+                        if let navController = navigationController {
+                            self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
+                        }
+                        call?.resolve()
+                    } else {
+                        call?.reject("Failed to send webview to back")
+                    }
+                    return
                 }
 
                 if let navController = navigationController {
@@ -1420,6 +1589,198 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func show(_ call: CAPPluginCall) {
         self.setHiddenState(false, targetId: call.getString("id"), call: call)
+    }
+
+    @objc func sendToBack(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let resolvedId = targetId,
+                  let webViewController = self.resolveWebViewController(for: resolvedId),
+                  let navigationController = self.resolveNavigationController(for: resolvedId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            let transparentBackground = call.getBool("transparentBackground", true)
+            webViewController.isLayeredBehind = true
+            webViewController.transparentHostBackground = transparentBackground
+            guard self.sendNavigationControllerToBack(id: resolvedId, transparentBackground: transparentBackground) else {
+                call.reject("Failed to send webview to back")
+                return
+            }
+            self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navigationController)
+            call.resolve()
+        }
+    }
+
+    @objc func bringToFront(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let resolvedId = targetId,
+                  let webViewController = self.resolveWebViewController(for: resolvedId),
+                  let navigationController = self.resolveNavigationController(for: resolvedId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+
+            webViewController.isLayeredBehind = false
+            webViewController.transparentHostBackground = true
+            self.detachLayeredWebView(id: resolvedId)
+            if let webView = webViewController.capableWebView, webView.superview !== webViewController.view {
+                self.attachWebViewToController(webViewController, webView: webView)
+            }
+            self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navigationController)
+            if navigationController.presentingViewController == nil {
+                let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
+                presenter?.present(navigationController, animated: true, completion: {
+                    call.resolve()
+                })
+                return
+            }
+            call.resolve()
+        }
+    }
+
+    private func jsNumber(_ value: Float?, fallback: String = "0") -> String {
+        guard let value, value.isFinite else {
+            return fallback
+        }
+        return String(Double(value))
+    }
+
+    private func dispatchInputScript(type: String, x: Float?, y: Float?, deltaX: Float?, deltaY: Float?) -> String? {
+        if type == "scroll" {
+            guard let x, let y, let deltaX, let deltaY,
+                  x.isFinite, y.isFinite, deltaX.isFinite, deltaY.isFinite else {
+                return nil
+            }
+            let xLiteral = jsNumber(x)
+            let yLiteral = jsNumber(y)
+            let deltaXLiteral = jsNumber(deltaX)
+            let deltaYLiteral = jsNumber(deltaY)
+            return """
+            (function() {
+              const x = \(xLiteral);
+              const y = \(yLiteral);
+              const dx = \(deltaXLiteral);
+              const dy = \(deltaYLiteral);
+              let target = Number.isFinite(x) && Number.isFinite(y) ? document.elementFromPoint(x, y) : null;
+              while (target && target !== document.body && target !== document.documentElement) {
+                const style = window.getComputedStyle(target);
+                const canScroll = /(auto|scroll)/.test(style.overflow + style.overflowX + style.overflowY) &&
+                  (target.scrollHeight > target.clientHeight || target.scrollWidth > target.clientWidth);
+                if (canScroll && typeof target.scrollBy === 'function') {
+                  target.scrollBy(dx, dy);
+                  return true;
+                }
+                target = target.parentElement;
+              }
+              window.scrollBy(dx, dy);
+              return true;
+            })();
+            """
+        }
+
+        let pointerEvents: [String]
+        let mouseEvents: [String]
+        let touchEvents: [String]
+        switch type {
+        case "click":
+            pointerEvents = ["pointerdown", "pointerup"]
+            mouseEvents = ["mousedown", "mouseup", "click"]
+            touchEvents = ["touchstart", "touchend"]
+        case "touchstart":
+            pointerEvents = ["pointerdown"]
+            mouseEvents = ["mousedown"]
+            touchEvents = ["touchstart"]
+        case "touchmove":
+            pointerEvents = ["pointermove"]
+            mouseEvents = ["mousemove"]
+            touchEvents = ["touchmove"]
+        case "touchend":
+            pointerEvents = ["pointerup"]
+            mouseEvents = ["mouseup"]
+            touchEvents = ["touchend"]
+        case "touchcancel":
+            pointerEvents = ["pointercancel"]
+            mouseEvents = []
+            touchEvents = ["touchcancel"]
+        default:
+            return nil
+        }
+
+        guard let x, let y, x.isFinite, y.isFinite else {
+            return nil
+        }
+
+        let pointerEventsData = try? JSONSerialization.data(withJSONObject: pointerEvents)
+        let mouseEventsData = try? JSONSerialization.data(withJSONObject: mouseEvents)
+        let touchEventsData = try? JSONSerialization.data(withJSONObject: touchEvents)
+        let pointerEventsJSON = pointerEventsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let mouseEventsJSON = mouseEventsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        let touchEventsJSON = touchEventsData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+
+        return """
+        (function() {
+          const x = \(jsNumber(x));
+          const y = \(jsNumber(y));
+          const target = document.elementFromPoint(x, y);
+          if (!target) return false;
+          const base = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, screenX: x, screenY: y };
+          for (const name of \(pointerEventsJSON)) {
+            if (typeof PointerEvent === 'function') {
+              target.dispatchEvent(new PointerEvent(name, Object.assign({}, base, { pointerId: 1, pointerType: 'touch', isPrimary: true })));
+            }
+          }
+          for (const name of \(mouseEventsJSON)) {
+            target.dispatchEvent(new MouseEvent(name, base));
+          }
+          if (typeof TouchEvent === 'function' && typeof Touch === 'function') {
+            for (const name of \(touchEventsJSON)) {
+              try {
+                const touch = new Touch({ identifier: 1, target: target, clientX: x, clientY: y, screenX: x, screenY: y });
+                const activeTouches = name === 'touchend' || name === 'touchcancel' ? [] : [touch];
+                target.dispatchEvent(new TouchEvent(name, {
+                  bubbles: true,
+                  cancelable: true,
+                  composed: true,
+                  touches: activeTouches,
+                  targetTouches: activeTouches,
+                  changedTouches: [touch]
+                }));
+              } catch (_) {}
+            }
+          }
+          return true;
+        })();
+        """
+    }
+
+    @objc func dispatchInputEvent(_ call: CAPPluginCall) {
+        guard let type = call.getString("type") else {
+            call.reject("Input event type is required")
+            return
+        }
+        guard let script = dispatchInputScript(
+            type: type,
+            x: call.getFloat("x"),
+            y: call.getFloat("y"),
+            deltaX: call.getFloat("deltaX"),
+            deltaY: call.getFloat("deltaY")
+        ) else {
+            call.reject("Unsupported input event type or invalid input payload: \(type)")
+            return
+        }
+
+        DispatchQueue.main.async {
+            let targetId = call.getString("id") ?? self.activeWebViewId
+            guard let webViewController = self.resolveWebViewController(for: targetId) else {
+                call.reject("WebView is not initialized")
+                return
+            }
+            webViewController.executeScript(script: script)
+            call.resolve()
+        }
     }
 
     @objc func executeScript(_ call: CAPPluginCall) {

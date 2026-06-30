@@ -7,6 +7,7 @@ import type {
   GetCookieOptions,
   ClearCookieOptions,
   DimensionOptions,
+  DispatchInputEventOptions,
   OpenSecureWindowOptions,
   OpenSecureWindowResponse,
   ScreenshotResult,
@@ -62,6 +63,21 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
 
   async show(options?: { id?: string }): Promise<void> {
     console.log('show', options);
+    return;
+  }
+
+  async sendToBack(options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
+    console.log('sendToBack not supported on web', options);
+    return;
+  }
+
+  async bringToFront(options?: { id?: string }): Promise<void> {
+    console.log('bringToFront not supported on web', options);
+    return;
+  }
+
+  async dispatchInputEvent(options: DispatchInputEventOptions): Promise<void> {
+    console.log('dispatchInputEvent not supported on web', options);
     return;
   }
 

@@ -433,6 +433,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var waitsForPopupNavigation = false
     var hiddenPopupWindow = false
     var opensHidden = false
+    var isLayeredBehind = false
+    var transparentHostBackground = true
 
     // Dimension properties
     var customWidth: CGFloat?
