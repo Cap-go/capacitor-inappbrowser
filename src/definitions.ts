@@ -53,6 +53,8 @@ export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: object) => void;
 export type CustomSchemeInterceptedListener = (state: CustomSchemeInterceptedEvent) => void;
 
+export type WebViewInputEventType = 'click' | 'scroll' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel';
+
 export enum BackgroundColor {
   WHITE = 'white',
   BLACK = 'black',
@@ -112,6 +114,46 @@ export interface ClearCookieOptions {
 export interface Credentials {
   username: string;
   password: string;
+}
+
+export interface LayerOptions {
+  /**
+   * Target webview id. If omitted, targets the active webview.
+   */
+  id?: string;
+  /**
+   * Makes the Capacitor host WebView transparent while this native webview is behind it.
+   *
+   * @default true
+   */
+  transparentBackground?: boolean;
+}
+
+export interface DispatchInputEventOptions {
+  /**
+   * Target webview id. If omitted, targets the active webview.
+   */
+  id?: string;
+  /**
+   * Input event to dispatch to the webview.
+   */
+  type: WebViewInputEventType;
+  /**
+   * X coordinate in CSS pixels from the webview's left edge.
+   */
+  x?: number;
+  /**
+   * Y coordinate in CSS pixels from the webview's top edge.
+   */
+  y?: number;
+  /**
+   * Horizontal scroll delta in CSS pixels. Used when `type` is `scroll`.
+   */
+  deltaX?: number;
+  /**
+   * Vertical scroll delta in CSS pixels. Used when `type` is `scroll`.
+   */
+  deltaY?: number;
 }
 
 /**
@@ -1099,6 +1141,22 @@ export interface OpenWebViewOptions {
   y?: number;
 
   /**
+   * Places the native browser behind the Capacitor host WebView.
+   * Make the app background transparent to reveal it, or rely on `transparentBackground` to clear the host WebView.
+   *
+   * @default false
+   */
+  toBack?: boolean;
+
+  /**
+   * When `toBack` is true, makes the Capacitor host WebView transparent so the native browser can be seen behind Ionic content.
+   * Ignored when the browser is in front.
+   *
+   * @default true
+   */
+  transparentBackground?: boolean;
+
+  /**
    * Disables the bounce (overscroll) effect on iOS WebView.
    * When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries.
    * This is useful for:
@@ -1224,6 +1282,21 @@ export interface InAppBrowserPlugin {
    * @since 8.0.8
    */
   show(options?: { id?: string }): Promise<void>;
+  /**
+   * Moves the native browser behind the Capacitor host WebView.
+   * Use `dispatchInputEvent()` to forward overlay gestures to the browser while it is behind the app UI.
+   */
+  sendToBack(options?: LayerOptions): Promise<void>;
+  /**
+   * Moves a browser that was behind the host WebView back to the front.
+   * When `id` is omitted, targets the active webview.
+   */
+  bringToFront(options?: { id?: string }): Promise<void>;
+  /**
+   * Dispatches a click, touch, or scroll event to a managed browser.
+   * Coordinates are relative to the browser viewport in CSS pixels.
+   */
+  dispatchInputEvent(options: DispatchInputEventOptions): Promise<void>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *

@@ -191,6 +191,8 @@ public class Options {
     private Integer x = null;
     private Integer y = null;
     private boolean hidden = false;
+    private boolean toBack = false;
+    private boolean transparentBackground = true;
     private boolean showScreenshotButton = false;
     private boolean allowWebViewJsVisibilityControl = false;
     private boolean allowScreenshotsFromWebPage = false;
@@ -232,6 +234,22 @@ public class Options {
 
     public void setY(Integer y) {
         this.y = y;
+    }
+
+    public boolean isToBack() {
+        return toBack;
+    }
+
+    public void setToBack(boolean toBack) {
+        this.toBack = toBack;
+    }
+
+    public boolean getTransparentBackground() {
+        return transparentBackground;
+    }
+
+    public void setTransparentBackground(boolean transparentBackground) {
+        this.transparentBackground = transparentBackground;
     }
 
     public int getTextZoom() {
@@ -709,6 +727,8 @@ public class Options {
         copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
         copy.setWidth(width);
         copy.setHeight(height);
+        copy.setToBack(toBack);
+        copy.setTransparentBackground(transparentBackground);
         copy.setX(x);
         copy.setY(y);
         copy.setHidden(hidden || hiddenPopupWindow);

@@ -405,6 +405,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return webViewDialog;
     }
 
+    private double getNumberOption(PluginCall call, String name, double defaultValue) {
+        Object value = call.getData().opt(name);
+        if (value instanceof Number numberValue) {
+            return numberValue.doubleValue();
+        }
+        return defaultValue;
+    }
+
     private ArrayList<WebView> cacheWebViewsFor(String targetId) {
         ArrayList<WebView> targetWebViews = new ArrayList<>();
         if (targetId != null) {
@@ -1173,6 +1181,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
 
         options.setHidden(Boolean.TRUE.equals(call.getBoolean("hidden", false)));
+        options.setToBack(Boolean.TRUE.equals(call.getBoolean("toBack", false)));
+        options.setTransparentBackground(call.getBoolean("transparentBackground", true));
         boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
@@ -1303,12 +1313,115 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         call.reject("WebView is not initialized");
                         return;
                     }
-                    if (!dialog.isShowing()) {
-                        dialog.show();
-                    }
                     dialog.setHidden(false);
+                    Options options = dialog.getOptions();
+                    if (options != null && options.isToBack()) {
+                        if (!dialog.sendToBack(options.getTransparentBackground())) {
+                            call.reject("Failed to send webview to back");
+                            return;
+                        }
+                    } else {
+                        dialog.bringToFrontLayer();
+                    }
                     if (dialog.getInstanceId() != null) {
                         setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void sendToBack(PluginCall call) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        boolean transparentBackground = call.getBoolean("transparentBackground", true);
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!dialog.sendToBack(transparentBackground)) {
+                        call.reject("Failed to send webview to back");
+                        return;
+                    }
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void bringToFront(PluginCall call) {
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    dialog.bringToFrontLayer();
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void dispatchInputEvent(PluginCall call) {
+        String type = call.getString("type");
+        if (type == null || type.trim().isEmpty()) {
+            call.reject("Input event type is required");
+            return;
+        }
+        String targetId = resolveTargetId(call);
+        WebViewDialog targetDialog = resolveDialog(targetId);
+        if (targetDialog == null) {
+            call.reject("WebView is not initialized");
+            return;
+        }
+
+        double x = getNumberOption(call, "x", 0d);
+        double y = getNumberOption(call, "y", 0d);
+        double deltaX = getNumberOption(call, "deltaX", 0d);
+        double deltaY = getNumberOption(call, "deltaY", 0d);
+        this.getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    WebViewDialog dialog = resolveDialog(targetId);
+                    if (dialog == null) {
+                        call.reject("WebView is not initialized");
+                        return;
+                    }
+                    if (!dialog.dispatchInputEvent(type, x, y, deltaX, deltaY)) {
+                        call.reject("Unsupported input event type: " + type);
+                        return;
                     }
                     call.resolve();
                 }

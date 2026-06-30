@@ -432,6 +432,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var waitsForPopupNavigation = false
     var hiddenPopupWindow = false
     var opensHidden = false
+    var isLayeredBehind = false
+    var transparentHostBackground = true
 
     // Dimension properties
     var customWidth: CGFloat?
@@ -748,8 +750,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
             ?? UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .first
+            .compactMap { $0 as? UIWindowScene }
+            .first
         return windowScene?.statusBarManager?.statusBarFrame.height ?? 0
     }
 
@@ -1934,7 +1936,6 @@ public extension WKWebViewController {
         }
         return false
     }
-
 
     func load(source sourceValue: WKWebSource) {
         switch sourceValue {

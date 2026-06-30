@@ -430,6 +430,9 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`close(...)`](#close)
 * [`hide(...)`](#hide)
 * [`show(...)`](#show)
+* [`sendToBack(...)`](#sendtoback)
+* [`bringToFront(...)`](#bringtofront)
+* [`dispatchInputEvent(...)`](#dispatchinputevent)
 * [`openWebView(...)`](#openwebview)
 * [`executeScript(...)`](#executescript)
 * [`postMessage(...)`](#postmessage)
@@ -631,6 +634,54 @@ When `id` is omitted, targets the active webview.
 | **`options`** | <code>{ id?: string; }</code> |
 
 **Since:** 8.0.8
+
+--------------------
+
+
+### sendToBack(...)
+
+```typescript
+sendToBack(options?: LayerOptions | undefined) => Promise<void>
+```
+
+Moves the native browser behind the Capacitor host WebView.
+Use `dispatchInputEvent()` to forward overlay gestures to the browser while it is behind the app UI.
+
+| Param         | Type                                                  |
+| ------------- | ----------------------------------------------------- |
+| **`options`** | <code><a href="#layeroptions">LayerOptions</a></code> |
+
+--------------------
+
+
+### bringToFront(...)
+
+```typescript
+bringToFront(options?: { id?: string | undefined; } | undefined) => Promise<void>
+```
+
+Moves a browser that was behind the host WebView back to the front.
+When `id` is omitted, targets the active webview.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
+
+--------------------
+
+
+### dispatchInputEvent(...)
+
+```typescript
+dispatchInputEvent(options: DispatchInputEventOptions) => Promise<void>
+```
+
+Dispatches a click, touch, or scroll event to a managed browser.
+Coordinates are relative to the browser viewport in CSS pixels.
+
+| Param         | Type                                                                            |
+| ------------- | ------------------------------------------------------------------------------- |
+| **`options`** | <code><a href="#dispatchinputeventoptions">DispatchInputEventOptions</a></code> |
 
 --------------------
 
@@ -1225,6 +1276,26 @@ And in the AndroidManifest.xml file:
 | **`isAnimated`** | <code>boolean</code> | Whether the webview closing is animated or not, ios only           | <code>true</code> |
 
 
+#### LayerOptions
+
+| Prop                        | Type                 | Description                                                                          | Default           |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------------ | ----------------- |
+| **`id`**                    | <code>string</code>  | Target webview id. If omitted, targets the active webview.                           |                   |
+| **`transparentBackground`** | <code>boolean</code> | Makes the Capacitor host WebView transparent while this native webview is behind it. | <code>true</code> |
+
+
+#### DispatchInputEventOptions
+
+| Prop         | Type                                                                    | Description                                                          |
+| ------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **`id`**     | <code>string</code>                                                     | Target webview id. If omitted, targets the active webview.           |
+| **`type`**   | <code><a href="#webviewinputeventtype">WebViewInputEventType</a></code> | Input event to dispatch to the webview.                              |
+| **`x`**      | <code>number</code>                                                     | X coordinate in CSS pixels from the webview's left edge.             |
+| **`y`**      | <code>number</code>                                                     | Y coordinate in CSS pixels from the webview's top edge.              |
+| **`deltaX`** | <code>number</code>                                                     | Horizontal scroll delta in CSS pixels. Used when `type` is `scroll`. |
+| **`deltaY`** | <code>number</code>                                                     | Vertical scroll delta in CSS pixels. Used when `type` is `scroll`.   |
+
+
 #### OpenWebViewOptions
 
 | Prop                                   | Type                                                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Default                                                       | Since  |
@@ -1283,6 +1354,8 @@ And in the AndroidManifest.xml file:
 | **`height`**                           | <code>number</code>                                                                                                                                                    | Height of the webview in pixels. If not set, webview will be fullscreen height.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>undefined (fullscreen)</code>                           |        |
 | **`x`**                                | <code>number</code>                                                                                                                                                    | X position of the webview in pixels from the left edge. Only effective when width is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
 | **`y`**                                | <code>number</code>                                                                                                                                                    | Y position of the webview in pixels from the top edge. Only effective when height is set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>0</code>                                                |        |
+| **`toBack`**                           | <code>boolean</code>                                                                                                                                                   | Places the native browser behind the Capacitor host WebView. Make the app background transparent to reveal it, or rely on `transparentBackground` to clear the host WebView.                                                                                                                                                                                                                                                                                                                                                                               | <code>false</code>                                            |        |
+| **`transparentBackground`**            | <code>boolean</code>                                                                                                                                                   | When `toBack` is true, makes the Capacitor host WebView transparent so the native browser can be seen behind Ionic content. Ignored when the browser is in front.                                                                                                                                                                                                                                                                                                                                                                                          | <code>true</code>                                             |        |
 | **`disableOverscroll`**                | <code>boolean</code>                                                                                                                                                   | Disables the bounce (overscroll) effect on iOS WebView. When enabled, prevents the rubber band scrolling effect when users scroll beyond content boundaries. This is useful for: - Creating a more native, app-like experience - Preventing accidental overscroll states - Avoiding issues when keyboard opens/closes Note: This option only affects iOS. Android does not have this bounce effect by default.                                                                                                                                             | <code>false</code>                                            | 8.0.2  |
 | **`hidden`**                           | <code>boolean</code>                                                                                                                                                   | Opens the webview in hidden mode (not visible to user but fully functional). When hidden, the webview loads and executes JavaScript but is not displayed. All control methods (executeScript, postMessage, setUrl, etc.) work while hidden. Use close() to clean up the hidden webview when done.                                                                                                                                                                                                                                                          | <code>false</code>                                            | 8.0.7  |
 | **`invisibilityMode`**                 | <code><a href="#invisibilitymode">InvisibilityMode</a></code>                                                                                                          | Controls how a hidden webview reports its visibility and size. - AWARE: webview is aware it's hidden (dimensions may be zero). - FAKE_VISIBLE: webview is hidden but reports fullscreen dimensions (uses alpha=0 to remain invisible).                                                                                                                                                                                                                                                                                                                     | <code>InvisibilityMode.AWARE</code>                           |        |
@@ -1559,6 +1632,11 @@ Construct a type with a set of properties K of type T
 #### GetCookieOptions
 
 <code><a href="#omit">Omit</a>&lt;<a href="#httpcookie">HttpCookie</a>, 'key' | 'value'&gt;</code>
+
+
+#### WebViewInputEventType
+
+<code>'click' | 'scroll' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel'</code>
 
 
 #### UrlChangeListener
