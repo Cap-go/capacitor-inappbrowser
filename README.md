@@ -426,6 +426,7 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`clearCookies(...)`](#clearcookies)
 * [`clearAllCookies(...)`](#clearallcookies)
 * [`clearCache(...)`](#clearcache)
+* [`clearAllBrowsingData()`](#clearallbrowsingdata)
 * [`getCookies(...)`](#getcookies)
 * [`close(...)`](#close)
 * [`hide(...)`](#hide)
@@ -559,6 +560,24 @@ When `id` is omitted, applies to all open webviews.
 **Returns:** <code>Promise&lt;any&gt;</code>
 
 **Since:** 6.5.0
+
+--------------------
+
+
+### clearAllBrowsingData()
+
+```typescript
+clearAllBrowsingData() => Promise<any>
+```
+
+Clear all browsing data from the default store and any opened managed webviews.
+
+This removes cookies, disk cache, memory cache, local storage, session storage, IndexedDB,
+WebSQL where supported, form data, and HTTP auth data where the platform exposes it.
+
+**Returns:** <code>Promise&lt;any&gt;</code>
+
+**Since:** 8.6.36
 
 --------------------
 
@@ -759,12 +778,18 @@ Listen for url change, only for openWebView
 addListener(eventName: 'buttonNearDoneClick', listenerFunc: ButtonNearListener) => Promise<PluginListenerHandle>
 ```
 
+Listen for buttonNearDone clicks.
+
+The event payload contains the webview `id`.
+
 | Param              | Type                                                              |
 | ------------------ | ----------------------------------------------------------------- |
 | **`eventName`**    | <code>'buttonNearDoneClick'</code>                                |
 | **`listenerFunc`** | <code><a href="#buttonnearlistener">ButtonNearListener</a></code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 0.0.1
 
 --------------------
 
@@ -1238,6 +1263,7 @@ And in the AndroidManifest.xml file:
 | **`jsInterface`**                      |                                                                                                                                                                        | JavaScript Interface: The webview automatically injects a JavaScript interface providing: - `window.mobileApp.close()`: Closes the webview from JavaScript - `window.mobileApp.postMessage(obj)`: Sends a message to the app (listen via "messageFromWebview" event) - `window.mobileApp.hide()` / `window.mobileApp.show()` when allowWebViewJsVisibilityControl is true in CapacitorConfig - `window.mobileApp.takeScreenshot()` when `allowScreenshotsFromWebPage` is true                                                                              |                                                               | 6.10.0 |
 | **`allowScreenshotsFromWebPage`**      | <code>boolean</code>                                                                                                                                                   | Allows page JavaScript to call `window.mobileApp.takeScreenshot()`. Disabled by default so only the host app can trigger native screenshots through the plugin API.                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            | 8.4.0  |
 | **`captureConsoleLogs`**               | <code>boolean</code>                                                                                                                                                   | Emits `consoleMessage` events for JavaScript `console.*` output coming from the managed page. Useful when the webview stays hidden and you still need page-level diagnostics.                                                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 8.6.0  |
+| **`persistWebViewData`**               | <code>boolean</code>                                                                                                                                                   | Controls whether the webview should persist website data such as cache, cookies, local storage, IndexedDB, and session data. When false, iOS uses a non-persistent `WKWebsiteDataStore`. Android disables per-view cache and DOM/database storage where the system WebView supports it. Android cookies use the shared WebView cookie store, so call `clearAllBrowsingData()` to remove cookies and other global data.                                                                                                                                     | <code>true</code>                                             | 8.6.36 |
 | **`handleDownloads`**                  | <code>boolean</code>                                                                                                                                                   | Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge. When enabled: - Standard attachment responses are written to a temporary file. - `blob:` downloads are also captured when the platform supports them. - Previewable files reopen inside the in-app browser when possible. - Other files are handed off to the native preview or viewer flow. - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.                                                        | <code>false</code>                                            | 8.6.0  |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
@@ -1354,6 +1380,13 @@ Any regex property that is omitted is treated as a wildcard.
 | --------- | ------------------- | ------------------------- | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.      |       |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
+
+
+#### ButtonNearDoneEvent
+
+| Prop     | Type                | Description          | Since  |
+| -------- | ------------------- | -------------------- | ------ |
+| **`id`** | <code>string</code> | Webview instance id. | 8.6.36 |
 
 
 #### BtnEvent
@@ -1568,7 +1601,7 @@ Construct a type with a set of properties K of type T
 
 #### ButtonNearListener
 
-<code>(state: object): void</code>
+<code>(state: <a href="#buttonneardoneevent">ButtonNearDoneEvent</a>): void</code>
 
 
 #### ConfirmBtnListener

@@ -109,6 +109,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getCookies", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearAllCookies", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearCache", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearAllBrowsingData", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "reload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
@@ -346,6 +347,26 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         return stores
     }
 
+    private func allBrowsingDataStores() -> [WKWebsiteDataStore] {
+        var seen = Set<ObjectIdentifier>()
+        var stores: [WKWebsiteDataStore] = []
+
+        func append(_ store: WKWebsiteDataStore) {
+            let identifier = ObjectIdentifier(store)
+            if seen.insert(identifier).inserted {
+                stores.append(store)
+            }
+        }
+
+        append(WKWebsiteDataStore.default())
+        for controller in webViewControllers.values {
+            if let store = controller.websiteDataStore() {
+                append(store)
+            }
+        }
+        return stores
+    }
+
     private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
         try rawRules.enumerated().map { index, item in
             guard let dictionary = item as? [String: Any] else {
@@ -572,6 +593,24 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func clearAllBrowsingData(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let dataStores = self.allBrowsingDataStores()
+            let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+            let group = DispatchGroup()
+            for dataStore in dataStores {
+                group.enter()
+                dataStore.removeData(ofTypes: dataTypes,
+                                     modifiedSince: Date(timeIntervalSince1970: 0)) {
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                call.resolve()
+            }
+        }
+    }
+
     @objc func clearCookies(_ call: CAPPluginCall) {
         guard let url = call.getString("url"),
               let host = URL(string: url)?.host else {
@@ -777,6 +816,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
         let handleDownloads = call.getBool("handleDownloads", false)
+        let persistWebViewData = call.getBool("persistWebViewData", true)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -918,36 +958,32 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.proxyBridges[webViewId] = proxyBridge
             }
 
-            self.webViewController = WKWebViewController.init(
-                url: url,
-                headers: headers,
-                isInspectable: isInspectable,
-                credentials: credentials,
-                preventDeeplink: preventDeeplink,
-                blankNavigationTab: toolbarType == "blank",
-                enabledSafeBottomMargin: enabledSafeBottomMargin,
-                enabledSafeTopMargin: enabledSafeTopMargin,
-                blockedHosts: blockedHosts,
+            let webViewController = WKWebViewController()
+            webViewController.blankNavigationTab = toolbarType == "blank"
+            webViewController.enabledSafeBottomMargin = enabledSafeBottomMargin
+            webViewController.enabledSafeTopMargin = enabledSafeTopMargin
+            webViewController.source = .remote(url)
+            webViewController.setCredentials(credentials: credentials)
+            webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+            webViewController.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+            webViewController.captureConsoleLogs = captureConsoleLogs
+            webViewController.proxyRequests = legacyProxyRequests.isEnabled
+            webViewController.proxySchemeHandler = proxyHandler
+            webViewController.proxyBridge = proxyBridge
+            webViewController.proxyBridgeAccessToken = proxyBridgeAccessToken
+            webViewController.legacyProxyRequestURLRegexPattern = legacyProxyRequests.urlRegex?.pattern
+            webViewController.openBlankTargetInWebView = openBlankTargetInWebView
+            webViewController.persistWebViewData = persistWebViewData
+            webViewController.setHeaders(headers: headers)
+            webViewController.setPreventDeeplink(preventDeeplink: preventDeeplink)
+            webViewController.setBlockedHosts(blockedHosts: blockedHosts)
+            webViewController.setAuthorizedAppLinks(authorizedAppLinks: authorizedAppLinks)
+            webViewController.documentStartUserScripts = self.documentStartUserScripts(
                 authorizedAppLinks: authorizedAppLinks,
-                allowWebViewJsVisibilityControl: allowWebViewJsVisibilityControl,
-                allowScreenshotsFromWebPage: allowScreenshotsFromWebPage,
-                captureConsoleLogs: captureConsoleLogs,
-                proxyRequests: legacyProxyRequests.isEnabled,
-                proxySchemeHandler: proxyHandler,
-                proxyBridge: proxyBridge,
-                proxyBridgeAccessToken: proxyBridgeAccessToken,
-                legacyProxyRequestURLRegexPattern: legacyProxyRequests.urlRegex?.pattern,
-                documentStartUserScripts: self.documentStartUserScripts(
-                    authorizedAppLinks: authorizedAppLinks,
-                    openBlankTargetInWebView: openBlankTargetInWebView
-                ),
                 openBlankTargetInWebView: openBlankTargetInWebView
             )
-
-            guard let webViewController = self.webViewController else {
-                call.reject("Failed to initialize WebViewController")
-                return
-            }
+            webViewController.initWebview(isInspectable: isInspectable)
+            self.webViewController = webViewController
 
             webViewController.instanceId = webViewId
 

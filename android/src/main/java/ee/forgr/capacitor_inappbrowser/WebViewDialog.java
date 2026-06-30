@@ -52,6 +52,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ImageButton;
@@ -1834,6 +1835,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.getSettings().setUseWideViewPort(true);
         _webView.getSettings().setAllowFileAccessFromFileURLs(true);
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        if (!_options.getPersistWebViewData()) {
+            _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+            _webView.getSettings().setDatabaseEnabled(false);
+            _webView.getSettings().setDomStorageEnabled(false);
+            _webView.clearCache(true);
+            _webView.clearHistory();
+            _webView.clearFormData();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                CookieManager.getInstance().setAcceptThirdPartyCookies(_webView, false);
+            }
+        }
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         injectDocumentStartJavaScriptInterface();
 
@@ -5077,6 +5089,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     _webView.evaluateJavascript(clearInputsScript, null);
                 } catch (Exception e) {
                     Log.w("InAppBrowser", "Could not clear file inputs (WebView may be in invalid state): " + e.getMessage());
+                }
+
+                if (_options != null && !_options.getPersistWebViewData()) {
+                    _webView.clearCache(true);
+                    _webView.clearHistory();
+                    _webView.clearFormData();
+                    _webView.clearSslPreferences();
                 }
 
                 forceStopMediaCapture(_webView);

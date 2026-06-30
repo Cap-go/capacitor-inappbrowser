@@ -196,6 +196,7 @@ public class Options {
     private boolean allowScreenshotsFromWebPage = false;
     private boolean captureConsoleLogs = false;
     private boolean handleDownloads = false;
+    private boolean persistWebViewData = true;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
@@ -276,6 +277,14 @@ public class Options {
 
     public void setHandleDownloads(boolean handleDownloads) {
         this.handleDownloads = handleDownloads;
+    }
+
+    public boolean getPersistWebViewData() {
+        return persistWebViewData;
+    }
+
+    public void setPersistWebViewData(boolean persistWebViewData) {
+        this.persistWebViewData = persistWebViewData;
     }
 
     public void setMaterialPicker(boolean materialPicker) {
@@ -708,6 +717,7 @@ public class Options {
         copy.setEnableGooglePaySupport(enableGooglePaySupport);
         copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
         copy.setWidth(width);
+        copy.setPersistWebViewData(persistWebViewData);
         copy.setHeight(height);
         copy.setX(x);
         copy.setY(y);
