@@ -55,7 +55,6 @@ import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
 @CapacitorPlugin(
     name = "CapgoInAppBrowser",
     permissions = {
@@ -76,7 +75,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
         return "prompt".equalsIgnoreCase(mode);
     }
-
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
