@@ -51,11 +51,8 @@ public final class ProxyBridge {
     func getAndRemove(requestId: String) -> ProxyBridgeStoredRequest? {
         lock.lock()
         defer { lock.unlock() }
-        guard let storedRequest = storedRequests.removeValue(forKey: requestId) else {
-            return nil
-        }
-        storedRequestOrder.removeAll { $0 == requestId }
-        return storedRequest
+        // Avoid O(n) queue scans on every parallel bridge request; stale ids are purged lazily.
+        return storedRequests.removeValue(forKey: requestId)
     }
 
     private func cleanupExpiredRequests(now: Date) {

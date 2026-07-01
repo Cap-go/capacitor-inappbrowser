@@ -21,6 +21,19 @@ public class ProxyBridgeTest {
     }
 
     @Test
+    public void getAndRemoveDoesNotRequireQueueRemoval() {
+        ProxyBridge bridge = new ProxyBridge("token");
+
+        for (int index = 0; index < 512; index += 1) {
+            bridge.storeRequest("token", "request-" + index, "GET", "{}", "", "same-origin");
+        }
+
+        for (int index = 0; index < 512; index += 1) {
+            assertNotNull(bridge.getAndRemove("request-" + index));
+        }
+    }
+
+    @Test
     public void storeRequestDropsExpiredPayloadsBeforeAddingNewOnes() {
         AtomicLong now = new AtomicLong(1_000L);
         ProxyBridge bridge = new ProxyBridge("token", now::get);

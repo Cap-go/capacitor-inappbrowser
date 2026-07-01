@@ -51,6 +51,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -65,6 +67,15 @@ import org.json.JSONObject;
     requestCodes = { WebViewDialog.FILE_CHOOSER_REQUEST_CODE }
 )
 public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
+
+    private static final ExecutorService PROXY_RESPONSE_EXECUTOR = Executors.newFixedThreadPool(
+        Math.max(4, Runtime.getRuntime().availableProcessors()),
+        runnable -> {
+            Thread thread = new Thread(runnable, "CapgoInAppBrowser-ProxyResponse");
+            thread.setDaemon(true);
+            return thread;
+        }
+    );
 
     private final String pluginVersion = "8.6.17";
 
@@ -1684,8 +1695,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        dialog.handleProxyResponse(requestId, decision);
-        call.resolve();
+        PROXY_RESPONSE_EXECUTOR.execute(() -> {
+            dialog.handleProxyResponse(requestId, decision);
+            call.resolve();
+        });
     }
 
     @PluginMethod

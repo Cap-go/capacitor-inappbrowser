@@ -2129,7 +2129,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             responseDict = dict
         }
 
-        proxyHandler.handleResponse(requestId: requestId, phase: phase, responseData: responseDict)
+        DispatchQueue.global(qos: .userInitiated).async { [proxyHandler] in
+            proxyHandler.handleResponse(requestId: requestId, phase: phase, responseData: responseDict)
+        }
         call.resolve()
     }
 
