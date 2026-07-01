@@ -708,6 +708,18 @@ export interface OpenWebViewOptions {
    */
   persistWebViewData?: boolean;
   /**
+   * Controls Android TLS client certificate prompts during HTTPS handshakes.
+   * Use `prompt` to show the system certificate picker; omit or use `none` to cancel silently (default).
+   *
+   * @default "none"
+   * @since 8.7.5
+   */
+  clientCertificate?: 'none' | 'prompt';
+  /**
+   * @deprecated Use `clientCertificate: "prompt"` instead.
+   */
+  clientCertificatePrompt?: boolean;
+  /**
    * Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge.
    *
    * When enabled:
