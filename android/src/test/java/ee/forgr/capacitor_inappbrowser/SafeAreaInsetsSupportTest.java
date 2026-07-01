@@ -17,8 +17,20 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
-    public void safeBottomInsetIgnoresFallbackWhenInsetsArePresent() {
-        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 48, true));
+    public void safeBottomInsetKeepsReportedInsetWhenItMatchesNavigationBarHeight() {
+        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 24, true));
+    }
+
+    @Test
+    public void safeBottomInsetUsesFallbackWhenReportedInsetUndershootsNavigationBarHeight() {
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 16, 8, 0, 0, 0, 0, 48, true));
+    }
+
+    @Test
+    public void safeBottomInsetUsesFallbackDespiteMinorHorizontalInsets() {
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 8, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 12, 0, 0, 48, true));
     }
 
     @Test
