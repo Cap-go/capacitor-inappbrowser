@@ -189,11 +189,16 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    private func dismissNavigationControllerIfPresented(_ navigationController: UINavigationController?) {
-        guard let navigationController, navigationController.presentingViewController != nil else {
+    private func dismissNavigationControllerIfPresented(_ navigationController: UINavigationController?, completion: (() -> Void)? = nil) {
+        guard let navigationController else {
+            completion?()
             return
         }
-        navigationController.dismiss(animated: false)
+        guard navigationController.presentingViewController != nil else {
+            completion?()
+            return
+        }
+        navigationController.dismiss(animated: false, completion: completion)
     }
 
     private func unregisterWebView(id: String) {
@@ -425,7 +430,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         dismissActiveKeyboard()
-        dismissNavigationControllerIfPresented(navigationController)
         navigationController.view.removeFromSuperview()
         if transparentBackground {
             makeHostWebViewTransparent(for: id)
@@ -1566,14 +1570,16 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             let transparentBackground = call.getBool("transparentBackground", true)
-            webViewController.isLayeredBehind = true
-            webViewController.transparentHostBackground = transparentBackground
-            guard self.sendNavigationControllerToBack(id: resolvedId, transparentBackground: transparentBackground) else {
-                call.reject("Failed to send webview to back")
-                return
+            self.dismissNavigationControllerIfPresented(navigationController) {
+                webViewController.isLayeredBehind = true
+                webViewController.transparentHostBackground = transparentBackground
+                guard self.sendNavigationControllerToBack(id: resolvedId, transparentBackground: transparentBackground) else {
+                    call.reject("Failed to send webview to back")
+                    return
+                }
+                self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navigationController)
+                call.resolve()
             }
-            self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navigationController)
-            call.resolve()
         }
     }
 
