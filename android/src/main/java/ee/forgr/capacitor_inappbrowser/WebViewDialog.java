@@ -6007,11 +6007,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return response;
     }
 
-    private WebResourceResponse createProxiedNativeFailureResponse(
-        String requestUrl,
-        boolean bridgeBackedRequest,
-        IOException error
-    ) {
+    private WebResourceResponse createProxiedNativeFailureResponse(String requestUrl, boolean bridgeBackedRequest, IOException error) {
         if (!ProxyRequestSupport.shouldReturnSyntheticNativeFailure(bridgeBackedRequest, _options, requestUrl)) {
             return null;
         }

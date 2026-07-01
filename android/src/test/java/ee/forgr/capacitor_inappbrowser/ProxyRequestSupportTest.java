@@ -303,27 +303,9 @@ public class ProxyRequestSupportTest {
             List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CONTINUE))
         );
 
-        assertTrue(
-            ProxyRequestSupport.shouldReturnSyntheticNativeFailure(
-                false,
-                options,
-                "https://example.com/main"
-            )
-        );
-        assertFalse(
-            ProxyRequestSupport.shouldReturnSyntheticNativeFailure(
-                false,
-                new Options(),
-                "https://example.com/main"
-            )
-        );
-        assertTrue(
-            ProxyRequestSupport.shouldReturnSyntheticNativeFailure(
-                true,
-                new Options(),
-                "https://example.com/main"
-            )
-        );
+        assertTrue(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(false, options, "https://example.com/main"));
+        assertFalse(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(false, new Options(), "https://example.com/main"));
+        assertTrue(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(true, new Options(), "https://example.com/main"));
     }
 
     @Test
