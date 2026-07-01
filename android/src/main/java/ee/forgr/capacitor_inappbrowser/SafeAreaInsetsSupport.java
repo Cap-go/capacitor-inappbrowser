@@ -48,8 +48,10 @@ final class SafeAreaInsetsSupport {
             return false;
         }
 
-        return Math.max(systemBarsLeft, navigationBarsLeft) >= minSideNavBarInset
-            || Math.max(systemBarsRight, navigationBarsRight) >= minSideNavBarInset;
+        return (
+            Math.max(systemBarsLeft, navigationBarsLeft) >= minSideNavBarInset ||
+            Math.max(systemBarsRight, navigationBarsRight) >= minSideNavBarInset
+        );
     }
 
     static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
