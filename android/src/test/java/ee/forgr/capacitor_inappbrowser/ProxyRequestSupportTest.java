@@ -429,11 +429,43 @@ public class ProxyRequestSupportTest {
         assertNull(metadata.mimeType());
         assertNull(metadata.encoding());
 
+        ProxyRequestSupport.WebResourceResponseMetadata svgMetadata = ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata(
+            "image/svg+xml",
+            Map.of("Content-Type", "image/svg+xml")
+        );
+
+        assertEquals("image/svg+xml", svgMetadata.mimeType());
+        assertNull(svgMetadata.encoding());
+
         ProxyRequestSupport.WebResourceResponseMetadata fallbackMetadata =
             ProxyRequestSupport.resolveWebResourceResponseConstructorMetadata("text/html; charset=utf-8", Map.of());
 
         assertEquals("text/html", fallbackMetadata.mimeType());
         assertEquals("utf-8", fallbackMetadata.encoding());
+    }
+
+    @Test
+    public void normalizeProxiedResponseMetadataInfersSvgContentTypeFromRequestUrl() {
+        ProxyRequestSupport.ProxiedResponseMetadata metadata = ProxyRequestSupport.normalizeProxiedResponseMetadata(
+            null,
+            Map.of(),
+            "https://example.com/assets/default-logo.svg"
+        );
+
+        assertEquals("image/svg+xml", metadata.contentType());
+        assertEquals("image/svg+xml", metadata.headers().get("Content-Type"));
+    }
+
+    @Test
+    public void normalizeProxiedResponseMetadataNormalizesGenericSvgXmlContentType() {
+        ProxyRequestSupport.ProxiedResponseMetadata metadata = ProxyRequestSupport.normalizeProxiedResponseMetadata(
+            "text/xml",
+            Map.of("Content-Type", "text/xml"),
+            "https://example.com/assets/default-logo.svg"
+        );
+
+        assertEquals("image/svg+xml", metadata.contentType());
+        assertEquals("text/xml", metadata.headers().get("Content-Type"));
     }
 
     @Test

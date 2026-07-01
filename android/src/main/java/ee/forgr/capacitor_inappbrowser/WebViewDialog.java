@@ -6135,7 +6135,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 contentType = conn.getContentType();
             }
 
-            return new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+            ProxyRequestSupport.ProxiedResponseMetadata normalizedResponse = ProxyRequestSupport.normalizeProxiedResponseMetadata(
+                contentType,
+                responseHeaders,
+                requestContext.url
+            );
+
+            return new NativeResponseData(
+                status,
+                normalizedResponse.contentType(),
+                normalizedResponse.headers(),
+                bodyBytes
+            );
         } finally {
             conn.disconnect();
         }
@@ -6261,14 +6272,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (contentType == null) {
                         contentType = responseHeaders.get("Content-Type");
                     }
-                    if (contentType == null) {
-                        contentType = "application/octet-stream";
-                    }
+                    ProxyRequestSupport.ProxiedResponseMetadata normalizedResponse = ProxyRequestSupport.normalizeProxiedResponseMetadata(
+                        contentType,
+                        responseHeaders,
+                        proxiedRequest.requestContext != null ? proxiedRequest.requestContext.url : null
+                    );
 
                     if (status < 100 || status > 599) {
                         status = 200;
                     }
-                    proxiedRequest.nativeResponse = new NativeResponseData(status, contentType, responseHeaders, bodyBytes);
+                    proxiedRequest.nativeResponse = new NativeResponseData(
+                        status,
+                        normalizedResponse.contentType(),
+                        normalizedResponse.headers(),
+                        bodyBytes
+                    );
                     proxiedRequest.response = buildWebResourceResponse(proxiedRequest.nativeResponse);
                 }
             } catch (IOException invalidBodyError) {
