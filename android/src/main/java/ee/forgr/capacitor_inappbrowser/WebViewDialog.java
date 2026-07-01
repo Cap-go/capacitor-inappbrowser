@@ -5283,8 +5283,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (view == null || _webView == null) {
                         return;
                     }
-                    _options.getCallbacks().pageLoadError();
-                    if (request != null && request.isForMainFrame() && !isInitialized) {
+                    if (request == null || !request.isForMainFrame()) {
+                        return;
+                    }
+                    if (_options.getCallbacks() != null) {
+                        _options.getCallbacks().pageLoadError();
+                    }
+                    if (!isInitialized) {
                         CharSequence description = error != null ? error.getDescription() : null;
                         String message = description != null ? "Initial page load failed: " + description : "Initial page load failed";
                         rejectOpenWebViewIfNeeded(message);
