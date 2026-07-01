@@ -169,6 +169,7 @@ public class Options {
     private String BackgroundColor;
     private boolean ShowArrow;
     private boolean ignoreUntrustedSSLError;
+    private boolean clientCertificatePrompt;
     private String preShowScript;
     private String toolbarTextColor;
     private Pattern proxyRequestsPattern = null;
@@ -579,6 +580,14 @@ public class Options {
         this.ignoreUntrustedSSLError = _ignoreUntrustedSSLError;
     }
 
+    public boolean clientCertificatePrompt() {
+        return clientCertificatePrompt;
+    }
+
+    public void setClientCertificatePrompt(boolean clientCertificatePrompt) {
+        this.clientCertificatePrompt = clientCertificatePrompt;
+    }
+
     public String getPreShowScript() {
         return preShowScript;
     }
@@ -718,6 +727,7 @@ public class Options {
         copy.setBackgroundColor(BackgroundColor);
         copy.setArrow(ShowArrow);
         copy.setIgnoreUntrustedSSLError(ignoreUntrustedSSLError);
+        copy.setClientCertificatePrompt(clientCertificatePrompt);
         copy.setPreShowScript(preShowScript);
         copy.setToolbarTextColor(toolbarTextColor);
         copy.setProxyRequestsPattern(proxyRequestsPattern);

@@ -55,6 +55,7 @@ import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+
 @CapacitorPlugin(
     name = "CapgoInAppBrowser",
     permissions = {
@@ -67,6 +68,15 @@ import org.json.JSONObject;
 public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
     private final String pluginVersion = "8.6.17";
+
+    private boolean resolveClientCertificatePrompt(PluginCall call) {
+        String mode = call.getString("clientCertificate");
+        if (mode == null) {
+            return Boolean.TRUE.equals(call.getBoolean("clientCertificatePrompt", false));
+        }
+        return "prompt".equalsIgnoreCase(mode);
+    }
+
 
     public static final String CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome"; // Change when in stable
     private CustomTabsClient customTabsClient;
@@ -1003,6 +1013,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         options.setToolbarTextColor(call.getString("toolbarTextColor"));
         options.setArrow(Boolean.TRUE.equals(call.getBoolean("showArrow", false)));
         options.setIgnoreUntrustedSSLError(Boolean.TRUE.equals(call.getBoolean("ignoreUntrustedSSLError", false)));
+        options.setClientCertificatePrompt(resolveClientCertificatePrompt(call));
         options.setShowScreenshotButton(Boolean.TRUE.equals(call.getBoolean("showScreenshotButton", false)));
         options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
         options.setCaptureConsoleLogs(Boolean.TRUE.equals(call.getBoolean("captureConsoleLogs", false)));

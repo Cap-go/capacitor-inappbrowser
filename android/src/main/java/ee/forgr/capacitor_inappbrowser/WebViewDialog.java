@@ -4766,6 +4766,30 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         return;
                     }
 
+                    String identityKey = clientCertificateIdentityKey(request.getHost(), request.getPort(), "https");
+                    ClientCertificateIdentity storedIdentity = clientCertificateIdentities.get(identityKey);
+                    if (storedIdentity != null) {
+                        try {
+                            request.proceed(storedIdentity.privateKey, storedIdentity.certificateChain);
+                            Log.i("InAppBrowser", "Proceeding with stored client certificate");
+                            return;
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error proceeding with stored certificate: " + e.getMessage());
+                            clientCertificateIdentities.remove(identityKey);
+                        }
+                    }
+
+                    boolean promptForCertificate = _options != null && _options.clientCertificatePrompt();
+                    if (!promptForCertificate) {
+                        try {
+                            request.cancel();
+                        } catch (Exception e) {
+                            Log.e("InAppBrowser", "Error canceling client cert request: " + e.getMessage());
+                        }
+                        Log.d("InAppBrowser", "Canceled optional client certificate request");
+                        return;
+                    }
+
                     try {
                         Log.i("InAppBrowser", "Host: " + request.getHost());
                         Log.i("InAppBrowser", "Port: " + request.getPort());
