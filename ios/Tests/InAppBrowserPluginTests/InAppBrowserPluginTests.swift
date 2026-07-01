@@ -71,6 +71,25 @@ final class InAppBrowserPluginTests: XCTestCase {
         XCTAssertEqual(contentView.frame, targetFrame)
     }
 
+    func testPassThroughViewRoutesTouchesOutsideTargetFrameToUnderlyingView() {
+        let container = PassThroughView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let contentView = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 600))
+        let underlyingView = UIView(frame: container.bounds)
+        let underlyingButton = UIView(frame: CGRect(x: 12, y: 700, width: 80, height: 48))
+
+        underlyingView.addSubview(underlyingButton)
+        container.addSubview(contentView)
+        container.framedContentView = contentView
+        container.targetFrame = contentView.frame
+        container.passthroughView = underlyingView
+
+        let outsideHit = container.hitTest(CGPoint(x: 24, y: 712), with: nil)
+        let insideHit = container.hitTest(CGPoint(x: 24, y: 120), with: nil)
+
+        XCTAssertTrue(outsideHit === underlyingButton)
+        XCTAssertTrue(insideHit === contentView)
+    }
+
     func testViewportRefreshIgnoresZeroSizeBeforeLayout() {
         XCTAssertFalse(
             WebViewViewportLayoutSupport.shouldRefreshViewport(

@@ -25,10 +25,12 @@ The official Capacitor Browser plugin has strict security limitations that preve
 - **Camera and microphone access** within the browser context
 - **URL change monitoring** for navigation tracking
 - **Custom toolbars and UI** for branded experiences
-- **Cookie and cache management** for session control
-- **Custom sizes** for extra control of the display position
+- **Native browser layering** behind Ionic or Capacitor UI with input forwarding
+- **Partial-screen WebViews** with click-through areas outside the browser frame
+- **Cookie, cache, and full browsing-data controls** for private or isolated sessions
+- **Native proxy, download, and popup handling** for advanced embedded web apps
 
-Perfect for OAuth flows, embedded web apps, video calls, and any scenario requiring deep integration with web content.
+Perfect for OAuth flows, embedded web apps, checkout screens, browser-backed payment flows, video calls, support portals, and apps that need native UI around live web content.
 
 ## Documentation
 
@@ -73,6 +75,82 @@ import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 InAppBrowser.open({ url: 'YOUR_URL' });
 ```
+
+### Common use cases
+
+#### Show Ionic UI over a live browser page
+
+Use `toBack` when the native browser should stay visible behind your Ionic or Capacitor UI. This is useful for checkout overlays, payment confirmation panels, guided browser flows, or any flow where your app owns the controls while the web page remains loaded behind it.
+
+```js
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
+
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://example.com/checkout',
+  toBack: true,
+  transparentBackground: true,
+});
+
+// If your overlay needs to interact with the page behind it, forward the gesture.
+await InAppBrowser.dispatchInputEvent({
+  id,
+  type: 'click',
+  x: 160,
+  y: 420,
+});
+
+// Bring the browser back above the app when the native overlay is done.
+await InAppBrowser.bringToFront({ id });
+```
+
+Make the app background transparent wherever the browser should be visible. `dispatchInputEvent()` supports click, touch, and scroll forwarding; coordinates are relative to the browser viewport.
+
+#### Build a partial-screen browser or bottom sheet
+
+Use `height`, `width`, `x`, and `y` for picture-in-picture views, browser sheets, or layouts where the user should keep interacting with the Ionic app around the browser. When the WebView does not cover the full screen, touches outside the browser frame pass through to the underlying Capacitor WebView on Android and iOS.
+
+```js
+const bottomGap = 200;
+
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://example.com/offers',
+  height: window.innerHeight - bottomGap,
+  y: 0,
+});
+```
+
+Use `updateDimensions()` to resize the browser while keeping the same page state, for example when expanding a mini browser into a larger sheet.
+
+#### Keep checkout, auth, or support sessions private
+
+Use `persistWebViewData: false` when a WebView must avoid persistent cookies, cache, local storage, IndexedDB, and other website data where the platform supports it. Use `clearAllBrowsingData()` when the app needs to wipe the default store and all opened managed WebViews.
+
+```js
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://example.com/login',
+  persistWebViewData: false,
+});
+
+// Later, after logout or account switching:
+await InAppBrowser.clearAllBrowsingData();
+```
+
+#### Keep multiple browser instances ready
+
+Use `hidden`, `hide()`, and `show()` when you need to preload or preserve several WebViews without keeping them on screen. This keeps browser state available while the native modal is dismissed so it does not block touches in the app.
+
+```js
+const first = await InAppBrowser.openWebView({ url: 'https://example.com/a', hidden: true });
+const second = await InAppBrowser.openWebView({ url: 'https://example.com/b', hidden: true });
+
+await InAppBrowser.show({ id: first.id });
+await InAppBrowser.hide({ id: first.id });
+await InAppBrowser.show({ id: second.id });
+```
+
+#### Embed advanced web app flows
+
+Use proxy rules and `handleDownloads` for web apps that need request control, file uploads, downloads, or controlled popup behavior inside the managed browser. Typical examples include document portals, support desks, payment pages, Google Pay flows on Android, and apps that need to keep `_blank` links inside the same managed WebView.
 
 ### Customize Chrome Custom Tab Appearance (Android)
 

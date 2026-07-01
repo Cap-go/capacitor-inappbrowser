@@ -3266,6 +3266,7 @@ class PassThroughView: UIView {
         }
     }
     weak var framedContentView: UIView?
+    weak var passthroughView: UIView?
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -3278,14 +3279,14 @@ class PassThroughView: UIView {
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        // If we have a target frame and the touch is outside it, pass through
-        if let frame = targetFrame {
-            if !frame.contains(point) {
-                return nil  // Pass through to underlying views
+        if let frame = targetFrame, !frame.contains(point) {
+            guard let passthroughView else {
+                return nil
             }
+            let convertedPoint = convert(point, to: passthroughView)
+            return passthroughView.hitTest(convertedPoint, with: event)
         }
 
-        // Otherwise, handle normally
         return super.hitTest(point, with: event)
     }
 }
