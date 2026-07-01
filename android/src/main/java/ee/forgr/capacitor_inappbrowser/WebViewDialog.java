@@ -6141,12 +6141,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 requestContext.url
             );
 
-            return new NativeResponseData(
-                status,
-                normalizedResponse.contentType(),
-                normalizedResponse.headers(),
-                bodyBytes
-            );
+            return new NativeResponseData(status, normalizedResponse.contentType(), normalizedResponse.headers(), bodyBytes);
         } finally {
             conn.disconnect();
         }
