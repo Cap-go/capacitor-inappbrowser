@@ -1382,6 +1382,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 containerView.backgroundColor = .clear
                 containerView.frame = UIScreen.main.bounds
                 containerView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                containerView.passthroughView = self.bridge?.webView
 
                 let targetFrame = CustomWebViewFrameSupport.resolvedFrame(
                     width: width.map { CGFloat($0) },
