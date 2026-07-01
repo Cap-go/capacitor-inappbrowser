@@ -26,19 +26,30 @@ final class SafeAreaInsetsSupport {
         boolean applyFallbackWhenZero
     ) {
         int inset = resolveSafeBottomInset(systemBarsBottom, navigationBarsBottom, systemGesturesBottom, mandatoryGesturesBottom);
-        if (inset > 0 || !applyFallbackWhenZero || fallbackBottomInset <= 0) {
+        if (!applyFallbackWhenZero || fallbackBottomInset <= 0) {
             return inset;
         }
 
-        if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight)) {
-            return 0;
+        if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight, fallbackBottomInset)) {
+            return inset;
         }
 
-        return fallbackBottomInset;
+        return Math.max(inset, fallbackBottomInset);
     }
 
-    static boolean hasSideNavigationBarInsets(int systemBarsLeft, int systemBarsRight, int navigationBarsLeft, int navigationBarsRight) {
-        return systemBarsLeft > 0 || systemBarsRight > 0 || navigationBarsLeft > 0 || navigationBarsRight > 0;
+    static boolean hasSideNavigationBarInsets(
+        int systemBarsLeft,
+        int systemBarsRight,
+        int navigationBarsLeft,
+        int navigationBarsRight,
+        int minSideNavBarInset
+    ) {
+        if (minSideNavBarInset <= 0) {
+            return false;
+        }
+
+        return Math.max(systemBarsLeft, navigationBarsLeft) >= minSideNavBarInset
+            || Math.max(systemBarsRight, navigationBarsRight) >= minSideNavBarInset;
     }
 
     static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
