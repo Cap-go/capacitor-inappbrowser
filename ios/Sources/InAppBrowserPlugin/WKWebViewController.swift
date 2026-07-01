@@ -756,40 +756,62 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         return windowScene?.statusBarManager?.statusBarFrame.height ?? 0
     }
 
+    private func applyNavigationBarBackground(color: UIColor) {
+        guard let navigationBar = navigationController?.navigationBar else {
+            return
+        }
+
+        navigationBar.backgroundColor = color
+        navigationBar.barTintColor = color
+        navigationBar.isTranslucent = false
+        navigationBar.setBackgroundImage(UIImage(), for: .default)
+        navigationBar.shadowImage = UIImage()
+        navigationBar.setValue(true, forKey: "hidesShadow")
+
+        if #available(iOS 13.0, *) {
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = color
+            appearance.backgroundEffect = nil
+            appearance.shadowColor = .clear
+            appearance.shadowImage = UIImage()
+
+            if let titleTextAttributes = navigationBar.titleTextAttributes {
+                appearance.titleTextAttributes = titleTextAttributes
+            }
+            if let largeTitleTextAttributes = navigationBar.largeTitleTextAttributes {
+                appearance.largeTitleTextAttributes = largeTitleTextAttributes
+            }
+
+            navigationBar.standardAppearance = appearance
+            navigationBar.compactAppearance = appearance
+            navigationBar.scrollEdgeAppearance = appearance
+            navigationBar.compactScrollEdgeAppearance = appearance
+        }
+    }
+
     // Make status bar background with colored view underneath
     open func setupStatusBarBackground(color: UIColor) {
-        // Remove any existing status bar view
         statusBarBackgroundView?.removeFromSuperview()
-
-        // Create a new view to cover both status bar and navigation bar
         statusBarBackgroundView = UIView()
 
-        if let navView = navigationController?.view {
-            // Add to back of view hierarchy
-            navView.insertSubview(statusBarBackgroundView!, at: 0)
-            statusBarBackgroundView?.translatesAutoresizingMaskIntoConstraints = false
-
-            // Calculate total height - status bar + navigation bar
-            let navBarHeight = navigationController?.navigationBar.frame.height ?? 44
-            let totalHeight = (navigationController?.view.safeAreaInsets.top ?? CGFloat(0)) + navBarHeight
-
-            // Position from top of screen to bottom of navigation bar
-            NSLayoutConstraint.activate([
-                statusBarBackgroundView!.topAnchor.constraint(equalTo: navView.topAnchor),
-                statusBarBackgroundView!.leadingAnchor.constraint(equalTo: navView.leadingAnchor),
-                statusBarBackgroundView!.trailingAnchor.constraint(equalTo: navView.trailingAnchor),
-                statusBarBackgroundView!.heightAnchor.constraint(equalToConstant: totalHeight)
-            ])
-
-            // Set background color
-            statusBarBackgroundView?.backgroundColor = color
-
-            // Make navigation bar transparent to show our view underneath
-            navigationController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
-            navigationController?.navigationBar.shadowImage = UIImage()
-            navigationController?.navigationBar.isTranslucent = true
-            navigationController?.navigationBar.isTranslucent = true
+        guard let navController = navigationController,
+              let navView = navController.view,
+              let statusBarBackgroundView else {
+            return
         }
+        navView.insertSubview(statusBarBackgroundView, at: 0)
+        statusBarBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        statusBarBackgroundView.backgroundColor = color
+
+        NSLayoutConstraint.activate([
+            statusBarBackgroundView.topAnchor.constraint(equalTo: navView.topAnchor),
+            statusBarBackgroundView.leadingAnchor.constraint(equalTo: navView.leadingAnchor),
+            statusBarBackgroundView.trailingAnchor.constraint(equalTo: navView.trailingAnchor),
+            statusBarBackgroundView.bottomAnchor.constraint(equalTo: navController.navigationBar.bottomAnchor, constant: 1)
+        ])
+
+        applyNavigationBarBackground(color: color)
     }
 
     // Override to use our custom status bar style
