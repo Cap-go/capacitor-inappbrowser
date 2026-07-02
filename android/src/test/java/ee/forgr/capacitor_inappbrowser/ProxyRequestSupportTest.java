@@ -19,13 +19,13 @@ import org.junit.Test;
 public class ProxyRequestSupportTest {
 
     @Test
-    public void shouldInjectBridgeWhenRulesEnableNativeProxy() {
+    public void shouldNotInjectBridgeWhenOnlyOutboundInboundRules() {
         Options options = new Options();
         options.setOutboundProxyRules(
             List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.DELEGATE_TO_JS))
         );
 
-        assertTrue(ProxyRequestSupport.shouldInjectBridge(options));
+        assertFalse(ProxyRequestSupport.shouldInjectBridge(options));
     }
 
     @Test
