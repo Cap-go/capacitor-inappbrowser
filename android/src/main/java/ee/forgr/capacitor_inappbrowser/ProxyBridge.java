@@ -58,11 +58,10 @@ public class ProxyBridge {
         if (requestId == null) {
             return null;
         }
-        StoredRequest storedRequest = storedRequests.remove(requestId);
-        if (storedRequest != null) {
-            storedRequestOrder.remove(requestId);
-        }
-        return storedRequest;
+        // Do not scan storedRequestOrder here: ConcurrentLinkedQueue.remove is O(n) and
+        // serializes parallel bridge-backed proxy requests. Stale queue ids are purged lazily
+        // in cleanupExpiredRequests().
+        return storedRequests.remove(requestId);
     }
 
     private void cleanupExpiredRequests(long now) {

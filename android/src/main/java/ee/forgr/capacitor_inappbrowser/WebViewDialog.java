@@ -334,12 +334,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private boolean datePickerInjected = false; // Track if we've injected date picker fixes
     private final WebView capacitorWebView;
     private String instanceId = "";
-    private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new HashMap<>();
+    private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new ConcurrentHashMap<>();
     private ProxyBridge proxyBridge;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final AtomicBoolean cookieFlushScheduled = new AtomicBoolean(false);
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
     private final Map<String, ClientCertificateIdentity> clientCertificateIdentities = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
@@ -4906,7 +4907,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         }
                         String initiatorUrl = request.getRequestHeaders().get("Referer");
                         if (initiatorUrl == null || initiatorUrl.isBlank()) {
-                            initiatorUrl = getWebViewUrlOnMainThread(originalUrl);
+                            initiatorUrl = getWebViewUrlOrFallback(
+                                _options != null && _options.getUrl() != null ? _options.getUrl() : originalUrl
+                            );
                         }
                         String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
                         if (
@@ -5538,9 +5541,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         shutdownExecutorServiceAsync();
 
         // Clear any remaining proxied requests
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.clear();
-        }
+        proxiedRequestsHashmap.clear();
 
         try {
             super.dismiss();
@@ -6155,15 +6156,22 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             wroteCookie = true;
         }
         if (wroteCookie) {
-            cookieManager.flush();
+            scheduleCookieFlush();
         }
     }
 
-    public void handleProxyResponse(String requestId, JSObject response) {
-        ProxiedRequest proxiedRequest;
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequest = proxiedRequestsHashmap.get(requestId);
+    private void scheduleCookieFlush() {
+        if (!cookieFlushScheduled.compareAndSet(false, true)) {
+            return;
         }
+        mainHandler.post(() -> {
+            cookieFlushScheduled.set(false);
+            CookieManager.getInstance().flush();
+        });
+    }
+
+    public void handleProxyResponse(String requestId, JSObject response) {
+        ProxiedRequest proxiedRequest = proxiedRequestsHashmap.get(requestId);
         if (proxiedRequest == null) {
             Log.e("InAppBrowserProxy", "No pending request for id: " + requestId);
             return;
@@ -6175,9 +6183,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         if (response == null) {
-            synchronized (proxiedRequestsHashmap) {
-                proxiedRequestsHashmap.remove(requestId);
-            }
+            proxiedRequestsHashmap.remove(requestId);
             proxiedRequest.semaphore.release();
             return;
         }
@@ -6279,17 +6285,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         }
 
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.remove(requestId);
-        }
+        proxiedRequestsHashmap.remove(requestId);
         proxiedRequest.semaphore.release();
     }
 
     @Override
     public boolean hasPendingProxyRequest(String requestId) {
-        synchronized (proxiedRequestsHashmap) {
-            return proxiedRequestsHashmap.containsKey(requestId);
-        }
+        return proxiedRequestsHashmap.containsKey(requestId);
     }
 
     private void shareUrl() {
