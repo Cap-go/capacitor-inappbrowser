@@ -5030,7 +5030,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             nativeResponse = performNativeRequest(requestContext);
                         } catch (IOException error) {
                             Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
-                            return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
+                            return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
                         }
                     }
 
@@ -5043,7 +5043,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
                             } catch (IOException error) {
                                 Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
-                                return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
+                                return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
                             }
                             if (redirectReplay != null) {
                                 requestContext = redirectReplay.requestContext;
@@ -5106,7 +5106,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
                         } catch (IOException error) {
                             Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
-                            return bridgeBackedRequest ? createNativeFailureResponse(requestContext.url, error) : null;
+                            return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
                         }
                         if (redirectReplay != null) {
                             requestContext = redirectReplay.requestContext;
@@ -5769,10 +5769,29 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private boolean shouldBootstrapInitialLegacyProxyLoad() {
-        if (_options == null || _options.isPopupWindowMode()) {
-            return false;
+        return ProxyRequestSupport.shouldBootstrapInitialProxyLoad(_options);
+    }
+
+    private void loadInitialUrlDirect(Map<String, String> requestHeaders, String httpMethod, String httpBody) {
+        if (_webView == null || _options == null) {
+            return;
         }
-        return ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, _options.getUrl());
+
+        Map<String, String> headers = requestHeaders != null ? requestHeaders : new HashMap<>();
+        if (supportsRequestBody(httpMethod) && httpBody != null) {
+            byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
+            _webView.postUrl(_options.getUrl(), postData);
+            if (!headers.isEmpty()) {
+                Log.w(
+                    "InAppBrowser",
+                    "Custom headers were provided but may not be sent with POST request. " +
+                        "Android WebView's postUrl method has limited header support."
+                );
+            }
+            return;
+        }
+
+        _webView.loadUrl(_options.getUrl(), headers);
     }
 
     private void loadInitialLegacyProxyContent(Map<String, String> requestHeaders, String httpMethod, String httpBody) {
@@ -5803,7 +5822,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                 NativeResponseData responseData = proxyResult.responseData;
                 if (responseData == null || !canBootstrapHtmlResponse(responseData.contentType)) {
-                    rejectOpenWebViewIfNeeded("Initial legacy proxy request did not return bootstrap HTML");
+                    if (_webView == null) {
+                        return;
+                    }
+                    _webView.post(() -> loadInitialUrlDirect(initialHeaders, initialMethod, httpBody));
                     return;
                 }
 
@@ -5827,7 +5849,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 });
             } catch (IOException error) {
                 Log.e("InAppBrowserProxy", "Initial legacy proxy bootstrap failed for: " + initialUrl, error);
-                rejectOpenWebViewIfNeeded("Initial legacy proxy bootstrap failed: " + error.getMessage());
+                if (_webView == null) {
+                    return;
+                }
+                String failureBody = new String(
+                    ProxyRequestSupport.createNativeRequestFailureBody(initialUrl, error),
+                    StandardCharsets.UTF_8
+                );
+                _webView.post(() -> {
+                    if (_webView == null) {
+                        return;
+                    }
+                    _webView.loadDataWithBaseURL(initialUrl, failureBody, "text/plain", "utf-8", initialUrl);
+                });
             }
         });
     }
@@ -5972,6 +6006,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         response.setStatusCodeAndReasonPhrase(204, "No Content");
         response.setResponseHeaders(new HashMap<>());
         return response;
+    }
+
+    private WebResourceResponse createProxiedNativeFailureResponse(String requestUrl, boolean bridgeBackedRequest, IOException error) {
+        if (!ProxyRequestSupport.shouldReturnSyntheticNativeFailure(bridgeBackedRequest, _options, requestUrl)) {
+            return null;
+        }
+        return createNativeFailureResponse(requestUrl, error);
     }
 
     private WebResourceResponse createNativeFailureResponse(String requestUrl, IOException error) {

@@ -109,6 +109,27 @@ final class ProxyRequestSupport {
         return !usesLegacyJsProxyMode(options) || matchesProxyRequestsPattern(options.getProxyRequestsPattern(), requestUrl);
     }
 
+    static boolean shouldBootstrapInitialProxyLoad(Options options) {
+        if (options == null || options.isPopupWindowMode()) {
+            return false;
+        }
+        String initialUrl = options.getUrl();
+        if (initialUrl == null || initialUrl.isBlank()) {
+            return false;
+        }
+        if (!options.shouldEnableNativeProxy()) {
+            return false;
+        }
+        if (shouldDelegateLegacyJsProxyRequest(options, initialUrl)) {
+            return true;
+        }
+        return shouldHandleNonBridgeRequest(options, initialUrl) && !usesLegacyJsProxyMode(options);
+    }
+
+    static boolean shouldReturnSyntheticNativeFailure(boolean bridgeBackedRequest, Options options, String requestUrl) {
+        return bridgeBackedRequest || shouldHandleNonBridgeRequest(options, requestUrl);
+    }
+
     static boolean isBridgeMarkerRequestUrl(String requestUrl) {
         if (requestUrl == null || requestUrl.isBlank()) {
             return false;

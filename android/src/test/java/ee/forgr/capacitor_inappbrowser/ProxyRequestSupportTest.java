@@ -268,6 +268,47 @@ public class ProxyRequestSupportTest {
     }
 
     @Test
+    public void shouldBootstrapInitialProxyLoadForNativeRules() {
+        Options options = new Options();
+        options.setUrl("https://example.com/app");
+        options.setOutboundProxyRules(
+            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CONTINUE))
+        );
+
+        assertTrue(ProxyRequestSupport.shouldBootstrapInitialProxyLoad(options));
+    }
+
+    @Test
+    public void shouldBootstrapInitialProxyLoadForLegacyRegexMatches() {
+        Options options = new Options();
+        options.setUrl("https://api.example.com/app");
+        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
+
+        assertTrue(ProxyRequestSupport.shouldBootstrapInitialProxyLoad(options));
+    }
+
+    @Test
+    public void shouldNotBootstrapInitialProxyLoadWhenLegacyRegexMisses() {
+        Options options = new Options();
+        options.setUrl("https://cdn.example.com/app");
+        options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
+
+        assertFalse(ProxyRequestSupport.shouldBootstrapInitialProxyLoad(options));
+    }
+
+    @Test
+    public void shouldReturnSyntheticNativeFailureForHandledNonBridgeRequests() {
+        Options options = new Options();
+        options.setOutboundProxyRules(
+            List.of(new NativeProxyRule(null, null, null, null, null, null, null, null, false, NativeProxyRule.Action.CONTINUE))
+        );
+
+        assertTrue(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(false, options, "https://example.com/main"));
+        assertFalse(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(false, new Options(), "https://example.com/main"));
+        assertTrue(ProxyRequestSupport.shouldReturnSyntheticNativeFailure(true, new Options(), "https://example.com/main"));
+    }
+
+    @Test
     public void shouldHandleNonBridgeRequestKeepsNativeRulesActiveWhenLegacyRegexMisses() {
         Options options = new Options();
         options.setProxyRequestsPattern(Pattern.compile("api\\.example\\.com"));
