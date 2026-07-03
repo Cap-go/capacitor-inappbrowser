@@ -16,7 +16,7 @@ private let cookieKey = "Cookie"
 
 enum CustomSchemeInterceptSupport {
     static let standardHandledSchemes = ["tel", "mailto", "sms"]
-    private static let webSchemes = ["http", "https", "file"]
+    private static let webSchemes = ["http", "https", "file", "data"]
 
     static func shouldEmitInterceptEvent(for url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased(), !scheme.isEmpty else {

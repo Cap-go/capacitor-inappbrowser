@@ -2718,7 +2718,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         String httpBody = _options.getHttpBody();
 
         if (!_options.isPopupWindowMode()) {
-            if (shouldBootstrapInitialLegacyProxyLoad()) {
+            if (loadHtmlDataUrlIfNeeded(this._options.getUrl())) {
+                // Inline HTML loaded from data:text/html;base64 URL.
+            } else if (shouldBootstrapInitialLegacyProxyLoad()) {
                 loadInitialLegacyProxyContent(requestHeaders, httpMethod, httpBody);
             } else if (supportsRequestBody(httpMethod) && httpBody != null) {
                 // For POST/PUT/PATCH requests with body
@@ -3832,6 +3834,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         try {
+            if (loadHtmlDataUrlIfNeeded(url)) {
+                return;
+            }
+
             Map<String, String> requestHeaders = new HashMap<>();
             if (_options.getHeaders() != null) {
                 Iterator<String> keys = _options.getHeaders().keys();
@@ -4662,6 +4668,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     Context context = view.getContext();
                     String url = request.getUrl().toString();
                     Log.d("InAppBrowser", "shouldOverrideUrlLoading: " + url);
+
+                    if (HtmlDataUrlSupport.isDataUrl(url)) {
+                        return false;
+                    }
 
                     boolean isNotHttpOrHttps = !url.startsWith("https://") && !url.startsWith("http://");
 
@@ -5769,6 +5779,20 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
     }
 
+    private boolean loadHtmlDataUrlIfNeeded(String url) {
+        if (_webView == null) {
+            return false;
+        }
+
+        String html = HtmlDataUrlSupport.parseHtml(url);
+        if (html == null) {
+            return false;
+        }
+
+        _webView.loadDataWithBaseURL("about:blank", html, "text/html", "utf-8", null);
+        return true;
+    }
+
     private boolean shouldUseNativeProxy() {
         return _options != null && _options.shouldEnableNativeProxy();
     }
@@ -5781,6 +5805,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_webView == null || _options == null) {
             return;
         }
+
+        if (loadHtmlDataUrlIfNeeded(_options.getUrl())) {
+            return;
+        }
+
 
         Map<String, String> headers = requestHeaders != null ? requestHeaders : new HashMap<>();
         if (supportsRequestBody(httpMethod) && httpBody != null) {

@@ -120,6 +120,9 @@ final class ProxyRequestSupport {
         if (initialUrl == null || initialUrl.isBlank()) {
             return false;
         }
+        if (HtmlDataUrlSupport.isDataUrl(initialUrl)) {
+            return false;
+        }
         if (!options.shouldEnableNativeProxy()) {
             return false;
         }
