@@ -42,6 +42,20 @@ private enum DownloadReservationStore {
     static let lock = NSLock()
 }
 
+private enum BlobDownloadSupport {
+    static let maxLegacyBytes = 512 * 1024
+    static let chunkBytes = 64 * 1024
+}
+
+private struct BlobDownloadSession {
+    let destinationURL: URL
+    let sourceURL: String?
+    let mimeType: String?
+    let fileHandle: FileHandle
+    let expectedSize: Int64?
+    var bytesWritten: Int64 = 0
+}
+
 public struct WKWebViewCredentials {
     var username: String
     var password: String
@@ -456,6 +470,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private var lastInjectedSafeAreaInsets: InjectedSafeAreaInsets?
     private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
+    private var blobDownloadSessions: [String: BlobDownloadSession] = [:]
     private var previewItemURL: URL?
 
     func setHeaders(headers: [String: String]) {
@@ -496,7 +511,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return nil
         }
 
-        return httpResponse.value(forHTTPHeaderField: "Content-Disposition")
+        if let value = httpResponse.value(forHTTPHeaderField: "Content-Disposition"),
+           !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return value
+        }
+
+        for (key, value) in httpResponse.allHeaderFields {
+            guard let headerName = key as? String,
+                  headerName.lowercased() == "content-disposition",
+                  let headerValue = value as? String,
+                  !headerValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                continue
+            }
+            return headerValue
+        }
+
+        return nil
     }
 
     private func attachmentDispositionType(_ response: URLResponse) -> String? {
@@ -700,6 +730,329 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             previewController.delegate = self
             self.present(previewController, animated: true)
             self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "systemPreview")
+        }
+    }
+
+
+    private func parseBlobBridgePayload(_ payload: Any) -> [String: Any]? {
+        if let dictionary = payload as? [String: Any] {
+            return dictionary
+        }
+
+        if let jsonString = payload as? String,
+           let data = jsonString.data(using: .utf8),
+           let dictionary = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dictionary
+        }
+
+        return nil
+    }
+
+    private func blobDownloadFileName(from payload: [String: Any], fallback: String = "download") -> String {
+        sanitizeDownloadFilename(payload["fileName"] as? String ?? fallback)
+    }
+
+    private func cleanupBlobDownloadSession(_ session: BlobDownloadSession?, deleteFile: Bool) {
+        guard let session else {
+            return
+        }
+
+        try? session.fileHandle.close()
+        if deleteFile {
+            try? FileManager.default.removeItem(at: session.destinationURL)
+            releaseDownloadDestination(session.destinationURL)
+        }
+    }
+
+    private func abortBlobDownloadSession(sessionId: String, deleteFile: Bool) -> BlobDownloadSession? {
+        guard let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
+            return nil
+        }
+        cleanupBlobDownloadSession(session, deleteFile: deleteFile)
+        return session
+    }
+
+    private func handleLegacyBlobDownloadPayload(_ payload: Any) {
+        guard handleDownloads else {
+            return
+        }
+
+        guard let jsonPayload = parseBlobBridgePayload(payload) else {
+            emitDownloadFailed(sourceURL: nil, error: "Blob download payload is missing")
+            return
+        }
+
+        let base64 = jsonPayload["base64"] as? String ?? ""
+        guard !base64.isEmpty else {
+            emitDownloadFailed(sourceURL: jsonPayload["sourceUrl"] as? String, error: "Blob download payload is empty")
+            return
+        }
+
+        let declaredSize = (jsonPayload["size"] as? NSNumber)?.int64Value
+        let estimatedSize = Int64((Double(base64.count) * 3.0 / 4.0).rounded(.up))
+        let decodedSize = max(declaredSize ?? estimatedSize, estimatedSize)
+        if decodedSize > Int64(BlobDownloadSupport.maxLegacyBytes) {
+            emitDownloadFailed(
+                sourceURL: jsonPayload["sourceUrl"] as? String,
+                fileName: blobDownloadFileName(from: jsonPayload),
+                mimeType: jsonPayload["mimeType"] as? String,
+                error: "Blob download is too large for the legacy bridge"
+            )
+            return
+        }
+
+        do {
+            guard let data = Data(base64Encoded: base64) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download payload is invalid"])
+            }
+
+            let fileName = blobDownloadFileName(from: jsonPayload)
+            let destinationURL = try uniqueDownloadDestination(for: fileName)
+            try data.write(to: destinationURL, options: .atomic)
+            let mimeType = jsonPayload["mimeType"] as? String
+            let sourceURL = jsonPayload["sourceUrl"] as? String
+            previewDownloadedFile(destinationURL, mimeType: mimeType, sourceURL: sourceURL)
+        } catch {
+            emitDownloadFailed(
+                sourceURL: jsonPayload["sourceUrl"] as? String,
+                fileName: blobDownloadFileName(from: jsonPayload),
+                mimeType: jsonPayload["mimeType"] as? String,
+                error: "Failed to save blob download: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func startBlobDownloadPayload(_ payload: Any) {
+        guard handleDownloads else {
+            return
+        }
+
+        do {
+            guard let jsonPayload = parseBlobBridgePayload(payload) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download start payload is missing"])
+            }
+
+            let sessionId = jsonPayload["sessionId"] as? String ?? ""
+            guard !sessionId.isEmpty else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download session id is missing"])
+            }
+
+            if blobDownloadSessions[sessionId] != nil {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download session already exists"])
+            }
+
+            let fileName = blobDownloadFileName(from: jsonPayload)
+            let destinationURL = try uniqueDownloadDestination(for: fileName)
+            let fileHandle = try FileHandle(forWritingTo: destinationURL)
+            let expectedSize = (jsonPayload["size"] as? NSNumber)?.int64Value
+            blobDownloadSessions[sessionId] = BlobDownloadSession(
+                destinationURL: destinationURL,
+                sourceURL: jsonPayload["sourceUrl"] as? String,
+                mimeType: jsonPayload["mimeType"] as? String,
+                fileHandle: fileHandle,
+                expectedSize: expectedSize
+            )
+        } catch {
+            emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(error.localizedDescription)")
+        }
+    }
+
+    private func appendBlobDownloadChunkPayload(_ payload: Any) {
+        guard handleDownloads else {
+            return
+        }
+
+        guard let jsonPayload = parseBlobBridgePayload(payload),
+              let sessionId = jsonPayload["sessionId"] as? String,
+              !sessionId.isEmpty,
+              var session = blobDownloadSessions[sessionId] else {
+            return
+        }
+
+        let base64 = jsonPayload["base64"] as? String ?? ""
+        guard !base64.isEmpty, let data = Data(base64Encoded: base64) else {
+            abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
+            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download")
+            return
+        }
+
+        do {
+            if let expectedSize = session.expectedSize, session.bytesWritten + Int64(data.count) > expectedSize {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download exceeded expected size"])
+            }
+
+            try session.fileHandle.write(contentsOf: data)
+            session.bytesWritten += Int64(data.count)
+            blobDownloadSessions[sessionId] = session
+        } catch {
+            abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
+            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download: \(error.localizedDescription)")
+        }
+    }
+
+    private func finishBlobDownloadPayload(_ payload: Any) {
+        guard handleDownloads else {
+            return
+        }
+
+        guard let jsonPayload = parseBlobBridgePayload(payload),
+              let sessionId = jsonPayload["sessionId"] as? String,
+              !sessionId.isEmpty,
+              let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
+            emitDownloadFailed(sourceURL: nil, error: "Blob download session was not initialized")
+            return
+        }
+
+        defer {
+            try? session.fileHandle.close()
+        }
+
+        if let expectedSize = session.expectedSize, session.bytesWritten != expectedSize {
+            cleanupBlobDownloadSession(session, deleteFile: true)
+            emitDownloadFailed(
+                sourceURL: session.sourceURL,
+                fileName: session.destinationURL.lastPathComponent,
+                mimeType: session.mimeType,
+                error: "Blob download size mismatch"
+            )
+            return
+        }
+
+        previewDownloadedFile(session.destinationURL, mimeType: session.mimeType, sourceURL: session.sourceURL)
+    }
+
+    private func abortBlobDownloadPayload(_ payload: Any) {
+        guard handleDownloads else {
+            return
+        }
+
+        let jsonPayload = parseBlobBridgePayload(payload)
+        let sessionId = jsonPayload?["sessionId"] as? String ?? ""
+        let session = abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
+        let reason = jsonPayload?["reason"] as? String ?? "Blob download aborted"
+        emitDownloadFailed(
+            sourceURL: session?.sourceURL ?? jsonPayload?["sourceUrl"] as? String,
+            fileName: session?.destinationURL.lastPathComponent ?? jsonPayload?["fileName"] as? String,
+            mimeType: session?.mimeType ?? jsonPayload?["mimeType"] as? String,
+            error: reason
+        )
+    }
+
+    private func handleBlobDownloadFromPage(blobUrl: String, mimeType: String?, contentDisposition: String?) {
+        guard handleDownloads, let webView else {
+            emitDownloadFailed(sourceURL: blobUrl, error: "Blob download requires an active WebView")
+            return
+        }
+
+        let fallbackMimeType = normalizedMimeType(mimeType, fileURL: URL(fileURLWithPath: "download")) ?? "application/octet-stream"
+        let fallbackFileName = sanitizeDownloadFilename(
+            contentDisposition?.components(separatedBy: "filename=").last?
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"' "))
+                ?? "download"
+        )
+
+        let params: [String: Any] = [
+            "blobUrl": blobUrl,
+            "fallbackMimeType": fallbackMimeType,
+            "fallbackFileName": fallbackFileName,
+            "legacyMaxBytes": BlobDownloadSupport.maxLegacyBytes,
+            "chunkSize": BlobDownloadSupport.chunkBytes
+        ]
+
+        guard JSONSerialization.isValidJSONObject(params),
+              let paramsData = try? JSONSerialization.data(withJSONObject: params),
+              let paramsJson = String(data: paramsData, encoding: .utf8) else {
+            emitDownloadFailed(sourceURL: blobUrl, error: "Failed to prepare blob download script")
+            return
+        }
+
+        let script = """
+        (function(params) {
+          const blobUrl = params.blobUrl;
+          const fallbackMimeType = params.fallbackMimeType;
+          const fallbackFileName = params.fallbackFileName;
+          const legacyMaxBytes = params.legacyMaxBytes;
+          const chunkSize = params.chunkSize;
+          const matchingLink = Array.from(document.querySelectorAll('a[download]')).find(function(link) { return link.href === blobUrl; });
+          const bridge = (window.mobileApp && window.mobileApp.startBlobDownload && window.mobileApp.appendBlobDownloadChunk && window.mobileApp.finishBlobDownload)
+            ? window.mobileApp
+            : (window.mobileApp && window.mobileApp.handleBlobDownload)
+              ? window.mobileApp
+              : null;
+          const sessionId = 'blob-download-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+          let fileName = fallbackFileName;
+          const readChunkAsBase64 = function(chunk) {
+            return new Promise(function(resolve, reject) {
+              const reader = new FileReader();
+              reader.onloadend = function() {
+                const dataUrl = reader.result || '';
+                resolve(String(dataUrl).split(',').pop() || '');
+              };
+              reader.onerror = function() {
+                reject(reader.error || new Error('Failed to read blob chunk'));
+              };
+              reader.readAsDataURL(chunk);
+            });
+          };
+
+          return (async function() {
+            if (!bridge) {
+              throw new Error('Blob download bridge is not available');
+            }
+
+            const response = await fetch(blobUrl);
+            const blob = await response.blob();
+            fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+
+            if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
+              bridge.startBlobDownload(JSON.stringify({
+                sessionId: sessionId,
+                fileName: fileName,
+                sourceUrl: blobUrl,
+                mimeType: blob.type || fallbackMimeType,
+                size: blob.size
+              }));
+              for (let offset = 0; offset < blob.size; offset += chunkSize) {
+                const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
+                bridge.appendBlobDownloadChunk(JSON.stringify({ sessionId: sessionId, base64: base64 }));
+              }
+              bridge.finishBlobDownload(JSON.stringify({ sessionId: sessionId }));
+              return;
+            }
+
+            if (blob.size > legacyMaxBytes) {
+              throw new Error('Blob download is too large for the legacy bridge');
+            }
+
+            const base64 = await readChunkAsBase64(blob);
+            bridge.handleBlobDownload(JSON.stringify({
+              fileName: fileName,
+              sourceUrl: blobUrl,
+              mimeType: blob.type || fallbackMimeType,
+              size: blob.size,
+              base64: base64
+            }));
+          })().catch(function(error) {
+            if (bridge && bridge.abortBlobDownload) {
+              bridge.abortBlobDownload(JSON.stringify({
+                sessionId: sessionId,
+                fileName: fileName,
+                sourceUrl: blobUrl,
+                mimeType: fallbackMimeType,
+                reason: String((error && error.message) || error || 'Blob download failed')
+              }));
+            }
+            console.error('Failed to capture blob download', error);
+          });
+        })(\(paramsJson));
+        """
+
+        DispatchQueue.main.async {
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    self.emitDownloadFailed(sourceURL: blobUrl, error: "Failed to capture blob download: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -1301,6 +1654,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 print("Received non-dictionary message from JavaScript:", message.body)
                 emit("messageFromWebview", data: ["rawMessage": String(describing: message.body)])
             }
+        } else if message.name == "blobDownload" {
+            handleLegacyBlobDownloadPayload(message.body)
+        } else if message.name == "blobDownloadStart" {
+            startBlobDownloadPayload(message.body)
+        } else if message.name == "blobDownloadChunk" {
+            appendBlobDownloadChunkPayload(message.body)
+        } else if message.name == "blobDownloadFinish" {
+            finishBlobDownloadPayload(message.body)
+        } else if message.name == "blobDownloadAbort" {
+            abortBlobDownloadPayload(message.body)
         } else if message.name == "consoleMessageHandler" {
             if let messageBody = message.body as? [String: Any] {
                 emit("consoleMessage", data: ConsoleMessageSupport.normalizePayload(from: messageBody))
@@ -1446,6 +1809,21 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         },
                         close: function() {
                                 window.webkit.messageHandlers.close.postMessage(null);
+                        },
+                        handleBlobDownload: function(payload) {
+                                window.webkit.messageHandlers.blobDownload.postMessage(payload);
+                        },
+                        startBlobDownload: function(payload) {
+                                window.webkit.messageHandlers.blobDownloadStart.postMessage(payload);
+                        },
+                        appendBlobDownloadChunk: function(payload) {
+                                window.webkit.messageHandlers.blobDownloadChunk.postMessage(payload);
+                        },
+                        finishBlobDownload: function(payload) {
+                                window.webkit.messageHandlers.blobDownloadFinish.postMessage(payload);
+                        },
+                        abortBlobDownload: function(payload) {
+                                window.webkit.messageHandlers.blobDownloadAbort.postMessage(payload);
                         }\(extraControls)\(screenshotControls)
                 });
                 if (!window.__capgoInAppBrowserWindowCloseInstalled) {
@@ -1575,6 +1953,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "close")
         userContentController.add(weakHandler, name: "hide")
         userContentController.add(weakHandler, name: "show")
+        userContentController.add(weakHandler, name: "blobDownload")
+        userContentController.add(weakHandler, name: "blobDownloadStart")
+        userContentController.add(weakHandler, name: "blobDownloadChunk")
+        userContentController.add(weakHandler, name: "blobDownloadFinish")
+        userContentController.add(weakHandler, name: "blobDownloadAbort")
         if allowScreenshotsFromWebPage {
             userContentController.add(weakHandler, name: "takeScreenshot")
         }
@@ -3001,13 +3384,26 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        let shouldForceDownload = handleDownloads && navigationAction.shouldPerformDownload
+        if handleDownloads && navigationAction.shouldPerformDownload {
+            decisionHandler(.download)
+            return
+        }
 
         var actionPolicy: WKNavigationActionPolicy = self.preventDeeplink ? .preventDeeplinkActionPolicy : .allow
 
         guard let url = navigationAction.request.url else {
             print("[InAppBrowser] Cannot determine URL from navigationAction")
             decisionHandler(actionPolicy)
+            return
+        }
+
+        if handleDownloads, url.scheme?.lowercased() == "blob" {
+            handleBlobDownloadFromPage(
+                blobUrl: url.absoluteString,
+                mimeType: navigationAction.request.value(forHTTPHeaderField: "Content-Type"),
+                contentDisposition: navigationAction.request.value(forHTTPHeaderField: "Content-Disposition")
+            )
+            decisionHandler(.cancel)
             return
         }
 
@@ -3065,11 +3461,6 @@ extension WKWebViewController: WKNavigationDelegate {
             if let navigationType = NavigationType(rawValue: navigationAction.navigationType.rawValue),
                let result = self.delegate?.webViewController?(self, decidePolicy: url, navigationType: navigationType) {
                 actionPolicy = result ? .allow : .cancel
-            }
-
-            if shouldForceDownload, actionPolicy != .cancel {
-                decisionHandler(.download)
-                return
             }
 
             self.injectJavaScriptInterface()
