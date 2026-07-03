@@ -832,7 +832,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     }
 
-
     private func webSource(for urlString: String) -> WKWebSource? {
         if let html = HtmlDataUrlSupport.parseHtml(from: urlString) {
             return .string(html, base: nil)

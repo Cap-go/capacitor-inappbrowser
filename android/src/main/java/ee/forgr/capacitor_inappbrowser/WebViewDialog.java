@@ -5810,7 +5810,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-
         Map<String, String> headers = requestHeaders != null ? requestHeaders : new HashMap<>();
         if (supportsRequestBody(httpMethod) && httpBody != null) {
             byte[] postData = httpBody.getBytes(StandardCharsets.UTF_8);
