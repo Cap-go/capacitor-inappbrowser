@@ -7,6 +7,8 @@ public interface WebViewCallbacks {
 
     public void closeEvent(String url);
 
+    public void hideEvent(String url);
+
     public void pageLoaded();
 
     public void pageLoadError();

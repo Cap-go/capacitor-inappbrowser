@@ -57,7 +57,6 @@ public class Options {
             throws IllegalArgumentException, RuntimeException {
             JSObject buttonNearDone = call.getObject("buttonNearDone");
             if (buttonNearDone == null) {
-                // Return null when "buttonNearDone" isn't configured, else throw an error
                 return null;
             }
 
@@ -66,42 +65,41 @@ public class Options {
                 throw new IllegalArgumentException("buttonNearDone.android is null");
             }
 
+            return generateFromAndroidObject(android, assetManager, "buttonNearDone.android");
+        }
+
+        public static ButtonNearDone generateFromAndroidObject(JSObject android, AssetManager assetManager, String optionName)
+            throws IllegalArgumentException, RuntimeException {
             String iconType = android.getString("iconType", "asset");
             AllIconTypes iconTypeEnum;
 
-            // Validate and process icon type
             if ("asset".equals(iconType)) {
                 iconTypeEnum = AllIconTypes.ASSET;
             } else if ("vector".equals(iconType)) {
                 iconTypeEnum = AllIconTypes.VECTOR;
             } else {
-                throw new IllegalArgumentException("buttonNearDone.android.iconType must be 'asset' or 'vector'");
+                throw new IllegalArgumentException(optionName + ".iconType must be 'asset' or 'vector'");
             }
 
             String icon = android.getString("icon");
             if (icon == null) {
-                throw new IllegalArgumentException("buttonNearDone.android.icon is null");
+                throw new IllegalArgumentException(optionName + ".icon is null");
             }
 
-            // For asset type, verify the file exists
             if (iconTypeEnum == AllIconTypes.ASSET) {
                 InputStream fileInputString = null;
 
                 try {
-                    // Try to find in public folder first
                     try {
                         fileInputString = assetManager.open("public/" + icon);
                     } catch (IOException e) {
-                        // If not in public, try in root assets
                         try {
                             fileInputString = assetManager.open(icon);
                         } catch (IOException e2) {
-                            throw new IllegalArgumentException("buttonNearDone.android.icon cannot be found in the assetManager");
+                            throw new IllegalArgumentException(optionName + ".icon cannot be found in the assetManager");
                         }
                     }
-                    // File exists, do nothing
                 } finally {
-                    // Close the input stream if it was opened
                     if (fileInputString != null) {
                         try {
                             fileInputString.close();
@@ -110,18 +108,14 @@ public class Options {
                         }
                     }
                 }
-            }
-            // For vector type, we don't validate here since resources are checked at runtime
-            else if (iconTypeEnum == AllIconTypes.VECTOR) {
-                // Vector resources will be validated when used
+            } else if (iconTypeEnum == AllIconTypes.VECTOR) {
                 System.out.println("Vector resource will be validated at runtime: " + icon);
             }
 
             Integer width = android.getInteger("width", 24);
             Integer height = android.getInteger("height", 24);
 
-            final ButtonNearDone buttonNearDone1 = new ButtonNearDone(iconTypeEnum, iconType, icon, height, width);
-            return buttonNearDone1;
+            return new ButtonNearDone(iconTypeEnum, iconType, icon, height, width);
         }
 
         public AllIconTypes getIconTypeEnum() {
@@ -151,6 +145,9 @@ public class Options {
     private String CloseModalDescription;
     private String CloseModalCancel;
     private ButtonNearDone buttonNearDone;
+    private String closeAction = "close";
+    private String titleFontFamily;
+    private ButtonNearDone titleIcon;
     private String CloseModalOk;
     private Pattern closeModalURLPattern;
     private String url;
@@ -416,6 +413,30 @@ public class Options {
 
     public ButtonNearDone getButtonNearDone() {
         return this.buttonNearDone;
+    }
+
+    public String getCloseAction() {
+        return closeAction;
+    }
+
+    public void setCloseAction(String closeAction) {
+        this.closeAction = closeAction;
+    }
+
+    public String getTitleFontFamily() {
+        return titleFontFamily;
+    }
+
+    public void setTitleFontFamily(String titleFontFamily) {
+        this.titleFontFamily = titleFontFamily;
+    }
+
+    public ButtonNearDone getTitleIcon() {
+        return titleIcon;
+    }
+
+    public void setTitleIcon(ButtonNearDone titleIcon) {
+        this.titleIcon = titleIcon;
     }
 
     public String getCloseModalCancel() {
@@ -713,6 +734,9 @@ public class Options {
         copy.setCloseModalOk(CloseModalOk);
         copy.setCloseModalURLPattern(closeModalURLPattern);
         copy.setButtonNearDone(buttonNearDone);
+        copy.setCloseAction(closeAction);
+        copy.setTitleFontFamily(titleFontFamily);
+        copy.setTitleIcon(titleIcon);
         copy.setUrl("about:blank");
         copy.setHeaders(headers);
         copy.setCredentials(credentials);

@@ -103,6 +103,30 @@ export enum InvisibilityMode {
   FAKE_VISIBLE = 'FAKE_VISIBLE',
 }
 
+export enum CloseAction {
+  /**
+   * The toolbar close button closes and destroys the webview.
+   */
+  CLOSE = 'close',
+  /**
+   * The toolbar close button hides the webview so it can be shown again.
+   */
+  HIDE = 'hide',
+}
+
+export interface ToolbarTitleIconOptions {
+  ios?: {
+    iconType: 'sf-symbol' | 'asset';
+    icon: string;
+  };
+  android?: {
+    iconType: 'asset' | 'vector';
+    icon: string;
+    width?: number;
+    height?: number;
+  };
+}
+
 export interface Headers {
   [key: string]: string;
 }
@@ -782,6 +806,36 @@ export interface OpenWebViewOptions {
    */
   title?: string;
   /**
+   * Native toolbar title font family.
+   * On iOS, use the registered font family name. On Android, the plugin first tries a res/font resource name,
+   * then falls back to a system font family name.
+   *
+   * @since 8.7.7
+   * @example "Inter"
+   */
+  titleFontFamily?: string;
+  /**
+   * Native toolbar title icon displayed before the title text.
+   *
+   * For Android:
+   * - iconType can be "asset" for a bundled SVG asset or "vector" for a drawable resource
+   * - icon path should be in the public folder for assets (e.g. "brand.svg")
+   * - width and height are optional and default to 24dp
+   *
+   * For iOS:
+   * - iconType can be "sf-symbol" or "asset"
+   * - for sf-symbol, icon should be the symbol name
+   * - for asset, icon should be the asset name or bundled web asset path
+   *
+   * @since 8.7.7
+   * @example
+   * titleIcon: {
+   *   ios: { iconType: "sf-symbol", icon: "lock.fill" },
+   *   android: { iconType: "vector", icon: "ic_lock", width: 20, height: 20 }
+   * }
+   */
+  titleIcon?: ToolbarTitleIconOptions;
+  /**
    * Background color of the browser
    * @since 0.1.0
    * @default BackgroundColor.BLACK
@@ -840,6 +894,16 @@ export interface OpenWebViewOptions {
    * Test URL: https://capgo.app
    */
   showReloadButton?: boolean;
+  /**
+   * closeAction controls what happens when the native toolbar close button is pressed.
+   * This does not change the behavior of close(), JavaScript window.mobileApp.close(), or native back navigation.
+   *
+   * @default CloseAction.CLOSE
+   * @since 8.7.7
+   * @example
+   * closeAction: CloseAction.HIDE
+   */
+  closeAction?: CloseAction;
   /**
    * CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.
    * @since 1.1.0
@@ -1422,6 +1486,12 @@ export interface InAppBrowserPlugin {
    * @since 0.4.0
    */
   addListener(eventName: 'closeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
+  /**
+   * Listen for webviews hidden by the toolbar close button when closeAction is CloseAction.HIDE.
+   *
+   * @since 8.7.7
+   */
+  addListener(eventName: 'hideEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
   /**
    * Will be triggered when user clicks on confirm button when disclaimer is required,
    * works with openWebView shareDisclaimer and closeModal

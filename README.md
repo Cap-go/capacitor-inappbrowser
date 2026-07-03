@@ -148,6 +148,34 @@ await InAppBrowser.hide({ id: first.id });
 await InAppBrowser.show({ id: second.id });
 ```
 
+#### Hide from the native close button and brand the toolbar title
+
+Use `closeAction: CloseAction.HIDE` when the toolbar close button should hide the WebView instead of destroying it. Listen to `hideEvent` if your app needs to update Ionic state, then call `show()` later to bring the same browser session back.
+
+```js
+import { CloseAction, InAppBrowser } from '@capgo/capacitor-inappbrowser';
+
+await InAppBrowser.addListener('hideEvent', ({ id, url }) => {
+  console.log('Browser hidden', id, url);
+});
+
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://example.com/checkout',
+  title: 'Secure checkout',
+  closeAction: CloseAction.HIDE,
+  titleFontFamily: 'Inter',
+  titleIcon: {
+    ios: { iconType: 'sf-symbol', icon: 'lock.fill' },
+    android: { iconType: 'vector', icon: 'ic_lock', width: 20, height: 20 },
+  },
+});
+
+// Later, after the toolbar close button hides it:
+await InAppBrowser.show({ id });
+```
+
+For iOS, `titleFontFamily` must match a registered font family name and `titleIcon` can use either an SF Symbol or bundled asset. For Android, `titleFontFamily` first checks `res/font` and then falls back to a system font family; `titleIcon` can use a vector drawable or bundled SVG asset.
+
 #### Embed advanced web app flows
 
 Use proxy rules and `handleDownloads` for web apps that need request control, file uploads, downloads, or controlled popup behavior inside the managed browser. Typical examples include document portals, support desks, payment pages, Google Pay flows on Android, and apps that need to keep `_blank` links inside the same managed WebView.
@@ -520,6 +548,7 @@ The W3C Payment Request API (used by Google Pay) requires Android WebView 120+. 
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
 * [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
+* [`addListener('hideEvent', ...)`](#addlistenerhideevent-)
 * [`addListener('confirmBtnClicked', ...)`](#addlistenerconfirmbtnclicked-)
 * [`addListener('messageFromWebview', ...)`](#addlistenermessagefromwebview-)
 * [`addListener('screenshotTaken', ...)`](#addlistenerscreenshottaken-)
@@ -939,6 +968,26 @@ Listen for close click only for openWebView
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 0.4.0
+
+--------------------
+
+
+### addListener('hideEvent', ...)
+
+```typescript
+addListener(eventName: 'hideEvent', listenerFunc: UrlChangeListener) => Promise<PluginListenerHandle>
+```
+
+Listen for webviews hidden by the toolbar close button when closeAction is <a href="#closeaction">CloseAction.HIDE</a>.
+
+| Param              | Type                                                            |
+| ------------------ | --------------------------------------------------------------- |
+| **`eventName`**    | <code>'hideEvent'</code>                                        |
+| **`listenerFunc`** | <code><a href="#urlchangelistener">UrlChangeListener</a></code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.7.7
 
 --------------------
 
@@ -1430,6 +1479,8 @@ And in the AndroidManifest.xml file:
 | **`toolbarType`**                      | <code><a href="#toolbartype">ToolBarType</a></code>                                                                                                                    | Toolbar type determines the appearance and behavior of the browser's toolbar - "activity": Shows a simple toolbar with just a close button and share button - "navigation": Shows a full navigation toolbar with back/forward buttons - "blank": Shows no toolbar - "": Default toolbar with close button                                                                                                                                                                                                                                                  | <code>ToolBarType.DEFAULT</code>                              | 0.1.0  |
 | **`shareSubject`**                     | <code>string</code>                                                                                                                                                    | Subject text for sharing. Required when using shareDisclaimer. This text will be used as the subject line when sharing content.                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                               | 0.1.0  |
 | **`title`**                            | <code>string</code>                                                                                                                                                    | Title of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | <code>"New Window"</code>                                     | 0.1.0  |
+| **`titleFontFamily`**                  | <code>string</code>                                                                                                                                                    | Native toolbar title font family. On iOS, use the registered font family name. On Android, the plugin first tries a res/font resource name, then falls back to a system font family name.                                                                                                                                                                                                                                                                                                                                                                  |                                                               | 8.7.7  |
+| **`titleIcon`**                        | <code><a href="#toolbartitleiconoptions">ToolbarTitleIconOptions</a></code>                                                                                            | Native toolbar title icon displayed before the title text. For Android: - iconType can be "asset" for a bundled SVG asset or "vector" for a drawable resource - icon path should be in the public folder for assets (e.g. "brand.svg") - width and height are optional and default to 24dp For iOS: - iconType can be "sf-symbol" or "asset" - for sf-symbol, icon should be the symbol name - for asset, icon should be the asset name or bundled web asset path                                                                                          |                                                               | 8.7.7  |
 | **`backgroundColor`**                  | <code><a href="#backgroundcolor">BackgroundColor</a></code>                                                                                                            | Background color of the browser                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>BackgroundColor.BLACK</code>                            | 0.1.0  |
 | **`activeNativeNavigationForWebview`** | <code>boolean</code>                                                                                                                                                   | If true, enables native navigation gestures within the webview. - Android: Native back button navigates within webview history - iOS: Enables swipe left/right gestures for back/forward navigation                                                                                                                                                                                                                                                                                                                                                        | <code>false (Android), true (iOS - enabled by default)</code> |        |
 | **`disableGoBackOnNativeApplication`** | <code>boolean</code>                                                                                                                                                   | Disable the possibility to go back on native application, useful to force user to stay on the webview, Android only                                                                                                                                                                                                                                                                                                                                                                                                                                        | <code>false</code>                                            |        |
@@ -1437,6 +1488,7 @@ And in the AndroidManifest.xml file:
 | **`isInspectable`**                    | <code>boolean</code>                                                                                                                                                   | Whether the website in the webview is inspectable or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            |        |
 | **`isAnimated`**                       | <code>boolean</code>                                                                                                                                                   | Whether the webview opening is animated or not, ios only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | <code>true</code>                                             |        |
 | **`showReloadButton`**                 | <code>boolean</code>                                                                                                                                                   | Shows a reload button that reloads the web page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | <code>false</code>                                            | 1.0.15 |
+| **`closeAction`**                      | <code><a href="#closeaction">CloseAction</a></code>                                                                                                                    | closeAction controls what happens when the native toolbar close button is pressed. This does not change the behavior of close(), JavaScript window.mobileApp.close(), or native back navigation.                                                                                                                                                                                                                                                                                                                                                           | <code>CloseAction.CLOSE</code>                                | 8.7.7  |
 | **`closeModal`**                       | <code>boolean</code>                                                                                                                                                   | CloseModal: if true a confirm will be displayed when user clicks on close button, if false the browser will be closed immediately.                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>false</code>                                            | 1.1.0  |
 | **`closeModalTitle`**                  | <code>string</code>                                                                                                                                                    | CloseModalTitle: title of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | <code>"Close"</code>                                          | 1.1.0  |
 | **`closeModalDescription`**            | <code>string</code>                                                                                                                                                    | CloseModalDescription: description of the confirm when user clicks on close button                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | <code>"Are you sure you want to close this window?"</code>    | 1.1.0  |
@@ -1496,6 +1548,14 @@ And in the AndroidManifest.xml file:
 | **`message`**    | <code>string</code> | Message shown in the disclaimer dialog | <code>"Message"</code> |
 | **`confirmBtn`** | <code>string</code> | Text for the confirm button            | <code>"Confirm"</code> |
 | **`cancelBtn`**  | <code>string</code> | Text for the cancel button             | <code>"Cancel"</code>  |
+
+
+#### ToolbarTitleIconOptions
+
+| Prop          | Type                                                                                           |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| **`ios`**     | <code>{ iconType: 'sf-symbol' \| 'asset'; icon: string; }</code>                               |
+| **`android`** | <code>{ iconType: 'asset' \| 'vector'; icon: string; width?: number; height?: number; }</code> |
 
 
 #### NativeProxyRule
@@ -1813,6 +1873,14 @@ Native handling mode used after a managed download finishes.
 | ----------- | -------------------- |
 | **`WHITE`** | <code>'white'</code> |
 | **`BLACK`** | <code>'black'</code> |
+
+
+#### CloseAction
+
+| Members     | Value                | Description                                                          |
+| ----------- | -------------------- | -------------------------------------------------------------------- |
+| **`CLOSE`** | <code>'close'</code> | The toolbar close button closes and destroys the webview.            |
+| **`HIDE`**  | <code>'hide'</code>  | The toolbar close button hides the webview so it can be shown again. |
 
 
 #### InvisibilityMode

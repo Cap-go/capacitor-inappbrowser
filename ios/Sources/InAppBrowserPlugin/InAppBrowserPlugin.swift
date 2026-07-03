@@ -687,6 +687,17 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         self.navigationWebViewController = nil
     }
 
+    func handleWebViewDidHide(id: String, url: String) {
+        if !id.isEmpty {
+            self.notifyListeners("hideEvent", data: ["id": id, "url": url])
+            self.setHiddenState(true, targetId: id, call: nil)
+            return
+        }
+
+        self.notifyListeners("hideEvent", data: ["url": url])
+        self.setHiddenState(true, targetId: activeWebViewId, call: nil)
+    }
+
     @objc func clearAllCookies(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             let targetId = call.getString("id")
@@ -832,6 +843,61 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     }
 
+    private func optionError(_ message: String) -> NSError {
+        NSError(domain: "CapgoInAppBrowser", code: 0, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+
+    private func loadToolbarIcon(from iosSettings: JSObject, optionName: String) throws -> UIImage {
+        guard let iconType = iosSettings["iconType"] as? String, !iconType.isEmpty else {
+            throw optionError("\(optionName).ios.iconType is empty")
+        }
+        guard iconType == "sf-symbol" || iconType == "asset" else {
+            throw optionError("\(optionName).ios.iconType must be 'sf-symbol' or 'asset'")
+        }
+        guard let icon = iosSettings["icon"] as? String, !icon.isEmpty else {
+            throw optionError("\(optionName).ios.icon is empty")
+        }
+
+        if iconType == "sf-symbol" {
+            guard let image = UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate) else {
+                throw optionError("Failed to load \(optionName) SF Symbol: \(icon)")
+            }
+            return image
+        }
+
+        let paths = [
+            icon,
+            "public/\(icon)",
+            icon.replacingOccurrences(of: "public/", with: "")
+        ]
+
+        for path in paths {
+            let assetPath = path.replacingOccurrences(of: "public/", with: "")
+            if let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") {
+                let fileURL = webDir.appendingPathComponent(assetPath)
+                if FileManager.default.fileExists(atPath: fileURL.path),
+                   let data = try? Data(contentsOf: fileURL),
+                   let image = UIImage(data: data) {
+                    return image.withRenderingMode(.alwaysTemplate)
+                }
+            }
+
+            if let wwwDir = Bundle.main.resourceURL?.appendingPathComponent("www") {
+                let wwwFileURL = wwwDir.appendingPathComponent(assetPath)
+                if FileManager.default.fileExists(atPath: wwwFileURL.path),
+                   let data = try? Data(contentsOf: wwwFileURL),
+                   let image = UIImage(data: data) {
+                    return image.withRenderingMode(.alwaysTemplate)
+                }
+            }
+
+            if let image = UIImage(named: path) {
+                return image.withRenderingMode(.alwaysTemplate)
+            }
+        }
+        throw optionError("Failed to load \(optionName) icon: \(icon)")
+    }
+
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
             self.setup()
@@ -862,84 +928,25 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("IOS settings are not an object")
                 return
             }
-
-            guard let iconType = iosSettings["iconType"] as? String else {
-                call.reject("buttonNearDone.iconType is empty")
+            do {
+                buttonNearDoneIcon = try self.loadToolbarIcon(from: iosSettings, optionName: "buttonNearDone")
+            } catch {
+                call.reject(error.localizedDescription)
                 return
             }
-            if iconType != "sf-symbol" && iconType != "asset" {
-                call.reject("IconType is neither 'sf-symbol' nor 'asset'")
+        }
+
+        var titleIcon: UIImage?
+        if let titleIconSettings = call.getObject("titleIcon"), let iosSettingsRaw = titleIconSettings["ios"] {
+            guard let iosSettings = iosSettingsRaw as? JSObject else {
+                call.reject("titleIcon.ios settings are not an object")
                 return
             }
-            guard let icon = iosSettings["icon"] as? String else {
-                call.reject("buttonNearDone.icon is empty")
+            do {
+                titleIcon = try self.loadToolbarIcon(from: iosSettings, optionName: "titleIcon")
+            } catch {
+                call.reject(error.localizedDescription)
                 return
-            }
-
-            if iconType == "sf-symbol" {
-                buttonNearDoneIcon = UIImage(systemName: icon)?.withRenderingMode(.alwaysTemplate)
-                print("[DEBUG] Set buttonNearDone SF Symbol icon: \(icon)")
-            } else {
-                // Look in app's web assets/public directory
-                guard let webDir = Bundle.main.resourceURL?.appendingPathComponent("public") else {
-                    call.reject("Failed to locate bundled web assets")
-                    return
-                }
-
-                // Try several path combinations to find the asset
-                let paths = [
-                    icon,                    // Just the icon name
-                    "public/\(icon)",        // With public/ prefix
-                    icon.replacingOccurrences(of: "public/", with: "")  // Without public/ prefix
-                ]
-
-                var foundImage = false
-
-                for path in paths {
-                    // Try as a direct path from web assets dir
-                    let assetPath = path.replacingOccurrences(of: "public/", with: "")
-                    let fileURL = webDir.appendingPathComponent(assetPath)
-
-                    print("[DEBUG] Trying to load from: \(fileURL.path)")
-
-                    if FileManager.default.fileExists(atPath: fileURL.path),
-                       let data = try? Data(contentsOf: fileURL),
-                       let img = UIImage(data: data) {
-                        buttonNearDoneIcon = img.withRenderingMode(.alwaysTemplate)
-                        print("[DEBUG] Successfully loaded buttonNearDone from web assets: \(fileURL.path)")
-                        foundImage = true
-                        break
-                    }
-
-                    // Try with www directory as an alternative
-                    if let wwwDir = Bundle.main.resourceURL?.appendingPathComponent("www") {
-                        let wwwFileURL = wwwDir.appendingPathComponent(assetPath)
-
-                        print("[DEBUG] Trying to load from www dir: \(wwwFileURL.path)")
-
-                        if FileManager.default.fileExists(atPath: wwwFileURL.path),
-                           let data = try? Data(contentsOf: wwwFileURL),
-                           let img = UIImage(data: data) {
-                            buttonNearDoneIcon = img.withRenderingMode(.alwaysTemplate)
-                            print("[DEBUG] Successfully loaded buttonNearDone from www dir: \(wwwFileURL.path)")
-                            foundImage = true
-                            break
-                        }
-                    }
-
-                    // Try looking in app bundle assets
-                    if let iconImage = UIImage(named: path) {
-                        buttonNearDoneIcon = iconImage.withRenderingMode(.alwaysTemplate)
-                        print("[DEBUG] Successfully loaded buttonNearDone from app bundle: \(path)")
-                        foundImage = true
-                        break
-                    }
-                }
-
-                if !foundImage {
-                    call.reject("Failed to load buttonNearDone icon: \(icon)")
-                    return
-                }
             }
         }
 
@@ -955,6 +962,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let closeModalOk = call.getString("closeModalOk", "OK")
         let closeModalCancel = call.getString("closeModalCancel", "Cancel")
         let closeModalURLPattern = call.getString("closeModalURLPattern")
+        let closeAction = call.getString("closeAction", "close").lowercased()
+        guard closeAction == "close" || closeAction == "hide" else {
+            call.reject("closeAction must be 'close' or 'hide'")
+            return
+        }
+        let titleFontFamily = call.getString("titleFontFamily")
         let isInspectable = call.getBool("isInspectable", false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
@@ -1263,6 +1276,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             webViewController.capBrowserPlugin = self
             webViewController.title = call.getString("title", "New Window")
+            webViewController.closeAction = closeAction
+            webViewController.titleFontFamily = titleFontFamily
+            webViewController.titleIcon = titleIcon
             // Only set shareSubject if not already set for activity mode
             if webViewController.shareSubject == nil {
                 webViewController.shareSubject = call.getString("shareSubject")
@@ -1372,6 +1388,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 webViewController.updateStatusBarStyle()
 
             }
+            webViewController.updateTitleAppearance()
 
             // Configure modal presentation for touch passthrough if custom dimensions are set
             if (width != nil || height != nil) && !toBack {
