@@ -7,7 +7,9 @@ import java.util.Set;
 
 final class CustomSchemeInterceptSupport {
 
-    private static final Set<String> EXCLUDED_SCHEMES = new HashSet<>(Arrays.asList("http", "https", "file", "tel", "mailto", "sms"));
+    private static final Set<String> EXCLUDED_SCHEMES = new HashSet<>(
+        Arrays.asList("http", "https", "file", "data", "tel", "mailto", "sms")
+    );
 
     private CustomSchemeInterceptSupport() {}
 

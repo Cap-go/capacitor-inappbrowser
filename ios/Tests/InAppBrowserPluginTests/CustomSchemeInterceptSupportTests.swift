@@ -20,6 +20,9 @@ final class CustomSchemeInterceptSupportTests: XCTestCase {
         )
         XCTAssertFalse(
             CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: try XCTUnwrap(URL(string: "file:///tmp/index.html")))
+            XCTAssertFalse(
+                CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: try XCTUnwrap(URL(string: "data:text/html;base64,PGh0bWw+PC9odG1sPg==")))
+            )
         )
         XCTAssertFalse(
             CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: try XCTUnwrap(URL(string: "tel:+15555550123")))

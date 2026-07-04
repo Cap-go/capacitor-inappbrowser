@@ -62,7 +62,7 @@ final class ProxyRequestSupport {
     private ProxyRequestSupport() {}
 
     static boolean shouldInjectBridge(Options options) {
-        return options != null && usesLegacyJsProxyMode(options);
+        return usesLegacyJsProxyMode(options);
     }
 
     static boolean usesLegacyJsProxyMode(Options options) {
@@ -118,6 +118,9 @@ final class ProxyRequestSupport {
         }
         String initialUrl = options.getUrl();
         if (initialUrl == null || initialUrl.isBlank()) {
+            return false;
+        }
+        if (HtmlDataUrlSupport.isDataUrl(initialUrl)) {
             return false;
         }
         if (!options.shouldEnableNativeProxy()) {

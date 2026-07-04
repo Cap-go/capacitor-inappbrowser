@@ -19,6 +19,7 @@ public class CustomSchemeInterceptSupportTest {
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("https://example.com"));
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("http://example.com"));
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("file:///android_asset/index.html"));
+        assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("data:text/html;base64,PGh0bWw+PC9odG1sPg=="));
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("tel:+15555550123"));
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("MAILTO:test@example.com"));
         assertFalse(CustomSchemeInterceptSupport.shouldEmitInterceptEvent("sms:+15555550123"));

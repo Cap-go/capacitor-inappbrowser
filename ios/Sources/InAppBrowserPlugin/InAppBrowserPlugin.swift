@@ -98,7 +98,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.7.6"
+    private let pluginVersion: String = "8.7.9"
     public let identifier = "CapgoInAppBrowserPlugin"
     public let jsName = "CapgoInAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -898,6 +898,17 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         throw optionError("Failed to load \(optionName) icon: \(icon)")
     }
 
+    private func webSource(for urlString: String) -> WKWebSource? {
+        if let html = HtmlDataUrlSupport.parseHtml(from: urlString) {
+            return .string(html, base: nil)
+        }
+
+        guard let url = URL(string: urlString) else {
+            return nil
+        }
+
+        return .remote(url)
+    }
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
             self.setup()
@@ -1100,7 +1111,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            guard let url = URL(string: urlString) else {
+            guard let webSource = self.webSource(for: urlString) else {
                 call.reject("Invalid URL format")
                 return
             }
@@ -1129,7 +1140,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.blankNavigationTab = toolbarType == "blank"
             webViewController.enabledSafeBottomMargin = enabledSafeBottomMargin
             webViewController.enabledSafeTopMargin = enabledSafeTopMargin
-            webViewController.source = .remote(url)
+            webViewController.source = webSource
             webViewController.setCredentials(credentials: credentials)
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
@@ -1198,7 +1209,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
-            webViewController.source = .remote(url)
+            webViewController.source = webSource
             webViewController.leftNavigationBarItemTypes = []
 
             // Configure close button based on showArrow
@@ -1522,17 +1533,25 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        guard let url = URL(string: urlString) else {
-            call.reject("Invalid URL")
-            return
-        }
-
         let targetId = call.getString("id")
         guard let webViewController = self.resolveWebViewController(for: targetId) else {
             call.reject("WebView is not initialized")
             return
         }
 
+        if let html = HtmlDataUrlSupport.parseHtml(from: urlString) {
+            webViewController.source = .string(html, base: nil)
+            webViewController.load(string: html, base: nil)
+            call.resolve()
+            return
+        }
+
+        guard let url = URL(string: urlString) else {
+            call.reject("Invalid URL")
+            return
+        }
+
+        webViewController.source = .remote(url)
         webViewController.load(remote: url)
         call.resolve()
     }
@@ -2002,12 +2021,14 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let credentials = self.readCredentials(call)
 
         DispatchQueue.main.async {
-            guard let url = URL(string: urlString) else {
+            guard let webSource = self.webSource(for: urlString) else {
                 call.reject("Invalid URL format")
                 return
             }
 
-            self.webViewController = WKWebViewController.init(url: url, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, enabledSafeTopMargin: true)
+            let initialUrl = webSource.remoteURL ?? URL(string: "about:blank")!
+
+            self.webViewController = WKWebViewController.init(url: initialUrl, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, enabledSafeTopMargin: true)
 
             guard let webViewController = self.webViewController else {
                 call.reject("Failed to initialize WebViewController")
@@ -2024,7 +2045,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
-            webViewController.source = .remote(url)
+            webViewController.source = webSource
             webViewController.leftNavigationBarItemTypes = [.back, .forward, .reload]
             webViewController.capBrowserPlugin = self
             webViewController.hasDynamicTitle = true
