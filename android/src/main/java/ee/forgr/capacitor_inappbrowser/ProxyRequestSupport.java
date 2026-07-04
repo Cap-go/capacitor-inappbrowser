@@ -62,7 +62,7 @@ final class ProxyRequestSupport {
     private ProxyRequestSupport() {}
 
     static boolean shouldInjectBridge(Options options) {
-        return options != null && usesLegacyJsProxyMode(options);
+        return usesLegacyJsProxyMode(options);
     }
 
     static boolean usesLegacyJsProxyMode(Options options) {
