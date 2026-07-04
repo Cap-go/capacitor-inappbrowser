@@ -1038,6 +1038,18 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             JSObject androidTitleIconObj = titleIconObj.getJSObject("android");
             if (androidTitleIconObj != null) {
                 try {
+                    String titleIconType = androidTitleIconObj.getString("iconType", "asset");
+                    String titleIconName = androidTitleIconObj.getString("icon", "");
+                    if ("vector".equals(titleIconType)) {
+                        int resourceId = getContext()
+                            .getResources()
+                            .getIdentifier(titleIconName, "drawable", getContext().getPackageName());
+                        if (resourceId == 0) {
+                            Log.e("InAppBrowser", "Title icon vector resource not found: " + titleIconName);
+                            call.reject("titleIcon validation failed: vector resource not found: " + titleIconName);
+                            return;
+                        }
+                    }
                     options.setTitleIcon(
                         Options.ButtonNearDone.generateFromAndroidObject(androidTitleIconObj, getContext().getAssets(), "titleIcon.android")
                     );

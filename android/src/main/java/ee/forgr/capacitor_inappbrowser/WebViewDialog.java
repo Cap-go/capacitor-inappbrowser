@@ -347,6 +347,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
     private final Map<String, ClientCertificateIdentity> clientCertificateIdentities = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
+    private Typeface cachedTitleTypeface;
+    private String cachedTitleFontFamily;
+    private Drawable cachedTitleIconDrawable;
+    private boolean cachedTitleIconResolved;
     private boolean isHiddenModeActive = false;
     private WindowManager.LayoutParams previousWindowAttributes;
     private Drawable previousWindowBackground;
@@ -3891,32 +3895,52 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         String fontFamily = _options.getTitleFontFamily();
         if (!TextUtils.isEmpty(fontFamily)) {
-            try {
-                int fontResourceId = _context.getResources().getIdentifier(fontFamily, "font", _context.getPackageName());
-                if (fontResourceId != 0) {
-                    Typeface typeface = ResourcesCompat.getFont(_context, fontResourceId);
-                    if (typeface != null) {
-                        titleText.setTypeface(typeface);
-                    }
-                } else {
-                    titleText.setTypeface(Typeface.create(fontFamily, Typeface.NORMAL));
-                }
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error loading title font: " + e.getMessage());
-                titleText.setTypeface(Typeface.create(fontFamily, Typeface.NORMAL));
+            if (!fontFamily.equals(cachedTitleFontFamily)) {
+                cachedTitleFontFamily = fontFamily;
+                cachedTitleTypeface = resolveTitleTypeface(fontFamily);
             }
+            if (cachedTitleTypeface != null) {
+                titleText.setTypeface(cachedTitleTypeface);
+            }
+        } else {
+            cachedTitleFontFamily = null;
+            cachedTitleTypeface = null;
         }
 
         Options.ButtonNearDone titleIcon = _options.getTitleIcon();
         if (titleIcon == null) {
             titleText.setCompoundDrawablesRelative(null, null, null, null);
+            cachedTitleIconDrawable = null;
+            cachedTitleIconResolved = false;
             return;
         }
 
-        Drawable drawable = loadTitleIconDrawable(titleIcon);
-        if (drawable != null) {
-            titleText.setCompoundDrawablesRelative(drawable, null, null, null);
+        if (!cachedTitleIconResolved) {
+            cachedTitleIconDrawable = loadTitleIconDrawable(titleIcon);
+            cachedTitleIconResolved = true;
+        }
+
+        if (cachedTitleIconDrawable != null) {
+            titleText.setCompoundDrawablesRelative(cachedTitleIconDrawable, null, null, null)
             titleText.setCompoundDrawablePadding(Math.round(6 * _context.getResources().getDisplayMetrics().density));
+        } else {
+            titleText.setCompoundDrawablesRelative(null, null, null, null);
+        }
+    }
+
+    private Typeface resolveTitleTypeface(String fontFamily) {
+        try {
+            int fontResourceId = _context.getResources().getIdentifier(fontFamily, "font", _context.getPackageName());
+            if (fontResourceId != 0) {
+                Typeface typeface = ResourcesCompat.getFont(_context, fontResourceId);
+                if (typeface != null) {
+                    return typeface;
+                }
+            }
+            return Typeface.create(fontFamily, Typeface.NORMAL);
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error loading title font: " + e.getMessage());
+            return Typeface.create(fontFamily, Typeface.NORMAL);
         }
     }
 
@@ -4011,6 +4035,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 TextView titleText = _toolbar.findViewById(R.id.titleText);
 
                 // Determine icon and text color
+                cachedTitleIconDrawable = null;
+                cachedTitleIconResolved = false;
+
                 int iconColor;
                 if (_options.getToolbarTextColor() != null && !_options.getToolbarTextColor().isEmpty()) {
                     try {

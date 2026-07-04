@@ -96,7 +96,7 @@ public class Options {
                         try {
                             fileInputString = assetManager.open(icon);
                         } catch (IOException e2) {
-                            throw new IllegalArgumentException(optionName + ".icon cannot be found in the assetManager");
+                            throw new IllegalArgumentException(optionName + ".icon cannot be found in the assetManager", e2);
                         }
                     }
                 } finally {
