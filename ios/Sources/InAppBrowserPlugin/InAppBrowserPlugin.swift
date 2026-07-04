@@ -55,8 +55,8 @@ enum CustomWebViewFrameSupport {
     static func resolvedFrame(
         width: CGFloat?,
         height: CGFloat?,
-        x: CGFloat?,
-        y: CGFloat?,
+        x positionX: CGFloat?,
+        y positionY: CGFloat?,
         fallbackSize: CGSize
     ) -> CGRect? {
         guard let height else {
@@ -64,8 +64,8 @@ enum CustomWebViewFrameSupport {
         }
 
         return CGRect(
-            x: x ?? 0,
-            y: y ?? 0,
+            x: positionX ?? 0,
+            y: positionY ?? 0,
             width: width ?? fallbackSize.width,
             height: height
         )
@@ -1691,14 +1691,14 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         return String(Double(value))
     }
 
-    private func dispatchInputScript(type: String, x: Float?, y: Float?, deltaX: Float?, deltaY: Float?) -> String? {
+    private func dispatchInputScript(type: String, x positionX: Float?, y positionY: Float?, deltaX: Float?, deltaY: Float?) -> String? {
         if type == "scroll" {
-            guard let x, let y, let deltaX, let deltaY,
-                  x.isFinite, y.isFinite, deltaX.isFinite, deltaY.isFinite else {
+            guard let positionX, let positionY, let deltaX, let deltaY,
+                  positionX.isFinite, positionY.isFinite, deltaX.isFinite, deltaY.isFinite else {
                 return nil
             }
-            let xLiteral = jsNumber(x)
-            let yLiteral = jsNumber(y)
+            let xLiteral = jsNumber(positionX)
+            let yLiteral = jsNumber(positionY)
             let deltaXLiteral = jsNumber(deltaX)
             let deltaYLiteral = jsNumber(deltaY)
             return """
@@ -1752,7 +1752,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return nil
         }
 
-        guard let x, let y, x.isFinite, y.isFinite else {
+        guard let positionX, let positionY, positionX.isFinite, positionY.isFinite else {
             return nil
         }
 
@@ -1765,8 +1765,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         return """
         (function() {
-          const x = \(jsNumber(x));
-          const y = \(jsNumber(y));
+          const x = \(jsNumber(positionX));
+          const y = \(jsNumber(positionY));
           const target = document.elementFromPoint(x, y);
           if (!target) return false;
           const base = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, screenX: x, screenY: y };
