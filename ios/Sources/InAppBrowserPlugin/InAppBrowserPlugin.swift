@@ -98,7 +98,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.7.9"
+    private let pluginVersion: String = "8.7.10"
     public let identifier = "CapgoInAppBrowserPlugin"
     public let jsName = "CapgoInAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
