@@ -3921,7 +3921,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         if (cachedTitleIconDrawable != null) {
-            titleText.setCompoundDrawablesRelative(cachedTitleIconDrawable, null, null, null)
+            titleText.setCompoundDrawablesRelative(cachedTitleIconDrawable, null, null, null);
             titleText.setCompoundDrawablePadding(Math.round(6 * _context.getResources().getDisplayMetrics().density));
         } else {
             titleText.setCompoundDrawablesRelative(null, null, null, null);
