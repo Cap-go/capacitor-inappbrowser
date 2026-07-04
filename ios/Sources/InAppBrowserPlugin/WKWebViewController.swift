@@ -766,6 +766,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
+    @discardableResult
     private func abortBlobDownloadSession(sessionId: String, deleteFile: Bool) -> BlobDownloadSession? {
         guard let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
             return nil

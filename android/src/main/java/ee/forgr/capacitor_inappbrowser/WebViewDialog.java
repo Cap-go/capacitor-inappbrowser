@@ -3909,13 +3909,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         Options.ButtonNearDone titleIcon = _options.getTitleIcon();
         if (titleIcon == null) {
-            titleText.setCompoundDrawables(null, null, null, null);
+            titleText.setCompoundDrawablesRelative(null, null, null, null);
             return;
         }
 
         Drawable drawable = loadTitleIconDrawable(titleIcon);
         if (drawable != null) {
-            titleText.setCompoundDrawables(drawable, null, null, null);
+            titleText.setCompoundDrawablesRelative(drawable, null, null, null);
             titleText.setCompoundDrawablePadding(Math.round(6 * _context.getResources().getDisplayMetrics().density));
         }
     }
