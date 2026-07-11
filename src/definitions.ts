@@ -941,6 +941,12 @@ export interface OpenWebViewOptions {
    *
    * Only applies when `closeAction` is `CloseAction.HIDE`.
    *
+   * On iOS, capture uses `WKWebView.takeSnapshot`. When testing through Apple's
+   * iPhone Mirroring app with the physical device locked, the snapshot can succeed
+   * with the correct dimensions but a fully transparent PNG. Capture works as
+   * expected on a normal unlocked device. This appears to be an Apple mirroring
+   * limitation rather than a plugin bug.
+   *
    * @default false
    * @since 8.7.10
    */
@@ -1499,6 +1505,10 @@ export interface InAppBrowserPlugin {
   /**
    * Captures the current webview viewport as a PNG screenshot.
    * When `id` is omitted, targets the active webview.
+   *
+   * On iOS, when testing through Apple's iPhone Mirroring app with the physical
+   * device locked, the snapshot can succeed with the correct dimensions but a
+   * fully transparent PNG. Capture works as expected on a normal unlocked device.
    */
   takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult>;
   /**
