@@ -3211,6 +3211,31 @@ extension WKWebViewController: WKUIDelegate {
         }
 
         print("[InAppBrowser] Handling popup/new window request for URL: \(url.absoluteString)")
+
+        let isAuthorized = isUrlAuthorized(url, authorizedLinks: authorizedAppLinks)
+        switch BlankTargetNavigationSupport.resolve(
+            urlIsHttpOrHttps: isHttpOrHttps(url),
+            openBlankTargetInWebView: openBlankTargetInWebView,
+            preventDeeplink: preventDeeplink,
+            isAuthorizedAppLink: isAuthorized
+        ) {
+        case .openExternalApp:
+            // Prefer the native app / Universal Link. If none handles it, keep browsing in-place.
+            tryOpenUniversalLink(url) { [weak webView] opened in
+                if !opened {
+                    DispatchQueue.main.async {
+                        webView?.load(URLRequest(url: url))
+                    }
+                }
+            }
+            return nil
+        case .loadInCurrentWebView:
+            webView.load(navigationAction.request)
+            return nil
+        case .createPopup:
+            break
+        }
+
         return capBrowserPlugin?.createManagedPopupWebView(
             from: self,
             configuration: configuration,
