@@ -1622,7 +1622,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Color the webview controller only — never paint PassThroughView or the
                     // y-offset gap would hide the host Capacitor app.
                     webViewController.view.backgroundColor = color
-                    applyBlankToolbarBackground(color, to: self.navigationWebViewController)
+                    self.applyBlankToolbarBackground(color, to: self.navigationWebViewController)
                 } else {
                     // Follow system appearance if no specific color
                     let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
@@ -1633,7 +1633,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Apply status bar background color via the special view
                     webViewController.setupStatusBarBackground(color: backgroundColor)
 
-                    applyBlankToolbarBackground(backgroundColor, to: self.navigationWebViewController)
+                    self.applyBlankToolbarBackground(backgroundColor, to: self.navigationWebViewController)
                 }
 
             }
@@ -2083,7 +2083,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
 
     /// Keep PassThroughView clear so custom y-offsets show the host app behind the gap.
-    private func applyBlankToolbarBackground(_ color: UIColor, to navigationController: UINavigationController?) {
+    private func self.applyBlankToolbarBackground(_ color: UIColor, to navigationController: UINavigationController?) {
         guard let navigationController else { return }
 
         if let passThrough = navigationController.view as? PassThroughView {
