@@ -14,6 +14,17 @@ final class BlankTargetNavigationSupportTests: XCTestCase {
         )
     }
 
+    func testAuthorizedLinkPrefersExternalAppOverBlankTargetOption() {
+        XCTAssertEqual(
+            BlankTargetNavigationSupport.resolve(
+                urlIsHttpOrHttps: true,
+                openBlankTargetInWebView: true,
+                preventDeeplink: false,
+                isAuthorizedAppLink: true
+            ),
+            .openExternalApp
+        )
+    }
     func testAuthorizedLinkLoadsInCurrentWhenDeeplinksPrevented() {
         XCTAssertEqual(
             BlankTargetNavigationSupport.resolve(

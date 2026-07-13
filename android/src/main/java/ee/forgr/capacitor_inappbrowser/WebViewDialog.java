@@ -2651,16 +2651,27 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                     // Authorized App Links with target=_blank should open the native app,
                     // not spawn a managed popup (which previously left the UI in a broken state).
-                    if (data != null && !_options.getPreventDeeplink() && isAuthorizedAppLink(data, _options.getAuthorizedAppLinks())) {
+                    if (
+                        data != null &&
+                        !_options.getPreventDeeplink() &&
+                        isHttpOrHttpsUrl(data) &&
+                        isAuthorizedAppLink(data, _options.getAuthorizedAppLinks())
+                    ) {
                         try {
                             Log.d("InAppBrowser", "Opening authorized blank-target link externally: " + data);
                             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
                             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                             view.getContext().startActivity(intent);
                             return false;
-                        } catch (ActivityNotFoundException e) {
+                        } catch (ActivityNotFoundException | SecurityException e) {
                             Log.w("InAppBrowser", "No app for authorized blank-target link, loading in current WebView", e);
-                            view.post(() -> _webView.loadUrl(data));
+                            final String fallbackUrl = data;
+                            view.post(() -> {
+                                if (isDismissing || _webView == null || _webView != view) {
+                                    return;
+                                }
+                                _webView.loadUrl(fallbackUrl);
+                            });
                             return false;
                         }
                     }

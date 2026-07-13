@@ -3224,7 +3224,7 @@ extension WKWebViewController: WKUIDelegate {
             tryOpenUniversalLink(url) { [weak webView] opened in
                 if !opened {
                     DispatchQueue.main.async {
-                        webView?.load(URLRequest(url: url))
+                        webView?.load(navigationAction.request)
                     }
                 }
             }
