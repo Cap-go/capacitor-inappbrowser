@@ -115,6 +115,42 @@ enum ProxyResponseRoutingSupport {
     }
 }
 
+
+enum StatusBarBackgroundLayoutSupport {
+    enum Placement: Equatable {
+        case skip
+        case host(pinToNavigationBar: Bool)
+    }
+
+    /// Decide where/how to pin the status-bar chrome without painting a PassThroughView gap.
+    static func placement(
+        isPassThroughOverlay: Bool,
+        blankNavigationTab: Bool,
+        navigationBarInHostHierarchy: Bool
+    ) -> Placement {
+        if isPassThroughOverlay && blankNavigationTab {
+            // Custom-frame blank overlays must stay transparent in the y-offset gap.
+            return .skip
+        }
+
+        if blankNavigationTab || !navigationBarInHostHierarchy {
+            return .host(pinToNavigationBar: false)
+        }
+
+        return .host(pinToNavigationBar: true)
+    }
+
+    static func hostView(
+        navigationControllerView: UIView,
+        framedContentView: UIView?
+    ) -> UIView? {
+        if let passThrough = navigationControllerView as? PassThroughView {
+            return framedContentView ?? passThrough.framedContentView
+        }
+        return navigationControllerView
+    }
+}
+
 enum CustomWebViewFrameSupport {
     static func resolvedFrame(
         width: CGFloat?,
@@ -1583,14 +1619,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Apply status bar background color via the special view
                     webViewController.setupStatusBarBackground(color: color)
 
-                    // Apply background color to whole view to ensure no gaps
+                    // Color the webview controller only — never paint PassThroughView or the
+                    // y-offset gap would hide the host Capacitor app.
                     webViewController.view.backgroundColor = color
-                    self.navigationWebViewController?.view.backgroundColor = color
-
-                    // Apply status bar background color
-                    if let navController = self.navigationWebViewController {
-                        navController.view.backgroundColor = color
-                    }
+                    applyBlankToolbarBackground(color, to: self.navigationWebViewController)
                 } else {
                     // Follow system appearance if no specific color
                     let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
@@ -1601,10 +1633,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Apply status bar background color via the special view
                     webViewController.setupStatusBarBackground(color: backgroundColor)
 
-                    // Set appropriate background color
-                    if let navController = self.navigationWebViewController {
-                        navController.view.backgroundColor = backgroundColor
-                    }
+                    applyBlankToolbarBackground(backgroundColor, to: self.navigationWebViewController)
                 }
 
             }
@@ -2050,6 +2079,20 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+    }
+
+
+    /// Keep PassThroughView clear so custom y-offsets show the host app behind the gap.
+    private func applyBlankToolbarBackground(_ color: UIColor, to navigationController: UINavigationController?) {
+        guard let navigationController else { return }
+
+        if let passThrough = navigationController.view as? PassThroughView {
+            passThrough.backgroundColor = .clear
+            passThrough.framedContentView?.backgroundColor = color
+            return
+        }
+
+        navigationController.view.backgroundColor = color
     }
 
     private func normalizedAuthorizedHosts(from links: [String]) -> [String] {

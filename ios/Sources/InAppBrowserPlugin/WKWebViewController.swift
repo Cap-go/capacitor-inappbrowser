@@ -1101,7 +1101,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var statusBarStyle: UIStatusBarStyle = .default
 
     // Status bar background view
-    private var statusBarBackgroundView: UIView?
+    var statusBarBackgroundView: UIView?
 
     // Status bar height
     private var statusBarHeight: CGFloat {
@@ -1151,25 +1151,60 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     // Make status bar background with colored view underneath
     open func setupStatusBarBackground(color: UIColor) {
         statusBarBackgroundView?.removeFromSuperview()
-        statusBarBackgroundView = UIView()
+        statusBarBackgroundView = nil
 
-        guard let navController = navigationController,
-              let navView = navController.view,
-              let statusBarBackgroundView else {
+        guard let navController = navigationController else {
             return
         }
-        navView.insertSubview(statusBarBackgroundView, at: 0)
-        statusBarBackgroundView.translatesAutoresizingMaskIntoConstraints = false
-        statusBarBackgroundView.backgroundColor = color
 
-        NSLayoutConstraint.activate([
-            statusBarBackgroundView.topAnchor.constraint(equalTo: navView.topAnchor),
-            statusBarBackgroundView.leadingAnchor.constraint(equalTo: navView.leadingAnchor),
-            statusBarBackgroundView.trailingAnchor.constraint(equalTo: navView.trailingAnchor),
-            statusBarBackgroundView.bottomAnchor.constraint(equalTo: navController.navigationBar.bottomAnchor, constant: 1)
-        ])
+        if let passThrough = navController.view as? PassThroughView {
+            // Never paint the full-screen overlay — that fills the custom y-offset gap.
+            passThrough.backgroundColor = .clear
+        }
 
-        applyNavigationBarBackground(color: color)
+        let navigationBar = navController.navigationBar
+        let hostCandidate = StatusBarBackgroundLayoutSupport.hostView(
+            navigationControllerView: navController.view,
+            framedContentView: (navController.view as? PassThroughView)?.framedContentView
+        )
+        let navigationBarInHost = hostCandidate.map { navigationBar.isDescendant(of: $0) } ?? false
+        let placement = StatusBarBackgroundLayoutSupport.placement(
+            isPassThroughOverlay: navController.view is PassThroughView,
+            blankNavigationTab: blankNavigationTab,
+            navigationBarInHostHierarchy: navigationBarInHost
+        )
+
+        guard case .host(let pinToNavigationBar) = placement,
+              let hostView = hostCandidate else {
+            return
+        }
+
+        let backgroundView = UIView()
+        statusBarBackgroundView = backgroundView
+        hostView.insertSubview(backgroundView, at: 0)
+        backgroundView.translatesAutoresizingMaskIntoConstraints = false
+        backgroundView.backgroundColor = color
+
+        var constraints = [
+            backgroundView.topAnchor.constraint(equalTo: hostView.topAnchor),
+            backgroundView.leadingAnchor.constraint(equalTo: hostView.leadingAnchor),
+            backgroundView.trailingAnchor.constraint(equalTo: hostView.trailingAnchor)
+        ]
+
+        if pinToNavigationBar {
+            constraints.append(
+                backgroundView.bottomAnchor.constraint(equalTo: navigationBar.bottomAnchor, constant: 1)
+            )
+            applyNavigationBarBackground(color: color)
+        } else {
+            // Blank toolbar / detached nav bar: cover status-bar height only.
+            // Avoid pinning to a hidden UINavigationBar (removed from hierarchy → crash).
+            constraints.append(
+                backgroundView.heightAnchor.constraint(equalToConstant: max(statusBarHeight, 20))
+            )
+        }
+
+        NSLayoutConstraint.activate(constraints)
     }
 
     // Override to use our custom status bar style
