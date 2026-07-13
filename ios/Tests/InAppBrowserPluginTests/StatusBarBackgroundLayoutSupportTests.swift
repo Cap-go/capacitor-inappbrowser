@@ -3,6 +3,8 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
+    private let exampleURL = URL(string: "https://example.com")!
+
     func testStatusBarBackgroundPlacementSkipsBlankPassThrough() {
         XCTAssertEqual(
             StatusBarBackgroundLayoutSupport.placement(
@@ -51,7 +53,7 @@ final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
 
     func testSetupStatusBarBackgroundDoesNotCrashForBlankHiddenNavBar() {
         let controller = WKWebViewController(
-            source: .remote(URL(string: "https://example.com")!)
+            source: .remote(exampleURL)
         )
         controller.blankNavigationTab = true
         let navigationController = UINavigationController(rootViewController: controller)
@@ -72,7 +74,7 @@ final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
 
     func testSetupStatusBarBackgroundKeepsPassThroughClearWithCustomOffset() {
         let controller = WKWebViewController(
-            source: .remote(URL(string: "https://example.com")!)
+            source: .remote(exampleURL)
         )
         let navigationController = UINavigationController(rootViewController: controller)
         navigationController.loadViewIfNeeded()
@@ -96,7 +98,7 @@ final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
 
     func testSetupStatusBarBackgroundSkipsBlankPassThroughOverlay() {
         let controller = WKWebViewController(
-            source: .remote(URL(string: "https://example.com")!)
+            source: .remote(exampleURL)
         )
         controller.blankNavigationTab = true
         let navigationController = UINavigationController(rootViewController: controller)
