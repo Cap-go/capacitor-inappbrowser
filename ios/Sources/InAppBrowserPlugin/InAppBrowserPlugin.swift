@@ -2083,7 +2083,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
 
     /// Keep PassThroughView clear so custom y-offsets show the host app behind the gap.
-    private func self.applyBlankToolbarBackground(_ color: UIColor, to navigationController: UINavigationController?) {
+    private func applyBlankToolbarBackground(_ color: UIColor, to navigationController: UINavigationController?) {
         guard let navigationController else { return }
 
         if let passThrough = navigationController.view as? PassThroughView {
