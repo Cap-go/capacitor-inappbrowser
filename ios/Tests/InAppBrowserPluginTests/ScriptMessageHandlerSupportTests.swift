@@ -3,6 +3,8 @@ import WebKit
 @testable import InappbrowserPlugin
 
 final class ScriptMessageHandlerSupportTests: XCTestCase {
+    deinit {}
+
     func testAllNamesIncludesBlobDownloadHandlers() {
         let names = Set(ScriptMessageHandlerSupport.allNames)
         XCTAssertTrue(names.contains("blobDownload"))
@@ -29,8 +31,12 @@ final class ScriptMessageHandlerSupportTests: XCTestCase {
 }
 
 private final class DummyScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    deinit {}
+
     func userContentController(
-        _ userContentController: WKUserContentController,
-        didReceive message: WKScriptMessage
-    ) {}
+        _ _: WKUserContentController,
+        didReceive _: WKScriptMessage
+    ) {
+        // Intentionally empty; this test only exercises handler registration.
+    }
 }
