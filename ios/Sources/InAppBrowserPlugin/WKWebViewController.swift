@@ -47,6 +47,35 @@ private enum BlobDownloadSupport {
     static let chunkBytes = 64 * 1024
 }
 
+/// Script message handlers registered on every in-app browser WKWebView.
+/// Popup configs from `createWebViewWith` copy parent handlers, so we must
+/// remove these names before re-adding or WKWebView raises NSInvalidArgumentException.
+enum ScriptMessageHandlerSupport {
+    static let allNames = [
+        "messageHandler",
+        "preShowScriptError",
+        "preShowScriptSuccess",
+        "close",
+        "hide",
+        "show",
+        "blobDownload",
+        "blobDownloadStart",
+        "blobDownloadChunk",
+        "blobDownloadFinish",
+        "blobDownloadAbort",
+        "takeScreenshot",
+        "consoleMessageHandler",
+        "magicPrint",
+        "capgoProxyBridge"
+    ]
+
+    static func removeAll(from userContentController: WKUserContentController) {
+        for name in allNames {
+            userContentController.removeScriptMessageHandler(forName: name)
+        }
+    }
+}
+
 private struct BlobDownloadSession {
     let destinationURL: URL
     let sourceURL: String?
@@ -2008,16 +2037,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
         let userContentController = webConfiguration.userContentController
         userContentController.removeAllUserScripts()
-        userContentController.removeScriptMessageHandler(forName: "messageHandler")
-        userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-        userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-        userContentController.removeScriptMessageHandler(forName: "close")
-        userContentController.removeScriptMessageHandler(forName: "hide")
-        userContentController.removeScriptMessageHandler(forName: "show")
-        userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
-        userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
-        userContentController.removeScriptMessageHandler(forName: "magicPrint")
-        userContentController.removeScriptMessageHandler(forName: "capgoProxyBridge")
+        ScriptMessageHandlerSupport.removeAll(from: userContentController)
 
         if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
             WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
@@ -2264,7 +2284,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
         self.blockedHosts = parent.blockedHosts
         self.authorizedAppLinks = parent.authorizedAppLinks
-        self.activeNativeNavigationForWebview = parent.activeNativeNavigationForWebview
+        // createWebViewWith configs copy parent script handlers; start clean so
+        // initWebview can register blobDownload/etc without NSInvalidArgumentException.
+        configuration.userContentController = WKUserContentController()
         self.initialWebConfiguration = configuration
         self.persistWebViewData = parent.persistWebViewData
         self.disableOverscroll = parent.disableOverscroll
@@ -2548,20 +2570,7 @@ public extension WKWebViewController {
         webView.loadHTMLString("", baseURL: nil)
 
         webView.configuration.userContentController.removeAllUserScripts()
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "messageHandler")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "close")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "hide")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "show")
-        if allowScreenshotsFromWebPage {
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "takeScreenshot")
-        }
-        if captureConsoleLogs {
-            webView.configuration.userContentController.removeScriptMessageHandler(forName: "consoleMessageHandler")
-        }
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptSuccess")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "preShowScriptError")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "magicPrint")
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: "capgoProxyBridge")
+        ScriptMessageHandlerSupport.removeAll(from: webView.configuration.userContentController)
 
         webView.removeFromSuperview()
         // Also clean progress bar view if present
