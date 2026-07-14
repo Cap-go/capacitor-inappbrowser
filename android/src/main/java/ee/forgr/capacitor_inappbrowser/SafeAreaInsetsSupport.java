@@ -54,6 +54,19 @@ final class SafeAreaInsetsSupport {
         );
     }
 
+    /**
+     * Absolute IME insets from the window decor must only be applied as layout margins when the
+     * dialog is edge-to-edge. Pre-Android 15 windows still fit system windows and are resized for
+     * the soft keyboard; applying decor IME height again leaves a black gap above the keyboard.
+     */
+    static int resolveImeBottomInset(boolean keyboardVisible, int imeBottom, boolean applyImeAsLayoutMargin) {
+        if (!keyboardVisible || !applyImeAsLayoutMargin || imeBottom <= 0) {
+            return 0;
+        }
+
+        return imeBottom;
+    }
+
     static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
         int bottomInset = enabledSafeBottomMargin ? safeBottomInset : 0;
         return Math.max(bottomInset, imeBottom);

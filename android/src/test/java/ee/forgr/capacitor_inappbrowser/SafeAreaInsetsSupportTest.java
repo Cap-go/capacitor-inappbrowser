@@ -53,6 +53,14 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void imeBottomInsetOnlyAppliedForEdgeToEdgeWindows() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveImeBottomInset(true, 280, false));
+        assertEquals(280, SafeAreaInsetsSupport.resolveImeBottomInset(true, 280, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveImeBottomInset(false, 280, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveImeBottomInset(true, 0, true));
+    }
+
+    @Test
     public void topMarginRequiresSafeTopAndExplicitTopInsetWithoutAppBarHandling() {
         assertEquals(48, SafeAreaInsetsSupport.resolveTopMargin(true, true, 48, false));
         assertEquals(0, SafeAreaInsetsSupport.resolveTopMargin(false, true, 48, false));

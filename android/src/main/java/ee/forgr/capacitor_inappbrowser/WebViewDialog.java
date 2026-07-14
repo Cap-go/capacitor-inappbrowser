@@ -3056,7 +3056,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 toolbarView != null &&
                 toolbarView.getVisibility() == View.VISIBLE &&
                 toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
-            applySafeAreaMargins(bars, navigationBars, systemGestures, mandatoryGestures, ime, keyboardVisible, appBarHandlesTopInset);
+            applySafeAreaMargins(
+                bars,
+                navigationBars,
+                systemGestures,
+                mandatoryGestures,
+                ime,
+                keyboardVisible,
+                appBarHandlesTopInset,
+                isAndroid15Plus
+            );
 
             return windowInsets;
         });
@@ -3139,7 +3148,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Insets mandatoryGestures,
         Insets ime,
         boolean keyboardVisible,
-        boolean appBarHandlesTopInset
+        boolean appBarHandlesTopInset,
+        boolean applyImeAsLayoutMargin
     ) {
         if (_webView == null || _options == null) {
             return;
@@ -3163,7 +3173,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             fallbackBottomInset,
             _options.getEnabledSafeMargin()
         );
-        int imeBottom = keyboardVisible ? ime.bottom : 0;
+        // Android 15+ uses edge-to-edge (decorFitsSystemWindows=false) and needs IME as margin.
+        // Older dialogs still resize for the keyboard; re-applying decor IME creates a black gap (#622).
+        int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, applyImeAsLayoutMargin);
         boolean applyTopFallback = _options.getEnabledSafeTopMargin() && _options.getUseTopInset();
         int fallbackTopInset = applyTopFallback ? getSystemStatusBarHeight() : 0;
         int navTop = SafeAreaInsetsSupport.resolveTopMarginWithFallback(
