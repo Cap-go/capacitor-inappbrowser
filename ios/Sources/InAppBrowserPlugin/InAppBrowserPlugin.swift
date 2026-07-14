@@ -2,6 +2,7 @@ import Foundation
 import Capacitor
 import WebKit
 import AuthenticationServices
+import SafariServices
 
 enum ActiveWebViewSupport {
     static func shouldActivateNewWebView(isHidden: Bool, hasActiveWebView: Bool) -> Bool {
@@ -255,6 +256,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var closeModalDescription: String?
     private var closeModalOk: String?
     private var closeModalCancel: String?
+    private var safariViewController: SFSafariViewController?
+    private var safariOpenedUrl: String?
     private var openSecureWindowCall: CAPPluginCall?
 
     private func setup() {
@@ -2183,12 +2186,6 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.setup()
         }
 
-        let isInspectable = call.getBool("isInspectable", false)
-        let preventDeeplink = call.getBool("preventDeeplink", false)
-        self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
-
-        self.currentPluginCall = call
-
         guard let urlString = call.getString("url") else {
             call.reject("Must provide a URL to open")
             return
@@ -2199,70 +2196,37 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let headers = call.getObject("headers", [:]).mapValues { String(describing: $0 as Any) }
-        let credentials = self.readCredentials(call)
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme) else {
+            call.reject("Must provide a valid http(s) URL to open")
+            return
+        }
 
         DispatchQueue.main.async {
-            guard let webSource = self.webSource(for: urlString) else {
-                call.reject("Invalid URL format")
+            if self.safariViewController != nil {
+                call.reject("Browser is already open")
                 return
             }
 
-            let initialUrl = webSource.remoteURL ?? URL(string: "about:blank")!
+            let safariVC = SFSafariViewController(url: url)
+            safariVC.delegate = self
+            safariVC.modalPresentationStyle = .fullScreen
 
-            self.webViewController = WKWebViewController.init(url: initialUrl, headers: headers, isInspectable: isInspectable, credentials: credentials, preventDeeplink: preventDeeplink, blankNavigationTab: true, enabledSafeBottomMargin: false, enabledSafeTopMargin: true)
+            self.safariViewController = safariVC
+            self.safariOpenedUrl = url.absoluteString
 
-            guard let webViewController = self.webViewController else {
-                call.reject("Failed to initialize WebViewController")
+            let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
+            guard let presenter else {
+                self.safariViewController = nil
+                self.safariOpenedUrl = nil
+                call.reject("Unable to present Safari View Controller")
                 return
             }
 
-            if self.bridge?.statusBarVisible == true {
-                let subviews = self.bridge?.webView?.superview?.subviews
-                if let emptyStatusBarIndex = subviews?.firstIndex(where: { $0.subviews.isEmpty }) {
-                    if let emptyStatusBar = subviews?[emptyStatusBarIndex] {
-                        webViewController.capacitorStatusBar = emptyStatusBar
-                        emptyStatusBar.removeFromSuperview()
-                    }
-                }
+            presenter.present(safariVC, animated: true) {
+                call.resolve()
             }
-
-            webViewController.source = webSource
-            webViewController.leftNavigationBarItemTypes = [.back, .forward, .reload]
-            webViewController.capBrowserPlugin = self
-            webViewController.hasDynamicTitle = true
-
-            self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
-            self.navigationWebViewController?.navigationBar.isTranslucent = false
-
-            // Ensure no lines or borders appear by default
-            self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
-            self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
-            self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
-
-            // Use system appearance
-            let isDarkMode = UITraitCollection.current.userInterfaceStyle == .dark
-            let backgroundColor = isDarkMode ? UIColor.black : UIColor.white
-            let textColor = isDarkMode ? UIColor.white : UIColor.black
-
-            // Apply colors
-            webViewController.setupStatusBarBackground(color: backgroundColor)
-            webViewController.tintColor = textColor
-            self.navigationWebViewController?.navigationBar.tintColor = textColor
-            self.navigationWebViewController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: textColor]
-            webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
-            webViewController.updateStatusBarStyle()
-
-            // Always hide toolbar to ensure no bottom bar
-            self.navigationWebViewController?.setToolbarHidden(true, animated: false)
-
-            self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
-            self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
-
-            if !self.isPresentAfterPageLoad {
-                self.presentView()
-            }
-            call.resolve()
         }
     }
 
@@ -2359,6 +2323,17 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let isAnimated = call.getBool("isAnimated", true)
 
         DispatchQueue.main.async {
+            if let safariViewController = self.safariViewController {
+                let url = self.safariOpenedUrl ?? ""
+                self.safariViewController = nil
+                self.safariOpenedUrl = nil
+                safariViewController.dismiss(animated: isAnimated) {
+                    self.notifyListeners("closeEvent", data: ["url": url])
+                    call.resolve()
+                }
+                return
+            }
+
             let targetId = call.getString("id") ?? self.activeWebViewId
             if let targetId,
                let webViewController = self.webViewControllers[targetId],
@@ -2401,6 +2376,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         }
     }
+
 
     private func showPrivacyScreen() {
         if privacyScreen == nil {
@@ -2581,5 +2557,21 @@ public typealias InAppBrowserPlugin = CapgoInAppBrowserPlugin
 extension CapgoInAppBrowserPlugin: ASWebAuthenticationPresentationContextProviding {
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         return self.bridge?.viewController?.view.window ?? ASPresentationAnchor()
+    }
+}
+
+extension CapgoInAppBrowserPlugin: SFSafariViewControllerDelegate {
+    public func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+        guard safariViewController != nil else {
+            return
+        }
+        let url = safariOpenedUrl ?? ""
+        safariViewController = nil
+        safariOpenedUrl = nil
+        notifyListeners("closeEvent", data: ["url": url])
+    }
+
+    public func safariViewController(_ controller: SFSafariViewController, didCompleteInitialLoad didLoadSuccessfully: Bool) {
+        notifyListeners("browserPageLoaded", data: [:])
     }
 }
