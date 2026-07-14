@@ -3349,6 +3349,19 @@ extension WKWebViewController: WKUIDelegate {
         // This allows websites to access location when opened with openWebView
         decisionHandler(.grant)
     }
+
+    @available(iOS 15.0, *)
+    public func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        print("[InAppBrowser] Media capture permission requested for origin: \(origin.host)")
+
+        // Grant media capture permission automatically, matching Capacitor core's
+        // WebViewDelegationHandler. The OS-level camera/microphone permission
+        // (Info.plist usage description + system prompt) still applies — this only
+        // suppresses WebKit's extra per-origin prompt, which is not persisted
+        // across app launches (WebKit bug 220416) and would otherwise re-prompt
+        // users on every cold start.
+        decisionHandler(.grant)
+    }
 }
 
 // MARK: - Host Blocking Utilities
