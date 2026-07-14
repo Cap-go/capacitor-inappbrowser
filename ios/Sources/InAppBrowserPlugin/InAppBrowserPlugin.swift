@@ -2216,15 +2216,20 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.safariViewController = safariVC
             self.safariOpenedUrl = url.absoluteString
 
-            let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
-            guard let presenter else {
+            guard let rootPresenter = self.bridge?.viewController else {
                 self.safariViewController = nil
                 self.safariOpenedUrl = nil
                 call.reject("Unable to present Safari View Controller")
                 return
             }
-
-            presenter.present(safariVC, animated: true) {
+            let top = BlankTargetNavigationSupport.topPresenter(from: rootPresenter)
+            guard top.presentedViewController == nil else {
+                self.safariViewController = nil
+                self.safariOpenedUrl = nil
+                call.reject("Unable to present Safari View Controller: another view is already presented")
+                return
+            }
+            top.present(safariVC, animated: true) {
                 call.resolve()
             }
         }
@@ -2323,7 +2328,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let isAnimated = call.getBool("isAnimated", true)
 
         DispatchQueue.main.async {
-            if let safariViewController = self.safariViewController {
+            if call.getString("id") == nil, let safariViewController = self.safariViewController {
                 let url = self.safariOpenedUrl ?? ""
                 self.safariViewController = nil
                 self.safariOpenedUrl = nil
@@ -2572,6 +2577,10 @@ extension CapgoInAppBrowserPlugin: SFSafariViewControllerDelegate {
     }
 
     public func safariViewController(_ controller: SFSafariViewController, didCompleteInitialLoad didLoadSuccessfully: Bool) {
-        notifyListeners("browserPageLoaded", data: [:])
+        if didLoadSuccessfully {
+            notifyListeners("browserPageLoaded", data: [:])
+        } else {
+            notifyListeners("pageLoadError", data: [:])
+        }
     }
 }
