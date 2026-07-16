@@ -1206,7 +1206,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let placement = StatusBarBackgroundLayoutSupport.placement(
             isPassThroughOverlay: navController.view is PassThroughView,
             blankNavigationTab: blankNavigationTab,
-            navigationBarInHostHierarchy: navigationBarInHost
+            navigationBarInHostHierarchy: navigationBarInHost,
+            isFramedCustomOverlay: shouldPresentAsFramedOverlay
         )
 
         guard case .host(let pinToNavigationBar) = placement,
@@ -3695,33 +3696,47 @@ extension WKWebViewController: WKNavigationDelegate {
 
     // MARK: - Dimension Management
 
-    /// Apply custom dimensions to the view if specified
     func applyCustomDimensions() {
         guard let navigationController = navigationController else {
             return
         }
 
-        let fallbackSize = navigationController.view.superview?.bounds.size ?? UIScreen.main.bounds.size
-        guard let targetFrame = CustomWebViewFrameSupport.resolvedFrame(
+        let hostView = navigationController.view.superview
+        let screenSize = CustomWebViewFrameSupport.screenSize(for: hostView ?? navigationController.view)
+        guard let screenFrame = CustomWebViewFrameSupport.resolvedFrame(
             width: customWidth,
             height: customHeight,
             x: customX,
             y: customY,
-            fallbackSize: fallbackSize
+            fallbackSize: screenSize
         ) else {
             return
         }
 
         if let passThroughView = navigationController.view as? PassThroughView {
-            passThroughView.targetFrame = targetFrame
+            // PassThroughView is full-screen; content stays in screen-space coordinates.
+            passThroughView.targetFrame = screenFrame
             let contentView = passThroughView.framedContentView ?? passThroughView.subviews.first
-            contentView?.frame = targetFrame
+            contentView?.frame = screenFrame
             contentView?.setNeedsLayout()
             contentView?.layoutIfNeeded()
             passThroughView.setNeedsLayout()
             passThroughView.layoutIfNeeded()
+        } else if let hostView {
+            let frameInHost = CustomWebViewFrameSupport.frameInHost(
+                width: customWidth,
+                height: customHeight,
+                x: customX,
+                y: customY,
+                screenSize: screenSize,
+                hostOriginInScreen: CustomWebViewFrameSupport.hostOriginInScreen(for: hostView)
+            ) ?? screenFrame
+            navigationController.view.frame = frameInHost
+            navigationController.view.clipsToBounds = true
+            navigationController.view.setNeedsLayout()
+            navigationController.view.layoutIfNeeded()
         } else {
-            navigationController.view.frame = targetFrame
+            navigationController.view.frame = screenFrame
             navigationController.view.setNeedsLayout()
             navigationController.view.layoutIfNeeded()
         }

@@ -154,14 +154,16 @@ enum StatusBarBackgroundLayoutSupport {
         case host(pinToNavigationBar: Bool)
     }
 
-    /// Decide where/how to pin the status-bar chrome without painting a PassThroughView gap.
+    /// Decide where/how to pin the status-bar chrome without painting a custom-frame gap.
     static func placement(
         isPassThroughOverlay: Bool,
         blankNavigationTab: Bool,
-        navigationBarInHostHierarchy: Bool
+        navigationBarInHostHierarchy: Bool,
+        isFramedCustomOverlay: Bool = false
     ) -> Placement {
-        if isPassThroughOverlay && blankNavigationTab {
-            // Custom-frame blank overlays must stay transparent in the y-offset gap.
+        // Pre-#629 custom frames used PassThroughView; #629 switched front frames to child
+        // overlays. Both must skip blank status-bar chrome so y/height stay screen-accurate.
+        if (isPassThroughOverlay || isFramedCustomOverlay) && blankNavigationTab {
             return .skip
         }
 
@@ -184,6 +186,7 @@ enum StatusBarBackgroundLayoutSupport {
 }
 
 enum CustomWebViewFrameSupport {
+    /// Resolve openWebView width/height/x/y in screen/window points (Android window attrs).
     static func resolvedFrame(
         width: CGFloat?,
         height: CGFloat?,
@@ -200,6 +203,48 @@ enum CustomWebViewFrameSupport {
             y: positionY ?? 0,
             width: width ?? fallbackSize.width,
             height: height
+        )
+    }
+
+    static func screenSize(for view: UIView?) -> CGSize {
+        if let window = view?.window {
+            return window.bounds.size
+        }
+        return UIScreen.main.bounds.size
+    }
+
+    static func hostOriginInScreen(for host: UIView) -> CGPoint {
+        if let window = host.window {
+            return host.convert(.zero, to: window)
+        }
+        // Outside a window (unit tests / early layout): treat frame.origin as screen-space.
+        return host.frame.origin
+    }
+
+    /// Convert a screen-space custom frame into the host view's coordinate space.
+    static func frameInHost(
+        width: CGFloat?,
+        height: CGFloat?,
+        x positionX: CGFloat?,
+        y positionY: CGFloat?,
+        screenSize: CGSize,
+        hostOriginInScreen: CGPoint
+    ) -> CGRect? {
+        guard let screenFrame = resolvedFrame(
+            width: width,
+            height: height,
+            x: positionX,
+            y: positionY,
+            fallbackSize: screenSize
+        ) else {
+            return nil
+        }
+
+        return CGRect(
+            x: screenFrame.origin.x - hostOriginInScreen.x,
+            y: screenFrame.origin.y - hostOriginInScreen.y,
+            width: screenFrame.width,
+            height: screenFrame.height
         )
     }
 }
@@ -2575,14 +2620,16 @@ extension CapgoInAppBrowserPlugin: SFSafariViewControllerDelegate {
 
 
 extension CapgoInAppBrowserPlugin {
-    private func targetFrame(for webViewController: WKWebViewController, in hostWebView: UIView) -> CGRect {
-        return CustomWebViewFrameSupport.resolvedFrame(
+    private func targetFrame(for webViewController: WKWebViewController, in hostView: UIView) -> CGRect {
+        // Keep pre-#629 screen-space semantics, then convert into the host's coordinates.
+        return CustomWebViewFrameSupport.frameInHost(
             width: webViewController.customWidth,
             height: webViewController.customHeight,
             x: webViewController.customX,
             y: webViewController.customY,
-            fallbackSize: hostWebView.bounds.size
-        ) ?? hostWebView.bounds
+            screenSize: CustomWebViewFrameSupport.screenSize(for: hostView),
+            hostOriginInScreen: CustomWebViewFrameSupport.hostOriginInScreen(for: hostView)
+        ) ?? hostView.bounds
     }
 
     @discardableResult
@@ -2661,6 +2708,7 @@ extension CapgoInAppBrowserPlugin {
 
         navigationController.view.frame = frame
         navigationController.view.autoresizingMask = []
+        navigationController.view.clipsToBounds = true
         navigationController.view.isUserInteractionEnabled = true
         parent.view.bringSubviewToFront(navigationController.view)
         navigationController.view.setNeedsLayout()

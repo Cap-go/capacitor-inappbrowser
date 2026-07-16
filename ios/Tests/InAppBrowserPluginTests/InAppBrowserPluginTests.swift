@@ -53,6 +53,73 @@ final class InAppBrowserPluginTests: XCTestCase {
         )
     }
 
+    func testCustomWebViewFrameInHostPreservesScreenSpaceSize() {
+        let frame = CustomWebViewFrameSupport.frameInHost(
+            width: 320,
+            height: 480,
+            x: 12,
+            y: 100,
+            screenSize: CGSize(width: 390, height: 844),
+            hostOriginInScreen: CGPoint(x: 0, y: 47)
+        )
+
+        XCTAssertEqual(frame, CGRect(x: 12, y: 53, width: 320, height: 480))
+    }
+
+    func testCustomWebViewFrameInHostIdentityWhenHostFillsScreen() {
+        let frame = CustomWebViewFrameSupport.frameInHost(
+            width: nil,
+            height: 600,
+            x: 0,
+            y: 80,
+            screenSize: CGSize(width: 390, height: 844),
+            hostOriginInScreen: .zero
+        )
+
+        XCTAssertEqual(frame, CGRect(x: 0, y: 80, width: 390, height: 600))
+    }
+
+    func testApplyCustomDimensionsKeepsExactSizeOnOffsetHost() {
+        let controller = WKWebViewController()
+        controller.customWidth = 320
+        controller.customHeight = 480
+        controller.customX = 12
+        controller.customY = 100
+
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+
+        let host = UIView(frame: CGRect(x: 0, y: 47, width: 390, height: 797))
+        host.addSubview(navigationController.view)
+
+        controller.applyCustomDimensions()
+
+        XCTAssertEqual(navigationController.view.frame, CGRect(x: 12, y: 53, width: 320, height: 480))
+        XCTAssertEqual(navigationController.view.bounds.size, CGSize(width: 320, height: 480))
+        XCTAssertTrue(navigationController.view.clipsToBounds)
+    }
+
+    func testApplyCustomDimensionsUsesScreenFallbackWidthNotHostWidth() {
+        let controller = WKWebViewController()
+        controller.customHeight = 500
+        controller.customY = 64
+
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+
+        // Narrower-than-screen host must not shrink height-only custom width.
+        let host = UIView(frame: CGRect(x: 0, y: 0, width: 300, height: 700))
+        host.addSubview(navigationController.view)
+
+        controller.applyCustomDimensions()
+
+        XCTAssertEqual(navigationController.view.frame.width, UIScreen.main.bounds.width)
+        XCTAssertEqual(navigationController.view.frame.height, 500)
+        XCTAssertEqual(navigationController.view.frame.origin, CGPoint(x: 0, y: 64))
+    }
+
     func testPassThroughViewKeepsContentOnTargetFrameAfterLayout() {
         let targetFrame = CGRect(x: 12, y: 24, width: 320, height: 480)
         let container = PassThroughView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))

@@ -1293,7 +1293,7 @@ export interface OpenWebViewOptions {
   blockedHosts?: string[];
 
   /**
-   * Width of the webview in pixels.
+   * Width of the webview in screen/window points.
    * If not set, webview will be fullscreen width.
    * @default undefined (fullscreen)
    * @example
@@ -1302,8 +1302,8 @@ export interface OpenWebViewOptions {
   width?: number;
 
   /**
-   * Height of the webview in pixels.
-   * If not set, webview will be fullscreen height.
+   * Height of the webview in screen/window points.
+   * Required for custom-sized (non-fullscreen) webviews.
    * @default undefined (fullscreen)
    * @example
    * height: 600
@@ -1311,8 +1311,8 @@ export interface OpenWebViewOptions {
   height?: number;
 
   /**
-   * X position of the webview in pixels from the left edge.
-   * Only effective when width is set.
+   * X position of the webview in screen/window points from the left edge.
+   * Only effective when custom height is set.
    * @default 0
    * @example
    * x: 50
@@ -1320,8 +1320,8 @@ export interface OpenWebViewOptions {
   x?: number;
 
   /**
-   * Y position of the webview in pixels from the top edge.
-   * Only effective when height is set.
+   * Y position of the webview in screen/window points from the top edge.
+   * Only effective when custom height is set.
    * @default 0
    * @example
    * y: 100

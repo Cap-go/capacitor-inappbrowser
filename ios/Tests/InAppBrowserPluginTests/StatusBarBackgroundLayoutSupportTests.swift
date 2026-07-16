@@ -16,6 +16,18 @@ final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
         )
     }
 
+    func testStatusBarBackgroundPlacementSkipsBlankFramedOverlay() {
+        XCTAssertEqual(
+            StatusBarBackgroundLayoutSupport.placement(
+                isPassThroughOverlay: false,
+                blankNavigationTab: true,
+                navigationBarInHostHierarchy: true,
+                isFramedCustomOverlay: true
+            ),
+            .skip
+        )
+    }
+
     func testStatusBarBackgroundPlacementPinsCompactPassThroughToNavBar() {
         XCTAssertEqual(
             StatusBarBackgroundLayoutSupport.placement(
@@ -116,5 +128,24 @@ final class StatusBarBackgroundLayoutSupportTests: XCTestCase {
 
         XCTAssertNil(controller.statusBarBackgroundView)
         XCTAssertEqual(passThrough.backgroundColor, UIColor.clear)
+    }
+
+    func testSetupStatusBarBackgroundSkipsBlankFramedCustomOverlay() {
+        let controller = WKWebViewController(
+            source: .remote(exampleURL)
+        )
+        controller.blankNavigationTab = true
+        controller.customHeight = 600
+        controller.customY = 100
+        XCTAssertTrue(controller.shouldPresentAsFramedOverlay)
+
+        let navigationController = UINavigationController(rootViewController: controller)
+        navigationController.setNavigationBarHidden(true, animated: false)
+        navigationController.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+
+        controller.setupStatusBarBackground(color: .white)
+
+        XCTAssertNil(controller.statusBarBackgroundView)
     }
 }
