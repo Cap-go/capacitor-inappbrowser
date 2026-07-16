@@ -2,11 +2,11 @@ import UIKit
 import WebKit
 
 extension WKWebViewController {
-    func configureReloadGesture(for webView: WKWebView) {
-        if let existing = webView.scrollView.refreshControl {
+    func configureReloadGesture(for targetWebView: WKWebView) {
+        if let existing = targetWebView.scrollView.refreshControl {
             existing.endRefreshing()
             existing.removeTarget(nil, action: nil, for: .allEvents)
-            webView.scrollView.refreshControl = nil
+            targetWebView.scrollView.refreshControl = nil
         }
 
         guard enableReloadGesture, !disableOverscroll else {
@@ -14,19 +14,22 @@ extension WKWebViewController {
             return
         }
 
-        webView.scrollView.alwaysBounceVertical = true
+        targetWebView.scrollView.alwaysBounceVertical = true
         let refreshControl = UIRefreshControl()
         refreshControl.addTarget(self, action: #selector(handleReloadGesture(_:)), for: .valueChanged)
-        webView.scrollView.refreshControl = refreshControl
+        targetWebView.scrollView.refreshControl = refreshControl
 
         if !reloadPanObserverInstalled {
-            webView.scrollView.panGestureRecognizer.addTarget(self, action: #selector(handleReloadPanGesture(_:)))
+            targetWebView.scrollView.panGestureRecognizer.addTarget(
+                self,
+                action: #selector(handleReloadPanGesture(_:))
+            )
             reloadPanObserverInstalled = true
         }
     }
 
-    @objc private func handleReloadGesture(_ sender: UIRefreshControl) {
-        guard let scrollView = webView?.scrollView else {
+    @objc func handleReloadGesture(_ sender: UIRefreshControl) {
+        guard let scrollView = self.capableWebView?.scrollView else {
             performReloadFromGesture()
             return
         }
@@ -43,12 +46,12 @@ extension WKWebViewController {
         performReloadFromGesture()
     }
 
-    @objc private func handleReloadPanGesture(_ gesture: UIPanGestureRecognizer) {
+    @objc func handleReloadPanGesture(_ gesture: UIPanGestureRecognizer) {
         guard enableReloadGesture else { return }
         guard gesture.state == .ended || gesture.state == .cancelled || gesture.state == .failed else {
             return
         }
-        guard let scrollView = webView?.scrollView else { return }
+        guard let scrollView = self.capableWebView?.scrollView else { return }
 
         let shouldReload = ReloadGestureSupport.shouldReloadOnTouchEnd(
             pendingReload: pendingReloadFromGesture,
@@ -91,19 +94,18 @@ extension WKWebViewController {
 
     func stopReloadGesture() {
         pendingReloadFromGesture = false
-        guard let webView = webView else { return }
-        let scrollView = webView.scrollView
+        guard let activeWebView = self.capableWebView else { return }
+        let scrollView = activeWebView.scrollView
         scrollView.refreshControl?.endRefreshing()
 
         // UIRefreshControl + WKWebView.reload() often leave a top gap and block the next pull
         // until a full document navigation recreates scroll state.
         DispatchQueue.main.async { [weak self] in
-            guard let self, let webView = self.webView else { return }
-            let scrollView = webView.scrollView
+            guard let self, let activeWebView = self.capableWebView else { return }
+            let scrollView = activeWebView.scrollView
             scrollView.refreshControl?.endRefreshing()
             self.resetReloadGestureScrollState(on: scrollView)
-            self.configureReloadGesture(for: webView)
+            self.configureReloadGesture(for: activeWebView)
         }
     }
-
 }
