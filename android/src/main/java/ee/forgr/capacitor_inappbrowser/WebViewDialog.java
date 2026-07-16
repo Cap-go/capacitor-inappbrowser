@@ -330,6 +330,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private SwipeRefreshLayout swipeRefreshLayout;
+    private boolean reloadFromGestureInProgress = false;
     private WebView _webView;
     private Toolbar _toolbar;
     private Options _options = null;
@@ -2177,7 +2178,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (this.swipeRefreshLayout != null) {
             boolean enableReloadGesture = _options != null && _options.getEnableReloadGesture();
             this.swipeRefreshLayout.setEnabled(enableReloadGesture);
-            this.swipeRefreshLayout.setOnRefreshListener(() -> reload());
+            this.swipeRefreshLayout.setOnRefreshListener(() -> {
+                reloadFromGestureInProgress = true;
+                reload();
+            });
             this.swipeRefreshLayout.setOnChildScrollUpCallback((parent, child) -> _webView != null && _webView.canScrollVertically(-1));
         }
 
@@ -3844,27 +3848,34 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void stopReloadGesture() {
-        if (swipeRefreshLayout != null && ReloadGestureSupport.shouldClearRefreshing(swipeRefreshLayout.isRefreshing())) {
+        boolean shouldResetScroll = reloadFromGestureInProgress;
+        reloadFromGestureInProgress = false;
+
+        if (swipeRefreshLayout != null && swipeRefreshLayout.isRefreshing()) {
             swipeRefreshLayout.setRefreshing(false);
+        }
+
+        // Only reset scroll after a gesture reload. Ordinary page loads / intercepted navigations
+        // also call stopReloadGesture and must not jump the WebView to the top.
+        if (!shouldResetScroll || _webView == null) {
+            return;
         }
 
         // Sticky scrollY after reload makes canScrollVertically(-1) true, which blocks the next pull
         // via setOnChildScrollUpCallback until a full document navigation resets scroll state.
-        if (_webView != null) {
-            final WebView webView = _webView;
-            webView.post(() -> {
-                if (_webView != webView) {
-                    return;
-                }
-                int targetY = ReloadGestureSupport.webViewScrollYAfterGestureReload(webView.getScrollY());
-                if (webView.getScrollY() != targetY) {
-                    webView.scrollTo(0, targetY);
-                }
-                if (swipeRefreshLayout != null) {
-                    swipeRefreshLayout.setRefreshing(false);
-                }
-            });
-        }
+        final WebView webView = _webView;
+        webView.post(() -> {
+            if (_webView != webView) {
+                return;
+            }
+            int targetY = ReloadGestureSupport.webViewScrollYAfterGestureReload(webView.getScrollY());
+            if (webView.getScrollY() != targetY) {
+                webView.scrollTo(webView.getScrollX(), targetY);
+            }
+            if (swipeRefreshLayout != null) {
+                swipeRefreshLayout.setRefreshing(false);
+            }
+        });
     }
 
     public void destroy() {

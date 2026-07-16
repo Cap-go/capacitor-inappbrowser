@@ -473,6 +473,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var activeNativeNavigationForWebview: Bool = true
     var enableReloadGesture: Bool = false
     var pendingReloadFromGesture = false
+    var reloadFromGestureInProgress = false
     var reloadPanObserverInstalled = false
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
@@ -2574,6 +2575,7 @@ public extension WKWebViewController {
             reloadPanObserverInstalled = false
         }
         pendingReloadFromGesture = false
+        reloadFromGestureInProgress = false
 
         // Remove KVO observers FIRST, before any operation that could trigger them
         webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)

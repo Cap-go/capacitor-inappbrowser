@@ -9,12 +9,8 @@ final class ReloadGestureSupport {
 
     private ReloadGestureSupport() {}
 
-    /** Pin to top after a gesture reload so the next pull can start. */
+    /** Pin vertical scroll to top after a gesture reload so the next pull can start. */
     static int webViewScrollYAfterGestureReload(int currentScrollY) {
         return 0;
-    }
-
-    static boolean shouldClearRefreshing(boolean isRefreshing) {
-        return isRefreshing;
     }
 }

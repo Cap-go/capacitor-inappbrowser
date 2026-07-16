@@ -250,20 +250,40 @@ enum CustomWebViewFrameSupport {
 }
 
 enum ReloadGestureSupport {
+    /// Approximate UIRefreshControl activation distance in points.
+    static let defaultPullThreshold: CGFloat = 60
+
     /// UIRefreshControl may fire valueChanged while the finger is still down.
     /// Match browser UX: commit reload only after touch end.
     static func shouldDeferReloadUntilTouchEnd(isTracking: Bool, isDragging: Bool) -> Bool {
         isTracking || isDragging
     }
 
-    /// After touch end, reload only if the pull stayed past the refresh threshold.
-    static func shouldReloadOnTouchEnd(pendingReload: Bool, isRefreshing: Bool) -> Bool {
-        pendingReload && isRefreshing
+    /// Pull distance below the resting top (adjusted inset). Positive when overscrolling down.
+    static func pullDistance(contentOffsetY: CGFloat, adjustedContentInsetTop: CGFloat) -> CGFloat {
+        max(0, -(contentOffsetY + adjustedContentInsetTop))
     }
 
-    /// WKWebView.reload() + UIRefreshControl often leave a negative offset (gap above content).
-    static func contentOffsetYAfterReloadReset(currentY: CGFloat) -> CGFloat {
-        currentY < 0 ? 0 : currentY
+    static func isPullPastRefreshThreshold(
+        contentOffsetY: CGFloat,
+        adjustedContentInsetTop: CGFloat,
+        threshold: CGFloat = defaultPullThreshold
+    ) -> Bool {
+        pullDistance(contentOffsetY: contentOffsetY, adjustedContentInsetTop: adjustedContentInsetTop) >= threshold
+    }
+
+    /// After intentional touch end, reload only if pull is still past the threshold.
+    static func shouldReloadOnTouchEnd(pendingReload: Bool, isPullPastThreshold: Bool) -> Bool {
+        pendingReload && isPullPastThreshold
+    }
+
+    /// Resting offset for the current adjusted top inset (safe-area aware).
+    static func contentOffsetYAfterReloadReset(
+        currentY: CGFloat,
+        adjustedContentInsetTop: CGFloat
+    ) -> CGFloat {
+        let restingY = -adjustedContentInsetTop
+        return currentY < restingY ? restingY : currentY
     }
 }
 
