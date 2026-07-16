@@ -1619,8 +1619,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
             call.resolve(["id": webViewId])
-            // Prevent deferred presentView (isPresentAfterPageLoad) from touching a completed call.
-            self.currentPluginCall = nil
+            // Only clear if this call still owns the slot (overlapping openWebView races).
+            if self.currentPluginCall === call {
+                self.currentPluginCall = nil
+            }
         }
     }
 
