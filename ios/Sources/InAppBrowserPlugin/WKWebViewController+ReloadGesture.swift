@@ -28,7 +28,7 @@ extension WKWebViewController {
         }
     }
 
-    @objc func handleReloadGesture(_ sender: UIRefreshControl) {
+    @objc func handleReloadGesture(_: UIRefreshControl) {
         guard let scrollView = self.capableWebView?.scrollView else {
             performReloadFromGesture()
             return
@@ -64,7 +64,8 @@ extension WKWebViewController {
 
             if shouldReload {
                 performReloadFromGesture()
-            } else if scrollView.refreshControl?.isRefreshing == true {
+            } else if !reloadFromGestureInProgress,
+                      scrollView.refreshControl?.isRefreshing == true {
                 scrollView.refreshControl?.endRefreshing()
                 resetReloadGestureScrollState(on: scrollView)
             }
