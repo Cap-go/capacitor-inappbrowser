@@ -886,7 +886,7 @@ export interface OpenWebViewOptions {
 
   /**
    * Enable pull-to-refresh (overscroll from top) to reload the current page.
-   * - iOS: Uses UIRefreshControl on the WebView scroll view
+   * - iOS: Uses UIRefreshControl on the WebView scroll view (reload commits on finger release)
    * - Android: Uses SwipeRefreshLayout around the WebView
    *
    * On iOS, this requires overscroll bounce. If `disableOverscroll` is `true`,

@@ -3844,8 +3844,26 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void stopReloadGesture() {
-        if (swipeRefreshLayout != null && swipeRefreshLayout.isRefreshing()) {
+        if (swipeRefreshLayout != null && ReloadGestureSupport.shouldClearRefreshing(swipeRefreshLayout.isRefreshing())) {
             swipeRefreshLayout.setRefreshing(false);
+        }
+
+        // Sticky scrollY after reload makes canScrollVertically(-1) true, which blocks the next pull
+        // via setOnChildScrollUpCallback until a full document navigation resets scroll state.
+        if (_webView != null) {
+            final WebView webView = _webView;
+            webView.post(() -> {
+                if (_webView != webView) {
+                    return;
+                }
+                int targetY = ReloadGestureSupport.webViewScrollYAfterGestureReload(webView.getScrollY());
+                if (webView.getScrollY() != targetY) {
+                    webView.scrollTo(0, targetY);
+                }
+                if (swipeRefreshLayout != null) {
+                    swipeRefreshLayout.setRefreshing(false);
+                }
+            });
         }
     }
 

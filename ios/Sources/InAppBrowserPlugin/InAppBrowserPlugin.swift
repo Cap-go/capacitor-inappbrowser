@@ -249,6 +249,24 @@ enum CustomWebViewFrameSupport {
     }
 }
 
+enum ReloadGestureSupport {
+    /// UIRefreshControl may fire valueChanged while the finger is still down.
+    /// Match browser UX: commit reload only after touch end.
+    static func shouldDeferReloadUntilTouchEnd(isTracking: Bool, isDragging: Bool) -> Bool {
+        isTracking || isDragging
+    }
+
+    /// After touch end, reload only if the pull stayed past the refresh threshold.
+    static func shouldReloadOnTouchEnd(pendingReload: Bool, isRefreshing: Bool) -> Bool {
+        pendingReload && isRefreshing
+    }
+
+    /// WKWebView.reload() + UIRefreshControl often leave a negative offset (gap above content).
+    static func contentOffsetYAfterReloadReset(currentY: CGFloat) -> CGFloat {
+        currentY < 0 ? 0 : currentY
+    }
+}
+
 extension UIColor {
 
     convenience init(hexString: String) {
