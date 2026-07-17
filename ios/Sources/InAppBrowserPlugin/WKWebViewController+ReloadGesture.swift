@@ -9,6 +9,10 @@ extension WKWebViewController {
             targetWebView.scrollView.refreshControl = nil
         }
 
+        // UIRefreshControl can leave sticky insets that clip the page header after reload.
+        targetWebView.scrollView.contentInset = .zero
+        targetWebView.scrollView.scrollIndicatorInsets = .zero
+
         guard enableReloadGesture, !disableOverscroll else {
             pendingReloadFromGesture = false
             reloadGestureArmedPullDistance = 0
@@ -41,7 +45,6 @@ extension WKWebViewController {
             isDragging: scrollView.isDragging
         ) {
             pendingReloadFromGesture = true
-            // Capture the real activation pull distance from UIRefreshControl.
             reloadGestureArmedPullDistance = ReloadGestureSupport.pullDistance(
                 contentOffsetY: scrollView.contentOffset.y,
                 adjustedContentInsetTop: scrollView.adjustedContentInset.top
@@ -75,18 +78,16 @@ extension WKWebViewController {
             } else if !reloadFromGestureInProgress,
                       scrollView.refreshControl?.isRefreshing == true {
                 scrollView.refreshControl?.endRefreshing()
-                resetReloadGestureScrollState(on: scrollView, forceToRestingTop: false)
+                hardResetReloadGestureScroll(on: scrollView)
             }
 
         case .cancelled, .failed:
-            // System interruption — never commit a reload.
             pendingReloadFromGesture = false
             reloadGestureArmedPullDistance = 0
-            // Don't touch an in-flight gesture reload's spinner / scroll.
             guard !reloadFromGestureInProgress else { break }
             if scrollView.refreshControl?.isRefreshing == true {
                 scrollView.refreshControl?.endRefreshing()
-                resetReloadGestureScrollState(on: scrollView, forceToRestingTop: false)
+                hardResetReloadGestureScroll(on: scrollView)
             }
 
         default:
@@ -98,21 +99,35 @@ extension WKWebViewController {
         pendingReloadFromGesture = false
         reloadGestureArmedPullDistance = 0
         reloadFromGestureInProgress = true
-        // Track this navigation so cancelled prior loads don't clear gesture state early.
-        reloadGestureNavigation = self.capableWebView?.reload()
+
+        guard let webView = self.capableWebView else {
+            stopReloadGesture()
+            return
+        }
+
+        // `reload()` preserves broken scroll/inset state after UIRefreshControl.
+        // A fresh URL load matches a normal navigation and resets scroll like the reporter's "proper" reload.
+        if let url = webView.url {
+            reloadGestureNavigation = webView.load(URLRequest(url: url))
+        } else {
+            reloadGestureNavigation = webView.reload()
+        }
+
         if reloadGestureNavigation == nil {
             stopReloadGesture()
         }
     }
 
-    private func resetReloadGestureScrollState(on scrollView: UIScrollView, forceToRestingTop: Bool) {
+    private func hardResetReloadGestureScroll(on scrollView: UIScrollView) {
+        scrollView.contentInset = .zero
+        scrollView.scrollIndicatorInsets = .zero
         let resetY = ReloadGestureSupport.contentOffsetYAfterReloadReset(
             currentY: scrollView.contentOffset.y,
-            adjustedContentInsetTop: scrollView.adjustedContentInset.top,
-            forceToRestingTop: forceToRestingTop
+            adjustedContentInsetTop: 0,
+            forceToRestingTop: true
         )
-        if resetY != scrollView.contentOffset.y {
-            scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: resetY), animated: false)
+        if scrollView.contentOffset.y != resetY || scrollView.contentOffset.x != 0 {
+            scrollView.setContentOffset(CGPoint(x: 0, y: resetY), animated: false)
         }
     }
 
@@ -121,7 +136,6 @@ extension WKWebViewController {
             reloadFromGestureInProgress: reloadFromGestureInProgress
         ) else { return }
 
-        // Ignore unrelated navigation callbacks while a gesture reload is in flight.
         if let expected = reloadGestureNavigation,
            let navigation,
            expected !== navigation {
@@ -134,22 +148,23 @@ extension WKWebViewController {
         reloadGestureArmedPullDistance = 0
 
         guard let activeWebView = self.capableWebView else { return }
-        let scrollView = activeWebView.scrollView
-        scrollView.refreshControl?.endRefreshing()
+        activeWebView.scrollView.refreshControl?.endRefreshing()
 
-        // UIRefreshControl + WKWebView.reload() often leave offset at 0 instead of
-        // -adjustedContentInset.top (clips header ~safe-area) and block the next pull.
+        // Reset after the current runloop so WKWebView finishes applying navigation scroll state.
         DispatchQueue.main.async { [weak self] in
             guard let self, let activeWebView = self.capableWebView else { return }
             let scrollView = activeWebView.scrollView
             scrollView.refreshControl?.endRefreshing()
-            self.resetReloadGestureScrollState(on: scrollView, forceToRestingTop: true)
+            self.hardResetReloadGestureScroll(on: scrollView)
             self.configureReloadGesture(for: activeWebView)
-            // Rebind can change adjusted insets; snap again to the new resting top.
-            self.resetReloadGestureScrollState(
-                on: activeWebView.scrollView,
-                forceToRestingTop: true
-            )
+            self.hardResetReloadGestureScroll(on: activeWebView.scrollView)
+            activeWebView.evaluateJavaScript("window.scrollTo(0, 0);", completionHandler: nil)
+
+            // One more pass after layout / JS scroll restoration.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let activeWebView = self.capableWebView else { return }
+                self.hardResetReloadGestureScroll(on: activeWebView.scrollView)
+            }
         }
     }
 }

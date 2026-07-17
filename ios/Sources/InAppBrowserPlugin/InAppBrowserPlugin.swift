@@ -278,18 +278,18 @@ enum ReloadGestureSupport {
         return currentPullDistance >= armedPullDistance * 0.9
     }
 
-    /// Resting offset for the current adjusted top inset (safe-area aware).
-    /// - Parameter forceToRestingTop: After gesture reload, always snap to resting top (fixes clipped header).
-    ///   Otherwise only un-overscroll after a cancelled pull.
+    /// Resting offset after gesture reload.
+    /// Plugin safe-area uses CSS variables with `contentInset = .zero`, so forced reset is always `0`.
+    /// - Parameter forceToRestingTop: After gesture reload, snap to top. Otherwise only un-overscroll.
     static func contentOffsetYAfterReloadReset(
         currentY: CGFloat,
         adjustedContentInsetTop: CGFloat,
         forceToRestingTop: Bool = false
     ) -> CGFloat {
-        let restingY = -adjustedContentInsetTop
         if forceToRestingTop {
-            return restingY
+            return 0
         }
+        let restingY = -adjustedContentInsetTop
         return currentY < restingY ? restingY : currentY
     }
 }

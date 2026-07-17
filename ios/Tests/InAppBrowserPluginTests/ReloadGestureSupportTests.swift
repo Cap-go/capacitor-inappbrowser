@@ -67,6 +67,8 @@ final class ReloadGestureSupportTests: XCTestCase {
 
     func testReloadResetClampsOrSnapsToRestingAdjustedInset() {
         XCTAssertEqual(
+    func testReloadResetClampsOrSnapsToTop() {
+        XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -120, adjustedContentInsetTop: 47),
             -47
         )
@@ -79,18 +81,19 @@ final class ReloadGestureSupportTests: XCTestCase {
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: 80, adjustedContentInsetTop: 47),
             80
         )
-        // After gesture reload, force resting top even when offset drifted to 0 (clipped header).
+        // After gesture reload, plugin uses contentInset.zero + CSS safe-area → snap to 0.
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(
-                currentY: 0,
+                currentY: 50,
                 adjustedContentInsetTop: 47,
                 forceToRestingTop: true
             ),
-            -47
+            0
         )
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -20, adjustedContentInsetTop: 0),
             0
         )
     }
+}
 }

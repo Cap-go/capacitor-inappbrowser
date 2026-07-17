@@ -3523,10 +3523,11 @@ extension WKWebViewController: WKNavigationDelegate {
             delegate?.webViewController?(self, didFinish: url)
         }
         self.injectJavaScriptInterface()
+        // End refresh + clear sticky insets before safe-area sync zeroes contentInset.
+        stopReloadGesture(for: navigation)
         lastInjectedSafeAreaInsets = nil
         syncWebViewSafeAreaLayout()
         emit("browserPageLoaded")
-        stopReloadGesture(for: navigation)
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
