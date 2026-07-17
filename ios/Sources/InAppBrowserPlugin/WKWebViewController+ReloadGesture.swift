@@ -117,8 +117,9 @@ extension WKWebViewController {
     }
 
     func stopReloadGesture(for navigation: WKNavigation? = nil) {
-        // Ordinary page finishes must not clear an armed pull the user is still holding.
-        guard reloadFromGestureInProgress else { return }
+        guard ReloadGestureSupport.shouldApplyStopReloadGesture(
+            reloadFromGestureInProgress: reloadFromGestureInProgress
+        ) else { return }
 
         // Ignore unrelated navigation callbacks while a gesture reload is in flight.
         if let expected = reloadGestureNavigation,

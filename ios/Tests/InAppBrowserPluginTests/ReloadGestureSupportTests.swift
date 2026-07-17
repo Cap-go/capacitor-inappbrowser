@@ -2,6 +2,15 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class ReloadGestureSupportTests: XCTestCase {
+    func testStopReloadGestureSkippedWhenNoGestureReloadInProgress() {
+        XCTAssertFalse(
+            ReloadGestureSupport.shouldApplyStopReloadGesture(reloadFromGestureInProgress: false)
+        )
+        XCTAssertTrue(
+            ReloadGestureSupport.shouldApplyStopReloadGesture(reloadFromGestureInProgress: true)
+        )
+    }
+
     func testDefersReloadWhileFingerStillDown() {
         XCTAssertTrue(
             ReloadGestureSupport.shouldDeferReloadUntilTouchEnd(isTracking: true, isDragging: false)

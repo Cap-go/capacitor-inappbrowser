@@ -250,6 +250,11 @@ enum CustomWebViewFrameSupport {
 }
 
 enum ReloadGestureSupport {
+    /// Ordinary page finishes must not clear an armed pull still held by the user.
+    static func shouldApplyStopReloadGesture(reloadFromGestureInProgress: Bool) -> Bool {
+        reloadFromGestureInProgress
+    }
+
     /// UIRefreshControl may fire valueChanged while the finger is still down.
     /// Match browser UX: commit reload only after touch end.
     static func shouldDeferReloadUntilTouchEnd(isTracking: Bool, isDragging: Bool) -> Bool {

@@ -3677,10 +3677,16 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         register(download: download, response: nil, sourceURL: navigationAction.request.url?.absoluteString)
+        stopReloadGesture()
     }
 
     public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         register(download: download, response: navigationResponse.response)
+        stopReloadGesture()
+    }
+
+    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        stopReloadGesture()
     }
 
     // MARK: - Dimension Management
