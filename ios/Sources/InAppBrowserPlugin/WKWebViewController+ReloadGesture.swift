@@ -117,17 +117,17 @@ extension WKWebViewController {
     }
 
     func stopReloadGesture(for navigation: WKNavigation? = nil) {
-        pendingReloadFromGesture = false
+        // Ordinary page finishes must not clear an armed pull the user is still holding.
+        guard reloadFromGestureInProgress else { return }
 
         // Ignore unrelated navigation callbacks while a gesture reload is in flight.
-        if reloadFromGestureInProgress,
-           let expected = reloadGestureNavigation,
+        if let expected = reloadGestureNavigation,
            let navigation,
            expected !== navigation {
             return
         }
 
-        let shouldResetScroll = reloadFromGestureInProgress
+        pendingReloadFromGesture = false
         reloadFromGestureInProgress = false
         reloadGestureNavigation = nil
         reloadGestureArmedPullDistance = 0
@@ -135,8 +135,6 @@ extension WKWebViewController {
         guard let activeWebView = self.capableWebView else { return }
         let scrollView = activeWebView.scrollView
         scrollView.refreshControl?.endRefreshing()
-
-        guard shouldResetScroll else { return }
 
         // UIRefreshControl + WKWebView.reload() often leave offset at 0 instead of
         // -adjustedContentInset.top (clips header ~safe-area) and block the next pull.

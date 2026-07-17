@@ -274,7 +274,7 @@ enum ReloadGestureSupport {
     }
 
     /// Resting offset for the current adjusted top inset (safe-area aware).
-    /// - forceToRestingTop: after gesture reload, always snap to resting top (fixes clipped header).
+    /// - Parameter forceToRestingTop: After gesture reload, always snap to resting top (fixes clipped header).
     ///   Otherwise only un-overscroll after a cancelled pull.
     static func contentOffsetYAfterReloadReset(
         currentY: CGFloat,
