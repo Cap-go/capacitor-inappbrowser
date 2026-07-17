@@ -1,13 +1,31 @@
+#!/usr/bin/env node
+/**
+ * Restore literal angle brackets inside markdown fenced code blocks.
+ *
+ * @capacitor/docgen escapes `<` and `>` in JSDoc descriptions, which breaks
+ * HTML/XML examples rendered on GitHub inside ``` fences.
+ */
+
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const readmePath = join(dirname(fileURLToPath(import.meta.url)), '..', 'README.md');
-let content = readFileSync(readmePath, 'utf8');
+const CODE_FENCE_PATTERN = /(```[^\n]*\n)([\s\S]*?)(```)/g;
 
-content = content.replace(/(```[^\n]*\n)([\s\S]*?)(```)/g, (match, open, body, close) => {
-  const unescaped = body.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-  return open + unescaped + close;
-});
+function unescapeCodeBlockEntities(body) {
+  return body.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+}
 
-writeFileSync(readmePath, content);
+function unescapeDocgenCodeBlocks(content) {
+  return content.replace(CODE_FENCE_PATTERN, (match, open, body, close) => {
+    return `${open}${unescapeCodeBlockEntities(body)}${close}`;
+  });
+}
+
+function main() {
+  const readmePath = join(dirname(fileURLToPath(import.meta.url)), '..', 'README.md');
+  const content = readFileSync(readmePath, 'utf8');
+  writeFileSync(readmePath, unescapeDocgenCodeBlocks(content));
+}
+
+main();
