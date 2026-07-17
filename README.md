@@ -1378,42 +1378,42 @@ Opens a secured window for OAuth2 authentication.
 For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
 Something like:
 ```html
-&lt;html&gt;
-&lt;head&gt;&lt;/head&gt;
-&lt;body&gt;
-&lt;script&gt;
+<html>
+<head></head>
+<body>
+<script>
   const searchParams = new URLSearchParams(location.search)
   if (searchParams.has("code")) {
     new BroadcastChannel("my-channel-name").postMessage(location.href);
     window.close();
   }
-&lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;
+</script>
+</body>
+</html>
 ```
 For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
 And make sure to register it in the app's info.plist:
 ```xml
-&lt;key&gt;CFBundleURLTypes&lt;/key&gt;
-&lt;array&gt;
-   &lt;dict&gt;
-      &lt;key&gt;CFBundleURLSchemes&lt;/key&gt;
-      &lt;array&gt;
-         &lt;string&gt;myapp&lt;/string&gt;
-      &lt;/array&gt;
-   &lt;/dict&gt;
-&lt;/array&gt;
+<key>CFBundleURLTypes</key>
+<array>
+   <dict>
+      <key>CFBundleURLSchemes</key>
+      <array>
+         <string>myapp</string>
+      </array>
+   </dict>
+</array>
 ```
 And in the AndroidManifest.xml file:
 ```xml
-&lt;activity&gt;
-   &lt;intent-filter&gt;
-      &lt;action android:name="android.intent.action.VIEW" /&gt;
-      &lt;category android:name="android.intent.category.DEFAULT" /&gt;
-      &lt;category android:name="android.intent.category.BROWSABLE" /&gt;
-      &lt;data android:host="oauth_callback" android:scheme="myapp" /&gt;
-   &lt;/intent-filter&gt;
-&lt;/activity&gt;
+<activity>
+   <intent-filter>
+      <action android:name="android.intent.action.VIEW" />
+      <category android:name="android.intent.category.DEFAULT" />
+      <category android:name="android.intent.category.BROWSABLE" />
+      <data android:host="oauth_callback" android:scheme="myapp" />
+   </intent-filter>
+</activity>
 ```
 
 | Param         | Type                                                                        | Description                                 |
