@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Restore literal angle brackets inside markdown fenced code blocks.
  *
@@ -34,6 +34,20 @@ export function unescapeDocgenCodeBlocks(content) {
   return ensureBlankLinesAroundFences(output).join('\n');
 }
 
+function addBlankLineBeforeFence(output) {
+  const previous = output[output.length - 1];
+  if (previous !== undefined && previous.trim() !== '') {
+    output.push('');
+  }
+}
+
+function addBlankLineAfterFence(output, lines, index) {
+  const next = lines[index + 1];
+  if (next !== undefined && next.trim() !== '' && !FENCE_LINE.test(next)) {
+    output.push('');
+  }
+}
+
 export function ensureBlankLinesAroundFences(lines) {
   const output = [];
   let inFence = false;
@@ -41,28 +55,21 @@ export function ensureBlankLinesAroundFences(lines) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    if (FENCE_LINE.test(line)) {
-      if (!inFence) {
-        const previous = output[output.length - 1];
-        if (previous !== undefined && previous.trim() !== '') {
-          output.push('');
-        }
-      }
-
+    if (!FENCE_LINE.test(line)) {
       output.push(line);
-      inFence = !inFence;
-
-      if (!inFence) {
-        const next = lines[i + 1];
-        if (next !== undefined && next.trim() !== '' && !FENCE_LINE.test(next)) {
-          output.push('');
-        }
-      }
-
       continue;
     }
 
+    if (!inFence) {
+      addBlankLineBeforeFence(output);
+    }
+
     output.push(line);
+    inFence = !inFence;
+
+    if (!inFence) {
+      addBlankLineAfterFence(output, lines, i);
+    }
   }
 
   return output;
@@ -74,6 +81,6 @@ function main() {
   writeFileSync(readmePath, unescapeDocgenCodeBlocks(content));
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (import.meta.main) {
   main();
 }
