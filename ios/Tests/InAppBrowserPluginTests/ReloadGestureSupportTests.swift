@@ -14,41 +14,49 @@ final class ReloadGestureSupportTests: XCTestCase {
         )
     }
 
-    func testPullDistanceAndThresholdUseAdjustedInset() {
-        // Resting at -47 with 47pt top inset → pull distance 0
+    func testPullDistanceUsesAdjustedInset() {
         XCTAssertEqual(
             ReloadGestureSupport.pullDistance(contentOffsetY: -47, adjustedContentInsetTop: 47),
             0
         )
-        // Pulled an extra 60pt → past default threshold
+        XCTAssertEqual(
+            ReloadGestureSupport.pullDistance(contentOffsetY: -107, adjustedContentInsetTop: 47),
+            60
+        )
+    }
+
+    func testReloadsOnTouchEndUsingArmedActivationDistance() {
         XCTAssertTrue(
-            ReloadGestureSupport.isPullPastRefreshThreshold(
-                contentOffsetY: -107,
-                adjustedContentInsetTop: 47
+            ReloadGestureSupport.shouldReloadOnTouchEnd(
+                pendingReload: true,
+                currentPullDistance: 55,
+                armedPullDistance: 60
             )
         )
-        // Pulled only 20pt → below threshold
         XCTAssertFalse(
-            ReloadGestureSupport.isPullPastRefreshThreshold(
-                contentOffsetY: -67,
-                adjustedContentInsetTop: 47
+            ReloadGestureSupport.shouldReloadOnTouchEnd(
+                pendingReload: true,
+                currentPullDistance: 20,
+                armedPullDistance: 60
+            )
+        )
+        XCTAssertFalse(
+            ReloadGestureSupport.shouldReloadOnTouchEnd(
+                pendingReload: false,
+                currentPullDistance: 60,
+                armedPullDistance: 60
+            )
+        )
+        XCTAssertFalse(
+            ReloadGestureSupport.shouldReloadOnTouchEnd(
+                pendingReload: true,
+                currentPullDistance: 60,
+                armedPullDistance: 0
             )
         )
     }
 
-    func testReloadsOnTouchEndOnlyWhenPendingAndStillPastThreshold() {
-        XCTAssertTrue(
-            ReloadGestureSupport.shouldReloadOnTouchEnd(pendingReload: true, isPullPastThreshold: true)
-        )
-        XCTAssertFalse(
-            ReloadGestureSupport.shouldReloadOnTouchEnd(pendingReload: true, isPullPastThreshold: false)
-        )
-        XCTAssertFalse(
-            ReloadGestureSupport.shouldReloadOnTouchEnd(pendingReload: false, isPullPastThreshold: true)
-        )
-    }
-
-    func testReloadResetClampsToRestingAdjustedInset() {
+    func testReloadResetClampsOrSnapsToRestingAdjustedInset() {
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -120, adjustedContentInsetTop: 47),
             -47
@@ -57,9 +65,19 @@ final class ReloadGestureSupportTests: XCTestCase {
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -47, adjustedContentInsetTop: 47),
             -47
         )
+        // Cancel path must not jump a scrolled page to the top.
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: 80, adjustedContentInsetTop: 47),
             80
+        )
+        // After gesture reload, force resting top even when offset drifted to 0 (clipped header).
+        XCTAssertEqual(
+            ReloadGestureSupport.contentOffsetYAfterReloadReset(
+                currentY: 0,
+                adjustedContentInsetTop: 47,
+                forceToRestingTop: true
+            ),
+            -47
         )
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -20, adjustedContentInsetTop: 0),

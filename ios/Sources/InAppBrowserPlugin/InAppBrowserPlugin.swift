@@ -250,9 +250,6 @@ enum CustomWebViewFrameSupport {
 }
 
 enum ReloadGestureSupport {
-    /// Approximate UIRefreshControl activation distance in points.
-    static let defaultPullThreshold: CGFloat = 60
-
     /// UIRefreshControl may fire valueChanged while the finger is still down.
     /// Match browser UX: commit reload only after touch end.
     static func shouldDeferReloadUntilTouchEnd(isTracking: Bool, isDragging: Bool) -> Bool {
@@ -264,25 +261,30 @@ enum ReloadGestureSupport {
         max(0, -(contentOffsetY + adjustedContentInsetTop))
     }
 
-    static func isPullPastRefreshThreshold(
-        contentOffsetY: CGFloat,
-        adjustedContentInsetTop: CGFloat,
-        threshold: CGFloat = defaultPullThreshold
+    /// After intentional touch end, reload only if still near the activation pull distance
+    /// captured when UIRefreshControl fired `.valueChanged` (not a fixed constant).
+    static func shouldReloadOnTouchEnd(
+        pendingReload: Bool,
+        currentPullDistance: CGFloat,
+        armedPullDistance: CGFloat
     ) -> Bool {
-        pullDistance(contentOffsetY: contentOffsetY, adjustedContentInsetTop: adjustedContentInsetTop) >= threshold
-    }
-
-    /// After intentional touch end, reload only if pull is still past the threshold.
-    static func shouldReloadOnTouchEnd(pendingReload: Bool, isPullPastThreshold: Bool) -> Bool {
-        pendingReload && isPullPastThreshold
+        guard pendingReload, armedPullDistance > 0 else { return false }
+        // Allow slight finger jitter below the exact activation point.
+        return currentPullDistance >= armedPullDistance * 0.9
     }
 
     /// Resting offset for the current adjusted top inset (safe-area aware).
+    /// - forceToRestingTop: after gesture reload, always snap to resting top (fixes clipped header).
+    ///   Otherwise only un-overscroll after a cancelled pull.
     static func contentOffsetYAfterReloadReset(
         currentY: CGFloat,
-        adjustedContentInsetTop: CGFloat
+        adjustedContentInsetTop: CGFloat,
+        forceToRestingTop: Bool = false
     ) -> CGFloat {
         let restingY = -adjustedContentInsetTop
+        if forceToRestingTop {
+            return restingY
+        }
         return currentY < restingY ? restingY : currentY
     }
 }

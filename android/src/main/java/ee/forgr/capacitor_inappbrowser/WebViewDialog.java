@@ -3868,12 +3868,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (_webView != webView) {
                 return;
             }
-            int targetY = ReloadGestureSupport.webViewScrollYAfterGestureReload(webView.getScrollY());
-            if (webView.getScrollY() != targetY) {
-                webView.scrollTo(webView.getScrollX(), targetY);
-            }
-            if (swipeRefreshLayout != null) {
-                swipeRefreshLayout.setRefreshing(false);
+            if (webView.getScrollY() != 0) {
+                webView.scrollTo(webView.getScrollX(), 0);
             }
         });
     }

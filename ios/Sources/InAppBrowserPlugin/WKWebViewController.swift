@@ -474,6 +474,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var enableReloadGesture: Bool = false
     var pendingReloadFromGesture = false
     var reloadFromGestureInProgress = false
+    var reloadGestureNavigation: WKNavigation?
+    var reloadGestureArmedPullDistance: CGFloat = 0
     var reloadPanObserverInstalled = false
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
@@ -2576,6 +2578,8 @@ public extension WKWebViewController {
         }
         pendingReloadFromGesture = false
         reloadFromGestureInProgress = false
+        reloadGestureNavigation = nil
+        reloadGestureArmedPullDistance = 0
 
         // Remove KVO observers FIRST, before any operation that could trigger them
         webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
@@ -3522,7 +3526,7 @@ extension WKWebViewController: WKNavigationDelegate {
         lastInjectedSafeAreaInsets = nil
         syncWebViewSafeAreaLayout()
         emit("browserPageLoaded")
-        stopReloadGesture()
+        stopReloadGesture(for: navigation)
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -3532,7 +3536,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        stopReloadGesture()
+        stopReloadGesture(for: navigation)
         emit("pageLoadError")
     }
 
@@ -3543,7 +3547,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        stopReloadGesture()
+        stopReloadGesture(for: navigation)
         emit("pageLoadError")
     }
 
