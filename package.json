@@ -35,7 +35,7 @@
     "verify:ios": "bun run build:proxy-bridge && xcodebuild -scheme CapgoCapacitorInappbrowser -destination generic/platform=iOS",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "bun run build && bun run test:web",
-    "test:web": "bun test src/proxy-bridge-support.test.ts",
+    "test:web": "bun test src/proxy-bridge-support.test.ts scripts/unescape-docgen-codeblocks.test.mjs",
     "test:maestro:android": "./scripts/test-maestro-android.sh",
     "lint": "bun run eslint && bun run prettier -- --check && bun run swiftlint -- lint",
     "fmt": "bun run eslint -- --fix && bun run prettier -- --write && bun run swiftlint -- --fix --format",

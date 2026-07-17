@@ -1377,6 +1377,7 @@ openSecureWindow(options: OpenSecureWindowOptions) => Promise<OpenSecureWindowRe
 Opens a secured window for OAuth2 authentication.
 For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
 Something like:
+
 ```html
 <html>
 <head></head>
@@ -1391,8 +1392,10 @@ Something like:
 </body>
 </html>
 ```
+
 For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
 And make sure to register it in the app's info.plist:
+
 ```xml
 <key>CFBundleURLTypes</key>
 <array>
@@ -1404,7 +1407,9 @@ And make sure to register it in the app's info.plist:
    </dict>
 </array>
 ```
+
 And in the AndroidManifest.xml file:
+
 ```xml
 <activity>
    <intent-filter>

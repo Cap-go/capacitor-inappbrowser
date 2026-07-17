@@ -1744,6 +1744,7 @@ export interface InAppBrowserPlugin {
    * Opens a secured window for OAuth2 authentication.
    * For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
    * Something like:
+   *
    * ```html
    * <html>
    * <head></head>
@@ -1758,8 +1759,10 @@ export interface InAppBrowserPlugin {
    * </body>
    * </html>
    * ```
+   *
    * For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
    * And make sure to register it in the app's info.plist:
+   *
    * ```xml
    * <key>CFBundleURLTypes</key>
    * <array>
@@ -1771,7 +1774,9 @@ export interface InAppBrowserPlugin {
    *    </dict>
    * </array>
    * ```
+   *
    * And in the AndroidManifest.xml file:
+   *
    * ```xml
    * <activity>
    *    <intent-filter>
@@ -1782,6 +1787,7 @@ export interface InAppBrowserPlugin {
    *    </intent-filter>
    * </activity>
    * ```
+   *
    * @param options - the options for the openSecureWindow call
    */
   openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse>;
