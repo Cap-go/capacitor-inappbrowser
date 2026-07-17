@@ -65,8 +65,6 @@ final class ReloadGestureSupportTests: XCTestCase {
         )
     }
 
-    func testReloadResetClampsOrSnapsToRestingAdjustedInset() {
-        XCTAssertEqual(
     func testReloadResetClampsOrSnapsToTop() {
         XCTAssertEqual(
             ReloadGestureSupport.contentOffsetYAfterReloadReset(currentY: -120, adjustedContentInsetTop: 47),
@@ -95,5 +93,4 @@ final class ReloadGestureSupportTests: XCTestCase {
             0
         )
     }
-}
 }
