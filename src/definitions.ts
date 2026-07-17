@@ -1742,51 +1742,10 @@ export interface InAppBrowserPlugin {
 
   /**
    * Opens a secured window for OAuth2 authentication.
-   * For web, you should have the code in the redirected page to use a broadcast channel to send the redirected url to the app
-   * Something like:
    *
-   * ```html
-   * <html>
-   * <head></head>
-   * <body>
-   * <script>
-   *   const searchParams = new URLSearchParams(location.search)
-   *   if (searchParams.has("code")) {
-   *     new BroadcastChannel("my-channel-name").postMessage(location.href);
-   *     window.close();
-   *   }
-   * </script>
-   * </body>
-   * </html>
-   * ```
-   *
-   * For mobile, you should have a redirect uri that opens the app, something like: `myapp://oauth_callback/`
-   * And make sure to register it in the app's info.plist:
-   *
-   * ```xml
-   * <key>CFBundleURLTypes</key>
-   * <array>
-   *    <dict>
-   *       <key>CFBundleURLSchemes</key>
-   *       <array>
-   *          <string>myapp</string>
-   *       </array>
-   *    </dict>
-   * </array>
-   * ```
-   *
-   * And in the AndroidManifest.xml file:
-   *
-   * ```xml
-   * <activity>
-   *    <intent-filter>
-   *       <action android:name="android.intent.action.VIEW" />
-   *       <category android:name="android.intent.category.DEFAULT" />
-   *       <category android:name="android.intent.category.BROWSABLE" />
-   *       <data android:host="oauth_callback" android:scheme="myapp" />
-   *    </intent-filter>
-   * </activity>
-   * ```
+   * On web, the redirect page should post the final URL to a `BroadcastChannel` and close itself.
+   * On mobile, register a custom redirect URI scheme (for example `myapp://oauth_callback/`) in Info.plist and AndroidManifest.xml.
+   * See the README section "openSecureWindow (OAuth)" for full setup examples.
    *
    * @param options - the options for the openSecureWindow call
    */
