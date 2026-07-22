@@ -472,6 +472,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var authorizedAppLinks: [String] = []
     var activeNativeNavigationForWebview: Bool = true
     var enableReloadGesture: Bool = false
+    var pendingReloadFromGesture = false
+    var reloadFromGestureInProgress = false
+    var reloadGestureNavigation: WKNavigation?
+    var reloadGestureArmedPullDistance: CGFloat = 0
+    var reloadPanObserverInstalled = false
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
     var proxySchemeHandler: ProxySchemeHandler?
@@ -2562,35 +2567,19 @@ public extension WKWebViewController {
         self.webView?.allowsBackForwardNavigationGestures = self.activeNativeNavigationForWebview
     }
 
-    private func configureReloadGesture(for webView: WKWebView) {
-        if let existing = webView.scrollView.refreshControl {
-            existing.endRefreshing()
-            existing.removeTarget(nil, action: nil, for: .allEvents)
-            webView.scrollView.refreshControl = nil
-        }
-
-        guard enableReloadGesture, !disableOverscroll else {
-            return
-        }
-
-        webView.scrollView.alwaysBounceVertical = true
-        let refreshControl = UIRefreshControl()
-        refreshControl.addTarget(self, action: #selector(handleReloadGesture(_:)), for: .valueChanged)
-        webView.scrollView.refreshControl = refreshControl
-    }
-
-    @objc private func handleReloadGesture(_ sender: UIRefreshControl) {
-        reload()
-    }
-
-    private func stopReloadGesture() {
-        webView?.scrollView.refreshControl?.endRefreshing()
-    }
-
     func cleanupWebView() {
         guard let webView = self.webView else { return }
         webView.stopLoading()
         previewItemURL = nil
+
+        if reloadPanObserverInstalled {
+            webView.scrollView.panGestureRecognizer.removeTarget(self, action: #selector(handleReloadPanGesture(_:)))
+            reloadPanObserverInstalled = false
+        }
+        pendingReloadFromGesture = false
+        reloadFromGestureInProgress = false
+        reloadGestureNavigation = nil
+        reloadGestureArmedPullDistance = 0
 
         // Remove KVO observers FIRST, before any operation that could trigger them
         webView.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
@@ -3534,10 +3523,11 @@ extension WKWebViewController: WKNavigationDelegate {
             delegate?.webViewController?(self, didFinish: url)
         }
         self.injectJavaScriptInterface()
+        // End refresh + clear sticky insets before safe-area sync zeroes contentInset.
+        stopReloadGesture(for: navigation)
         lastInjectedSafeAreaInsets = nil
         syncWebViewSafeAreaLayout()
         emit("browserPageLoaded")
-        stopReloadGesture()
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
@@ -3547,7 +3537,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        stopReloadGesture()
+        stopReloadGesture(for: navigation)
         emit("pageLoadError")
     }
 
@@ -3558,7 +3548,7 @@ extension WKWebViewController: WKNavigationDelegate {
             self.url = url
             delegate?.webViewController?(self, didFail: url, withError: error)
         }
-        stopReloadGesture()
+        stopReloadGesture(for: navigation)
         emit("pageLoadError")
     }
 
@@ -3688,10 +3678,16 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         register(download: download, response: nil, sourceURL: navigationAction.request.url?.absoluteString)
+        stopReloadGesture()
     }
 
     public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         register(download: download, response: navigationResponse.response)
+        stopReloadGesture()
+    }
+
+    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        stopReloadGesture()
     }
 
     // MARK: - Dimension Management

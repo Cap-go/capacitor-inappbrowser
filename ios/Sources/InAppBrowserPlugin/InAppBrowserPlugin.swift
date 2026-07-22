@@ -249,6 +249,51 @@ enum CustomWebViewFrameSupport {
     }
 }
 
+enum ReloadGestureSupport {
+    /// Ordinary page finishes must not clear an armed pull still held by the user.
+    static func shouldApplyStopReloadGesture(reloadFromGestureInProgress: Bool) -> Bool {
+        reloadFromGestureInProgress
+    }
+
+    /// UIRefreshControl may fire valueChanged while the finger is still down.
+    /// Match browser UX: commit reload only after touch end.
+    static func shouldDeferReloadUntilTouchEnd(isTracking: Bool, isDragging: Bool) -> Bool {
+        isTracking || isDragging
+    }
+
+    /// Pull distance below the resting top (adjusted inset). Positive when overscrolling down.
+    static func pullDistance(contentOffsetY: CGFloat, adjustedContentInsetTop: CGFloat) -> CGFloat {
+        max(0, -(contentOffsetY + adjustedContentInsetTop))
+    }
+
+    /// After intentional touch end, reload only if still near the activation pull distance
+    /// captured when UIRefreshControl fired `.valueChanged` (not a fixed constant).
+    static func shouldReloadOnTouchEnd(
+        pendingReload: Bool,
+        currentPullDistance: CGFloat,
+        armedPullDistance: CGFloat
+    ) -> Bool {
+        guard pendingReload, armedPullDistance > 0 else { return false }
+        // Allow slight finger jitter below the exact activation point.
+        return currentPullDistance >= armedPullDistance * 0.9
+    }
+
+    /// Resting offset after gesture reload.
+    /// Plugin safe-area uses CSS variables with `contentInset = .zero`, so forced reset is always `0`.
+    /// - Parameter forceToRestingTop: After gesture reload, snap to top. Otherwise only un-overscroll.
+    static func contentOffsetYAfterReloadReset(
+        currentY: CGFloat,
+        adjustedContentInsetTop: CGFloat,
+        forceToRestingTop: Bool = false
+    ) -> CGFloat {
+        if forceToRestingTop {
+            return 0
+        }
+        let restingY = -adjustedContentInsetTop
+        return currentY < restingY ? restingY : currentY
+    }
+}
+
 extension UIColor {
 
     convenience init(hexString: String) {
