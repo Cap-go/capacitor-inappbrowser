@@ -94,4 +94,40 @@ final class SafeAreaInsetsSupport {
 
         return fallbackTopInset;
     }
+
+    /**
+     * Bottom padding to apply to the WebView container (a SwipeRefreshLayout, which honours its own
+     * padding but ignores child margins). Combines the resolved safe bottom inset with a compensation
+     * term: on Android 15+ the AppBarLayout is pushed down by the status-bar height, which shifts the
+     * container's bottom edge off-screen by that same amount, so it must be added back as padding
+     * regardless of the safe-margin option.
+     */
+    static int resolveContainerBottomPadding(
+        boolean enabledSafeBottomMargin,
+        int safeBottomInset,
+        boolean appBarHandlesTopInset,
+        int statusBarTop
+    ) {
+        int base = enabledSafeBottomMargin ? Math.max(0, safeBottomInset) : 0;
+        int appBarCompensation = appBarHandlesTopInset ? Math.max(0, statusBarTop) : 0;
+        return base + appBarCompensation;
+    }
+
+    /**
+     * Top padding for the WebView container. When the AppBarLayout handles the top inset it already
+     * sits below the status bar, so no additional padding is needed; otherwise the status-bar height
+     * is applied when the safe-top options request it.
+     */
+    static int resolveContainerTopPadding(
+        boolean enabledSafeTopMargin,
+        boolean useTopInset,
+        int statusBarTop,
+        boolean appBarHandlesTopInset
+    ) {
+        if (appBarHandlesTopInset || !enabledSafeTopMargin || !useTopInset) {
+            return 0;
+        }
+
+        return Math.max(0, statusBarTop);
+    }
 }
