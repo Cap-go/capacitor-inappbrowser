@@ -84,4 +84,48 @@ public class SafeAreaInsetsSupportTest {
         assertEquals(0, SafeAreaInsetsSupport.resolveTopMarginWithFallback(false, true, 0, false, 48, true));
         assertEquals(0, SafeAreaInsetsSupport.resolveTopMarginWithFallback(true, false, 0, false, 48, true));
     }
+
+    @Test
+    public void containerBottomPaddingAddsAppBarDisplacementToNavigationBarInset() {
+        // Android 15 device: 126px navigation bar + 87px status-bar appbar displacement = 213px.
+        assertEquals(213, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, true, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingOmitsCompensationWhenAppBarDoesNotHandleTopInset() {
+        assertEquals(126, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, false, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingCompensatesAppBarEvenWhenSafeMarginDisabled() {
+        // The appbar top-margin displaces the WebView bottom regardless of the safe-margin option,
+        // so the displacement must still be compensated to keep bottom content on-screen.
+        assertEquals(87, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, true, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingIsZeroWithoutSafeMarginOrAppBarDisplacement() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, false, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingClampsNegativeInputsToZero() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, -10, true, -5));
+    }
+
+    @Test
+    public void containerTopPaddingIsZeroWhenAppBarHandlesTopInset() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(true, true, 87, true));
+    }
+
+    @Test
+    public void containerTopPaddingUsesStatusBarWhenAppBarDoesNotHandleTop() {
+        assertEquals(87, SafeAreaInsetsSupport.resolveContainerTopPadding(true, true, 87, false));
+    }
+
+    @Test
+    public void containerTopPaddingRequiresBothSafeTopAndExplicitTopInset() {
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(false, true, 87, false));
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(true, false, 87, false));
+    }
 }

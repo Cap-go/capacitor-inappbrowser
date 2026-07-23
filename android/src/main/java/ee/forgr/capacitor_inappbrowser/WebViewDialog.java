@@ -3147,6 +3147,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         requestSafeAreaInsets();
+
+        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 300);
+        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 1200);
     }
 
     private void applySafeAreaMargins(
@@ -3202,6 +3205,81 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         mlp.rightMargin = bars.right;
         _webView.setLayoutParams(mlp);
         injectSafeAreaCssVariables(navTop, bottomMargin, bars.left, bars.right);
+        applyContainerInsetsSnapshot();
+    }
+
+    private void applyContainerInsetsSnapshot() {
+        if (_options == null || _webView == null) {
+            return;
+        }
+
+        View container = findViewById(R.id.content_browser_layout);
+        if (container == null) {
+            return;
+        }
+
+        Window window = getWindow();
+        View decorView = window != null ? window.getDecorView() : null;
+        WindowInsetsCompat windowInsets = decorView != null ? ViewCompat.getRootWindowInsets(decorView) : null;
+
+        Insets bars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()) : Insets.NONE;
+        Insets navigationBars = windowInsets != null
+            ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            : Insets.NONE;
+        Insets systemGestures = windowInsets != null
+            ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
+            : Insets.NONE;
+        Insets mandatoryGestures = windowInsets != null
+            ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
+            : Insets.NONE;
+
+        boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
+        View toolbarView = findViewById(R.id.tool_bar);
+        boolean appBarHandlesTopInset =
+            isAndroid15Plus &&
+            !TextUtils.equals(_options.getToolbarType(), "blank") &&
+            toolbarView != null &&
+            toolbarView.getVisibility() == View.VISIBLE &&
+            toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
+
+        int statusBarTop = bars.top > 0 ? bars.top : getSystemStatusBarHeight();
+        int fallbackBottomInset = _options.getEnabledSafeMargin() ? getSystemNavigationBarHeight() : 0;
+        int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
+            bars.bottom,
+            navigationBars.bottom,
+            systemGestures.bottom,
+            mandatoryGestures.bottom,
+            bars.left,
+            bars.right,
+            navigationBars.left,
+            navigationBars.right,
+            fallbackBottomInset,
+            _options.getEnabledSafeMargin()
+        );
+
+        int padTop = SafeAreaInsetsSupport.resolveContainerTopPadding(
+            _options.getEnabledSafeTopMargin(),
+            _options.getUseTopInset(),
+            statusBarTop,
+            appBarHandlesTopInset
+        );
+        int padBottom = SafeAreaInsetsSupport.resolveContainerBottomPadding(
+            _options.getEnabledSafeMargin(),
+            safeBottomInset,
+            appBarHandlesTopInset,
+            statusBarTop
+        );
+
+        if (
+            container.getPaddingLeft() == bars.left &&
+            container.getPaddingTop() == padTop &&
+            container.getPaddingRight() == bars.right &&
+            container.getPaddingBottom() == padBottom
+        ) {
+            return;
+        }
+
+        container.setPadding(bars.left, padTop, bars.right, padBottom);
     }
 
     private void configureBlankToolbarLayout() {
@@ -3285,7 +3363,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         ViewCompat.requestApplyInsets(insetsSourceView);
-        insetsSourceView.post(() -> ViewCompat.requestApplyInsets(insetsSourceView));
+        insetsSourceView.post(() -> {
+            ViewCompat.requestApplyInsets(insetsSourceView);
+            applyContainerInsetsSnapshot();
+        });
     }
 
     public void postMessageToJS(Object detail) {
