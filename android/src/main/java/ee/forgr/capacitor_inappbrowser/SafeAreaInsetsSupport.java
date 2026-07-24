@@ -97,18 +97,19 @@ final class SafeAreaInsetsSupport {
 
     /**
      * Bottom padding to apply to the WebView container (a SwipeRefreshLayout, which honours its own
-     * padding but ignores child margins). Combines the resolved safe bottom inset with a compensation
-     * term: on Android 15+ the AppBarLayout is pushed down by the status-bar height, which shifts the
-     * container's bottom edge off-screen by that same amount, so it must be added back as padding
-     * regardless of the safe-margin option.
+     * padding but ignores child margins). Takes the larger of the safe bottom inset and the keyboard
+     * (IME) inset via {@link #resolveBottomMargin}, then adds a compensation term: on Android 15+ the
+     * AppBarLayout is pushed down by the status-bar height, which shifts the container's bottom edge
+     * off-screen by that same amount, so it must be added back as padding regardless of the options.
      */
     static int resolveContainerBottomPadding(
         boolean enabledSafeBottomMargin,
         int safeBottomInset,
+        int imeBottom,
         boolean appBarHandlesTopInset,
         int statusBarTop
     ) {
-        int base = enabledSafeBottomMargin ? Math.max(0, safeBottomInset) : 0;
+        int base = resolveBottomMargin(enabledSafeBottomMargin, safeBottomInset, imeBottom);
         int appBarCompensation = appBarHandlesTopInset ? Math.max(0, statusBarTop) : 0;
         return base + appBarCompensation;
     }
@@ -129,5 +130,15 @@ final class SafeAreaInsetsSupport {
         }
 
         return Math.max(0, statusBarTop);
+    }
+
+    /**
+     * Whether the WebView container must be inset for the bottom system bar. On Android 15+ the dialog
+     * is forced edge-to-edge (decorFitsSystemWindows=false), so the window always draws under the
+     * navigation bar and insetting is mandatory to keep bottom content on-screen, regardless of the
+     * enabledSafeBottomMargin opt-in that older versions honour.
+     */
+    static boolean shouldInsetBottomForContainer(boolean enabledSafeBottomMargin, boolean isEdgeToEdge) {
+        return enabledSafeBottomMargin || isEdgeToEdge;
     }
 }

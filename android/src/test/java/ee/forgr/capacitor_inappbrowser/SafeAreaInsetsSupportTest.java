@@ -1,6 +1,8 @@
 package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -88,29 +90,46 @@ public class SafeAreaInsetsSupportTest {
     @Test
     public void containerBottomPaddingAddsAppBarDisplacementToNavigationBarInset() {
         // Android 15 device: 126px navigation bar + 87px status-bar appbar displacement = 213px.
-        assertEquals(213, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, true, 87));
+        assertEquals(213, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, 0, true, 87));
     }
 
     @Test
     public void containerBottomPaddingOmitsCompensationWhenAppBarDoesNotHandleTopInset() {
-        assertEquals(126, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, false, 87));
+        assertEquals(126, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, 0, false, 87));
     }
 
     @Test
     public void containerBottomPaddingCompensatesAppBarEvenWhenSafeMarginDisabled() {
         // The appbar top-margin displaces the WebView bottom regardless of the safe-margin option,
         // so the displacement must still be compensated to keep bottom content on-screen.
-        assertEquals(87, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, true, 87));
+        assertEquals(87, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, 0, true, 87));
     }
 
     @Test
     public void containerBottomPaddingIsZeroWithoutSafeMarginOrAppBarDisplacement() {
-        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, false, 87));
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, 0, false, 87));
     }
 
     @Test
     public void containerBottomPaddingClampsNegativeInputsToZero() {
-        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, -10, true, -5));
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, -10, 0, true, -5));
+    }
+
+    @Test
+    public void containerBottomPaddingUsesKeyboardInsetOverNavigationBarPlusCompensation() {
+        // Keyboard visible (280px) exceeds the 126px navigation bar; the 87px appbar displacement
+        // still applies on top: max(126, 280) + 87 = 367.
+        assertEquals(367, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, 280, true, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingAppliesKeyboardInsetEvenWhenSafeMarginDisabled() {
+        assertEquals(367, SafeAreaInsetsSupport.resolveContainerBottomPadding(false, 126, 280, true, 87));
+    }
+
+    @Test
+    public void containerBottomPaddingKeepsNavigationBarWhenLargerThanKeyboardInset() {
+        assertEquals(126, SafeAreaInsetsSupport.resolveContainerBottomPadding(true, 126, 50, false, 0));
     }
 
     @Test
@@ -127,5 +146,26 @@ public class SafeAreaInsetsSupportTest {
     public void containerTopPaddingRequiresBothSafeTopAndExplicitTopInset() {
         assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(false, true, 87, false));
         assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(true, false, 87, false));
+    }
+
+    @Test
+    public void bottomInsetIsForcedOnEdgeToEdgeEvenWithoutOptIn() {
+        // Android 15 forces edge-to-edge, so the nav-bar inset applies regardless of the opt-in.
+        assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true));
+        assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(true, true));
+    }
+
+    @Test
+    public void bottomInsetHonoursOptInWhenNotEdgeToEdge() {
+        // Pre-Android 15 keeps the original opt-in behaviour untouched.
+        assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(true, false));
+        assertFalse(SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, false));
+    }
+
+    @Test
+    public void containerBottomPaddingAppliesNavigationBarWhenForcedByEdgeToEdge() {
+        // Opt-in off, but edge-to-edge forces applyBottomInset=true → 126 nav + 87 appbar = 213.
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true);
+        assertEquals(213, SafeAreaInsetsSupport.resolveContainerBottomPadding(applyBottomInset, 126, 0, true, 87));
     }
 }

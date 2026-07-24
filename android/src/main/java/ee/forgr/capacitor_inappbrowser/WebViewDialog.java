@@ -3223,15 +3223,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         WindowInsetsCompat windowInsets = decorView != null ? ViewCompat.getRootWindowInsets(decorView) : null;
 
         Insets bars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()) : Insets.NONE;
-        Insets navigationBars = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            : Insets.NONE;
-        Insets systemGestures = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
-            : Insets.NONE;
-        Insets mandatoryGestures = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
-            : Insets.NONE;
+        Insets navigationBars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars()) : Insets.NONE;
+        Insets systemGestures = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures()) : Insets.NONE;
+        Insets mandatoryGestures =
+            windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()) : Insets.NONE;
+        Insets ime = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.ime()) : Insets.NONE;
+        boolean keyboardVisible = windowInsets != null && windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
         View toolbarView = findViewById(R.id.tool_bar);
@@ -3242,8 +3239,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             toolbarView.getVisibility() == View.VISIBLE &&
             toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
 
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isAndroid15Plus);
+
         int statusBarTop = bars.top > 0 ? bars.top : getSystemStatusBarHeight();
-        int fallbackBottomInset = _options.getEnabledSafeMargin() ? getSystemNavigationBarHeight() : 0;
+        int fallbackBottomInset = applyBottomInset ? getSystemNavigationBarHeight() : 0;
         int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
             bars.bottom,
             navigationBars.bottom,
@@ -3254,7 +3253,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             navigationBars.left,
             navigationBars.right,
             fallbackBottomInset,
-            _options.getEnabledSafeMargin()
+            applyBottomInset
         );
 
         int padTop = SafeAreaInsetsSupport.resolveContainerTopPadding(
@@ -3263,9 +3262,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             statusBarTop,
             appBarHandlesTopInset
         );
+        int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, isAndroid15Plus);
         int padBottom = SafeAreaInsetsSupport.resolveContainerBottomPadding(
-            _options.getEnabledSafeMargin(),
+            applyBottomInset,
             safeBottomInset,
+            imeBottom,
             appBarHandlesTopInset,
             statusBarTop
         );
