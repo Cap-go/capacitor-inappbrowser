@@ -3223,15 +3223,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         WindowInsetsCompat windowInsets = decorView != null ? ViewCompat.getRootWindowInsets(decorView) : null;
 
         Insets bars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()) : Insets.NONE;
-        Insets navigationBars = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            : Insets.NONE;
-        Insets systemGestures = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures())
-            : Insets.NONE;
-        Insets mandatoryGestures = windowInsets != null
-            ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())
-            : Insets.NONE;
+        Insets navigationBars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars()) : Insets.NONE;
+        Insets systemGestures = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures()) : Insets.NONE;
+        Insets mandatoryGestures =
+            windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()) : Insets.NONE;
 
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
         View toolbarView = findViewById(R.id.tool_bar);
