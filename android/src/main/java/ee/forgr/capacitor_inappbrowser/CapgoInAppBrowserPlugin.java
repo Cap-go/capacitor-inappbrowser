@@ -1079,6 +1079,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         options.setHandleDownloads(Boolean.TRUE.equals(call.getBoolean("handleDownloads", false)));
 
         options.setPersistWebViewData(call.getBoolean("persistWebViewData", true));
+        // No-op on Android: CookieManager is already process-global (API parity with iOS).
+        options.setUseSharedDataStore(Boolean.TRUE.equals(call.getBoolean("useSharedDataStore", false)));
         // Set text zoom if specified in options (default is 100)
         Integer textZoom = call.getInt("textZoom");
         if (textZoom != null) {

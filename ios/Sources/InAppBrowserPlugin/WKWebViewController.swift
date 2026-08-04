@@ -431,6 +431,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var allowScreenshotsFromWebPage = false
     open var captureConsoleLogs = false
     open var persistWebViewData = true
+    open var useSharedDataStore = false
     open var handleDownloads = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
@@ -2047,7 +2048,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         let webConfiguration = initialWebConfiguration ?? WKWebViewConfiguration()
         webConfiguration.websiteDataStore = BrowsingDataStoreSupport.websiteDataStore(
-            persistWebViewData: persistWebViewData
+            persistWebViewData: persistWebViewData,
+            useSharedDataStore: useSharedDataStore
         )
         let userContentController = webConfiguration.userContentController
         userContentController.removeAllUserScripts()
@@ -2302,6 +2304,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         configuration.userContentController = WKUserContentController()
         self.initialWebConfiguration = configuration
         self.persistWebViewData = parent.persistWebViewData
+        self.useSharedDataStore = parent.useSharedDataStore
         self.enableReloadGesture = parent.enableReloadGesture
         self.disableOverscroll = parent.disableOverscroll
         self.proxyRequests = parent.proxyRequests
