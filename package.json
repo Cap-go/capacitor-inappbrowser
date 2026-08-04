@@ -1,6 +1,6 @@
 {
   "name": "@capgo/capacitor-inappbrowser",
-  "version": "8.13.0",
+  "version": "8.13.3",
   "description": "Capacitor plugin in app browser",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -68,7 +68,7 @@
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@types/node": "^24.10.1",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.31.0",
     "husky": "^9.1.7",

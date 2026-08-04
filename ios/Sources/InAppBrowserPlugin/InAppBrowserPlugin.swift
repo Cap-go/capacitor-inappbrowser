@@ -110,6 +110,42 @@ enum CustomSchemeOpenSupport {
     }
 }
 
+enum SecureWindowRedirectSupport {
+    /// The auth session reports any navigation on the callback scheme, so the redirect is
+    /// identified component-wise. Query items configured in the redirect URI are matched,
+    /// while any extra items (e.g. provider code, state) are ignored, unless they reuse a
+    /// configured name: parsers disagree over which duplicate takes precedence.
+    static func matches(_ callbackURL: URL, redirectUri: String) -> Bool {
+        guard let expected = URLComponents(string: redirectUri),
+              let received = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              received.scheme?.lowercased() == expected.scheme?.lowercased(),
+              received.percentEncodedUser == expected.percentEncodedUser,
+              received.percentEncodedPassword == expected.percentEncodedPassword,
+              received.percentEncodedHost?.lowercased() == expected.percentEncodedHost?.lowercased(),
+              received.port == expected.port,
+              normalizedPath(received.percentEncodedPath) == normalizedPath(expected.percentEncodedPath) else {
+            return false
+        }
+
+        let expectedItems = expected.percentEncodedQueryItems ?? []
+        let receivedItems = received.percentEncodedQueryItems ?? []
+        let configuredDecodedNames = Set((expected.queryItems ?? []).map(\.name))
+        let configuredReceivedItemCount = (received.queryItems ?? []).filter {
+            configuredDecodedNames.contains($0.name)
+        }.count
+        guard configuredReceivedItemCount == expectedItems.count else {
+            return false
+        }
+        return Set(expectedItems.map(\.name)).allSatisfy { name in
+            receivedItems.filter { $0.name == name } == expectedItems.filter { $0.name == name }
+        }
+    }
+
+    private static func normalizedPath(_ path: String) -> String {
+        path == "/" ? "" : path
+    }
+}
+
 protocol ProxyRequestLocating {
     func hasPendingProxyRequest(_ requestId: String) -> Bool
 }
@@ -249,6 +285,62 @@ enum CustomWebViewFrameSupport {
     }
 }
 
+enum BrowsingDataStoreSupport {
+    /// Stable identifier for the plugin-owned persistent website data store (iOS 17+).
+    /// Keeps InAppBrowser cookies/storage separate from the Capacitor/Ionic host WKWebView.
+    static let persistentStoreIdentifier = UUID(uuidString: "C4A96F00-1A8B-4650-9E55-1A8B00000650")!
+
+    static func websiteDataStore(persistWebViewData: Bool) -> WKWebsiteDataStore {
+        guard persistWebViewData else {
+            return .nonPersistent()
+        }
+        return persistentWebsiteDataStore()
+    }
+
+    static func persistentWebsiteDataStore() -> WKWebsiteDataStore {
+        if #available(iOS 17.0, *) {
+            return WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier)
+        }
+        // Custom persistent stores require iOS 17+. Older OS versions share the default store.
+        return .default()
+    }
+
+    /// Host Capacitor apps use `WKWebsiteDataStore.default()`. Clearing it wipes Ionic storage.
+    static func isHostAppWebsiteDataStore(_ store: WKWebsiteDataStore) -> Bool {
+        ObjectIdentifier(store) == ObjectIdentifier(WKWebsiteDataStore.default())
+    }
+
+    /// Stores owned by InAppBrowser only. Never includes the Capacitor/Ionic default store.
+    static func storesForClearAllBrowsingData(openStores: [WKWebsiteDataStore]) -> [WKWebsiteDataStore] {
+        var seen = Set<ObjectIdentifier>()
+        var stores: [WKWebsiteDataStore] = []
+
+        func append(_ store: WKWebsiteDataStore) {
+            guard !isHostAppWebsiteDataStore(store) else { return }
+            let identifier = ObjectIdentifier(store)
+            if seen.insert(identifier).inserted {
+                stores.append(store)
+            }
+        }
+
+        if #available(iOS 17.0, *) {
+            append(WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier))
+        }
+        for store in openStores {
+            append(store)
+        }
+        return stores
+    }
+
+    /// When no managed webview is open, only return a store that is not the host app store.
+    static func fallbackStoresWhenNoWebViewOpen() -> [WKWebsiteDataStore] {
+        if #available(iOS 17.0, *) {
+            return [WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier)]
+        }
+        return []
+    }
+}
+
 enum ReloadGestureSupport {
     /// Ordinary page finishes must not clear an armed pull still held by the user.
     static func shouldApplyStopReloadGesture(reloadFromGestureInProgress: Bool) -> Bool {
@@ -320,7 +412,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         case aware = "AWARE"
         case fakeVisible = "FAKE_VISIBLE"
     }
-    private let pluginVersion: String = "8.13.0"
+    private let pluginVersion: String = "8.13.3"
     public let identifier = "CapgoInAppBrowserPlugin"
     public let jsName = "CapgoInAppBrowser"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -628,7 +720,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let controllers = Array(webViewControllers.values)
         if controllers.isEmpty {
-            return [WKWebsiteDataStore.default()]
+            return BrowsingDataStoreSupport.fallbackStoresWhenNoWebViewOpen()
         }
 
         var seen = Set<ObjectIdentifier>()
@@ -645,23 +737,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func allBrowsingDataStores() -> [WKWebsiteDataStore] {
-        var seen = Set<ObjectIdentifier>()
-        var stores: [WKWebsiteDataStore] = []
-
-        func append(_ store: WKWebsiteDataStore) {
-            let identifier = ObjectIdentifier(store)
-            if seen.insert(identifier).inserted {
-                stores.append(store)
-            }
-        }
-
-        append(WKWebsiteDataStore.default())
-        for controller in webViewControllers.values {
-            if let store = controller.websiteDataStore() {
-                append(store)
-            }
-        }
-        return stores
+        let openStores = webViewControllers.values.compactMap { $0.websiteDataStore() }
+        return BrowsingDataStoreSupport.storesForClearAllBrowsingData(openStores: openStores)
     }
 
     private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
@@ -1077,7 +1154,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+            BrowsingDataStoreSupport.persistentWebsiteDataStore().httpCookieStore.getAllCookies { cookies in
                 var cookieDict = [String: String]()
                 for cookie in cookies {
 
@@ -1227,7 +1304,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let titleFontFamily = call.getString("titleFontFamily")
-        let isInspectable = call.getBool("isInspectable", false)
+        let isInspectable = call.getBool("isInspectable", self.bridge?.config.isWebDebuggable ?? false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
         let isAnimated = call.getBool("isAnimated", true)
@@ -2596,6 +2673,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        guard let callbackURLScheme = URL(string: redirectUri)?.scheme else {
+            call.reject("Invalid Redirect URI")
+            return
+        }
+
         // Store the call for later resolution
         self.openSecureWindowCall = call
 
@@ -2603,7 +2685,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         // Open the URL in a secure browser window
         DispatchQueue.main.async {
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: url.scheme) {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme) {
                 callbackURL, error in
 
                 // Clean up the stored call
@@ -2620,7 +2702,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
 
-                if !callbackURL.absoluteString.hasPrefix(redirectUri) {
+                if !SecureWindowRedirectSupport.matches(callbackURL, redirectUri: redirectUri) {
                     call.reject("Redirect URI does not match, expected " + redirectUri + " but got " + callbackURL.absoluteString)
                     return
                 }
