@@ -123,7 +123,7 @@ Use `updateDimensions()` to resize the browser while keeping the same page state
 
 #### Keep checkout, auth, or support sessions private
 
-Use `persistWebViewData: false` when a WebView must avoid persistent cookies, cache, local storage, IndexedDB, and other website data where the platform supports it. Use `clearAllBrowsingData()` when the app needs to wipe the default store and all opened managed WebViews.
+Use `persistWebViewData: false` when a WebView must avoid persistent cookies, cache, local storage, IndexedDB, and other website data where the platform supports it. Use `clearAllBrowsingData()` when the app needs to wipe InAppBrowser-managed browsing data without touching the Capacitor/Ionic host WebView.
 
 ```js
 const { id } = await InAppBrowser.openWebView({

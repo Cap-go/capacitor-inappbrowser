@@ -2044,9 +2044,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.edgesForExtendedLayout = [.bottom]
 
         let webConfiguration = initialWebConfiguration ?? WKWebViewConfiguration()
-        if !persistWebViewData {
-            webConfiguration.websiteDataStore = .nonPersistent()
-        }
+        webConfiguration.websiteDataStore = BrowsingDataStoreSupport.websiteDataStore(
+            persistWebViewData: persistWebViewData
+        )
         let userContentController = webConfiguration.userContentController
         userContentController.removeAllUserScripts()
         ScriptMessageHandlerSupport.removeAll(from: userContentController)

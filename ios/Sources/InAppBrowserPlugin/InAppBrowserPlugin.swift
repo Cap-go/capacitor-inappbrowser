@@ -249,6 +249,62 @@ enum CustomWebViewFrameSupport {
     }
 }
 
+enum BrowsingDataStoreSupport {
+    /// Stable identifier for the plugin-owned persistent website data store (iOS 17+).
+    /// Keeps InAppBrowser cookies/storage separate from the Capacitor/Ionic host WKWebView.
+    static let persistentStoreIdentifier = UUID(uuidString: "C4A96F00-1A8B-4650-9E55-1A8B00000650")!
+
+    static func websiteDataStore(persistWebViewData: Bool) -> WKWebsiteDataStore {
+        guard persistWebViewData else {
+            return .nonPersistent()
+        }
+        return persistentWebsiteDataStore()
+    }
+
+    static func persistentWebsiteDataStore() -> WKWebsiteDataStore {
+        if #available(iOS 17.0, *) {
+            return WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier)
+        }
+        // Custom persistent stores require iOS 17+. Older OS versions share the default store.
+        return .default()
+    }
+
+    /// Host Capacitor apps use `WKWebsiteDataStore.default()`. Clearing it wipes Ionic storage.
+    static func isHostAppWebsiteDataStore(_ store: WKWebsiteDataStore) -> Bool {
+        ObjectIdentifier(store) == ObjectIdentifier(WKWebsiteDataStore.default())
+    }
+
+    /// Stores owned by InAppBrowser only. Never includes the Capacitor/Ionic default store.
+    static func storesForClearAllBrowsingData(openStores: [WKWebsiteDataStore]) -> [WKWebsiteDataStore] {
+        var seen = Set<ObjectIdentifier>()
+        var stores: [WKWebsiteDataStore] = []
+
+        func append(_ store: WKWebsiteDataStore) {
+            guard !isHostAppWebsiteDataStore(store) else { return }
+            let identifier = ObjectIdentifier(store)
+            if seen.insert(identifier).inserted {
+                stores.append(store)
+            }
+        }
+
+        if #available(iOS 17.0, *) {
+            append(WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier))
+        }
+        for store in openStores {
+            append(store)
+        }
+        return stores
+    }
+
+    /// When no managed webview is open, only return a store that is not the host app store.
+    static func fallbackStoresWhenNoWebViewOpen() -> [WKWebsiteDataStore] {
+        if #available(iOS 17.0, *) {
+            return [WKWebsiteDataStore(forIdentifier: persistentStoreIdentifier)]
+        }
+        return []
+    }
+}
+
 enum ReloadGestureSupport {
     /// Ordinary page finishes must not clear an armed pull still held by the user.
     static func shouldApplyStopReloadGesture(reloadFromGestureInProgress: Bool) -> Bool {
@@ -628,7 +684,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let controllers = Array(webViewControllers.values)
         if controllers.isEmpty {
-            return [WKWebsiteDataStore.default()]
+            return BrowsingDataStoreSupport.fallbackStoresWhenNoWebViewOpen()
         }
 
         var seen = Set<ObjectIdentifier>()
@@ -645,23 +701,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func allBrowsingDataStores() -> [WKWebsiteDataStore] {
-        var seen = Set<ObjectIdentifier>()
-        var stores: [WKWebsiteDataStore] = []
-
-        func append(_ store: WKWebsiteDataStore) {
-            let identifier = ObjectIdentifier(store)
-            if seen.insert(identifier).inserted {
-                stores.append(store)
-            }
-        }
-
-        append(WKWebsiteDataStore.default())
-        for controller in webViewControllers.values {
-            if let store = controller.websiteDataStore() {
-                append(store)
-            }
-        }
-        return stores
+        let openStores = webViewControllers.values.compactMap { $0.websiteDataStore() }
+        return BrowsingDataStoreSupport.storesForClearAllBrowsingData(openStores: openStores)
     }
 
     private func parseProxyRules(_ rawRules: [Any]) throws -> [NativeProxyRule] {
@@ -1077,7 +1118,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
+            BrowsingDataStoreSupport.persistentWebsiteDataStore().httpCookieStore.getAllCookies { cookies in
                 var cookieDict = [String: String]()
                 for cookie in cookies {
 

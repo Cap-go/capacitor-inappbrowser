@@ -19,9 +19,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
-import android.webkit.WebStorage;
 import android.webkit.WebView;
-import android.webkit.WebViewDatabase;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -887,11 +885,11 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     public void clearAllBrowsingData(PluginCall call) {
         this.getActivity().runOnUiThread(() -> {
             try {
-                ArrayList<WebView> targetWebViews = cacheWebViewsFor(null);
                 WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
-                if (bridgeWebView != null && !targetWebViews.contains(bridgeWebView)) {
-                    targetWebViews.add(bridgeWebView);
-                }
+                ArrayList<WebView> targetWebViews = BrowsingDataClearSupport.managedWebViewsOnly(
+                    webViewDialogs.values(),
+                    bridgeWebView
+                );
 
                 for (WebView targetWebView : targetWebViews) {
                     targetWebView.stopLoading();
@@ -899,18 +897,18 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                     targetWebView.clearHistory();
                     targetWebView.clearFormData();
                     targetWebView.clearSslPreferences();
+                    // Clear page storage for currently loaded origins only.
+                    // Do not call WebStorage.deleteAllData() — it wipes the Capacitor host WebView.
+                    targetWebView.evaluateJavascript(
+                        "(function(){try{localStorage.clear();}catch(e){}" +
+                            "try{sessionStorage.clear();}catch(e){}})();",
+                        null
+                    );
                 }
 
-                WebStorage.getInstance().deleteAllData();
-                WebViewDatabase webViewDatabase = WebViewDatabase.getInstance(getContext());
-                webViewDatabase.clearFormData();
-                webViewDatabase.clearHttpAuthUsernamePassword();
-
-                CookieManager cookieManager = CookieManager.getInstance();
-                cookieManager.removeAllCookies((value) -> {
-                    cookieManager.flush();
-                    call.resolve();
-                });
+                // CookieManager / WebStorage / WebViewDatabase are process-global and shared with
+                // the Ionic/Capacitor bridge WebView. Never wipe them here.
+                call.resolve();
             } catch (Exception e) {
                 Log.e("InAppBrowser", "Error clearing browsing data: " + e.getMessage());
                 call.reject("Failed to clear browsing data: " + e.getMessage());
