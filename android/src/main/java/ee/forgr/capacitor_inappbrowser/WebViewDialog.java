@@ -3147,12 +3147,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         lastConfiguration = null;
     }
 
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-        handleConfigurationChanged(newConfig);
-    }
-
     private void handleConfigurationChanged(Configuration newConfig) {
         if (isDismissing || _webView == null) {
             return;
