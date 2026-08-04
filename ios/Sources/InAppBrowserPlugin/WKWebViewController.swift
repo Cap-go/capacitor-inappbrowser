@@ -439,6 +439,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var httpMethod: String?
     open var httpBody: String?
     open var capBrowserPlugin: CapgoInAppBrowserPlugin?
+    open var isInspectable: Bool = false
     var instanceId: String = ""
     var shareDisclaimer: [String: Any]?
     var shareSubject: String?
@@ -2032,11 +2033,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    open func initWebview(isInspectable: Bool = true) {
+    open func initWebview(isInspectable: Bool = false) {
         if self.isWebViewInitialized {
             return
         }
         self.isWebViewInitialized = true
+        self.isInspectable = isInspectable
         self.startObservingKeyboardViewportChanges()
         self.view.backgroundColor = UIColor.white
 
@@ -2183,9 +2185,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         //        }
 
         if #available(iOS 16.4, *) {
-            webView.isInspectable = true
-        } else {
-            // Fallback on earlier versions
+            webView.isInspectable = isInspectable
         }
 
         // First add the webView to view hierarchy
@@ -2341,7 +2341,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.view.backgroundColor = parent.view.backgroundColor
         self.title = parent.title ?? request.url?.host ?? "Popup Window"
         self.navigationItem.title = self.title
-        self.initWebview()
+        self.initWebview(isInspectable: parent.isInspectable)
         return self.capableWebView
     }
 

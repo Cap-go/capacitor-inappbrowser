@@ -1304,7 +1304,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let titleFontFamily = call.getString("titleFontFamily")
-        let isInspectable = call.getBool("isInspectable", false)
+        let isInspectable = call.getBool("isInspectable", self.bridge?.config.isWebDebuggable ?? false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
         let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
         let isAnimated = call.getBool("isAnimated", true)
