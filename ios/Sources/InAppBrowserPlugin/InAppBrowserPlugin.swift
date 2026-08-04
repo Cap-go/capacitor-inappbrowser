@@ -110,6 +110,42 @@ enum CustomSchemeOpenSupport {
     }
 }
 
+enum SecureWindowRedirectSupport {
+    /// The auth session reports any navigation on the callback scheme, so the redirect is
+    /// identified component-wise. Query items configured in the redirect URI are matched,
+    /// while any extra items (e.g. provider code, state) are ignored, unless they reuse a
+    /// configured name: parsers disagree over which duplicate takes precedence.
+    static func matches(_ callbackURL: URL, redirectUri: String) -> Bool {
+        guard let expected = URLComponents(string: redirectUri),
+              let received = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              received.scheme?.lowercased() == expected.scheme?.lowercased(),
+              received.percentEncodedUser == expected.percentEncodedUser,
+              received.percentEncodedPassword == expected.percentEncodedPassword,
+              received.percentEncodedHost?.lowercased() == expected.percentEncodedHost?.lowercased(),
+              received.port == expected.port,
+              normalizedPath(received.percentEncodedPath) == normalizedPath(expected.percentEncodedPath) else {
+            return false
+        }
+
+        let expectedItems = expected.percentEncodedQueryItems ?? []
+        let receivedItems = received.percentEncodedQueryItems ?? []
+        let configuredDecodedNames = Set((expected.queryItems ?? []).map(\.name))
+        let configuredReceivedItemCount = (received.queryItems ?? []).filter {
+            configuredDecodedNames.contains($0.name)
+        }.count
+        guard configuredReceivedItemCount == expectedItems.count else {
+            return false
+        }
+        return Set(expectedItems.map(\.name)).allSatisfy { name in
+            receivedItems.filter { $0.name == name } == expectedItems.filter { $0.name == name }
+        }
+    }
+
+    private static func normalizedPath(_ path: String) -> String {
+        path == "/" ? "" : path
+    }
+}
+
 protocol ProxyRequestLocating {
     func hasPendingProxyRequest(_ requestId: String) -> Bool
 }
@@ -2637,6 +2673,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        guard let callbackURLScheme = URL(string: redirectUri)?.scheme else {
+            call.reject("Invalid Redirect URI")
+            return
+        }
+
         // Store the call for later resolution
         self.openSecureWindowCall = call
 
@@ -2644,7 +2685,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         // Open the URL in a secure browser window
         DispatchQueue.main.async {
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: url.scheme) {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme) {
                 callbackURL, error in
 
                 // Clean up the stored call
@@ -2661,7 +2702,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
 
-                if !callbackURL.absoluteString.hasPrefix(redirectUri) {
+                if !SecureWindowRedirectSupport.matches(callbackURL, redirectUri: redirectUri) {
                     call.reject("Redirect URI does not match, expected " + redirectUri + " but got " + callbackURL.absoluteString)
                     return
                 }
