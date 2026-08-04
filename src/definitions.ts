@@ -776,6 +776,27 @@ export interface OpenWebViewOptions {
    */
   persistWebViewData?: boolean;
   /**
+   * Share the host Capacitor WebView's website data store (cookies, local storage, etc.).
+   *
+   * On iOS 17+, InAppBrowser uses an isolated plugin-owned `WKWebsiteDataStore` by default so host
+   * and browser data stay separate. Set this to `true` to use `WKWebsiteDataStore.default()` instead,
+   * which shares session cookies with the Capacitor host WebView. Useful for SSO / OIDC silent login
+   * when the IdP session was established in the main app WebView.
+   *
+   * Requires `persistWebViewData: true` (the default). When `persistWebViewData` is false, a
+   * non-persistent store is used and this option has no effect.
+   *
+   * On Android this is a no-op: cookies are already process-global via `CookieManager`.
+   * On Web this is a no-op.
+   *
+   * Warning: clearing cookies/cache for a webview opened with this flag can affect the host WebView
+   * on iOS, because both share the same store. `clearAllBrowsingData()` still skips the host store.
+   *
+   * @default false
+   * @since 8.13.6
+   */
+  useSharedDataStore?: boolean;
+  /**
    * Controls Android TLS client certificate prompts during HTTPS handshakes.
    * Use `prompt` to show the system certificate picker; omit or use `none` to cancel silently (default).
    *
@@ -1464,9 +1485,10 @@ export interface InAppBrowserPlugin {
    * WebSQL where supported, form data, and HTTP auth data for InAppBrowser only.
    *
    * It does **not** clear the Capacitor/Ionic host WebView stores. On iOS 17+, InAppBrowser uses a
-   * dedicated persistent `WKWebsiteDataStore` so host and browser data stay isolated. On Android,
-   * process-global `CookieManager` / `WebStorage` are shared with the host WebView and are not wiped
-   * by this method; open managed WebViews still clear per-view cache/history and page storage.
+   * dedicated persistent `WKWebsiteDataStore` so host and browser data stay isolated (unless
+   * `useSharedDataStore: true` was set on `openWebView`). On Android, process-global `CookieManager`
+   * / `WebStorage` are shared with the host WebView and are not wiped by this method; open managed
+   * WebViews still clear per-view cache/history and page storage.
    *
    * @since 8.6.36
    */

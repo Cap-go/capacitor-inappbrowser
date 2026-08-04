@@ -201,6 +201,8 @@ public class Options {
     private boolean captureConsoleLogs = false;
     private boolean handleDownloads = false;
     private boolean persistWebViewData = true;
+    /** Accepted for API parity with iOS; Android cookies are already process-global. */
+    private boolean useSharedDataStore = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
     private String httpMethod = null;
     private String httpBody = null;
@@ -313,6 +315,14 @@ public class Options {
 
     public void setPersistWebViewData(boolean persistWebViewData) {
         this.persistWebViewData = persistWebViewData;
+    }
+
+    public boolean getUseSharedDataStore() {
+        return useSharedDataStore;
+    }
+
+    public void setUseSharedDataStore(boolean useSharedDataStore) {
+        this.useSharedDataStore = useSharedDataStore;
     }
 
     public void setMaterialPicker(boolean materialPicker) {
@@ -809,6 +819,7 @@ public class Options {
         copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
         copy.setWidth(width);
         copy.setPersistWebViewData(persistWebViewData);
+        copy.setUseSharedDataStore(useSharedDataStore);
         copy.setHeight(height);
         copy.setToBack(toBack);
         copy.setTransparentBackground(transparentBackground);

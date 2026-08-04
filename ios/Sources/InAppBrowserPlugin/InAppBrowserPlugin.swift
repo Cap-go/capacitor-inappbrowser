@@ -290,9 +290,12 @@ enum BrowsingDataStoreSupport {
     /// Keeps InAppBrowser cookies/storage separate from the Capacitor/Ionic host WKWebView.
     static let persistentStoreIdentifier = UUID(uuidString: "C4A96F00-1A8B-4650-9E55-1A8B00000650")!
 
-    static func websiteDataStore(persistWebViewData: Bool) -> WKWebsiteDataStore {
+    static func websiteDataStore(persistWebViewData: Bool, useSharedDataStore: Bool = false) -> WKWebsiteDataStore {
         guard persistWebViewData else {
             return .nonPersistent()
+        }
+        if useSharedDataStore {
+            return .default()
         }
         return persistentWebsiteDataStore()
     }
@@ -1321,6 +1324,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
         let handleDownloads = call.getBool("handleDownloads", false)
         let persistWebViewData = call.getBool("persistWebViewData", true)
+        let useSharedDataStore = call.getBool("useSharedDataStore", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -1479,6 +1483,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.legacyProxyRequestURLRegexPattern = legacyProxyRequests.urlRegex?.pattern
             webViewController.openBlankTargetInWebView = openBlankTargetInWebView
             webViewController.persistWebViewData = persistWebViewData
+            webViewController.useSharedDataStore = useSharedDataStore
             webViewController.setHeaders(headers: headers)
             if let customUserAgent = call.getString("customUserAgent"), !customUserAgent.isEmpty {
                 webViewController.customUserAgent = customUserAgent

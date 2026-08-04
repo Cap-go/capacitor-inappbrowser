@@ -33,4 +33,35 @@ final class BrowsingDataStoreSupportTests: XCTestCase {
         let store = BrowsingDataStoreSupport.websiteDataStore(persistWebViewData: false)
         XCTAssertFalse(store.isPersistent)
     }
+
+    func testUseSharedDataStoreReturnsHostDefaultStore() {
+        let store = BrowsingDataStoreSupport.websiteDataStore(
+            persistWebViewData: true,
+            useSharedDataStore: true
+        )
+        XCTAssertTrue(BrowsingDataStoreSupport.isHostAppWebsiteDataStore(store))
+        XCTAssertTrue(store.isPersistent)
+    }
+
+    func testUseSharedDataStoreIgnoredWhenPersistFalse() {
+        let store = BrowsingDataStoreSupport.websiteDataStore(
+            persistWebViewData: false,
+            useSharedDataStore: true
+        )
+        XCTAssertFalse(store.isPersistent)
+        XCTAssertFalse(BrowsingDataStoreSupport.isHostAppWebsiteDataStore(store))
+    }
+
+    func testDefaultIsolatedStoreIsNotHostAppStoreOnModernOS() {
+        let store = BrowsingDataStoreSupport.websiteDataStore(
+            persistWebViewData: true,
+            useSharedDataStore: false
+        )
+        if #available(iOS 17.0, *) {
+            XCTAssertFalse(BrowsingDataStoreSupport.isHostAppWebsiteDataStore(store))
+        } else {
+            // Pre-iOS 17 falls back to the shared default store.
+            XCTAssertTrue(BrowsingDataStoreSupport.isHostAppWebsiteDataStore(store))
+        }
+    }
 }
