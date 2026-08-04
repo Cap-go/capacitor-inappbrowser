@@ -886,10 +886,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         this.getActivity().runOnUiThread(() -> {
             try {
                 WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
-                ArrayList<WebView> targetWebViews = BrowsingDataClearSupport.managedWebViewsOnly(
-                    webViewDialogs.values(),
-                    bridgeWebView
-                );
+                ArrayList<WebView> targetWebViews = BrowsingDataClearSupport.managedWebViewsOnly(webViewDialogs.values(), bridgeWebView);
 
                 for (WebView targetWebView : targetWebViews) {
                     targetWebView.stopLoading();
@@ -900,8 +897,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                     // Clear page storage for currently loaded origins only.
                     // Do not call WebStorage.deleteAllData() — it wipes the Capacitor host WebView.
                     targetWebView.evaluateJavascript(
-                        "(function(){try{localStorage.clear();}catch(e){}" +
-                            "try{sessionStorage.clear();}catch(e){}})();",
+                        "(function(){try{localStorage.clear();}catch(e){}" + "try{sessionStorage.clear();}catch(e){}})();",
                         null
                     );
                 }
