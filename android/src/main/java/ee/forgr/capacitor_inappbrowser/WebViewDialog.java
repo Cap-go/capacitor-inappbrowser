@@ -3165,13 +3165,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Integer previousDensityDpi = lastConfiguration != null ? lastConfiguration.densityDpi : null;
 
         int currentOrientation = newConfig != null ? newConfig.orientation : (previousOrientation != null ? previousOrientation : 0);
-        int currentScreenWidthDp = newConfig != null ? newConfig.screenWidthDp : (previousScreenWidthDp != null ? previousScreenWidthDp : 0);
-        int currentScreenHeightDp = newConfig != null
-            ? newConfig.screenHeightDp
-            : (previousScreenHeightDp != null ? previousScreenHeightDp : 0);
-        int currentSmallestScreenWidthDp = newConfig != null
-            ? newConfig.smallestScreenWidthDp
-            : (previousSmallestScreenWidthDp != null ? previousSmallestScreenWidthDp : 0);
+        int currentScreenWidthDp =
+            newConfig != null ? newConfig.screenWidthDp : (previousScreenWidthDp != null ? previousScreenWidthDp : 0);
+        int currentScreenHeightDp =
+            newConfig != null ? newConfig.screenHeightDp : (previousScreenHeightDp != null ? previousScreenHeightDp : 0);
+        int currentSmallestScreenWidthDp =
+            newConfig != null
+                ? newConfig.smallestScreenWidthDp
+                : (previousSmallestScreenWidthDp != null ? previousSmallestScreenWidthDp : 0);
         int currentDensityDpi = newConfig != null ? newConfig.densityDpi : (previousDensityDpi != null ? previousDensityDpi : 0);
 
         boolean shouldRefresh = OrientationLayoutSupport.shouldRefreshBrowserLayout(
