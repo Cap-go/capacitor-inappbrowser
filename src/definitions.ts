@@ -768,7 +768,8 @@ export interface OpenWebViewOptions {
    *
    * When false, iOS uses a non-persistent `WKWebsiteDataStore`. Android disables per-view cache and
    * DOM/database storage where the system WebView supports it. Android cookies use the shared
-   * WebView cookie store, so call `clearAllBrowsingData()` to remove cookies and other global data.
+   * WebView cookie store; clearing them also affects the host WebView, so prefer per-URL cookie
+   * helpers instead of relying on process-global wipes.
    *
    * @default true
    * @since 8.6.36
@@ -1457,10 +1458,15 @@ export interface InAppBrowserPlugin {
   clearCache(options?: { id?: string }): Promise<any>;
 
   /**
-   * Clear all browsing data from the default store and any opened managed webviews.
+   * Clear all browsing data from InAppBrowser-managed webviews and the plugin-owned data store.
    *
    * This removes cookies, disk cache, memory cache, local storage, session storage, IndexedDB,
-   * WebSQL where supported, form data, and HTTP auth data where the platform exposes it.
+   * WebSQL where supported, form data, and HTTP auth data for InAppBrowser only.
+   *
+   * It does **not** clear the Capacitor/Ionic host WebView stores. On iOS 17+, InAppBrowser uses a
+   * dedicated persistent `WKWebsiteDataStore` so host and browser data stay isolated. On Android,
+   * process-global `CookieManager` / `WebStorage` are shared with the host WebView and are not wiped
+   * by this method; open managed WebViews still clear per-view cache/history and page storage.
    *
    * @since 8.6.36
    */
