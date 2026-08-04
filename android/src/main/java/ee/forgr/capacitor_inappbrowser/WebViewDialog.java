@@ -5,10 +5,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -356,6 +358,20 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private boolean cachedTitleIconResolved;
     private boolean isHiddenModeActive = false;
     private boolean toolbarHideInProgress = false;
+    private boolean configurationCallbacksRegistered = false;
+    private Configuration lastConfiguration;
+    private final ComponentCallbacks2 configurationCallbacks = new ComponentCallbacks2() {
+        @Override
+        public void onConfigurationChanged(Configuration newConfig) {
+            handleConfigurationChanged(newConfig);
+        }
+
+        @Override
+        public void onLowMemory() {}
+
+        @Override
+        public void onTrimMemory(int level) {}
+    };
     private WindowManager.LayoutParams previousWindowAttributes;
     private Drawable previousWindowBackground;
     private ViewGroup.LayoutParams previousWebViewLayoutParams;
@@ -2824,6 +2840,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             showAccordingToLayerModeOrFallback();
             resolveOpenWebViewIfNeeded();
         }
+
+        // Capacitor activities handle orientation themselves; refresh dialog layout explicitly.
+        registerConfigurationCallbacks();
     }
 
     private void applyHiddenMode() {
@@ -2974,22 +2993,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         // Check if we need Android 15+ specific fixes
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
 
-        // Find status bar color view and toolbar for Android 15+ specific handling
-        View statusBarColorView = findViewById(R.id.status_bar_color_view);
         View toolbarView = findViewById(R.id.tool_bar);
 
         // Fix content browser layout height for all Android versions to allow proper scrolling
         // This fixes landscape scrolling issues where bottom content is unreachable
-        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
-        if (contentBrowserLayout != null) {
-            ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
-            if (layoutParams != null) {
-                // Use MATCH_PARENT for height to allow proper scrolling in all orientations
-                // The AppBarLayout's layout_behavior will handle positioning automatically
-                layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
-                contentBrowserLayout.setLayoutParams(layoutParams);
-            }
-        }
+        ensureContentBrowserMatchParentHeight();
 
         boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
         if (isBlankToolbar) {
@@ -2998,53 +3006,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         // Special handling for Android 15+
         if (isAndroid15Plus && !isBlankToolbar) {
-            // Get AppBarLayout which contains the toolbar
-            if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
-                // Remove elevation to eliminate shadows (only on Android 15+)
-                appBarLayout.setElevation(0);
-                appBarLayout.setStateListAnimator(null);
-                appBarLayout.setOutlineProvider(null);
-
-                // Determine background color to use
-                int backgroundColor = Color.BLACK; // Default fallback
-                if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
-                    try {
-                        backgroundColor = Color.parseColor(_options.getToolbarColor());
-                    } catch (IllegalArgumentException e) {
-                        Log.e("InAppBrowser", "Invalid toolbar color, using black: " + e.getMessage());
-                    }
-                } else {
-                    // Follow system theme if no color specified
-                    boolean isDarkTheme = isDarkThemeEnabled();
-                    backgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                }
-
-                // Apply fixes for Android 15+ using a delayed post
-                final int finalBgColor = backgroundColor;
-                _webView.post(() -> {
-                    // Get status bar height
-                    int statusBarHeight = 0;
-                    int resourceId = getContext().getResources().getIdentifier("status_bar_height", "dimen", "android");
-                    if (resourceId > 0) {
-                        statusBarHeight = getContext().getResources().getDimensionPixelSize(resourceId);
-                    }
-
-                    // Fix status bar view
-                    if (statusBarColorView != null) {
-                        ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
-                        params.height = statusBarHeight;
-                        statusBarColorView.setLayoutParams(params);
-                        statusBarColorView.setBackgroundColor(finalBgColor);
-                        statusBarColorView.setVisibility(View.VISIBLE);
-                    }
-
-                    // Fix AppBarLayout position
-                    ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) appBarLayout.getLayoutParams();
-                    params.topMargin = statusBarHeight;
-                    appBarLayout.setLayoutParams(params);
-                    appBarLayout.setBackgroundColor(finalBgColor);
-                });
-            }
+            refreshEdgeToEdgeChrome();
         }
 
         // Resolve insets from the dialog window root; layout children can receive already-fitted zero insets.
@@ -3150,6 +3112,232 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 300);
         mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 1200);
+    }
+
+    private void registerConfigurationCallbacks() {
+        if (configurationCallbacksRegistered) {
+            return;
+        }
+
+        Context callbackContext = activity != null ? activity : _context;
+        if (callbackContext == null) {
+            return;
+        }
+
+        lastConfiguration = new Configuration(callbackContext.getResources().getConfiguration());
+        callbackContext.registerComponentCallbacks(configurationCallbacks);
+        configurationCallbacksRegistered = true;
+    }
+
+    private void unregisterConfigurationCallbacks() {
+        if (!configurationCallbacksRegistered) {
+            return;
+        }
+
+        Context callbackContext = activity != null ? activity : _context;
+        if (callbackContext != null) {
+            try {
+                callbackContext.unregisterComponentCallbacks(configurationCallbacks);
+            } catch (Exception e) {
+                Log.w("InAppBrowser", "Failed to unregister configuration callbacks: " + e.getMessage());
+            }
+        }
+
+        configurationCallbacksRegistered = false;
+        lastConfiguration = null;
+    }
+
+    private void handleConfigurationChanged(Configuration newConfig) {
+        if (isDismissing || _webView == null) {
+            return;
+        }
+
+        Integer previousOrientation = lastConfiguration != null ? lastConfiguration.orientation : null;
+        Integer previousScreenWidthDp = lastConfiguration != null ? lastConfiguration.screenWidthDp : null;
+        Integer previousScreenHeightDp = lastConfiguration != null ? lastConfiguration.screenHeightDp : null;
+        Integer previousSmallestScreenWidthDp = lastConfiguration != null ? lastConfiguration.smallestScreenWidthDp : null;
+        Integer previousDensityDpi = lastConfiguration != null ? lastConfiguration.densityDpi : null;
+
+        int currentOrientation = newConfig != null ? newConfig.orientation : (previousOrientation != null ? previousOrientation : 0);
+        int currentScreenWidthDp =
+            newConfig != null ? newConfig.screenWidthDp : (previousScreenWidthDp != null ? previousScreenWidthDp : 0);
+        int currentScreenHeightDp =
+            newConfig != null ? newConfig.screenHeightDp : (previousScreenHeightDp != null ? previousScreenHeightDp : 0);
+        int currentSmallestScreenWidthDp =
+            newConfig != null
+                ? newConfig.smallestScreenWidthDp
+                : (previousSmallestScreenWidthDp != null ? previousSmallestScreenWidthDp : 0);
+        int currentDensityDpi = newConfig != null ? newConfig.densityDpi : (previousDensityDpi != null ? previousDensityDpi : 0);
+
+        boolean shouldRefresh = OrientationLayoutSupport.shouldRefreshBrowserLayout(
+            previousOrientation,
+            previousScreenWidthDp,
+            previousScreenHeightDp,
+            previousSmallestScreenWidthDp,
+            previousDensityDpi,
+            currentOrientation,
+            currentScreenWidthDp,
+            currentScreenHeightDp,
+            currentSmallestScreenWidthDp,
+            currentDensityDpi
+        );
+
+        if (newConfig != null) {
+            lastConfiguration = new Configuration(newConfig);
+        }
+
+        if (!shouldRefresh) {
+            return;
+        }
+
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            refreshLayoutForConfigurationChange();
+        } else {
+            mainHandler.post(this::refreshLayoutForConfigurationChange);
+        }
+    }
+
+    /**
+     * Capacitor keeps the host activity alive across orientation changes. Re-apply fullscreen
+     * window dimensions, system chrome, and safe-area insets so the WebView stays scrollable
+     * after portrait↔landscape transitions.
+     */
+    private void refreshLayoutForConfigurationChange() {
+        if (isDismissing || _webView == null) {
+            return;
+        }
+
+        if (isHiddenModeActive) {
+            requestSafeAreaInsets();
+            return;
+        }
+
+        if (backLayerActive) {
+            applyBackLayerDimensions();
+        } else {
+            applyDimensions();
+        }
+
+        ensureContentBrowserMatchParentHeight();
+
+        boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
+        if (isBlankToolbar) {
+            configureBlankToolbarLayout();
+        } else if (Build.VERSION.SDK_INT >= 35) {
+            refreshEdgeToEdgeChrome();
+        } else {
+            refreshStatusBarColorViewHeight();
+        }
+
+        View coordinator = findViewById(R.id.coordinator_layout);
+        if (coordinator != null) {
+            coordinator.requestLayout();
+        }
+
+        if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.requestLayout();
+        }
+
+        _webView.requestLayout();
+        _webView.invalidate();
+        requestSafeAreaInsets();
+
+        mainHandler.post(this::applyContainerInsetsSnapshot);
+        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 100);
+        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 300);
+
+        _webView.post(() -> {
+            if (_webView == null) {
+                return;
+            }
+            _webView.evaluateJavascript("(function(){window.dispatchEvent(new Event('resize'));})();", null);
+        });
+    }
+
+    private void ensureContentBrowserMatchParentHeight() {
+        View contentBrowserLayout = findViewById(R.id.content_browser_layout);
+        if (contentBrowserLayout == null) {
+            return;
+        }
+
+        ViewGroup.LayoutParams layoutParams = contentBrowserLayout.getLayoutParams();
+        if (layoutParams == null) {
+            return;
+        }
+
+        layoutParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        contentBrowserLayout.setLayoutParams(layoutParams);
+    }
+
+    private void refreshStatusBarColorViewHeight() {
+        View statusBarColorView = findViewById(R.id.status_bar_color_view);
+        if (statusBarColorView == null) {
+            return;
+        }
+
+        int statusBarHeight = getSystemStatusBarHeight();
+        ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+        if (params == null) {
+            return;
+        }
+
+        params.height = statusBarHeight;
+        statusBarColorView.setLayoutParams(params);
+        statusBarColorView.requestLayout();
+    }
+
+    private void refreshEdgeToEdgeChrome() {
+        if (_webView == null || _options == null) {
+            return;
+        }
+
+        View statusBarColorView = findViewById(R.id.status_bar_color_view);
+        View toolbarView = findViewById(R.id.tool_bar);
+        if (toolbarView == null || !(toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout)) {
+            refreshStatusBarColorViewHeight();
+            return;
+        }
+
+        appBarLayout.setElevation(0);
+        appBarLayout.setStateListAnimator(null);
+        appBarLayout.setOutlineProvider(null);
+
+        int backgroundColor = Color.BLACK;
+        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
+            try {
+                backgroundColor = Color.parseColor(_options.getToolbarColor());
+            } catch (IllegalArgumentException e) {
+                Log.e("InAppBrowser", "Invalid toolbar color, using black: " + e.getMessage());
+            }
+        } else {
+            backgroundColor = isDarkThemeEnabled() ? Color.BLACK : Color.WHITE;
+        }
+
+        final int finalBgColor = backgroundColor;
+        _webView.post(() -> {
+            if (_webView == null) {
+                return;
+            }
+
+            int statusBarHeight = getSystemStatusBarHeight();
+
+            if (statusBarColorView != null) {
+                ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+                if (params != null) {
+                    params.height = statusBarHeight;
+                    statusBarColorView.setLayoutParams(params);
+                }
+                statusBarColorView.setBackgroundColor(finalBgColor);
+                statusBarColorView.setVisibility(View.VISIBLE);
+            }
+
+            ViewGroup.LayoutParams appBarParams = appBarLayout.getLayoutParams();
+            if (appBarParams instanceof ViewGroup.MarginLayoutParams marginParams) {
+                marginParams.topMargin = statusBarHeight;
+                appBarLayout.setLayoutParams(marginParams);
+            }
+            appBarLayout.setBackgroundColor(finalBgColor);
+        });
     }
 
     private void applySafeAreaMargins(
@@ -5859,6 +6047,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     @Override
     public void dismiss() {
+        unregisterConfigurationCallbacks();
         scheduleHostWebViewInsetRestore();
         detachBackLayer();
 
@@ -6969,7 +7158,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Integer x = _options.getX();
         Integer y = _options.getY();
 
-        WindowManager.LayoutParams params = getWindow().getAttributes();
+        Window window = getWindow();
+        if (window == null) {
+            return;
+        }
+
+        WindowManager.LayoutParams params = window.getAttributes();
 
         // If both width and height are specified, use custom dimensions
         if (width != null && height != null) {
@@ -6979,6 +7173,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             params.x = (x != null) ? (int) getPixels(x) : 0;
             params.y = (y != null) ? (int) getPixels(y) : 0;
             params.gravity = Gravity.TOP | Gravity.START;
+            window.setAttributes(params);
         } else if (height != null && width == null) {
             // If only height is specified, use custom height with fullscreen width
             params.gravity = Gravity.TOP | Gravity.LEFT;
@@ -6987,15 +7182,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             params.x = 0;
             params.y = (y != null) ? (int) getPixels(y) : 0;
             params.gravity = Gravity.TOP | Gravity.START;
+            window.setAttributes(params);
         } else {
-            // Default to fullscreen
-            params.width = WindowManager.LayoutParams.MATCH_PARENT;
-            params.height = WindowManager.LayoutParams.MATCH_PARENT;
+            // Default to fullscreen. Prefer setLayout so MATCH_PARENT is not replaced by
+            // previously resolved portrait/landscape pixel sizes after a configuration change.
             params.x = 0;
             params.y = 0;
+            params.gravity = Gravity.TOP | Gravity.START;
+            window.setAttributes(params);
+            window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
         }
-
-        getWindow().setAttributes(params);
     }
 
     /**
