@@ -76,6 +76,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
     );
 
+    private static final ExecutorService CUSTOM_TABS_LIFECYCLE_EXECUTOR = Executors.newSingleThreadExecutor((runnable) -> {
+        Thread thread = new Thread(runnable, "CapgoInAppBrowser-CustomTabsLifecycle");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private final CustomTabsLifecycleSupport customTabsLifecycleSupport = new CustomTabsLifecycleSupport(CUSTOM_TABS_LIFECYCLE_EXECUTOR);
+
     private final String pluginVersion = "8.6.17";
 
     private boolean resolveClientCertificatePrompt(PluginCall call) {
@@ -679,6 +687,27 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         @Override
         public void onServiceDisconnected(ComponentName name) {
             customTabsClient = null;
+        }
+    };
+
+    private final CustomTabsLifecycleSupport.Binder customTabsBinder = new CustomTabsLifecycleSupport.Binder() {
+        @Override
+        public boolean bindCustomTabsService() {
+            try {
+                boolean ok = CustomTabsClient.bindCustomTabsService(getContext(), CUSTOM_TAB_PACKAGE_NAME, connection);
+                if (!ok) {
+                    Log.e(getLogTag(), "Error binding to custom tabs service");
+                }
+                return ok;
+            } catch (RuntimeException e) {
+                Log.e(getLogTag(), "Error binding to custom tabs service", e);
+                return false;
+            }
+        }
+
+        @Override
+        public void unbindCustomTabsService() {
+            getContext().unbindService(connection);
         }
     };
 
@@ -1839,10 +1868,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnResume() {
-        boolean ok = CustomTabsClient.bindCustomTabsService(getContext(), CUSTOM_TAB_PACKAGE_NAME, connection);
-        if (!ok) {
-            Log.e(getLogTag(), "Error binding to custom tabs service");
-        }
+        customTabsLifecycleSupport.onResume(customTabsBinder);
+
         // If we have a saved call and user returned without callback, reject
         if (openSecureWindowSavedCall != null) {
             openSecureWindowSavedCall.reject("OAuth cancelled or no callback received");
@@ -1851,7 +1878,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnPause() {
-        getContext().unbindService(connection);
+        customTabsLifecycleSupport.onPause(customTabsBinder);
     }
 
     public CustomTabsSession getCustomTabsSession() {
