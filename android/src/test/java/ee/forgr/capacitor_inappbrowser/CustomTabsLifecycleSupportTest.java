@@ -23,7 +23,7 @@ public class CustomTabsLifecycleSupportTest {
     }
 
     @Test
-    public void pauseWhileBindInProgressUnbindsAfterBindCompletes() throws Exception {
+    public void pauseWhileBindInProgressDefersUnbindUntilBindCompletes() throws Exception {
         executor = Executors.newSingleThreadExecutor();
         CustomTabsLifecycleSupport support = new CustomTabsLifecycleSupport(executor);
         CountDownLatch bindStarted = new CountDownLatch(1);
@@ -54,13 +54,20 @@ public class CustomTabsLifecycleSupportTest {
         support.onResume(binder);
         assertTrue(bindStarted.await(1, TimeUnit.SECONDS));
 
-        support.onPause(binder);
+        Thread pauseThread = new Thread(() -> support.onPause(binder));
+        pauseThread.start();
+        pauseThread.join(1000);
+
+        assertTrue(support.isUnbindPending());
+        assertFalse(unbound.get());
+
         releaseBind.countDown();
 
         executor.shutdown();
         assertTrue(executor.awaitTermination(2, TimeUnit.SECONDS));
         assertTrue(bound.get());
         assertTrue(unbound.get());
+        assertFalse(support.isUnbindPending());
     }
 
     @Test

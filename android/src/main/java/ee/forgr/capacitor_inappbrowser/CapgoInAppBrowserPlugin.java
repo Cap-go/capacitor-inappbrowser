@@ -678,10 +678,16 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         currentPermissionNeedsMicrophone = false;
     }
 
+    private final Object customTabsClientLock = new Object();
+    private static final long CUSTOM_TABS_CONNECTION_TIMEOUT_MS = 2000;
+
     CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
         @Override
         public void onCustomTabsServiceConnected(ComponentName name, CustomTabsClient client) {
             customTabsClient = client;
+            synchronized (customTabsClientLock) {
+                customTabsClientLock.notifyAll();
+            }
         }
 
         @Override
@@ -777,8 +783,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
         if (TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
         currentUrl = url;
+        awaitCustomTabsClientIfNeeded();
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
 
         // --- Chrome Custom Tab UI customization ---
@@ -1879,6 +1887,28 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     protected void handleOnPause() {
         customTabsLifecycleSupport.onPause(customTabsBinder);
+    }
+
+    private void awaitCustomTabsClientIfNeeded() {
+        if (customTabsClient != null || !customTabsLifecycleSupport.isBindingOrBound()) {
+            return;
+        }
+
+        synchronized (customTabsClientLock) {
+            long deadline = System.currentTimeMillis() + CUSTOM_TABS_CONNECTION_TIMEOUT_MS;
+            while (customTabsClient == null && customTabsLifecycleSupport.isBindingOrBound() && System.currentTimeMillis() < deadline) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    break;
+                }
+                try {
+                    customTabsClientLock.wait(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
     }
 
     public CustomTabsSession getCustomTabsSession() {

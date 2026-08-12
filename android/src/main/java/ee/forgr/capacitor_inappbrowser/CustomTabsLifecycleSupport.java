@@ -25,7 +25,25 @@ final class CustomTabsLifecycleSupport {
     }
 
     void onPause(Binder binder) {
+        synchronized (lock) {
+            if (bindInProgress) {
+                unbindPending = true;
+                return;
+            }
+        }
         executor.execute(() -> performUnbind(binder));
+    }
+
+    boolean isBindingOrBound() {
+        synchronized (lock) {
+            return bindInProgress || bound;
+        }
+    }
+
+    boolean isUnbindPending() {
+        synchronized (lock) {
+            return unbindPending;
+        }
     }
 
     private void performBind(Binder binder) {
