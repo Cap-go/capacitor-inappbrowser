@@ -14,7 +14,6 @@ final class CustomTabsLifecycleSupport {
     private final Object lock = new Object();
     private boolean bound = false;
     private boolean bindInProgress = false;
-    private boolean unbindPending = false;
 
     CustomTabsLifecycleSupport(Executor executor) {
         this.executor = executor;
@@ -25,12 +24,6 @@ final class CustomTabsLifecycleSupport {
     }
 
     void onPause(Binder binder) {
-        synchronized (lock) {
-            if (bindInProgress) {
-                unbindPending = true;
-                return;
-            }
-        }
         executor.execute(() -> performUnbind(binder));
     }
 
@@ -40,9 +33,9 @@ final class CustomTabsLifecycleSupport {
         }
     }
 
-    boolean isUnbindPending() {
+    boolean isBound() {
         synchronized (lock) {
-            return unbindPending;
+            return bound;
         }
     }
 
@@ -52,7 +45,6 @@ final class CustomTabsLifecycleSupport {
                 return;
             }
             bindInProgress = true;
-            unbindPending = false;
         }
 
         boolean ok = false;
@@ -68,17 +60,6 @@ final class CustomTabsLifecycleSupport {
                 return;
             }
 
-            if (unbindPending) {
-                unbindPending = false;
-                try {
-                    binder.unbindCustomTabsService();
-                } catch (RuntimeException ignored) {
-                    // Service may already be unbound.
-                }
-                bound = false;
-                return;
-            }
-
             bound = true;
         }
     }
@@ -86,7 +67,6 @@ final class CustomTabsLifecycleSupport {
     private void performUnbind(Binder binder) {
         synchronized (lock) {
             if (bindInProgress) {
-                unbindPending = true;
                 return;
             }
             if (!bound) {
