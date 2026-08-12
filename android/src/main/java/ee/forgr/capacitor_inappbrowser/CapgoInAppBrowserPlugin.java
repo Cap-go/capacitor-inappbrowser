@@ -76,6 +76,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
     );
 
+    private static final ExecutorService CUSTOM_TABS_LIFECYCLE_EXECUTOR = Executors.newSingleThreadExecutor((runnable) -> {
+        Thread thread = new Thread(runnable, "CapgoInAppBrowser-CustomTabsLifecycle");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private final CustomTabsLifecycleSupport customTabsLifecycleSupport = new CustomTabsLifecycleSupport(CUSTOM_TABS_LIFECYCLE_EXECUTOR);
+
     private final String pluginVersion = "8.6.17";
 
     private boolean resolveClientCertificatePrompt(PluginCall call) {
@@ -670,15 +678,42 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         currentPermissionNeedsMicrophone = false;
     }
 
+    private final Object customTabsClientLock = new Object();
+    private static final long CUSTOM_TABS_CONNECTION_TIMEOUT_MS = 2000;
+
     CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
         @Override
         public void onCustomTabsServiceConnected(ComponentName name, CustomTabsClient client) {
             customTabsClient = client;
+            synchronized (customTabsClientLock) {
+                customTabsClientLock.notifyAll();
+            }
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             customTabsClient = null;
+        }
+    };
+
+    private final CustomTabsLifecycleSupport.Binder customTabsBinder = new CustomTabsLifecycleSupport.Binder() {
+        @Override
+        public boolean bindCustomTabsService() {
+            try {
+                boolean ok = CustomTabsClient.bindCustomTabsService(getContext(), CUSTOM_TAB_PACKAGE_NAME, connection);
+                if (!ok) {
+                    Log.e(getLogTag(), "Error binding to custom tabs service");
+                }
+                return ok;
+            } catch (RuntimeException e) {
+                Log.e(getLogTag(), "Error binding to custom tabs service", e);
+                return false;
+            }
+        }
+
+        @Override
+        public void unbindCustomTabsService() {
+            getContext().unbindService(connection);
         }
     };
 
@@ -748,8 +783,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
         if (TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
         currentUrl = url;
+        awaitCustomTabsClientIfNeeded();
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
 
         // --- Chrome Custom Tab UI customization ---
@@ -1839,10 +1876,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnResume() {
-        boolean ok = CustomTabsClient.bindCustomTabsService(getContext(), CUSTOM_TAB_PACKAGE_NAME, connection);
-        if (!ok) {
-            Log.e(getLogTag(), "Error binding to custom tabs service");
-        }
+        customTabsLifecycleSupport.onResume(customTabsBinder);
+
         // If we have a saved call and user returned without callback, reject
         if (openSecureWindowSavedCall != null) {
             openSecureWindowSavedCall.reject("OAuth cancelled or no callback received");
@@ -1851,7 +1886,29 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnPause() {
-        getContext().unbindService(connection);
+        customTabsLifecycleSupport.onPause(customTabsBinder);
+    }
+
+    private void awaitCustomTabsClientIfNeeded() {
+        if (customTabsClient != null || !customTabsLifecycleSupport.isBindingOrBound()) {
+            return;
+        }
+
+        synchronized (customTabsClientLock) {
+            long deadline = System.currentTimeMillis() + CUSTOM_TABS_CONNECTION_TIMEOUT_MS;
+            while (customTabsClient == null && customTabsLifecycleSupport.isBindingOrBound() && System.currentTimeMillis() < deadline) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    break;
+                }
+                try {
+                    customTabsClientLock.wait(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
     }
 
     public CustomTabsSession getCustomTabsSession() {
