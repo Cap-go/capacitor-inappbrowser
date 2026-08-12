@@ -3230,7 +3230,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (_webView == null) {
                 return;
             }
-            forceWebViewContentRemeasure();
+            requestWebViewContentRelayout();
             _webView.evaluateJavascript("(function(){window.dispatchEvent(new Event('resize'));})();", null);
         });
     }
@@ -3370,6 +3370,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(decorView);
         if (windowInsets == null) {
+            applyContainerInsetsSnapshot();
             return;
         }
 
@@ -3378,22 +3379,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
     }
 
-    private void forceWebViewContentRemeasure() {
+    private void requestWebViewContentRelayout() {
         View container = findViewById(R.id.content_browser_layout);
-        if (container == null || _webView == null) {
+        if (container != null) {
+            container.requestLayout();
+            container.invalidate();
+        }
+
+        if (_webView == null) {
             return;
         }
 
-        int width = container.getWidth();
-        int height = container.getHeight();
-        if (width <= 0 || height <= 0) {
-            return;
-        }
-
-        int widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY);
-        int heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY);
-        _webView.measure(widthSpec, heightSpec);
-        _webView.layout(_webView.getLeft(), _webView.getTop(), _webView.getLeft() + width, _webView.getTop() + height);
+        _webView.requestLayout();
+        _webView.invalidate();
     }
 
     private void applySafeAreaMargins(
