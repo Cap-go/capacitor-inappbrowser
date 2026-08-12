@@ -3370,7 +3370,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(decorView);
         if (windowInsets == null) {
-            applyContainerInsetsSnapshot();
+            // Root insets not ready yet; do not mutate margins/padding (would desync WebView
+            // margins from container padding). Delayed retries and requestApplyInsets will retry.
             return;
         }
 
