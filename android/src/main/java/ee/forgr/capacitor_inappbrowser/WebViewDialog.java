@@ -3013,30 +3013,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         final View insetsSourceView = resolveSafeAreaInsetsSourceView();
 
         ViewCompat.setOnApplyWindowInsetsListener(insetsSourceView, (v, windowInsets) -> {
-            Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
-            Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
-            Insets mandatoryGestures = windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
-            Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
-            boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
-
-            boolean appBarHandlesTopInset =
-                isAndroid15Plus &&
-                !TextUtils.equals(_options.getToolbarType(), "blank") &&
-                toolbarView != null &&
-                toolbarView.getVisibility() == View.VISIBLE &&
-                toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
-            applySafeAreaMargins(
-                bars,
-                navigationBars,
-                systemGestures,
-                mandatoryGestures,
-                ime,
-                keyboardVisible,
-                appBarHandlesTopInset,
-                isAndroid15Plus
-            );
-
+            applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
             return windowInsets;
         });
         requestSafeAreaInsets();
@@ -3209,6 +3186,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         if (isHiddenModeActive) {
             requestSafeAreaInsets();
+            reapplyInsetsFromWindowRoot();
             return;
         }
 
@@ -3235,21 +3213,24 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         if (swipeRefreshLayout != null) {
+            swipeRefreshLayout.setRefreshing(false);
             swipeRefreshLayout.requestLayout();
         }
 
         _webView.requestLayout();
         _webView.invalidate();
         requestSafeAreaInsets();
+        reapplyInsetsFromWindowRoot();
 
-        mainHandler.post(this::applyContainerInsetsSnapshot);
-        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 100);
-        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 300);
+        mainHandler.post(this::reapplyInsetsFromWindowRoot);
+        mainHandler.postDelayed(this::reapplyInsetsFromWindowRoot, 100);
+        mainHandler.postDelayed(this::reapplyInsetsFromWindowRoot, 300);
 
         _webView.post(() -> {
             if (_webView == null) {
                 return;
             }
+            forceWebViewContentRemeasure();
             _webView.evaluateJavascript("(function(){window.dispatchEvent(new Event('resize'));})();", null);
         });
     }
@@ -3338,6 +3319,81 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
             appBarLayout.setBackgroundColor(finalBgColor);
         });
+    }
+
+    private void applyWindowInsetsToWebView(WindowInsetsCompat windowInsets, boolean isAndroid15Plus, View toolbarView) {
+        if (windowInsets == null || _options == null) {
+            return;
+        }
+
+        Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+        Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+        Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
+        Insets mandatoryGestures = windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures());
+        Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+        boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
+
+        boolean appBarHandlesTopInset =
+            isAndroid15Plus &&
+            !TextUtils.equals(_options.getToolbarType(), "blank") &&
+            toolbarView != null &&
+            toolbarView.getVisibility() == View.VISIBLE &&
+            toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
+
+        applySafeAreaMargins(
+            bars,
+            navigationBars,
+            systemGestures,
+            mandatoryGestures,
+            ime,
+            keyboardVisible,
+            appBarHandlesTopInset,
+            isAndroid15Plus
+        );
+    }
+
+    /**
+     * Re-read root window insets and apply WebView margins plus container padding.
+     * Dialog windows may not re-dispatch inset listeners after rotation, leaving stale
+     * portrait margins that break vertical scrolling in landscape.
+     */
+    private void reapplyInsetsFromWindowRoot() {
+        if (_webView == null || _options == null) {
+            return;
+        }
+
+        Window window = getWindow();
+        View decorView = window != null ? window.getDecorView() : null;
+        if (decorView == null) {
+            return;
+        }
+
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(decorView);
+        if (windowInsets == null) {
+            return;
+        }
+
+        boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
+        View toolbarView = findViewById(R.id.tool_bar);
+        applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
+    }
+
+    private void forceWebViewContentRemeasure() {
+        View container = findViewById(R.id.content_browser_layout);
+        if (container == null || _webView == null) {
+            return;
+        }
+
+        int width = container.getWidth();
+        int height = container.getHeight();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        int widthSpec = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY);
+        int heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY);
+        _webView.measure(widthSpec, heightSpec);
+        _webView.layout(_webView.getLeft(), _webView.getTop(), _webView.getLeft() + width, _webView.getTop() + height);
     }
 
     private void applySafeAreaMargins(
@@ -3554,7 +3610,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         ViewCompat.requestApplyInsets(insetsSourceView);
         insetsSourceView.post(() -> {
             ViewCompat.requestApplyInsets(insetsSourceView);
-            applyContainerInsetsSnapshot();
+            reapplyInsetsFromWindowRoot();
         });
     }
 
