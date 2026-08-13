@@ -3472,8 +3472,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
                 applyAppBarTopInset(appBarLayout, statusBarTop);
             }
-        } else {
-            syncBlankToolbarStatusBarStrip(padTop);
         }
 
         boolean paddingChanged =
@@ -3486,34 +3484,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         injectSafeAreaCssVariables(padTop, padBottom, bars.left, bars.right);
-    }
-
-    /**
-     * A blank toolbar has no appbar to paint the status-bar area, so the strip freed by the container
-     * top padding would expose the bare window background behind the status bar icons. Reuse the
-     * status-bar colour view (already tinted with the toolbar colour) to fill it (#655).
-     */
-    private void syncBlankToolbarStatusBarStrip(int topInset) {
-        if (_options == null || !TextUtils.equals(_options.getToolbarType(), "blank")) {
-            return;
-        }
-
-        View statusBarColorView = findViewById(R.id.status_bar_color_view);
-        if (statusBarColorView == null) {
-            return;
-        }
-
-        if (topInset <= 0) {
-            statusBarColorView.setVisibility(View.GONE);
-            return;
-        }
-
-        ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
-        if (params != null && params.height != topInset) {
-            params.height = topInset;
-            statusBarColorView.setLayoutParams(params);
-        }
-        statusBarColorView.setVisibility(View.VISIBLE);
     }
 
     private void configureBlankToolbarLayout() {
