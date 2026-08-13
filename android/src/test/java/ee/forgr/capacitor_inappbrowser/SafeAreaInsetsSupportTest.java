@@ -73,6 +73,24 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void statusBarTopUsesReportedInsetWhenPresent() {
+        assertEquals(87, SafeAreaInsetsSupport.resolveStatusBarTop(87, 126, 0, 0, 63));
+    }
+
+    @Test
+    public void statusBarTopFallsBackOnlyWhenInsetsLookUnpopulated() {
+        assertEquals(63, SafeAreaInsetsSupport.resolveStatusBarTop(0, 0, 0, 0, 63));
+    }
+
+    @Test
+    public void statusBarTopStaysZeroWhenOtherInsetsAreReported() {
+        // Multi-window secondary window or hidden status bar: no status bar to avoid, so no padding.
+        assertEquals(0, SafeAreaInsetsSupport.resolveStatusBarTop(0, 126, 0, 0, 63));
+        assertEquals(0, SafeAreaInsetsSupport.resolveStatusBarTop(0, 0, 126, 0, 63));
+        assertEquals(0, SafeAreaInsetsSupport.resolveStatusBarTop(0, 0, 0, 126, 63));
+    }
+
+    @Test
     public void containerTopPaddingIsZeroWhenAppBarHandlesTopInset() {
         assertEquals(0, SafeAreaInsetsSupport.resolveContainerTopPadding(true, true, 87, true, true));
     }

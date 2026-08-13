@@ -3451,7 +3451,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isEdgeToEdge);
-        int statusBarTop = bars.top > 0 ? bars.top : getSystemStatusBarHeight();
+        int statusBarTop = SafeAreaInsetsSupport.resolveStatusBarTop(
+            bars.top,
+            bars.bottom,
+            bars.left,
+            bars.right,
+            getSystemStatusBarHeight()
+        );
         int fallbackBottomInset = applyBottomInset ? getSystemNavigationBarHeight() : 0;
         int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
             bars.bottom,
@@ -3469,12 +3475,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         // Older dialogs still resize for the keyboard; re-applying decor IME creates a black gap (#622).
         int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, isEdgeToEdge);
 
+        // In back-layer mode the content is reparented into the host activity's window, which this
+        // plugin never puts in edge-to-edge, so the host owns the top inset and the useTopInset opt-in
+        // still decides there.
         int padTop = SafeAreaInsetsSupport.resolveContainerTopPadding(
             _options.getEnabledSafeTopMargin(),
             _options.getUseTopInset(),
             statusBarTop,
             appBarHandlesTopInset,
-            isEdgeToEdge
+            isEdgeToEdge && !backLayerActive
         );
         int padBottom = SafeAreaInsetsSupport.resolveContainerBottomPadding(applyBottomInset, safeBottomInset, imeBottom);
 

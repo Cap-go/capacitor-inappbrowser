@@ -77,6 +77,27 @@ final class SafeAreaInsetsSupport {
     }
 
     /**
+     * The status-bar height resource stands in for the reported top inset only when the whole inset
+     * set looks unpopulated, which happens on devices that hand out zeroed insets. A window that
+     * reports other insets but no top one has no status bar to avoid — a secondary multi-window
+     * window, or one whose status bar is hidden — and padding it would open a phantom gap.
+     */
+    static int resolveStatusBarTop(
+        int systemBarsTop,
+        int systemBarsBottom,
+        int systemBarsLeft,
+        int systemBarsRight,
+        int fallbackStatusBarTop
+    ) {
+        if (systemBarsTop > 0) {
+            return systemBarsTop;
+        }
+
+        boolean insetsPopulated = systemBarsBottom > 0 || systemBarsLeft > 0 || systemBarsRight > 0;
+        return insetsPopulated ? 0 : Math.max(0, fallbackStatusBarTop);
+    }
+
+    /**
      * Top padding for the WebView container. When a visible AppBarLayout handles the top inset it
      * already sits below the status bar, so no additional padding is needed. Otherwise nothing
      * consumes the status bar on edge-to-edge windows (Android 15+, blank or hidden toolbar), so the
