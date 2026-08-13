@@ -3547,6 +3547,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
+        // Recorded before posting so passes that repeat within the same frame are suppressed too.
+        injectedSafeAreaTop = top;
+        injectedSafeAreaBottom = bottom;
+        injectedSafeAreaLeft = left;
+        injectedSafeAreaRight = right;
+
         String script = String.format(
             Locale.US,
             "(function(){var root=document.documentElement;" +
@@ -3561,13 +3567,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         );
         _webView.post(() -> {
             if (_webView == null) {
+                // Nothing was delivered, so let a later pass inject these values again.
+                resetInjectedSafeAreaCssVariables();
                 return;
             }
-            // Recorded here, not above, so a dropped post never counts as an injection.
-            injectedSafeAreaTop = top;
-            injectedSafeAreaBottom = bottom;
-            injectedSafeAreaLeft = left;
-            injectedSafeAreaRight = right;
             _webView.evaluateJavascript(script, null);
         });
     }
