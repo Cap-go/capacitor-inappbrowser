@@ -679,6 +679,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (isShowing()) {
             super.hide();
         }
+        refreshInsetsForHostingLayer();
         return true;
     }
 
@@ -692,6 +693,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             show();
         }
         applyDimensions();
+        refreshInsetsForHostingLayer();
+    }
+
+    /**
+     * The container padding is computed for the window hosting the content, and the two windows inset
+     * differently: the dialog is edge-to-edge on Android 15+, while the host activity fits its own
+     * system windows. Recompute after a layer change so padding from the previous host is not left
+     * behind (which would stack on top of the host offset).
+     */
+    private void refreshInsetsForHostingLayer() {
+        reapplyInsetsFromWindowRoot();
+        mainHandler.post(this::reapplyInsetsFromWindowRoot);
     }
 
     private boolean showAccordingToLayerMode() {
@@ -3393,22 +3406,38 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        Window window = getWindow();
-        View decorView = window != null ? window.getDecorView() : null;
-        if (decorView == null) {
+        View insetsSourceView = resolveHostedInsetsSourceView();
+        if (insetsSourceView == null) {
             return;
         }
 
-        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(decorView);
+        WindowInsetsCompat windowInsets = ViewCompat.getRootWindowInsets(insetsSourceView);
         if (windowInsets == null) {
-            // Root insets not ready yet; do not mutate margins/padding (would desync WebView
-            // margins from container padding). Delayed retries and requestApplyInsets will retry.
+            // Root insets not ready yet; do not mutate the container padding. Delayed retries and
+            // requestApplyInsets will retry.
             return;
         }
 
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
         View toolbarView = findViewById(R.id.tool_bar);
         applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
+    }
+
+    /**
+     * Insets must come from the window that currently hosts the content. In back-layer mode the
+     * content lives in the host activity's window and this dialog's window is hidden, so its decor
+     * would report stale insets.
+     */
+    private View resolveHostedInsetsSourceView() {
+        if (backLayerActive) {
+            View contentView = getBrowserContentView();
+            if (contentView != null && contentView.isAttachedToWindow()) {
+                return contentView;
+            }
+        }
+
+        Window window = getWindow();
+        return window != null ? window.getDecorView() : null;
     }
 
     private void requestWebViewContentRelayout() {
