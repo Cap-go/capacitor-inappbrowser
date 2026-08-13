@@ -3316,9 +3316,25 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 statusBarColorView.setVisibility(View.VISIBLE);
             }
 
-            applyAppBarTopInset(appBarLayout, statusBarHeight);
+            applyAppBarTopInset(appBarLayout, appBarHandlesTopInset(toolbarView) ? statusBarHeight : 0);
             appBarLayout.setBackgroundColor(finalBgColor);
         });
+    }
+
+    /**
+     * Whether a visible AppBarLayout consumes the top inset itself. It is the only alternative to
+     * padding the WebView container for the status bar, so both mechanisms share this condition and
+     * can never inset the top twice.
+     */
+    private boolean appBarHandlesTopInset(View toolbarView) {
+        return (
+            Build.VERSION.SDK_INT >= 35 &&
+            _options != null &&
+            !TextUtils.equals(_options.getToolbarType(), "blank") &&
+            toolbarView != null &&
+            toolbarView.getVisibility() == View.VISIBLE &&
+            toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout
+        );
     }
 
     /**
@@ -3355,13 +3371,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
         boolean keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
 
-        boolean appBarHandlesTopInset =
-            isAndroid15Plus &&
-            !TextUtils.equals(_options.getToolbarType(), "blank") &&
-            toolbarView != null &&
-            toolbarView.getVisibility() == View.VISIBLE &&
-            toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
-
         applySafeAreaInsets(
             bars,
             navigationBars,
@@ -3369,7 +3378,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             mandatoryGestures,
             ime,
             keyboardVisible,
-            appBarHandlesTopInset,
+            appBarHandlesTopInset(toolbarView),
             isAndroid15Plus
         );
     }
