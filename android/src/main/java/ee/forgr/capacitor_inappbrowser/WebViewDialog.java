@@ -3559,7 +3559,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 "root.style.setProperty('--safe-area-inset-top','%dpx');" +
                 "root.style.setProperty('--safe-area-inset-bottom','%dpx');" +
                 "root.style.setProperty('--safe-area-inset-left','%dpx');" +
-                "root.style.setProperty('--safe-area-inset-right','%dpx');})();",
+                "root.style.setProperty('--safe-area-inset-right','%dpx');" +
+                "return root.style.getPropertyValue('--safe-area-inset-top')?1:0;})();",
             top,
             bottom,
             left,
@@ -3567,11 +3568,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         );
         _webView.post(() -> {
             if (_webView == null) {
-                // Nothing was delivered, so let a later pass inject these values again.
                 resetInjectedSafeAreaCssVariables();
                 return;
             }
-            _webView.evaluateJavascript(script, null);
+            _webView.evaluateJavascript(script, (value) -> {
+                // The document did not take the variables, so let a later pass inject them again.
+                if (!"1".equals(value)) {
+                    resetInjectedSafeAreaCssVariables();
+                }
+            });
         });
     }
 
