@@ -3547,11 +3547,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        injectedSafeAreaTop = top;
-        injectedSafeAreaBottom = bottom;
-        injectedSafeAreaLeft = left;
-        injectedSafeAreaRight = right;
-
         String script = String.format(
             Locale.US,
             "(function(){var root=document.documentElement;" +
@@ -3565,9 +3560,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             right
         );
         _webView.post(() -> {
-            if (_webView != null) {
-                _webView.evaluateJavascript(script, null);
+            if (_webView == null) {
+                return;
             }
+            // Recorded here, not above, so a dropped post never counts as an injection.
+            injectedSafeAreaTop = top;
+            injectedSafeAreaBottom = bottom;
+            injectedSafeAreaLeft = left;
+            injectedSafeAreaRight = right;
+            _webView.evaluateJavascript(script, null);
         });
     }
 
