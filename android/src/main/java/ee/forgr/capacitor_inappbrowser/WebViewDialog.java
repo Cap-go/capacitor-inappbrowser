@@ -3419,7 +3419,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
-        View toolbarView = findViewById(R.id.tool_bar);
+        View toolbarView = findBrowserContentDescendant(R.id.tool_bar);
         applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
     }
 
@@ -3438,6 +3438,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         Window window = getWindow();
         return window != null ? window.getDecorView() : null;
+    }
+
+    /**
+     * Back-layer mode reparents the browser content out of the dialog window, so {@link
+     * #findViewById(int)} no longer reaches it. Resolve through the content view, which owns these
+     * views in both layers.
+     */
+    private View findBrowserContentDescendant(int id) {
+        View contentView = getBrowserContentView();
+        View view = contentView != null ? contentView.findViewById(id) : null;
+        return view != null ? view : findViewById(id);
     }
 
     private void requestWebViewContentRelayout() {
@@ -3474,7 +3485,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        View container = findViewById(R.id.content_browser_layout);
+        View container = findBrowserContentDescendant(R.id.content_browser_layout);
         if (container == null) {
             return;
         }
@@ -3519,7 +3530,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (appBarHandlesTopInset) {
             // Keep the appbar inset in sync with the reported inset (cutouts, rotation, multi-window)
             // instead of the status_bar_height resource used for the initial layout.
-            View toolbarView = findViewById(R.id.tool_bar);
+            View toolbarView = findBrowserContentDescendant(R.id.tool_bar);
             if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
                 applyAppBarTopInset(appBarLayout, statusBarTop);
             }
