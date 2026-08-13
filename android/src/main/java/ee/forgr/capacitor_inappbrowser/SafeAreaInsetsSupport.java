@@ -55,77 +55,63 @@ final class SafeAreaInsetsSupport {
     }
 
     /**
-     * Absolute IME insets from the window decor must only be applied as layout margins when the
-     * dialog is edge-to-edge. Pre-Android 15 windows still fit system windows and are resized for
-     * the soft keyboard; applying decor IME height again leaves a black gap above the keyboard.
+     * Absolute IME insets from the window decor must only be inset when the dialog is edge-to-edge.
+     * Pre-Android 15 windows still fit system windows and are resized for the soft keyboard;
+     * applying decor IME height again leaves a black gap above the keyboard.
      */
-    static int resolveImeBottomInset(boolean keyboardVisible, int imeBottom, boolean applyImeAsLayoutMargin) {
-        if (!keyboardVisible || !applyImeAsLayoutMargin || imeBottom <= 0) {
+    static int resolveImeBottomInset(boolean keyboardVisible, int imeBottom, boolean applyImeInset) {
+        if (!keyboardVisible || !applyImeInset || imeBottom <= 0) {
             return 0;
         }
 
         return imeBottom;
     }
 
-    static int resolveBottomMargin(boolean enabledSafeBottomMargin, int safeBottomInset, int imeBottom) {
-        int bottomInset = enabledSafeBottomMargin ? safeBottomInset : 0;
-        return Math.max(bottomInset, imeBottom);
+    /**
+     * Bottom padding for the WebView container (a SwipeRefreshLayout, which honours its own padding
+     * but ignores child margins): the larger of the safe bottom inset and the keyboard (IME) inset.
+     */
+    static int resolveContainerBottomPadding(boolean applyBottomInset, int safeBottomInset, int imeBottom) {
+        int bottomInset = applyBottomInset ? safeBottomInset : 0;
+        return Math.max(0, Math.max(bottomInset, imeBottom));
     }
 
-    static int resolveTopMargin(boolean enabledSafeTopMargin, boolean useTopInset, int systemBarsTop, boolean appBarHandlesTopInset) {
-        return resolveTopMarginWithFallback(enabledSafeTopMargin, useTopInset, systemBarsTop, appBarHandlesTopInset, 0, false);
-    }
-
-    static int resolveTopMarginWithFallback(
-        boolean enabledSafeTopMargin,
-        boolean useTopInset,
+    /**
+     * The status-bar height resource stands in for the reported top inset only when the whole inset
+     * set looks unpopulated, which happens on devices that hand out zeroed insets. A window that
+     * reports other insets but no top one has no status bar to avoid — a secondary multi-window
+     * window, or one whose status bar is hidden — and padding it would open a phantom gap.
+     */
+    static int resolveStatusBarTop(
         int systemBarsTop,
-        boolean appBarHandlesTopInset,
-        int fallbackTopInset,
-        boolean applyFallbackWhenZero
+        int systemBarsBottom,
+        int systemBarsLeft,
+        int systemBarsRight,
+        int fallbackStatusBarTop
     ) {
-        if (!enabledSafeTopMargin || !useTopInset || appBarHandlesTopInset) {
-            return 0;
-        }
-
-        if (systemBarsTop > 0 || !applyFallbackWhenZero || fallbackTopInset <= 0) {
+        if (systemBarsTop > 0) {
             return systemBarsTop;
         }
 
-        return fallbackTopInset;
+        boolean insetsPopulated = systemBarsBottom > 0 || systemBarsLeft > 0 || systemBarsRight > 0;
+        return insetsPopulated ? 0 : Math.max(0, fallbackStatusBarTop);
     }
 
     /**
-     * Bottom padding to apply to the WebView container (a SwipeRefreshLayout, which honours its own
-     * padding but ignores child margins). Takes the larger of the safe bottom inset and the keyboard
-     * (IME) inset via {@link #resolveBottomMargin}, then adds a compensation term: on Android 15+ the
-     * AppBarLayout is pushed down by the status-bar height, which shifts the container's bottom edge
-     * off-screen by that same amount, so it must be added back as padding regardless of the options.
-     */
-    static int resolveContainerBottomPadding(
-        boolean enabledSafeBottomMargin,
-        int safeBottomInset,
-        int imeBottom,
-        boolean appBarHandlesTopInset,
-        int statusBarTop
-    ) {
-        int base = resolveBottomMargin(enabledSafeBottomMargin, safeBottomInset, imeBottom);
-        int appBarCompensation = appBarHandlesTopInset ? Math.max(0, statusBarTop) : 0;
-        return base + appBarCompensation;
-    }
-
-    /**
-     * Top padding for the WebView container. When the AppBarLayout handles the top inset it already
-     * sits below the status bar, so no additional padding is needed; otherwise the status-bar height
-     * is applied when the safe-top options request it.
+     * Top padding for the WebView container. When a visible AppBarLayout handles the top inset it
+     * already sits below the status bar, so no additional padding is needed. Otherwise nothing
+     * consumes the status bar on edge-to-edge windows (Android 15+, blank or hidden toolbar), so the
+     * status-bar height is applied whenever enabledSafeTopMargin is on (#655). Windows that still fit
+     * system windows keep the legacy useTopInset opt-in to avoid padding twice.
      */
     static int resolveContainerTopPadding(
         boolean enabledSafeTopMargin,
         boolean useTopInset,
         int statusBarTop,
-        boolean appBarHandlesTopInset
+        boolean appBarHandlesTopInset,
+        boolean isEdgeToEdge
     ) {
-        if (appBarHandlesTopInset || !enabledSafeTopMargin || !useTopInset) {
+        if (appBarHandlesTopInset || !enabledSafeTopMargin || (!useTopInset && !isEdgeToEdge)) {
             return 0;
         }
 

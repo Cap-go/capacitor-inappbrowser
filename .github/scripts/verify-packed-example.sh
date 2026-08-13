@@ -31,27 +31,32 @@ if [ "${#packed_packages[@]}" -ne 1 ]; then
   exit 1
 fi
 
+# Any bun command that installs runs the example app's postinstall scripts, and the sharp prebuild
+# download flakes on the runners, so retry them all rather than only the plugin install.
+run_with_retries() {
+  local max_attempts=3
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    echo "'$*' failed on attempt $attempt/$max_attempts"
+    if [ "$attempt" -eq "$max_attempts" ]; then
+      return 1
+    fi
+
+    rm -rf node_modules
+    attempt=$((attempt + 1))
+    sleep $((attempt * 15))
+  done
+}
+
 plugin_name="$(bun -e 'console.log(require("./package.json").name)')"
 cp -R example-app/. "$test_app/"
 cd "$test_app"
-bun remove "$plugin_name"
-
-max_attempts=3
-attempt=1
-while [ "$attempt" -le "$max_attempts" ]; do
-  if bun add "${packed_packages[0]}"; then
-    break
-  fi
-
-  echo "bun add failed on attempt $attempt/$max_attempts"
-  if [ "$attempt" -eq "$max_attempts" ]; then
-    exit 1
-  fi
-
-  rm -rf node_modules
-  attempt=$((attempt + 1))
-  sleep $((attempt * 15))
-done
+run_with_retries bun remove "$plugin_name"
+run_with_retries bun add "${packed_packages[0]}"
 
 bun run build
 
