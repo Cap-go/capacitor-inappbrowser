@@ -3572,8 +3572,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 return;
             }
             _webView.evaluateJavascript(script, (value) -> {
+                boolean cacheStillHoldsTheseValues =
+                    injectedSafeAreaTop == top &&
+                    injectedSafeAreaBottom == bottom &&
+                    injectedSafeAreaLeft == left &&
+                    injectedSafeAreaRight == right;
                 // The document did not take the variables, so let a later pass inject them again.
-                if (!"1".equals(value)) {
+                // A newer injection may already have replaced them, in which case it owns the cache.
+                if (!"1".equals(value) && cacheStillHoldsTheseValues) {
                     resetInjectedSafeAreaCssVariables();
                 }
             });
