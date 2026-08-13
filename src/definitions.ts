@@ -1252,8 +1252,9 @@ export interface OpenWebViewOptions {
   authorizedAppLinks?: string[];
 
   /**
-   * If true, the webView will not take the full height and will have a 20px margin at the bottom.
-   * This creates a safe margin area outside the browser view.
+   * If true, the webView is inset by the bottom system bar (navigation bar) so bottom-anchored
+   * content stays reachable. On Android 15+ the browser window is always edge-to-edge, so the
+   * bottom inset is applied there regardless of this option.
    * @since 7.13.0
    * @default false
    * @example
@@ -1265,6 +1266,8 @@ export interface OpenWebViewOptions {
    * If false, the webView will extend behind the status bar for true full-screen immersive content.
    * When true (default), respects the safe area at the top of the screen.
    * Works independently of toolbarType - use for full-screen video players, games, or immersive web apps.
+   * On Android, when a toolbar is visible the toolbar itself provides that safe area; with
+   * `toolbarType: 'blank'` on Android 15+ the status bar inset is applied to the webView instead.
    * @since 8.2.0
    * @default true
    * @example
@@ -1273,8 +1276,10 @@ export interface OpenWebViewOptions {
   enabledSafeTopMargin?: boolean;
 
   /**
-   * When true, applies the system status bar inset as the WebView top margin on Android.
-   * Keeps the legacy 0px margin by default for apps that handle padding themselves.
+   * When true, applies the system status bar inset to the top of the WebView on Android even when
+   * the window is not edge-to-edge (before Android 15). Keeps the legacy 0px inset by default for
+   * apps that handle padding themselves. On Android 15+ this is not needed: without a visible
+   * toolbar the status bar inset already follows `enabledSafeTopMargin`.
    * @default false
    * @example
    * useTopInset: true

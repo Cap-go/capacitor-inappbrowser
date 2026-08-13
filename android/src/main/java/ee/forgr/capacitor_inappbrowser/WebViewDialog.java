@@ -3087,8 +3087,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         requestSafeAreaInsets();
 
-        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 300);
-        mainHandler.postDelayed(this::applyContainerInsetsSnapshot, 1200);
+        mainHandler.postDelayed(this::reapplyInsetsFromWindowRoot, 300);
+        mainHandler.postDelayed(this::reapplyInsetsFromWindowRoot, 1200);
     }
 
     private void registerConfigurationCallbacks() {
@@ -3312,13 +3312,31 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 statusBarColorView.setVisibility(View.VISIBLE);
             }
 
-            ViewGroup.LayoutParams appBarParams = appBarLayout.getLayoutParams();
-            if (appBarParams instanceof ViewGroup.MarginLayoutParams marginParams) {
-                marginParams.topMargin = statusBarHeight;
-                appBarLayout.setLayoutParams(marginParams);
-            }
+            applyAppBarTopInset(appBarLayout, statusBarHeight);
             appBarLayout.setBackgroundColor(finalBgColor);
         });
+    }
+
+    /**
+     * The appbar must sit below the status bar on edge-to-edge windows. A top margin does that
+     * visually, but CoordinatorLayout's scrolling-view behavior sizes the content container from the
+     * appbar height only and positions it below the appbar margin, so a margin pushes the container
+     * bottom off-screen by the status-bar height (#641). Padding grows the appbar height instead,
+     * which the behavior does account for, keeping the container inside the window.
+     */
+    private void applyAppBarTopInset(com.google.android.material.appbar.AppBarLayout appBarLayout, int statusBarTop) {
+        ViewGroup.LayoutParams appBarParams = appBarLayout.getLayoutParams();
+        if (appBarParams instanceof ViewGroup.MarginLayoutParams marginParams && marginParams.topMargin != 0) {
+            marginParams.topMargin = 0;
+            appBarLayout.setLayoutParams(marginParams);
+        }
+
+        appBarLayout.setPadding(
+            appBarLayout.getPaddingLeft(),
+            Math.max(0, statusBarTop),
+            appBarLayout.getPaddingRight(),
+            appBarLayout.getPaddingBottom()
+        );
     }
 
     private void applyWindowInsetsToWebView(WindowInsetsCompat windowInsets, boolean isAndroid15Plus, View toolbarView) {
@@ -3340,7 +3358,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             toolbarView.getVisibility() == View.VISIBLE &&
             toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
 
-        applySafeAreaMargins(
+        applySafeAreaInsets(
             bars,
             navigationBars,
             systemGestures,
@@ -3353,9 +3371,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     /**
-     * Re-read root window insets and apply WebView margins plus container padding.
+     * Re-read root window insets and apply the container padding.
      * Dialog windows may not re-dispatch inset listeners after rotation, leaving stale
-     * portrait margins that break vertical scrolling in landscape.
+     * portrait insets that break vertical scrolling in landscape.
      */
     private void reapplyInsetsFromWindowRoot() {
         if (_webView == null || _options == null) {
@@ -3395,7 +3413,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         _webView.invalidate();
     }
 
-    private void applySafeAreaMargins(
+    /**
+     * The WebView is the content child of a SwipeRefreshLayout, which lays that child out inside its
+     * own padding and ignores child margins entirely. Safe-area insets are therefore applied as
+     * padding on the container instead of margins on the WebView (#641).
+     */
+    private void applySafeAreaInsets(
         Insets bars,
         Insets navigationBars,
         Insets systemGestures,
@@ -3403,56 +3426,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Insets ime,
         boolean keyboardVisible,
         boolean appBarHandlesTopInset,
-        boolean applyImeAsLayoutMargin
+        boolean isEdgeToEdge
     ) {
         if (_webView == null || _options == null) {
-            return;
-        }
-
-        ViewGroup.LayoutParams layoutParams = _webView.getLayoutParams();
-        if (!(layoutParams instanceof ViewGroup.MarginLayoutParams mlp)) {
-            return;
-        }
-
-        int fallbackBottomInset = _options.getEnabledSafeMargin() ? getSystemNavigationBarHeight() : 0;
-        int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
-            bars.bottom,
-            navigationBars.bottom,
-            systemGestures.bottom,
-            mandatoryGestures.bottom,
-            bars.left,
-            bars.right,
-            navigationBars.left,
-            navigationBars.right,
-            fallbackBottomInset,
-            _options.getEnabledSafeMargin()
-        );
-        // Android 15+ uses edge-to-edge (decorFitsSystemWindows=false) and needs IME as margin.
-        // Older dialogs still resize for the keyboard; re-applying decor IME creates a black gap (#622).
-        int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, applyImeAsLayoutMargin);
-        boolean applyTopFallback = _options.getEnabledSafeTopMargin() && _options.getUseTopInset();
-        int fallbackTopInset = applyTopFallback ? getSystemStatusBarHeight() : 0;
-        int navTop = SafeAreaInsetsSupport.resolveTopMarginWithFallback(
-            _options.getEnabledSafeTopMargin(),
-            _options.getUseTopInset(),
-            bars.top,
-            appBarHandlesTopInset,
-            fallbackTopInset,
-            applyTopFallback
-        );
-        int bottomMargin = SafeAreaInsetsSupport.resolveBottomMargin(_options.getEnabledSafeMargin(), safeBottomInset, imeBottom);
-
-        mlp.topMargin = navTop;
-        mlp.bottomMargin = bottomMargin;
-        mlp.leftMargin = bars.left;
-        mlp.rightMargin = bars.right;
-        _webView.setLayoutParams(mlp);
-        injectSafeAreaCssVariables(navTop, bottomMargin, bars.left, bars.right);
-        applyContainerInsetsSnapshot();
-    }
-
-    private void applyContainerInsetsSnapshot() {
-        if (_options == null || _webView == null) {
             return;
         }
 
@@ -3461,29 +3437,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        Window window = getWindow();
-        View decorView = window != null ? window.getDecorView() : null;
-        WindowInsetsCompat windowInsets = decorView != null ? ViewCompat.getRootWindowInsets(decorView) : null;
-
-        Insets bars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()) : Insets.NONE;
-        Insets navigationBars = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars()) : Insets.NONE;
-        Insets systemGestures = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures()) : Insets.NONE;
-        Insets mandatoryGestures =
-            windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()) : Insets.NONE;
-        Insets ime = windowInsets != null ? windowInsets.getInsets(WindowInsetsCompat.Type.ime()) : Insets.NONE;
-        boolean keyboardVisible = windowInsets != null && windowInsets.isVisible(WindowInsetsCompat.Type.ime());
-
-        boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
-        View toolbarView = findViewById(R.id.tool_bar);
-        boolean appBarHandlesTopInset =
-            isAndroid15Plus &&
-            !TextUtils.equals(_options.getToolbarType(), "blank") &&
-            toolbarView != null &&
-            toolbarView.getVisibility() == View.VISIBLE &&
-            toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout;
-
-        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isAndroid15Plus);
-
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isEdgeToEdge);
         int statusBarTop = bars.top > 0 ? bars.top : getSystemStatusBarHeight();
         int fallbackBottomInset = applyBottomInset ? getSystemNavigationBarHeight() : 0;
         int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
@@ -3498,32 +3452,68 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             fallbackBottomInset,
             applyBottomInset
         );
+        // Android 15+ uses edge-to-edge (decorFitsSystemWindows=false) and needs the IME inset applied.
+        // Older dialogs still resize for the keyboard; re-applying decor IME creates a black gap (#622).
+        int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, isEdgeToEdge);
 
         int padTop = SafeAreaInsetsSupport.resolveContainerTopPadding(
             _options.getEnabledSafeTopMargin(),
             _options.getUseTopInset(),
             statusBarTop,
-            appBarHandlesTopInset
-        );
-        int imeBottom = SafeAreaInsetsSupport.resolveImeBottomInset(keyboardVisible, ime.bottom, isAndroid15Plus);
-        int padBottom = SafeAreaInsetsSupport.resolveContainerBottomPadding(
-            applyBottomInset,
-            safeBottomInset,
-            imeBottom,
             appBarHandlesTopInset,
-            statusBarTop
+            isEdgeToEdge
         );
+        int padBottom = SafeAreaInsetsSupport.resolveContainerBottomPadding(applyBottomInset, safeBottomInset, imeBottom);
 
-        if (
-            container.getPaddingLeft() == bars.left &&
-            container.getPaddingTop() == padTop &&
-            container.getPaddingRight() == bars.right &&
-            container.getPaddingBottom() == padBottom
-        ) {
+        if (appBarHandlesTopInset) {
+            // Keep the appbar inset in sync with the reported inset (cutouts, rotation, multi-window)
+            // instead of the status_bar_height resource used for the initial layout.
+            View toolbarView = findViewById(R.id.tool_bar);
+            if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
+                applyAppBarTopInset(appBarLayout, statusBarTop);
+            }
+        } else {
+            syncBlankToolbarStatusBarStrip(padTop);
+        }
+
+        boolean paddingChanged =
+            container.getPaddingLeft() != bars.left ||
+            container.getPaddingTop() != padTop ||
+            container.getPaddingRight() != bars.right ||
+            container.getPaddingBottom() != padBottom;
+        if (paddingChanged) {
+            container.setPadding(bars.left, padTop, bars.right, padBottom);
+        }
+
+        injectSafeAreaCssVariables(padTop, padBottom, bars.left, bars.right);
+    }
+
+    /**
+     * A blank toolbar has no appbar to paint the status-bar area, so the strip freed by the container
+     * top padding would expose the bare window background behind the status bar icons. Reuse the
+     * status-bar colour view (already tinted with the toolbar colour) to fill it (#655).
+     */
+    private void syncBlankToolbarStatusBarStrip(int topInset) {
+        if (_options == null || !TextUtils.equals(_options.getToolbarType(), "blank")) {
             return;
         }
 
-        container.setPadding(bars.left, padTop, bars.right, padBottom);
+        View statusBarColorView = findViewById(R.id.status_bar_color_view);
+        if (statusBarColorView == null) {
+            return;
+        }
+
+        if (topInset <= 0) {
+            statusBarColorView.setVisibility(View.GONE);
+            return;
+        }
+
+        ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+        if (params != null && params.height != topInset) {
+            params.height = topInset;
+            statusBarColorView.setLayoutParams(params);
+        }
+        statusBarColorView.setVisibility(View.VISIBLE);
     }
 
     private void configureBlankToolbarLayout() {
