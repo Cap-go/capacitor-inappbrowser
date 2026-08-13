@@ -3531,7 +3531,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         // Insets are dispatched on every layout pass; only touch the document when they differ from
-        // what it already holds. Cleared in onPageStarted so a new document is served again.
+        // what it already holds. Cleared on page load so a new document is served again.
         if (
             injectedSafeAreaTop == top && injectedSafeAreaBottom == bottom && injectedSafeAreaLeft == left && injectedSafeAreaRight == right
         ) {
@@ -5843,8 +5843,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (view == null || _webView == null) {
                         return;
                     }
-                    // The new document has no safe-area variables yet.
-                    resetInjectedSafeAreaCssVariables();
                     if (_options.getCallbacks() != null) {
                         _options.getCallbacks().pageLoadStart();
                     }
@@ -5939,7 +5937,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     _options.getCallbacks().pageLoaded();
                     stopReloadGesture();
                     injectJavaScriptInterface();
-                    // Serve the safe-area variables to the freshly parsed document.
+                    // The freshly parsed document carries no safe-area variables, whatever was
+                    // injected into the previous one, so drop the cache and serve them again.
+                    resetInjectedSafeAreaCssVariables();
                     reapplyInsetsFromWindowRoot();
 
                     // Inject Google Pay polyfills if enabled
