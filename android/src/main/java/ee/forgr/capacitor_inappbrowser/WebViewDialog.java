@@ -358,6 +358,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private boolean cachedTitleIconResolved;
     private boolean isHiddenModeActive = false;
     private boolean toolbarHideInProgress = false;
+    private int injectedSafeAreaTop = Integer.MIN_VALUE;
+    private int injectedSafeAreaBottom = Integer.MIN_VALUE;
+    private int injectedSafeAreaLeft = Integer.MIN_VALUE;
+    private int injectedSafeAreaRight = Integer.MIN_VALUE;
     private boolean configurationCallbacksRegistered = false;
     private Configuration lastConfiguration;
     private final ComponentCallbacks2 configurationCallbacks = new ComponentCallbacks2() {
@@ -3514,10 +3518,30 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return getContext().getResources().getDimensionPixelSize(resourceId);
     }
 
+    private void resetInjectedSafeAreaCssVariables() {
+        injectedSafeAreaTop = Integer.MIN_VALUE;
+        injectedSafeAreaBottom = Integer.MIN_VALUE;
+        injectedSafeAreaLeft = Integer.MIN_VALUE;
+        injectedSafeAreaRight = Integer.MIN_VALUE;
+    }
+
     private void injectSafeAreaCssVariables(int top, int bottom, int left, int right) {
         if (_webView == null) {
             return;
         }
+
+        // Insets are dispatched on every layout pass; only touch the document when they differ from
+        // what it already holds. Cleared in onPageStarted so a new document is served again.
+        if (
+            injectedSafeAreaTop == top && injectedSafeAreaBottom == bottom && injectedSafeAreaLeft == left && injectedSafeAreaRight == right
+        ) {
+            return;
+        }
+
+        injectedSafeAreaTop = top;
+        injectedSafeAreaBottom = bottom;
+        injectedSafeAreaLeft = left;
+        injectedSafeAreaRight = right;
 
         String script = String.format(
             Locale.US,
@@ -5819,6 +5843,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (view == null || _webView == null) {
                         return;
                     }
+                    // The new document has no safe-area variables yet.
+                    resetInjectedSafeAreaCssVariables();
                     if (_options.getCallbacks() != null) {
                         _options.getCallbacks().pageLoadStart();
                     }
@@ -5913,6 +5939,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     _options.getCallbacks().pageLoaded();
                     stopReloadGesture();
                     injectJavaScriptInterface();
+                    // Serve the safe-area variables to the freshly parsed document.
+                    reapplyInsetsFromWindowRoot();
 
                     // Inject Google Pay polyfills if enabled
                     if (_options.getEnableGooglePaySupport()) {
