@@ -482,6 +482,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var disableOverscroll: Bool = false
     var proxyRequests: Bool = false
     var proxySchemeHandler: ProxySchemeHandler?
+    var bundledAssetSchemeHandler: BundledAssetSchemeHandler?
+    var bundledAssetLocalScheme: String = BundledAssetSupport.iosDefaults.scheme
+    var bundledAssetLocalHost: String = BundledAssetSupport.iosDefaults.host
     var proxyBridge: ProxyBridge?
     var proxyBridgeAccessToken: String?
     var legacyProxyRequestURLRegexPattern: String?
@@ -2065,6 +2068,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
         }
 
+        let bundledAssetHandler = BundledAssetSchemeHandler(expectedHost: bundledAssetLocalHost)
+        self.bundledAssetSchemeHandler = bundledAssetHandler
+        if webConfiguration.urlSchemeHandler(forURLScheme: bundledAssetLocalScheme) == nil {
+            webConfiguration.setURLSchemeHandler(bundledAssetHandler, forURLScheme: bundledAssetLocalScheme)
+        }
+
         if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
             addProxyBridgeUserScripts(to: userContentController)
         }
@@ -2309,6 +2318,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.disableOverscroll = parent.disableOverscroll
         self.proxyRequests = parent.proxyRequests
         self.proxySchemeHandler = proxySchemeHandler
+        self.bundledAssetLocalScheme = parent.bundledAssetLocalScheme
+        self.bundledAssetLocalHost = parent.bundledAssetLocalHost
         self.proxyBridge = parent.proxyBridge
         self.proxyBridgeAccessToken = parent.proxyBridgeAccessToken
         self.legacyProxyRequestURLRegexPattern = parent.legacyProxyRequestURLRegexPattern
@@ -2977,6 +2988,16 @@ fileprivate extension WKWebViewController {
         let internalSchemes = ["about", "data", "blob", "javascript"]
         if internalSchemes.contains(scheme) {
             print("[InAppBrowser] internal WebKit scheme detected, allowing navigation")
+            completion(false)
+            return
+        }
+
+        let bundledLocalConfig = BundledAssetSupport.LocalConfig(
+            scheme: bundledAssetLocalScheme,
+            host: bundledAssetLocalHost
+        )
+        if BundledAssetSupport.isBundledLocalURL(url.absoluteString, localConfig: bundledLocalConfig) {
+            print("[InAppBrowser] bundled local asset URL detected, allowing navigation")
             completion(false)
             return
         }

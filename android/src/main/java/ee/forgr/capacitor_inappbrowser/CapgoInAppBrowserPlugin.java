@@ -32,6 +32,7 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 import androidx.core.content.ContextCompat;
+import com.getcapacitor.Bridge;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -356,6 +357,26 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         dialog.activity = CapgoInAppBrowserPlugin.this.getActivity();
         registerWebView(webViewId, dialog, makeActive);
         return dialog;
+    }
+
+    private boolean applyBundledAssetOptions(Options options, String url) {
+        Bridge bridge = getBridge();
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, bridge);
+        if (resolution == null) {
+            return false;
+        }
+        options.setUrl(resolution.url);
+        if (resolution.needsAssetLoader) {
+            BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(
+                bridge != null ? bridge.getLocalUrl() : null
+            );
+            options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+            options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+            options.setServeBundledAssets(true);
+        } else {
+            options.setServeBundledAssets(false);
+        }
+        return true;
     }
 
     private void notifyPopupWindowOpened(String popupId, String parentId, String popupUrl, boolean visible) {
@@ -752,13 +773,21 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        currentUrl = url;
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+        if (resolution == null) {
+            call.reject("Invalid bundled asset path");
+            return;
+        }
+        final String resolvedUrl = resolution.url;
+        currentUrl = resolvedUrl;
+        final String localUrl = getBridge() != null ? getBridge().getLocalUrl() : null;
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        webViewDialog.setUrl(url);
+                        webViewDialog.applyBundledAssetResolution(resolution, localUrl);
+                        webViewDialog.setUrl(resolvedUrl);
                         call.resolve();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error setting URL: " + e.getMessage());
@@ -783,6 +812,11 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
         if (TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
+        }
+
+        if (BundledAssetSupport.isLikelyBundledRelativePath(url)) {
+            call.reject("Bundled assets require openWebView()");
             return;
         }
         currentUrl = url;
@@ -1054,11 +1088,15 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         String url = call.getString("url");
         if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
-        currentUrl = url;
         final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();
-        options.setUrl(url);
+        if (!applyBundledAssetOptions(options, url)) {
+            call.reject("Invalid bundled asset path");
+            return;
+        }
+        currentUrl = options.getUrl();
         options.setHeaders(call.getObject("headers"));
         options.setCustomUserAgent(call.getString("customUserAgent"));
         options.setCredentials(call.getObject("credentials"));
