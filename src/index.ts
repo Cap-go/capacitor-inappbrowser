@@ -10,6 +10,7 @@ import {
 } from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
+  OpenOptions,
   OpenWebViewOptions,
   ProxyDecision,
   ProxyHandler,
@@ -69,7 +70,7 @@ function getConfiguredLocalConfig() {
   return parseBundledLocalConfig(getServerUrl());
 }
 
-function prepareWebViewOptions<T extends { url: string }>(options: T): T {
+function prepareUrlOptions<T extends { url: string }>(options: T): T {
   assertValidBundledAssetPath(options.url);
 
   if (!Capacitor.isNativePlatform() || activePluginName !== PREVIOUS_PLUGIN_NAME) {
@@ -86,11 +87,14 @@ const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(activePluginName, in
 
 const InAppBrowser = new Proxy(baseInAppBrowser, {
   get(target, prop, receiver) {
+    if (prop === 'open') {
+      return (options: OpenOptions) => target.open(prepareUrlOptions(options));
+    }
     if (prop === 'openWebView') {
-      return (options: OpenWebViewOptions) => target.openWebView(prepareWebViewOptions(options));
+      return (options: OpenWebViewOptions) => target.openWebView(prepareUrlOptions(options));
     }
     if (prop === 'setUrl') {
-      return (options: Parameters<InAppBrowserPlugin['setUrl']>[0]) => target.setUrl(prepareWebViewOptions(options));
+      return (options: Parameters<InAppBrowserPlugin['setUrl']>[0]) => target.setUrl(prepareUrlOptions(options));
     }
 
     const value = Reflect.get(target, prop, receiver);

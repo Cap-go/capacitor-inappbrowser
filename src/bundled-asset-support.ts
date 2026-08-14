@@ -9,6 +9,7 @@ export interface BundledAssetResolution {
   url: string;
 }
 
+/** Default Capacitor local URL settings used when no runtime config is available. */
 export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLocalConfig> = {
   ios: { scheme: 'capacitor', host: 'localhost' },
   android: { scheme: 'https', host: 'localhost' },
@@ -17,14 +18,20 @@ export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLo
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 const RESERVED_WEB_SCHEMES = ['http', 'https'];
 
+/** Returns true when the input looks like an absolute URL (including protocol-relative URLs). */
 export function isAbsoluteUrl(url: string): boolean {
   return ABSOLUTE_URL_PATTERN.test(url) || url.startsWith('//');
 }
 
+/** Returns true when any path segment is `..`. */
 export function containsPathTraversal(path: string): boolean {
   return path.split('/').some((segment) => segment === '..');
 }
 
+/**
+ * Normalizes a relative bundled asset path to a leading-slash form.
+ * Returns null when the path contains traversal segments.
+ */
 export function normalizeBundledPath(path: string): string | null {
   const trimmed = path.trim();
   if (!trimmed || trimmed === '/') {
@@ -38,6 +45,7 @@ export function normalizeBundledPath(path: string): string | null {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
+/** Parses a Capacitor local URL into scheme and host components. */
 export function parseBundledLocalConfig(localUrl?: string | null): BundledAssetLocalConfig | null {
   if (!localUrl) {
     return null;
@@ -58,6 +66,7 @@ export function parseBundledLocalConfig(localUrl?: string | null): BundledAssetL
   }
 }
 
+/** Returns the scheme WebView navigation should use for bundled assets on a platform. */
 export function handlerSchemeForPlatform(platform: BundledAssetPlatform, localConfig: BundledAssetLocalConfig): string {
   if (platform === 'ios' && RESERVED_WEB_SCHEMES.includes(localConfig.scheme)) {
     return BUNDLED_ASSET_DEFAULTS.ios.scheme;
@@ -73,6 +82,10 @@ export function handlerSchemeForPlatform(platform: BundledAssetPlatform, localCo
   return localConfig.scheme;
 }
 
+/**
+ * Returns true when the URL targets the configured Capacitor local host/scheme
+ * (including the platform handler scheme rewrite).
+ */
 export function isBundledLocalUrl(
   url: string,
   platform: BundledAssetPlatform,
@@ -106,6 +119,7 @@ export function isBundledLocalUrl(
   }
 }
 
+/** Returns true when the input is a non-empty relative bundled asset path. */
 export function isRelativeBundledPath(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed) {
@@ -140,6 +154,10 @@ function rewriteBundledLocalUrl(
   }
 }
 
+/**
+ * Resolves a bundled asset URL for the given platform.
+ * Relative paths become platform-local URLs; bundled local URLs may be rewritten to the handler scheme.
+ */
 export function resolveBundledAssetUrl(
   url: string,
   platform: BundledAssetPlatform,
@@ -171,6 +189,10 @@ export function resolveBundledAssetUrl(
   };
 }
 
+/**
+ * Resolves relative bundled paths for legacy native plugins that do not perform native resolution.
+ * Throws when the path is invalid.
+ */
 export function resolveLegacyNativeWebViewUrl(
   url: string,
   platform: BundledAssetPlatform,

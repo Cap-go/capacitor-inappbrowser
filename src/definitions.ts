@@ -450,7 +450,16 @@ export type ProxyHandler = (request: ProxyRequest) => ProxyHandlerResult | Promi
 export interface OpenOptions {
   /**
    * Target URL to load.
+   *
+   * Remote `http://` and `https://` URLs are loaded as-is.
+   *
+   * Relative bundled paths such as `/index.html` are resolved to the Capacitor local URL
+   * before opening. Bundled asset serving itself requires `openWebView()`; system browser
+   * flows (`open()`) receive the resolved URL but cannot intercept packaged assets.
+   *
    * @since 0.1.0
+   * @example "https://capgo.app"
+   * @example "/index.html"
    */
   url: string;
   /**

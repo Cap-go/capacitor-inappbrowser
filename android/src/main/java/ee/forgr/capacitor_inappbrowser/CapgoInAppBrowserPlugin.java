@@ -814,6 +814,13 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             call.reject("Invalid URL");
             return;
         }
+
+        BundledAssetSupport.Resolution openResolution = BundledAssetSupport.resolve(url, getBridge());
+        if (openResolution == null) {
+            call.reject("Invalid bundled asset path");
+            return;
+        }
+        url = openResolution.url;
         currentUrl = url;
         awaitCustomTabsClientIfNeeded();
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
@@ -1083,6 +1090,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         String url = call.getString("url");
         if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
+            return;
         }
         final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();

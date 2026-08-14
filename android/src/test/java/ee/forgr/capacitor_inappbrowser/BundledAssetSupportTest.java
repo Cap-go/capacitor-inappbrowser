@@ -64,4 +64,18 @@ public class BundledAssetSupportTest {
         assertEquals("example.com", localConfig.host);
         assertTrue(BundledAssetSupport.isBundledLocalUrl("https://example.com/app/index.html", localConfig));
     }
+
+    @Test
+    public void mimeTypeForPathFallsBackToHtmlForExtensionlessPaths() {
+        assertEquals("text/html", BundledAssetSupport.mimeTypeForPath("/index"));
+    }
+
+    @Test
+    public void encodingForMimeTypeReturnsUtf8ForTextLikeTypes() {
+        assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("text/html"));
+        assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/json"));
+        assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/javascript"));
+        assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/xml"));
+        assertNull(BundledAssetSupport.encodingForMimeType("image/png"));
+    }
 }
