@@ -4,17 +4,19 @@ import UniformTypeIdentifiers
 import WebKit
 
 final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
-    private let router = CapacitorRouter()
+    private let router: CapacitorRouter
     private var activeTasks: [ObjectIdentifier: WKURLSchemeTask] = [:]
     private let tasksLock = NSLock()
 
     override init() {
-        super.init()
+        var router = CapacitorRouter()
         if let publicDirectory = Self.publicDirectoryURL() {
             router.basePath = publicDirectory.path
         } else if let wwwDirectory = Self.wwwDirectoryURL() {
             router.basePath = wwwDirectory.path
         }
+        self.router = router
+        super.init()
     }
 
     func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
