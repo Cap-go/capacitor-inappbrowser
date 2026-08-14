@@ -67,7 +67,8 @@ public class BundledAssetSupportTest {
 
     @Test
     public void mimeTypeForPathFallsBackToHtmlForExtensionlessPaths() {
-        assertEquals("text/html", BundledAssetSupport.mimeTypeForPath("/index"));
+        assertEquals("text/html", BundledAssetSupport.mimeTypeForPath("https://localhost/assets/page"));
+        assertEquals("application/octet-stream", BundledAssetSupport.mimeTypeForPath("https://localhost/assets/file.unknownext"));
     }
 
     @Test
