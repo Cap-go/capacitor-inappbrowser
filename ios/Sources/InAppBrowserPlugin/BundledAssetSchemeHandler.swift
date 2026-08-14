@@ -93,7 +93,7 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         urlSchemeTask.stopped = true
     }
 
-    private func finish(task: WKURLSchemeTask, taskID: ObjectIdentifier, block: () -> Void) {
+    private func finish(task: WKURLSchemeTask, taskID: ObjectIdentifier, block: @escaping () -> Void) {
         tasksLock.lock()
         let isActive = activeTasks[taskID] != nil
         activeTasks.removeValue(forKey: taskID)
