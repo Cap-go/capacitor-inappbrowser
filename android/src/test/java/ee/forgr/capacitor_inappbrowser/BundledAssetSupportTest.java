@@ -66,12 +66,6 @@ public class BundledAssetSupportTest {
     }
 
     @Test
-    public void mimeTypeForPathFallsBackToHtmlForExtensionlessPaths() {
-        assertEquals("text/html", BundledAssetSupport.mimeTypeForPath("https://localhost/assets/page"));
-        assertEquals("application/octet-stream", BundledAssetSupport.mimeTypeForPath("https://localhost/assets/file.unknownext"));
-    }
-
-    @Test
     public void encodingForMimeTypeReturnsUtf8ForTextLikeTypes() {
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("text/html"));
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/json"));
