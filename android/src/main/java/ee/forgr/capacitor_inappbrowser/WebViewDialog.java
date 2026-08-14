@@ -4369,21 +4369,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void ensureBundledAssetLoader() {
+        synchronized (bundledAssetLoaderLock) {
+            ensureBundledAssetLoaderLocked();
+        }
+    }
+
+    private void ensureBundledAssetLoaderLocked() {
         if (bundledAssetLoader != null || _options == null || !_options.getServeBundledAssets()) {
             return;
         }
 
-        synchronized (bundledAssetLoaderLock) {
-            if (bundledAssetLoader != null) {
-                return;
-            }
-
-            bundledAssetLoader = BundledAssetSupport.createAssetLoader(
-                _context,
-                _options.getBundledAssetHost(),
-                _options.getBundledAssetScheme()
-            );
-        }
+        bundledAssetLoader = BundledAssetSupport.createAssetLoader(
+            _context,
+            _options.getBundledAssetHost(),
+            _options.getBundledAssetScheme()
+        );
     }
 
     public void applyBundledAssetResolution(BundledAssetSupport.Resolution resolution, String localUrl) {
@@ -4408,11 +4408,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_options == null || !_options.getServeBundledAssets()) {
             return null;
         }
-        ensureBundledAssetLoader();
-        if (bundledAssetLoader == null) {
+
+        final WebViewAssetLoader loader;
+        synchronized (bundledAssetLoaderLock) {
+            ensureBundledAssetLoaderLocked();
+            loader = bundledAssetLoader;
+        }
+
+        if (loader == null) {
             return null;
         }
-        return bundledAssetLoader.shouldInterceptRequest(request.getUrl());
+        return loader.shouldInterceptRequest(request.getUrl());
     }
 
     public void setUrl(String url) {

@@ -1,7 +1,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
-import { resolveBundledAssetUrl, type BundledAssetPlatform } from './bundled-asset-support';
+import { containsPathTraversal, isRelativeBundledPath } from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
   OpenWebViewOptions,
@@ -38,32 +38,36 @@ const inAppBrowserImplementations = {
   web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
 };
 
-function bundledAssetPlatform(): BundledAssetPlatform {
-  return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
-}
-
-function resolveNativeWebViewUrl(url: string): string {
-  const resolution = resolveBundledAssetUrl(url, bundledAssetPlatform());
-  if (resolution === null) {
+function assertValidBundledAssetPath(url: string): void {
+  if (isRelativeBundledPath(url) && containsPathTraversal(url)) {
     throw new Error('Invalid bundled asset path');
   }
-  return resolution.url;
-}
-
-function withNativeBundledAssetUrl<T extends { url: string }>(options: T): T {
-  if (!Capacitor.isNativePlatform()) {
-    return options;
-  }
-  return { ...options, url: resolveNativeWebViewUrl(options.url) };
 }
 
 const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
 
-const InAppBrowser: InAppBrowserPlugin = {
-  ...baseInAppBrowser,
-  openWebView: (options: OpenWebViewOptions) => baseInAppBrowser.openWebView(withNativeBundledAssetUrl(options)),
-  setUrl: (options) => baseInAppBrowser.setUrl(withNativeBundledAssetUrl(options)),
-};
+const InAppBrowser = new Proxy(baseInAppBrowser, {
+  get(target, prop, receiver) {
+    if (prop === 'openWebView') {
+      return (options: OpenWebViewOptions) => {
+        assertValidBundledAssetPath(options.url);
+        return target.openWebView(options);
+      };
+    }
+    if (prop === 'setUrl') {
+      return (options: Parameters<InAppBrowserPlugin['setUrl']>[0]) => {
+        assertValidBundledAssetPath(options.url);
+        return target.setUrl(options);
+      };
+    }
+
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof value === 'function') {
+      return value.bind(target);
+    }
+    return value;
+  },
+}) as InAppBrowserPlugin;
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
