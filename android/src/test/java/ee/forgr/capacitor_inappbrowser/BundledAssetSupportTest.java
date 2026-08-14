@@ -73,4 +73,13 @@ public class BundledAssetSupportTest {
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/xml"));
         assertNull(BundledAssetSupport.encodingForMimeType("image/png"));
     }
+
+    @Test
+    public void distinguishesBundledPathsFromBareHostnames() {
+        assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("/index.html"));
+        assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("assets/page.html"));
+        assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("index.html"));
+        assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("www.example.com"));
+        assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("https://example.com"));
+    }
 }

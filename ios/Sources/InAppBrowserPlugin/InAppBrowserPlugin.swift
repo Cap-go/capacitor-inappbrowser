@@ -2374,7 +2374,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        if BundledAssetSupport.isRelativeBundledPath(urlString) {
+        if BundledAssetSupport.isLikelyBundledRelativePath(urlString) {
             call.reject("Bundled assets require openWebView()")
             return
         }

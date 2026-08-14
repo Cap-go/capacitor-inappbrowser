@@ -136,6 +136,44 @@ final class BundledAssetSupport {
         return !isAbsoluteUrl(url);
     }
 
+    private static final java.util.Set<String> BUNDLED_ASSET_EXTENSIONS = java.util.Set.of(
+        "html",
+        "htm",
+        "js",
+        "css",
+        "json",
+        "xml",
+        "svg",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "woff",
+        "woff2",
+        "ttf",
+        "map"
+    );
+
+    static boolean isLikelyBundledRelativePath(String url) {
+        if (!isRelativeBundledPath(url)) {
+            return false;
+        }
+
+        String trimmed = url.trim();
+        if (trimmed.startsWith("/") || trimmed.contains("/")) {
+            return true;
+        }
+
+        int dot = trimmed.lastIndexOf('.');
+        if (dot <= 0) {
+            return true;
+        }
+
+        String extension = trimmed.substring(dot + 1).toLowerCase(Locale.ROOT);
+        return BUNDLED_ASSET_EXTENSIONS.contains(extension);
+    }
+
     static String normalizeBundledPath(String path) {
         String trimmed = path == null ? "" : path.trim();
         if (trimmed.isEmpty() || "/".equals(trimmed)) {

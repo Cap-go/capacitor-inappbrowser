@@ -815,7 +815,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        if (BundledAssetSupport.isRelativeBundledPath(url)) {
+        if (BundledAssetSupport.isLikelyBundledRelativePath(url)) {
             call.reject("Bundled assets require openWebView()");
             return;
         }

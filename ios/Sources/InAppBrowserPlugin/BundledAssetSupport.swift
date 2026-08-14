@@ -90,6 +90,34 @@ enum BundledAssetSupport {
         return !isAbsoluteURL(trimmed)
     }
 
+    private static let bundledAssetExtensions: Set<String> = [
+        "html", "htm", "js", "css", "json", "xml", "svg",
+        "png", "jpg", "jpeg", "gif", "webp", "woff", "woff2", "ttf", "map"
+    ]
+
+    static func isLikelyBundledRelativePath(_ urlString: String) -> Bool {
+        guard isRelativeBundledPath(urlString) else {
+            return false
+        }
+
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("/") || trimmed.contains("/") {
+            return true
+        }
+
+        guard let dot = trimmed.lastIndex(of: ".") else {
+            return true
+        }
+
+        let extensionStart = trimmed.index(after: dot)
+        guard extensionStart < trimmed.endIndex else {
+            return true
+        }
+
+        let fileExtension = String(trimmed[extensionStart...]).lowercased()
+        return bundledAssetExtensions.contains(fileExtension)
+    }
+
     static func normalizeBundledPath(_ path: String) -> String? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "/" {
