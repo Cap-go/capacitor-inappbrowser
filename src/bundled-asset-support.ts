@@ -171,12 +171,16 @@ export function resolveBundledAssetUrl(
   };
 }
 
-export function resolveLegacyNativeWebViewUrl(url: string, platform: BundledAssetPlatform): string {
+export function resolveLegacyNativeWebViewUrl(
+  url: string,
+  platform: BundledAssetPlatform,
+  localConfig?: BundledAssetLocalConfig | null,
+): string {
   if (!isRelativeBundledPath(url)) {
     return url;
   }
 
-  const resolution = resolveBundledAssetUrl(url, platform);
+  const resolution = resolveBundledAssetUrl(url, platform, localConfig);
   if (resolution === null) {
     throw new Error('Invalid bundled asset path');
   }

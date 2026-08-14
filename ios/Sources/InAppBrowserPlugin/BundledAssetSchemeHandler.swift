@@ -5,11 +5,13 @@ import WebKit
 
 final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     private let basePath: String
+    private let expectedHost: String
     private var activeTasks: [ObjectIdentifier: WKURLSchemeTask] = [:]
     private let tasksLock = NSLock()
 
-    override init() {
+    init(expectedHost: String) {
         self.basePath = Self.resolveBasePath()
+        self.expectedHost = expectedHost.lowercased()
         super.init()
     }
 
@@ -25,6 +27,19 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         tasksLock.lock()
         activeTasks[taskID] = urlSchemeTask
         tasksLock.unlock()
+
+        guard Self.isAllowedBundledAssetRequest(requestURL, expectedHost: expectedHost) else {
+            finish(task: urlSchemeTask, taskID: taskID) {
+                urlSchemeTask.didFailWithError(
+                    NSError(
+                        domain: "BundledAssetSchemeHandler",
+                        code: 403,
+                        userInfo: [NSLocalizedDescriptionKey: "Blocked bundled asset host: \(requestURL.absoluteString)"]
+                    )
+                )
+            }
+            return
+        }
 
         guard let filePath = BundledAssetSupport.routeAssetPath(for: requestURL.path, basePath: basePath) else {
             finish(task: urlSchemeTask, taskID: taskID) {
@@ -116,6 +131,14 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
 
             block()
         }
+    }
+
+    private static func isAllowedBundledAssetRequest(_ requestURL: URL, expectedHost: String) -> Bool {
+        guard let host = requestURL.host?.lowercased(), host == expectedHost else {
+            return false
+        }
+
+        return requestURL.port == nil
     }
 
     private func mimeType(for pathExtension: String) -> String {

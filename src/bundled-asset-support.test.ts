@@ -130,9 +130,13 @@ describe('bundled asset url resolution', () => {
 });
 
 describe('legacy native webview url fallback', () => {
-  it('rewrites relative bundled paths for legacy native resolution', () => {
-    expect(resolveLegacyNativeWebViewUrl('/index.html', 'ios')).toBe('capacitor://localhost/index.html');
-    expect(resolveLegacyNativeWebViewUrl('assets/app.js', 'android')).toBe('https://localhost/assets/app.js');
+  it('uses configured local url for legacy native resolution', () => {
+    const localConfig = parseBundledLocalConfig('https://example.com/');
+    expect(localConfig).not.toBeNull();
+    if (!localConfig) {
+      return;
+    }
+    expect(resolveLegacyNativeWebViewUrl('/index.html', 'android', localConfig)).toBe('https://example.com/index.html');
   });
 
   it('keeps remote urls unchanged for legacy native resolution', () => {

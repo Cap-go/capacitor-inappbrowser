@@ -151,9 +151,9 @@ public class Options {
     private String CloseModalOk;
     private Pattern closeModalURLPattern;
     private String url;
-    private String bundledAssetHost = "localhost";
-    private String bundledAssetScheme = "https";
-    private boolean serveBundledAssets = false;
+    private volatile String bundledAssetHost = "localhost";
+    private volatile String bundledAssetScheme = "https";
+    private volatile boolean serveBundledAssets = false;
     private JSObject headers;
     private String customUserAgent;
     private JSObject credentials;

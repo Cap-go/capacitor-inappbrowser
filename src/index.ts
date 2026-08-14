@@ -4,6 +4,7 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import {
   containsPathTraversal,
   isRelativeBundledPath,
+  parseBundledLocalConfig,
   resolveLegacyNativeWebViewUrl,
   type BundledAssetPlatform,
 } from './bundled-asset-support';
@@ -55,6 +56,19 @@ function bundledAssetPlatform(): BundledAssetPlatform {
   return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
 }
 
+function getConfiguredLocalConfig() {
+  if (!Capacitor.isNativePlatform()) {
+    return null;
+  }
+
+  const getServerUrl = (Capacitor as { getServerUrl?: () => string }).getServerUrl;
+  if (typeof getServerUrl !== 'function') {
+    return null;
+  }
+
+  return parseBundledLocalConfig(getServerUrl());
+}
+
 function prepareWebViewOptions<T extends { url: string }>(options: T): T {
   assertValidBundledAssetPath(options.url);
 
@@ -64,7 +78,7 @@ function prepareWebViewOptions<T extends { url: string }>(options: T): T {
 
   return {
     ...options,
-    url: resolveLegacyNativeWebViewUrl(options.url, bundledAssetPlatform()),
+    url: resolveLegacyNativeWebViewUrl(options.url, bundledAssetPlatform(), getConfiguredLocalConfig()),
   };
 }
 

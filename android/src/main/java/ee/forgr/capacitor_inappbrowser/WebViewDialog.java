@@ -4405,12 +4405,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {
-        if (_options == null || !_options.getServeBundledAssets()) {
-            return null;
-        }
-
         final WebViewAssetLoader loader;
         synchronized (bundledAssetLoaderLock) {
+            if (_options == null || !_options.getServeBundledAssets()) {
+                return null;
+            }
+
             ensureBundledAssetLoaderLocked();
             loader = bundledAssetLoader;
         }

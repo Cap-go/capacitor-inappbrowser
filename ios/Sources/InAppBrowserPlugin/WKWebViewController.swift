@@ -2068,7 +2068,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
         }
 
-        let bundledAssetHandler = BundledAssetSchemeHandler()
+        let bundledAssetHandler = BundledAssetSchemeHandler(expectedHost: bundledAssetLocalHost)
         self.bundledAssetSchemeHandler = bundledAssetHandler
         if webConfiguration.urlSchemeHandler(forURLScheme: bundledAssetLocalScheme) == nil {
             webConfiguration.setURLSchemeHandler(bundledAssetHandler, forURLScheme: bundledAssetLocalScheme)
