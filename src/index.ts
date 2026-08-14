@@ -148,4 +148,5 @@ const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> 
 };
 
 export * from './definitions';
+export * from './bundled-asset-support';
 export { InAppBrowser, addProxyHandler };

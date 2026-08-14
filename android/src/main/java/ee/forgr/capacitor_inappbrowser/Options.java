@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -152,6 +152,7 @@ public class Options {
     private Pattern closeModalURLPattern;
     private String url;
     private String bundledAssetHost = "localhost";
+    private String bundledAssetScheme = "https";
     private JSObject headers;
     private String customUserAgent;
     private JSObject credentials;
@@ -506,6 +507,18 @@ public class Options {
         this.bundledAssetHost = bundledAssetHost;
     }
 
+    public String getBundledAssetScheme() {
+        return bundledAssetScheme;
+    }
+
+    public void setBundledAssetScheme(String bundledAssetScheme) {
+        if (bundledAssetScheme == null || bundledAssetScheme.isBlank()) {
+            this.bundledAssetScheme = "https";
+            return;
+        }
+        this.bundledAssetScheme = bundledAssetScheme.toLowerCase(Locale.ROOT);
+    }
+
     public JSObject getHeaders() {
         return headers;
     }
@@ -798,6 +811,7 @@ public class Options {
         copy.setTitleIcon(titleIcon);
         copy.setUrl("about:blank");
         copy.setBundledAssetHost(bundledAssetHost);
+        copy.setBundledAssetScheme(bundledAssetScheme);
         copy.setHeaders(headers);
         copy.setCustomUserAgent(customUserAgent);
         copy.setCredentials(credentials);

@@ -1232,21 +1232,21 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func applyBundledAssetSettings(to webViewController: WKWebViewController) {
         let localConfig = bundledAssetLocalConfig()
-        webViewController.bundledAssetLocalScheme = localConfig.scheme
+        webViewController.bundledAssetLocalScheme = BundledAssetSupport.handlerScheme(for: localConfig)
         webViewController.bundledAssetLocalHost = localConfig.host
     }
 
-    private func webSource(for urlString: String) -> (source: WKWebSource?, needsBundledAssetHandler: Bool) {
+    private func webSource(for urlString: String) -> WKWebSource? {
         if let html = HtmlDataUrlSupport.parseHtml(from: urlString) {
-            return (.string(html, base: nil), false)
+            return .string(html, base: nil)
         }
 
-        let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL)
-        guard let url = URL(string: resolution.url) else {
-            return (nil, false)
+        guard let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL),
+              let url = URL(string: resolution.url) else {
+            return nil
         }
 
-        return (.remote(url), resolution.needsHandler)
+        return .remote(url)
     }
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
@@ -1454,7 +1454,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         DispatchQueue.main.async {
             let webSourceResult = self.webSource(for: urlString)
-            guard let webSource = webSourceResult.source else {
+            guard let webSource = webSourceResult else {
                 call.reject("Invalid URL format")
                 return
             }
@@ -1859,8 +1859,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL)
-        guard let url = URL(string: resolution.url) else {
+        guard let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL),
+              let url = URL(string: resolution.url) else {
             call.reject("Invalid URL")
             return
         }

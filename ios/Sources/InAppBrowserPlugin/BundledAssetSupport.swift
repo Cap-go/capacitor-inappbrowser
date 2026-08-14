@@ -8,11 +8,10 @@ enum BundledAssetSupport {
 
     struct Resolution: Equatable {
         let url: String
-        let needsHandler: Bool
     }
 
     static let iosDefaults = LocalConfig(scheme: "capacitor", host: "localhost")
-    static let androidDefaults = LocalConfig(scheme: "https", host: "localhost")
+    static let reservedWebKitSchemes = ["http", "https"]
 
     static func parseLocalConfig(from localURL: URL?) -> LocalConfig? {
         guard let localURL else {
@@ -31,23 +30,34 @@ enum BundledAssetSupport {
         return LocalConfig(scheme: scheme, host: host)
     }
 
-    static func resolve(_ urlString: String, localURL: URL?) -> Resolution {
+    static func handlerScheme(for localConfig: LocalConfig) -> String {
+        if reservedWebKitSchemes.contains(localConfig.scheme) {
+            return iosDefaults.scheme
+        }
+        return localConfig.scheme
+    }
+
+    static func resolve(_ urlString: String, localURL: URL?) -> Resolution? {
         let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
         let localConfig = parseLocalConfig(from: localURL) ?? iosDefaults
+        let navigationScheme = handlerScheme(for: localConfig)
 
         if isRelativeBundledPath(trimmed) {
+            guard !containsPathTraversal(trimmed) else {
+                return nil
+            }
             let path = normalizeBundledPath(trimmed)
-            return Resolution(
-                url: "\(localConfig.scheme)://\(localConfig.host)\(path)",
-                needsHandler: true
-            )
+            return Resolution(url: "\(navigationScheme)://\(localConfig.host)\(path)")
         }
 
         if isBundledLocalURL(trimmed, localConfig: localConfig) {
-            return Resolution(url: trimmed, needsHandler: true)
+            if let rewritten = rewriteBundledLocalURL(trimmed, localConfig: localConfig, navigationScheme: navigationScheme) {
+                return Resolution(url: rewritten)
+            }
+            return Resolution(url: trimmed)
         }
 
-        return Resolution(url: trimmed, needsHandler: false)
+        return Resolution(url: trimmed)
     }
 
     static func isBundledLocalURL(_ urlString: String, localConfig: LocalConfig) -> Bool {
@@ -57,7 +67,15 @@ enum BundledAssetSupport {
             return false
         }
 
-        return scheme == localConfig.scheme && host == localConfig.host
+        guard host == localConfig.host else {
+            return false
+        }
+
+        if scheme == localConfig.scheme || scheme == handlerScheme(for: localConfig) {
+            return true
+        }
+
+        return reservedWebKitSchemes.contains(scheme) && reservedWebKitSchemes.contains(localConfig.scheme)
     }
 
     static func isRelativeBundledPath(_ urlString: String) -> Bool {
@@ -69,24 +87,66 @@ enum BundledAssetSupport {
         return !isAbsoluteURL(trimmed)
     }
 
-    static func normalizeBundledPath(_ path: String) -> String {
+    static func normalizeBundledPath(_ path: String) -> String? {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed == "/" {
             return "/"
         }
 
+        guard !containsPathTraversal(trimmed) else {
+            return nil
+        }
+
         return trimmed.hasPrefix("/") ? trimmed : "/\(trimmed)"
     }
 
-    static func routeAssetPath(for requestPath: String, basePath: String) -> String {
-        let normalizedPath = requestPath.isEmpty ? "/" : requestPath
-        let pathURL = URL(fileURLWithPath: normalizedPath)
-
-        if pathURL.pathExtension.isEmpty {
-            return basePath + "/index.html"
+    static func routeAssetPath(for requestPath: String, basePath: String) -> String? {
+        guard !containsPathTraversal(requestPath) else {
+            return nil
         }
 
-        return basePath + normalizedPath
+        let normalizedPath = requestPath.isEmpty ? "/" : requestPath
+        let relativePath: String
+        if URL(fileURLWithPath: normalizedPath).pathExtension.isEmpty {
+            relativePath = "/index.html"
+        } else {
+            relativePath = normalizedPath.hasPrefix("/") ? normalizedPath : "/\(normalizedPath)"
+        }
+
+        let resolvedURL = URL(fileURLWithPath: basePath).appendingPathComponent(relativePath, isDirectory: false).standardizedFileURL
+        let baseURL = URL(fileURLWithPath: basePath).standardizedFileURL
+        let resolvedPath = resolvedURL.path
+        let basePathValue = baseURL.path
+
+        guard resolvedPath == basePathValue || resolvedPath.hasPrefix(basePathValue + "/") else {
+            return nil
+        }
+
+        return resolvedPath
+    }
+
+    static func containsPathTraversal(_ path: String) -> Bool {
+        path.split(separator: "/").contains(where: { $0 == ".." })
+    }
+
+    private static func rewriteBundledLocalURL(
+        _ urlString: String,
+        localConfig: LocalConfig,
+        navigationScheme: String
+    ) -> String? {
+        guard let url = URL(string: urlString),
+              let host = url.host?.lowercased(),
+              host == localConfig.host else {
+            return nil
+        }
+
+        guard let scheme = url.scheme?.lowercased(), scheme != navigationScheme else {
+            return nil
+        }
+
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = navigationScheme
+        return components?.url?.absoluteString
     }
 
     private static func isAbsoluteURL(_ urlString: String) -> Bool {

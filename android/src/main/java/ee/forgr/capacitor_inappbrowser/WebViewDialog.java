@@ -4372,7 +4372,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        bundledAssetLoader = BundledAssetSupport.createAssetLoader(_context, _options.getBundledAssetHost());
+        bundledAssetLoader = BundledAssetSupport.createAssetLoader(
+            _context,
+            _options.getBundledAssetHost(),
+            _options.getBundledAssetScheme()
+        );
+    }
+
+    private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {
+        ensureBundledAssetLoader();
+        if (bundledAssetLoader == null) {
+            return null;
+        }
+        return bundledAssetLoader.shouldInterceptRequest(request.getUrl());
     }
 
     public void setUrl(String url) {
@@ -5598,194 +5610,253 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         return null;
                     }
 
-                    ensureBundledAssetLoader();
-                    if (bundledAssetLoader != null) {
-                        WebResourceResponse bundledResponse = bundledAssetLoader.shouldInterceptRequest(request.getUrl());
-                        if (bundledResponse != null) {
-                            return bundledResponse;
-                        }
-                    }
+                    if (shouldUseNativeProxy()) {
+                        String requestUrl = request.getUrl().toString();
+                        boolean bridgeBackedRequest = ProxyRequestSupport.isBridgeMarkerRequestUrl(requestUrl);
+                        String originalUrl;
+                        String method;
+                        Map<String, String> requestHeaders = new HashMap<>();
+                        String base64Body = "";
+                        String credentialsMode = "same-origin";
 
-                    if (!shouldUseNativeProxy()) {
-                        return null;
-                    }
-
-                    String requestUrl = request.getUrl().toString();
-                    boolean bridgeBackedRequest = ProxyRequestSupport.isBridgeMarkerRequestUrl(requestUrl);
-                    String originalUrl;
-                    String method;
-                    Map<String, String> requestHeaders = new HashMap<>();
-                    String base64Body = "";
-                    String credentialsMode = "same-origin";
-
-                    if (bridgeBackedRequest) {
-                        Uri uri = request.getUrl();
-                        originalUrl = uri.getQueryParameter("u");
-                        String requestId = uri.getQueryParameter("rid");
-                        if (originalUrl == null || requestId == null) {
-                            return null;
-                        }
-
-                        if (
-                            ProxyRequestSupport.usesLegacyJsProxyMode(_options) &&
-                            !ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, originalUrl)
-                        ) {
-                            if (proxyBridge != null) {
-                                proxyBridge.getAndRemove(requestId);
+                        if (bridgeBackedRequest) {
+                            Uri uri = request.getUrl();
+                            originalUrl = uri.getQueryParameter("u");
+                            String requestId = uri.getQueryParameter("rid");
+                            if (originalUrl == null || requestId == null) {
+                                return null;
                             }
-                            Log.w("InAppBrowserProxy", "Ignoring legacy regex miss for bridge-backed request: " + originalUrl);
-                            return createCanceledResponse();
-                        }
 
-                        ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
-                        if (stored == null) {
-                            Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
-                            return createCanceledResponse();
-                        }
-                        method = stored.method;
-                        base64Body = stored.base64Body;
-                        credentialsMode = stored.credentialsMode;
-                        Map<String, String> safeMarkerHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(request.getRequestHeaders());
-                        try {
-                            requestHeaders = ProxyRequestSupport.mergeRequestHeaders(null, stored.headersJson);
-                            requestHeaders = ProxyRequestSupport.mergeMissingHeaders(requestHeaders, safeMarkerHeaders);
-                        } catch (JSONException error) {
-                            Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
-                            return createCanceledResponse();
-                        }
-                        String initiatorUrl = request.getRequestHeaders().get("Referer");
-                        if (initiatorUrl == null || initiatorUrl.isBlank()) {
-                            initiatorUrl = getWebViewUrlOrFallback(
-                                _options != null && _options.getUrl() != null ? _options.getUrl() : originalUrl
+                            if (
+                                ProxyRequestSupport.usesLegacyJsProxyMode(_options) &&
+                                !ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(_options, originalUrl)
+                            ) {
+                                if (proxyBridge != null) {
+                                    proxyBridge.getAndRemove(requestId);
+                                }
+                                Log.w("InAppBrowserProxy", "Ignoring legacy regex miss for bridge-backed request: " + originalUrl);
+                                return createCanceledResponse();
+                            }
+
+                            ProxyBridge.StoredRequest stored = proxyBridge != null ? proxyBridge.getAndRemove(requestId) : null;
+                            if (stored == null) {
+                                Log.e("InAppBrowserProxy", "Missing stored proxy bridge payload for request id: " + requestId);
+                                return createCanceledResponse();
+                            }
+                            method = stored.method;
+                            base64Body = stored.base64Body;
+                            credentialsMode = stored.credentialsMode;
+                            Map<String, String> safeMarkerHeaders = ProxyRequestSupport.extractSafeMarkerHeaders(
+                                request.getRequestHeaders()
                             );
+                            try {
+                                requestHeaders = ProxyRequestSupport.mergeRequestHeaders(null, stored.headersJson);
+                                requestHeaders = ProxyRequestSupport.mergeMissingHeaders(requestHeaders, safeMarkerHeaders);
+                            } catch (JSONException error) {
+                                Log.e("InAppBrowserProxy", "Failed to parse stored proxy headers", error);
+                                return createCanceledResponse();
+                            }
+                            String initiatorUrl = request.getRequestHeaders().get("Referer");
+                            if (initiatorUrl == null || initiatorUrl.isBlank()) {
+                                initiatorUrl = getWebViewUrlOrFallback(
+                                    _options != null && _options.getUrl() != null ? _options.getUrl() : originalUrl
+                                );
+                            }
+                            String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
+                            if (
+                                targetCookies != null &&
+                                !targetCookies.isBlank() &&
+                                ProxyRequestSupport.shouldInjectCookies(credentialsMode, initiatorUrl, originalUrl, requestHeaders)
+                            ) {
+                                requestHeaders.put("Cookie", targetCookies);
+                            }
+                        } else {
+                            if (!ProxyRequestSupport.shouldHandleNonBridgeRequest(_options, requestUrl)) {
+                                return interceptBundledAssetRequest(request);
+                            }
+
+                            originalUrl = requestUrl;
+                            method = request.getMethod();
+                            if (request.getRequestHeaders() != null) {
+                                requestHeaders.putAll(request.getRequestHeaders());
+                            }
                         }
-                        String targetCookies = CookieManager.getInstance().getCookie(originalUrl);
+
+                        NativeRequestContext requestContext = new NativeRequestContext(
+                            originalUrl,
+                            method,
+                            requestHeaders,
+                            base64Body,
+                            request.isForMainFrame(),
+                            credentialsMode
+                        );
+
                         if (
-                            targetCookies != null &&
-                            !targetCookies.isBlank() &&
-                            ProxyRequestSupport.shouldInjectCookies(credentialsMode, initiatorUrl, originalUrl, requestHeaders)
-                        ) {
-                            requestHeaders.put("Cookie", targetCookies);
-                        }
-                    } else {
-                        if (!ProxyRequestSupport.shouldHandleNonBridgeRequest(_options, requestUrl)) {
-                            return null;
-                        }
-
-                        originalUrl = requestUrl;
-                        method = request.getMethod();
-                        if (request.getRequestHeaders() != null) {
-                            requestHeaders.putAll(request.getRequestHeaders());
-                        }
-                    }
-
-                    NativeRequestContext requestContext = new NativeRequestContext(
-                        originalUrl,
-                        method,
-                        requestHeaders,
-                        base64Body,
-                        request.isForMainFrame(),
-                        credentialsMode
-                    );
-
-                    if (
-                        ProxyRequestSupport.shouldLetWebViewHandleMissingBody(requestUrl, requestContext.method, requestContext.base64Body)
-                    ) {
-                        Log.w("InAppBrowserProxy", "Allowing WebView to handle request with uncaptured body: " + requestContext.url);
-                        return null;
-                    }
-
-                    boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
-                    boolean shouldDelegateLegacyRequest = ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(
-                        _options,
-                        requestContext.url
-                    );
-                    NativeResponseData directResponseData = null;
-
-                    NativeProxyRule outboundRule =
-                        legacyProxyMode && shouldDelegateLegacyRequest
-                            ? new NativeProxyRule(
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  null,
-                                  false,
-                                  NativeProxyRule.Action.DELEGATE_TO_JS
-                              )
-                            : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
-
-                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
-                        return createCanceledResponse();
-                    }
-
-                    if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS) {
-                        String proxyId = UUID.randomUUID().toString();
-                        ProxiedRequest proxiedRequest = new ProxiedRequest();
-                        proxiedRequest.requestContext = requestContext;
-                        addProxiedRequest(proxyId, proxiedRequest);
-
-                        String dialogId = instanceId != null ? instanceId : "";
-                        _options
-                            .getCallbacks()
-                            .proxyRequestEvent(
-                                proxyId,
-                                "outbound",
-                                requestContext.url,
+                            ProxyRequestSupport.shouldLetWebViewHandleMissingBody(
+                                requestUrl,
                                 requestContext.method,
-                                serializeHeaders(requestContext.headers),
-                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
-                                null,
-                                null,
-                                null,
-                                dialogId
-                            );
+                                requestContext.base64Body
+                            )
+                        ) {
+                            Log.w("InAppBrowserProxy", "Allowing WebView to handle request with uncaptured body: " + requestContext.url);
+                            return null;
+                        }
 
-                        try {
-                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                                if (proxiedRequest.canceled) {
-                                    return createCanceledResponse();
-                                }
-                                if (proxiedRequest.response != null) {
-                                    return proxiedRequest.response;
-                                }
-                                if (proxiedRequest.nativeResponse != null) {
-                                    directResponseData = proxiedRequest.nativeResponse;
+                        boolean legacyProxyMode = ProxyRequestSupport.usesLegacyJsProxyMode(_options);
+                        boolean shouldDelegateLegacyRequest = ProxyRequestSupport.shouldDelegateLegacyJsProxyRequest(
+                            _options,
+                            requestContext.url
+                        );
+                        NativeResponseData directResponseData = null;
+
+                        NativeProxyRule outboundRule =
+                            legacyProxyMode && shouldDelegateLegacyRequest
+                                ? new NativeProxyRule(
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      null,
+                                      false,
+                                      NativeProxyRule.Action.DELEGATE_TO_JS
+                                  )
+                                : findMatchingRule(_options.getOutboundProxyRules(), requestContext, null);
+
+                        if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                            return createCanceledResponse();
+                        }
+
+                        if (outboundRule != null && outboundRule.getAction() == NativeProxyRule.Action.DELEGATE_TO_JS) {
+                            String proxyId = UUID.randomUUID().toString();
+                            ProxiedRequest proxiedRequest = new ProxiedRequest();
+                            proxiedRequest.requestContext = requestContext;
+                            addProxiedRequest(proxyId, proxiedRequest);
+
+                            String dialogId = instanceId != null ? instanceId : "";
+                            _options
+                                .getCallbacks()
+                                .proxyRequestEvent(
+                                    proxyId,
+                                    "outbound",
+                                    requestContext.url,
+                                    requestContext.method,
+                                    serializeHeaders(requestContext.headers),
+                                    requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                    null,
+                                    null,
+                                    null,
+                                    dialogId
+                                );
+
+                            try {
+                                if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                    if (proxiedRequest.canceled) {
+                                        return createCanceledResponse();
+                                    }
+                                    if (proxiedRequest.response != null) {
+                                        return proxiedRequest.response;
+                                    }
+                                    if (proxiedRequest.nativeResponse != null) {
+                                        directResponseData = proxiedRequest.nativeResponse;
+                                    } else {
+                                        requestContext =
+                                            proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                                    }
                                 } else {
-                                    requestContext = proxiedRequest.requestContext != null ? proxiedRequest.requestContext : requestContext;
+                                    synchronized (proxiedRequest) {
+                                        proxiedRequest.timedOut = true;
+                                    }
+                                    removeProxiedRequest(proxyId);
+                                    Log.w("InAppBrowserProxy", "Proxy timeout, falling back to native replay for: " + requestContext.url);
                                 }
-                            } else {
-                                synchronized (proxiedRequest) {
-                                    proxiedRequest.timedOut = true;
-                                }
+                            } catch (InterruptedException error) {
                                 removeProxiedRequest(proxyId);
-                                Log.w("InAppBrowserProxy", "Proxy timeout, falling back to native replay for: " + requestContext.url);
+                                Thread.currentThread().interrupt();
+                                Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                                return bridgeBackedRequest ? createCanceledResponse() : null;
                             }
-                        } catch (InterruptedException error) {
-                            removeProxiedRequest(proxyId);
-                            Thread.currentThread().interrupt();
-                            Log.e("InAppBrowserProxy", "Semaphore wait error", error);
-                            return bridgeBackedRequest ? createCanceledResponse() : null;
                         }
-                    }
 
-                    NativeResponseData nativeResponse = directResponseData;
-                    if (nativeResponse == null) {
-                        try {
-                            nativeResponse = performNativeRequest(requestContext);
-                        } catch (IOException error) {
-                            Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
-                            return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
+                        NativeResponseData nativeResponse = directResponseData;
+                        if (nativeResponse == null) {
+                            try {
+                                nativeResponse = performNativeRequest(requestContext);
+                            } catch (IOException error) {
+                                Log.e("InAppBrowserProxy", "Native request failed for: " + requestContext.url, error);
+                                return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
+                            }
                         }
-                    }
 
-                    int redirectsFollowed = 0;
-                    while (true) {
-                        NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
-                        if (inboundRule == null || inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
+                        int redirectsFollowed = 0;
+                        while (true) {
+                            NativeProxyRule inboundRule = findMatchingRule(_options.getInboundProxyRules(), requestContext, nativeResponse);
+                            if (inboundRule == null || inboundRule.getAction() == NativeProxyRule.Action.CONTINUE) {
+                                RedirectReplayResult redirectReplay;
+                                try {
+                                    redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
+                                } catch (IOException error) {
+                                    Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
+                                    return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
+                                }
+                                if (redirectReplay != null) {
+                                    requestContext = redirectReplay.requestContext;
+                                    nativeResponse = redirectReplay.responseData;
+                                    redirectsFollowed++;
+                                    continue;
+                                }
+                                return createWebResourceResponseOrFallback(nativeResponse, bridgeBackedRequest, requestContext.url);
+                            }
+                            if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
+                                return createCanceledResponse();
+                            }
+
+                            String proxyId = UUID.randomUUID().toString();
+                            ProxiedRequest proxiedRequest = new ProxiedRequest();
+                            proxiedRequest.requestContext = requestContext;
+                            proxiedRequest.nativeResponse = nativeResponse;
+                            addProxiedRequest(proxyId, proxiedRequest);
+
+                            String dialogId = instanceId != null ? instanceId : "";
+                            _options
+                                .getCallbacks()
+                                .proxyRequestEvent(
+                                    proxyId,
+                                    "inbound",
+                                    requestContext.url,
+                                    requestContext.method,
+                                    serializeHeaders(requestContext.headers),
+                                    requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
+                                    nativeResponse.statusCode,
+                                    serializeHeaders(nativeResponse.headers),
+                                    Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
+                                    dialogId
+                                );
+
+                            try {
+                                if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
+                                    if (proxiedRequest.canceled) {
+                                        return createCanceledResponse();
+                                    }
+                                    if (proxiedRequest.response != null) {
+                                        return proxiedRequest.response;
+                                    }
+                                    if (proxiedRequest.nativeResponse != null) {
+                                        nativeResponse = proxiedRequest.nativeResponse;
+                                    }
+                                } else {
+                                    synchronized (proxiedRequest) {
+                                        proxiedRequest.timedOut = true;
+                                    }
+                                    removeProxiedRequest(proxyId);
+                                }
+                            } catch (InterruptedException error) {
+                                Thread.currentThread().interrupt();
+                                Log.e("InAppBrowserProxy", "Semaphore wait error", error);
+                            }
+
                             RedirectReplayResult redirectReplay;
                             try {
                                 redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
@@ -5801,69 +5872,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             }
                             return createWebResourceResponseOrFallback(nativeResponse, bridgeBackedRequest, requestContext.url);
                         }
-                        if (inboundRule.getAction() == NativeProxyRule.Action.CANCEL) {
-                            return createCanceledResponse();
-                        }
-
-                        String proxyId = UUID.randomUUID().toString();
-                        ProxiedRequest proxiedRequest = new ProxiedRequest();
-                        proxiedRequest.requestContext = requestContext;
-                        proxiedRequest.nativeResponse = nativeResponse;
-                        addProxiedRequest(proxyId, proxiedRequest);
-
-                        String dialogId = instanceId != null ? instanceId : "";
-                        _options
-                            .getCallbacks()
-                            .proxyRequestEvent(
-                                proxyId,
-                                "inbound",
-                                requestContext.url,
-                                requestContext.method,
-                                serializeHeaders(requestContext.headers),
-                                requestContext.base64Body.isEmpty() ? null : requestContext.base64Body,
-                                nativeResponse.statusCode,
-                                serializeHeaders(nativeResponse.headers),
-                                Base64.encodeToString(nativeResponse.bodyBytes, Base64.NO_WRAP),
-                                dialogId
-                            );
-
-                        try {
-                            if (proxiedRequest.semaphore.tryAcquire(1, 10, TimeUnit.SECONDS)) {
-                                if (proxiedRequest.canceled) {
-                                    return createCanceledResponse();
-                                }
-                                if (proxiedRequest.response != null) {
-                                    return proxiedRequest.response;
-                                }
-                                if (proxiedRequest.nativeResponse != null) {
-                                    nativeResponse = proxiedRequest.nativeResponse;
-                                }
-                            } else {
-                                synchronized (proxiedRequest) {
-                                    proxiedRequest.timedOut = true;
-                                }
-                                removeProxiedRequest(proxyId);
-                            }
-                        } catch (InterruptedException error) {
-                            Thread.currentThread().interrupt();
-                            Log.e("InAppBrowserProxy", "Semaphore wait error", error);
-                        }
-
-                        RedirectReplayResult redirectReplay;
-                        try {
-                            redirectReplay = followRedirectForWebView(requestContext, nativeResponse, redirectsFollowed);
-                        } catch (IOException error) {
-                            Log.e("InAppBrowserProxy", "Native redirect replay failed for: " + requestContext.url, error);
-                            return createProxiedNativeFailureResponse(requestContext.url, bridgeBackedRequest, error);
-                        }
-                        if (redirectReplay != null) {
-                            requestContext = redirectReplay.requestContext;
-                            nativeResponse = redirectReplay.responseData;
-                            redirectsFollowed++;
-                            continue;
-                        }
-                        return createWebResourceResponseOrFallback(nativeResponse, bridgeBackedRequest, requestContext.url);
                     }
+
+                    return interceptBundledAssetRequest(request);
                 }
 
                 @Override

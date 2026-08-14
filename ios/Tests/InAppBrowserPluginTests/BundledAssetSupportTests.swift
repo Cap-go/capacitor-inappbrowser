@@ -6,15 +6,27 @@ final class BundledAssetSupportTests: XCTestCase {
         let localURL = URL(string: "capacitor://localhost")!
         let resolution = BundledAssetSupport.resolve("/page.html", localURL: localURL)
 
-        XCTAssertEqual(resolution.url, "capacitor://localhost/page.html")
-        XCTAssertTrue(resolution.needsHandler)
+        XCTAssertEqual(resolution?.url, "capacitor://localhost/page.html")
+    }
+
+    func testUsesCapacitorSchemeWhenLocalConfigUsesHttp() {
+        let localURL = URL(string: "http://localhost")!
+        let resolution = BundledAssetSupport.resolve("/page.html", localURL: localURL)
+
+        XCTAssertEqual(resolution?.url, "capacitor://localhost/page.html")
+        XCTAssertEqual(BundledAssetSupport.handlerScheme(for: BundledAssetSupport.parseLocalConfig(from: localURL)!), "capacitor")
+    }
+
+    func testRejectsPathTraversal() {
+        XCTAssertNil(BundledAssetSupport.resolve("/../secret.txt", localURL: URL(string: "capacitor://localhost")))
+        XCTAssertNil(BundledAssetSupport.normalizeBundledPath("/../secret.txt"))
+        XCTAssertNil(BundledAssetSupport.routeAssetPath(for: "/../../secret.txt", basePath: "/tmp/public"))
     }
 
     func testKeepsRemoteUrlsUnchanged() {
         let resolution = BundledAssetSupport.resolve("https://example.com/page.html", localURL: URL(string: "capacitor://localhost"))
 
-        XCTAssertEqual(resolution.url, "https://example.com/page.html")
-        XCTAssertFalse(resolution.needsHandler)
+        XCTAssertEqual(resolution?.url, "https://example.com/page.html")
     }
 
     func testRecognizesBundledLocalURL() {

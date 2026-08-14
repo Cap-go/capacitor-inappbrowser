@@ -7,7 +7,6 @@ export interface BundledAssetLocalConfig {
 
 export interface BundledAssetResolution {
   url: string;
-  needsHandler: boolean;
 }
 
 export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLocalConfig> = {
@@ -16,15 +15,24 @@ export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLo
 };
 
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
+const RESERVED_WEB_SCHEMES = ['http', 'https'];
 
 export function isAbsoluteUrl(url: string): boolean {
   return ABSOLUTE_URL_PATTERN.test(url) || url.startsWith('//');
 }
 
-export function normalizeBundledPath(path: string): string {
+export function containsPathTraversal(path: string): boolean {
+  return path.split('/').some((segment) => segment === '..');
+}
+
+export function normalizeBundledPath(path: string): string | null {
   const trimmed = path.trim();
   if (!trimmed || trimmed === '/') {
     return '/';
+  }
+
+  if (containsPathTraversal(trimmed)) {
+    return null;
   }
 
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
@@ -50,6 +58,21 @@ export function parseBundledLocalConfig(localUrl?: string | null): BundledAssetL
   }
 }
 
+export function handlerSchemeForPlatform(platform: BundledAssetPlatform, localConfig: BundledAssetLocalConfig): string {
+  if (platform === 'ios' && RESERVED_WEB_SCHEMES.includes(localConfig.scheme)) {
+    return BUNDLED_ASSET_DEFAULTS.ios.scheme;
+  }
+
+  if (platform === 'android') {
+    if (localConfig.scheme === 'http' || localConfig.scheme === 'https') {
+      return localConfig.scheme;
+    }
+    return BUNDLED_ASSET_DEFAULTS.android.scheme;
+  }
+
+  return localConfig.scheme;
+}
+
 export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalConfig | null): boolean {
   if (!isAbsoluteUrl(url)) {
     return false;
@@ -61,7 +84,15 @@ export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalCo
     const host = parsed.hostname.toLowerCase();
     const config = localConfig ?? BUNDLED_ASSET_DEFAULTS.android;
 
-    return scheme === config.scheme && host === config.host;
+    if (host !== config.host) {
+      return false;
+    }
+
+    if (scheme === config.scheme || scheme === handlerSchemeForPlatform('android', config)) {
+      return true;
+    }
+
+    return RESERVED_WEB_SCHEMES.includes(scheme) && RESERVED_WEB_SCHEMES.includes(config.scheme);
   } catch {
     return false;
   }
@@ -76,31 +107,54 @@ export function isRelativeBundledPath(url: string): boolean {
   return !isAbsoluteUrl(trimmed);
 }
 
+function rewriteBundledLocalUrl(
+  url: string,
+  localConfig: BundledAssetLocalConfig,
+  navigationScheme: string,
+): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
+
+    if (host !== localConfig.host || scheme === navigationScheme) {
+      return null;
+    }
+
+    parsed.protocol = `${navigationScheme}:`;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function resolveBundledAssetUrl(
   url: string,
   platform: BundledAssetPlatform,
   localConfig?: BundledAssetLocalConfig | null,
-): BundledAssetResolution {
+): BundledAssetResolution | null {
   const trimmed = url.trim();
-  const defaults = localConfig ?? BUNDLED_ASSET_DEFAULTS[platform];
+  const config = localConfig ?? BUNDLED_ASSET_DEFAULTS[platform];
+  const navigationScheme = handlerSchemeForPlatform(platform, config);
 
   if (isRelativeBundledPath(trimmed)) {
     const path = normalizeBundledPath(trimmed);
+    if (path === null) {
+      return null;
+    }
     return {
-      url: `${defaults.scheme}://${defaults.host}${path}`,
-      needsHandler: true,
+      url: `${navigationScheme}://${config.host}${path}`,
     };
   }
 
-  if (isBundledLocalUrl(trimmed, defaults)) {
+  if (isBundledLocalUrl(trimmed, config)) {
+    const rewritten = rewriteBundledLocalUrl(trimmed, config, navigationScheme);
     return {
-      url: trimmed,
-      needsHandler: true,
+      url: rewritten ?? trimmed,
     };
   }
 
   return {
     url: trimmed,
-    needsHandler: false,
   };
 }

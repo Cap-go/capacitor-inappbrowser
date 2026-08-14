@@ -4,18 +4,12 @@ import UniformTypeIdentifiers
 import WebKit
 
 final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
-    private let router: CapacitorRouter
+    private let basePath: String
     private var activeTasks: [ObjectIdentifier: WKURLSchemeTask] = [:]
     private let tasksLock = NSLock()
 
     override init() {
-        var router = CapacitorRouter()
-        if let publicDirectory = Self.publicDirectoryURL() {
-            router.basePath = publicDirectory.path
-        } else if let wwwDirectory = Self.wwwDirectoryURL() {
-            router.basePath = wwwDirectory.path
-        }
-        self.router = router
+        self.basePath = Self.resolveBasePath()
         super.init()
     }
 
@@ -32,7 +26,19 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         activeTasks[taskID] = urlSchemeTask
         tasksLock.unlock()
 
-        let filePath = router.route(for: requestURL.path)
+        guard let filePath = BundledAssetSupport.routeAssetPath(for: requestURL.path, basePath: basePath) else {
+            finish(task: urlSchemeTask, taskID: taskID) {
+                urlSchemeTask.didFailWithError(
+                    NSError(
+                        domain: "BundledAssetSchemeHandler",
+                        code: 403,
+                        userInfo: [NSLocalizedDescriptionKey: "Blocked bundled asset path: \(requestURL.path)"]
+                    )
+                )
+            }
+            return
+        }
+
         let fileURL = URL(fileURLWithPath: filePath)
 
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -104,25 +110,26 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         return pathExtension.isEmpty ? "text/html" : "application/octet-stream"
     }
 
+    private static func resolveBasePath() -> String {
+        if let publicDirectory = publicDirectoryURL(),
+           FileManager.default.fileExists(atPath: publicDirectory.path) {
+            return publicDirectory.path
+        }
+
+        if let wwwDirectory = wwwDirectoryURL(),
+           FileManager.default.fileExists(atPath: wwwDirectory.path) {
+            return wwwDirectory.path
+        }
+
+        return publicDirectoryURL()?.path ?? wwwDirectoryURL()?.path ?? ""
+    }
+
     private static func publicDirectoryURL() -> URL? {
         Bundle.main.resourceURL?.appendingPathComponent("public", isDirectory: true)
     }
 
     private static func wwwDirectoryURL() -> URL? {
         Bundle.main.resourceURL?.appendingPathComponent("www", isDirectory: true)
-    }
-}
-
-private struct CapacitorRouter {
-    var basePath: String = ""
-
-    func route(for path: String) -> String {
-        let pathURL = URL(fileURLWithPath: path)
-        if pathURL.pathExtension.isEmpty {
-            return basePath + "/index.html"
-        }
-
-        return basePath + path
     }
 }
 

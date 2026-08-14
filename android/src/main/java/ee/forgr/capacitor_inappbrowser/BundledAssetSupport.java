@@ -27,13 +27,14 @@ final class BundledAssetSupport {
     static final class Resolution {
 
         final String url;
-        final boolean needsHandler;
 
-        Resolution(String url, boolean needsHandler) {
+        Resolution(String url) {
             this.url = url;
-            this.needsHandler = needsHandler;
         }
     }
+
+    private static final String[] RESERVED_WEB_SCHEMES = { "http", "https" };
+    private static final String PROXY_BRIDGE_MARKER_PATH = "/_capgo_proxy_";
 
     private BundledAssetSupport() {}
 
@@ -55,23 +56,35 @@ final class BundledAssetSupport {
         }
     }
 
+    static String assetLoaderScheme(LocalConfig localConfig) {
+        if ("http".equals(localConfig.scheme) || "https".equals(localConfig.scheme)) {
+            return localConfig.scheme;
+        }
+        return "https";
+    }
+
     static Resolution resolve(String url, Bridge bridge) {
         String trimmed = url == null ? "" : url.trim();
         LocalConfig localConfig = parseLocalConfig(bridge != null ? bridge.getLocalUrl() : null);
         if (localConfig == null) {
             localConfig = new LocalConfig("https", "localhost");
         }
+        String navigationScheme = assetLoaderScheme(localConfig);
 
         if (isRelativeBundledPath(trimmed)) {
             String path = normalizeBundledPath(trimmed);
-            return new Resolution(localConfig.scheme + "://" + localConfig.host + path, true);
+            if (path == null) {
+                return null;
+            }
+            return new Resolution(navigationScheme + "://" + localConfig.host + path);
         }
 
         if (isBundledLocalUrl(trimmed, localConfig)) {
-            return new Resolution(trimmed, true);
+            String rewritten = rewriteBundledLocalUrl(trimmed, localConfig, navigationScheme);
+            return new Resolution(rewritten != null ? rewritten : trimmed);
         }
 
-        return new Resolution(trimmed, false);
+        return new Resolution(trimmed);
     }
 
     static boolean isBundledLocalUrl(String url, LocalConfig localConfig) {
@@ -86,7 +99,17 @@ final class BundledAssetSupport {
             if (scheme == null || host == null) {
                 return false;
             }
-            return scheme.equalsIgnoreCase(localConfig.scheme) && host.equalsIgnoreCase(localConfig.host);
+
+            if (!host.equalsIgnoreCase(localConfig.host)) {
+                return false;
+            }
+
+            String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+            if (normalizedScheme.equalsIgnoreCase(localConfig.scheme) || normalizedScheme.equals(assetLoaderScheme(localConfig))) {
+                return true;
+            }
+
+            return isReservedWebScheme(normalizedScheme) && isReservedWebScheme(localConfig.scheme);
         } catch (IllegalArgumentException error) {
             return false;
         }
@@ -104,14 +127,26 @@ final class BundledAssetSupport {
         if (trimmed.isEmpty() || "/".equals(trimmed)) {
             return "/";
         }
+
+        if (containsPathTraversal(trimmed)) {
+            return null;
+        }
+
         return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
     }
 
-    static WebViewAssetLoader createAssetLoader(Context context, String hostname) {
-        return new WebViewAssetLoader.Builder()
+    static boolean isProxyBridgeMarkerPath(String path) {
+        return PROXY_BRIDGE_MARKER_PATH.equals(path);
+    }
+
+    static WebViewAssetLoader createAssetLoader(Context context, String hostname, String scheme) {
+        WebViewAssetLoader.Builder builder = new WebViewAssetLoader.Builder()
             .setDomain(hostname)
-            .addPathHandler("/", new PublicAssetsPathHandler(context.getAssets()))
-            .build();
+            .addPathHandler("/", new PublicAssetsPathHandler(context.getAssets()));
+        if ("http".equalsIgnoreCase(scheme)) {
+            builder.setHttpAllowed(true);
+        }
+        return builder.build();
     }
 
     static String mimeTypeForPath(String path) {
@@ -123,6 +158,15 @@ final class BundledAssetSupport {
             }
         }
         return extension == null || extension.isEmpty() ? "text/html" : "application/octet-stream";
+    }
+
+    private static boolean isReservedWebScheme(String scheme) {
+        for (String reservedScheme : RESERVED_WEB_SCHEMES) {
+            if (reservedScheme.equals(scheme)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isAbsoluteUrl(String url) {
@@ -145,7 +189,45 @@ final class BundledAssetSupport {
         return Character.isLetter(url.charAt(0));
     }
 
+    private static boolean containsPathTraversal(String path) {
+        for (String segment : path.split("/")) {
+            if ("..".equals(segment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String rewriteBundledLocalUrl(String url, LocalConfig localConfig, String navigationScheme) {
+        try {
+            URI uri = URI.create(url);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null || !host.equalsIgnoreCase(localConfig.host)) {
+                return null;
+            }
+            if (scheme.equalsIgnoreCase(navigationScheme)) {
+                return null;
+            }
+            return new URI(
+                navigationScheme,
+                uri.getUserInfo(),
+                host,
+                uri.getPort(),
+                uri.getPath(),
+                uri.getQuery(),
+                uri.getFragment()
+            ).toString();
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
     private static String mapToAssetPath(String path) {
+        if (containsPathTraversal(path)) {
+            return null;
+        }
+
         String normalizedPath = path == null || path.isEmpty() ? "/" : path;
         if (!normalizedPath.startsWith("/")) {
             normalizedPath = "/" + normalizedPath;
@@ -170,19 +252,19 @@ final class BundledAssetSupport {
 
         @Override
         public WebResourceResponse handle(String path) {
+            if (isProxyBridgeMarkerPath(path)) {
+                return null;
+            }
+
             String assetPath = mapToAssetPath(path);
+            if (assetPath == null) {
+                return null;
+            }
+
             try {
                 InputStream stream = assetManager.open(assetPath);
                 return new WebResourceResponse(mimeTypeForPath(path), null, stream);
-            } catch (IOException primaryError) {
-                if (!"public/index.html".equals(assetPath)) {
-                    try {
-                        InputStream fallbackStream = assetManager.open("public/index.html");
-                        return new WebResourceResponse("text/html", null, fallbackStream);
-                    } catch (IOException ignored) {
-                        return null;
-                    }
-                }
+            } catch (IOException error) {
                 return null;
             }
         }

@@ -360,9 +360,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     private void applyBundledAssetOptions(Options options, String url) {
         BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+        if (resolution == null) {
+            options.setUrl(url);
+            return;
+        }
         options.setUrl(resolution.url);
         BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(getBridge().getLocalUrl());
         options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+        options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
     }
 
     private void notifyPopupWindowOpened(String popupId, String parentId, String popupUrl, boolean visible) {
@@ -1064,7 +1069,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         if (url == null || TextUtils.isEmpty(url)) {
             call.reject("Invalid URL");
         }
-        currentUrl = url;
         final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();
         applyBundledAssetOptions(options, url);
