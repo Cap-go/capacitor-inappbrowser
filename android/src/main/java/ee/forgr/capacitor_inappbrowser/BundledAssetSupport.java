@@ -9,7 +9,11 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 
 final class BundledAssetSupport {
 
@@ -136,23 +140,27 @@ final class BundledAssetSupport {
         return !isAbsoluteUrl(url);
     }
 
-    private static final java.util.Set<String> BUNDLED_ASSET_EXTENSIONS = java.util.Set.of(
-        "html",
-        "htm",
-        "js",
-        "css",
-        "json",
-        "xml",
-        "svg",
-        "png",
-        "jpg",
-        "jpeg",
-        "gif",
-        "webp",
-        "woff",
-        "woff2",
-        "ttf",
-        "map"
+    private static final Set<String> BUNDLED_ASSET_EXTENSIONS = Collections.unmodifiableSet(
+        new HashSet<>(
+            Arrays.asList(
+                "html",
+                "htm",
+                "js",
+                "css",
+                "json",
+                "xml",
+                "svg",
+                "png",
+                "jpg",
+                "jpeg",
+                "gif",
+                "webp",
+                "woff",
+                "woff2",
+                "ttf",
+                "map"
+            )
+        )
     );
 
     static boolean isLikelyBundledRelativePath(String url) {
@@ -160,18 +168,33 @@ final class BundledAssetSupport {
             return false;
         }
 
-        String trimmed = url.trim();
+        String trimmed = stripPathQueryAndFragment(url.trim());
         if (trimmed.startsWith("/") || trimmed.contains("/")) {
             return true;
         }
 
         int dot = trimmed.lastIndexOf('.');
-        if (dot <= 0) {
+        if (dot < 0) {
             return true;
+        }
+        if (dot == 0) {
+            return false;
         }
 
         String extension = trimmed.substring(dot + 1).toLowerCase(Locale.ROOT);
         return BUNDLED_ASSET_EXTENSIONS.contains(extension);
+    }
+
+    private static String stripPathQueryAndFragment(String path) {
+        int query = path.indexOf('?');
+        if (query >= 0) {
+            path = path.substring(0, query);
+        }
+        int fragment = path.indexOf('#');
+        if (fragment >= 0) {
+            path = path.substring(0, fragment);
+        }
+        return path;
     }
 
     static String normalizeBundledPath(String path) {

@@ -100,13 +100,13 @@ enum BundledAssetSupport {
             return false
         }
 
-        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = stripPathQueryAndFragment(urlString.trimmingCharacters(in: .whitespacesAndNewlines))
         if trimmed.hasPrefix("/") || trimmed.contains("/") {
             return true
         }
 
         guard let dot = trimmed.lastIndex(of: "."), dot > trimmed.startIndex else {
-            return true
+            return dot == trimmed.startIndex ? false : true
         }
 
         let extensionStart = trimmed.index(after: dot)
@@ -116,6 +116,11 @@ enum BundledAssetSupport {
 
         let fileExtension = String(trimmed[extensionStart...]).lowercased()
         return bundledAssetExtensions.contains(fileExtension)
+    }
+
+    private static func stripPathQueryAndFragment(_ path: String) -> String {
+        let withoutQuery = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? path
+        return withoutQuery.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? withoutQuery
     }
 
     static func normalizeBundledPath(_ path: String) -> String? {
