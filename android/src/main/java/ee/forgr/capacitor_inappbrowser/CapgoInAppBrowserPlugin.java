@@ -366,13 +366,15 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return false;
         }
         options.setUrl(resolution.url);
-        options.setServeBundledAssets(resolution.needsAssetLoader);
         if (resolution.needsAssetLoader) {
             BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(
                 bridge != null ? bridge.getLocalUrl() : null
             );
             options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
             options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+            options.setServeBundledAssets(true);
+        } else {
+            options.setServeBundledAssets(false);
         }
         return true;
     }

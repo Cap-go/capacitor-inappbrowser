@@ -4391,16 +4391,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        _options.setUrl(resolution.url);
-        _options.setServeBundledAssets(resolution.needsAssetLoader);
-        if (resolution.needsAssetLoader) {
-            BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
-            _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
-            _options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
-        }
-
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
+            _options.setUrl(resolution.url);
+            if (resolution.needsAssetLoader) {
+                BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
+                _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+                _options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+                _options.setServeBundledAssets(true);
+            } else {
+                _options.setServeBundledAssets(false);
+            }
         }
     }
 
