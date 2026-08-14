@@ -1226,16 +1226,27 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         throw optionError("Failed to load \(optionName) icon: \(icon)")
     }
 
-    private func webSource(for urlString: String) -> WKWebSource? {
+    private func bundledAssetLocalConfig() -> BundledAssetSupport.LocalConfig {
+        BundledAssetSupport.parseLocalConfig(from: self.bridge?.config.localURL) ?? BundledAssetSupport.iosDefaults
+    }
+
+    private func applyBundledAssetSettings(to webViewController: WKWebViewController) {
+        let localConfig = bundledAssetLocalConfig()
+        webViewController.bundledAssetLocalScheme = localConfig.scheme
+        webViewController.bundledAssetLocalHost = localConfig.host
+    }
+
+    private func webSource(for urlString: String) -> (source: WKWebSource?, needsBundledAssetHandler: Bool) {
         if let html = HtmlDataUrlSupport.parseHtml(from: urlString) {
-            return .string(html, base: nil)
+            return (.string(html, base: nil), false)
         }
 
-        guard let url = URL(string: urlString) else {
-            return nil
+        let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL)
+        guard let url = URL(string: resolution.url) else {
+            return (nil, false)
         }
 
-        return .remote(url)
+        return (.remote(url), resolution.needsHandler)
     }
     @objc func openWebView(_ call: CAPPluginCall) {
         if !self.isSetupDone {
@@ -1442,7 +1453,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         DispatchQueue.main.async {
-            guard let webSource = self.webSource(for: urlString) else {
+            let webSourceResult = self.webSource(for: urlString)
+            guard let webSource = webSourceResult.source else {
                 call.reject("Invalid URL format")
                 return
             }
@@ -1495,6 +1507,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 authorizedAppLinks: authorizedAppLinks,
                 openBlankTargetInWebView: openBlankTargetInWebView
             )
+            self.applyBundledAssetSettings(to: webViewController)
             webViewController.enableReloadGesture = enableReloadGesture
             webViewController.disableOverscroll = disableOverscroll
             webViewController.initWebview(isInspectable: isInspectable)
@@ -1846,10 +1859,13 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        guard let url = URL(string: urlString) else {
+        let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL)
+        guard let url = URL(string: resolution.url) else {
             call.reject("Invalid URL")
             return
         }
+
+        self.applyBundledAssetSettings(to: webViewController)
 
         webViewController.source = .remote(url)
         webViewController.load(remote: url)

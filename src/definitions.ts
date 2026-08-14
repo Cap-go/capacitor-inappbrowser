@@ -643,8 +643,17 @@ export interface CloseWebviewOptions {
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
+   *
+   * Remote `http://` and `https://` URLs are loaded as-is.
+   *
+   * To open bundled web assets from the app `public/` folder without running a local HTTP server,
+   * pass a relative path such as `/index.html` or `assets/page.html`. The plugin resolves it to
+   * the Capacitor local URL for the current platform (`capacitor://localhost/...` on iOS,
+   * `https://localhost/...` on Android) and serves files from the packaged `public/` directory.
+   *
    * @since 0.1.0
    * @example "https://capgo.app"
+   * @example "/index.html"
    */
   url: string;
   /**

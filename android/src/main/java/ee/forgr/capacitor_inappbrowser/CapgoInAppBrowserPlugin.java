@@ -358,6 +358,13 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return dialog;
     }
 
+    private void applyBundledAssetOptions(Options options, String url) {
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+        options.setUrl(resolution.url);
+        BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(getBridge().getLocalUrl());
+        options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+    }
+
     private void notifyPopupWindowOpened(String popupId, String parentId, String popupUrl, boolean visible) {
         JSObject event = new JSObject();
         event.put("id", popupId);
@@ -752,13 +759,15 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        currentUrl = url;
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+        final String resolvedUrl = resolution.url;
+        currentUrl = resolvedUrl;
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
                     try {
-                        webViewDialog.setUrl(url);
+                        webViewDialog.setUrl(resolvedUrl);
                         call.resolve();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error setting URL: " + e.getMessage());
@@ -1058,7 +1067,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         currentUrl = url;
         final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();
-        options.setUrl(url);
+        applyBundledAssetOptions(options, url);
+        currentUrl = options.getUrl();
         options.setHeaders(call.getObject("headers"));
         options.setCustomUserAgent(call.getString("customUserAgent"));
         options.setCredentials(call.getObject("credentials"));

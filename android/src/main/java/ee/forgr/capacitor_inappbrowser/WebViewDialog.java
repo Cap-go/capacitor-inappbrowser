@@ -81,6 +81,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewAssetLoader;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.caverock.androidsvg.SVG;
@@ -344,6 +345,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new ConcurrentHashMap<>();
     private ProxyBridge proxyBridge;
+    private WebViewAssetLoader bundledAssetLoader;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -2232,6 +2234,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
             proxyBridgeScript = loadProxyBridgeScript();
         }
+        ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
         _webView.getSettings().setDatabaseEnabled(true);
@@ -4364,6 +4367,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         return proxyHeaders;
     }
 
+    private void ensureBundledAssetLoader() {
+        if (bundledAssetLoader != null || _options == null) {
+            return;
+        }
+
+        bundledAssetLoader = BundledAssetSupport.createAssetLoader(_context, _options.getBundledAssetHost());
+    }
+
     public void setUrl(String url) {
         if (_webView == null) {
             Log.w("InAppBrowser", "Cannot set URL - WebView is null");
@@ -5586,6 +5597,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     if (view == null || _webView == null) {
                         return null;
                     }
+
+                    ensureBundledAssetLoader();
+                    if (bundledAssetLoader != null) {
+                        WebResourceResponse bundledResponse = bundledAssetLoader.shouldInterceptRequest(request.getUrl());
+                        if (bundledResponse != null) {
+                            return bundledResponse;
+                        }
+                    }
+
                     if (!shouldUseNativeProxy()) {
                         return null;
                     }

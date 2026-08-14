@@ -151,6 +151,7 @@ public class Options {
     private String CloseModalOk;
     private Pattern closeModalURLPattern;
     private String url;
+    private String bundledAssetHost = "localhost";
     private JSObject headers;
     private String customUserAgent;
     private JSObject credentials;
@@ -493,6 +494,18 @@ public class Options {
         this.url = url;
     }
 
+    public String getBundledAssetHost() {
+        return bundledAssetHost;
+    }
+
+    public void setBundledAssetHost(String bundledAssetHost) {
+        if (bundledAssetHost == null || bundledAssetHost.isBlank()) {
+            this.bundledAssetHost = "localhost";
+            return;
+        }
+        this.bundledAssetHost = bundledAssetHost;
+    }
+
     public JSObject getHeaders() {
         return headers;
     }
@@ -784,6 +797,7 @@ public class Options {
         copy.setTitleFontFamily(titleFontFamily);
         copy.setTitleIcon(titleIcon);
         copy.setUrl("about:blank");
+        copy.setBundledAssetHost(bundledAssetHost);
         copy.setHeaders(headers);
         copy.setCustomUserAgent(customUserAgent);
         copy.setCredentials(credentials);
