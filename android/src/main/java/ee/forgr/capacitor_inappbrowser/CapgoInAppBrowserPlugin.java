@@ -778,11 +778,13 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
         final String resolvedUrl = resolution.url;
         currentUrl = resolvedUrl;
+        final String localUrl = getBridge() != null ? getBridge().getLocalUrl() : null;
         this.getActivity().runOnUiThread(
             new Runnable() {
                 @Override
                 public void run() {
                     try {
+                        webViewDialog.applyBundledAssetResolution(resolution, localUrl);
                         webViewDialog.setUrl(resolvedUrl);
                         call.resolve();
                     } catch (Exception e) {

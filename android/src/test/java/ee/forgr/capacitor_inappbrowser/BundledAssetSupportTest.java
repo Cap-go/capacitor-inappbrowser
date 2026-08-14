@@ -5,13 +5,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.getcapacitor.Bridge;
 import org.junit.Test;
 
 public class BundledAssetSupportTest {
 
     @Test
     public void resolveRelativePathForLocalhost() {
-        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("/page.html", null);
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("/page.html", (Bridge) null);
 
         assertEquals("https://localhost/page.html", resolution.url);
         assertTrue(resolution.needsAssetLoader);
@@ -35,13 +36,13 @@ public class BundledAssetSupportTest {
     @Test
     public void rejectsPathTraversal() {
         assertNull(BundledAssetSupport.normalizeBundledPath("/../secret.txt"));
-        assertNull(BundledAssetSupport.resolve("/../secret.txt", null));
+        assertNull(BundledAssetSupport.resolve("/../secret.txt", (Bridge) null));
         assertTrue(BundledAssetSupport.isProxyBridgeMarkerPath("/_capgo_proxy_"));
     }
 
     @Test
     public void keepsRemoteUrlsUnchanged() {
-        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("https://example.com/page.html", null);
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("https://example.com/page.html", (Bridge) null);
 
         assertEquals("https://example.com/page.html", resolution.url);
         assertFalse(resolution.needsAssetLoader);

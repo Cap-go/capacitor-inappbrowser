@@ -94,19 +94,27 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func finish(task: WKURLSchemeTask, taskID: ObjectIdentifier, block: @escaping () -> Void) {
-        tasksLock.lock()
-        let isActive = activeTasks[taskID] != nil
-        activeTasks.removeValue(forKey: taskID)
-        tasksLock.unlock()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
 
-        guard isActive, !task.stopped else {
-            return
-        }
+            guard !task.stopped else {
+                return
+            }
 
-        if Thread.isMainThread {
+            self.tasksLock.lock()
+            let isActive = self.activeTasks[taskID] != nil
+            if isActive {
+                self.activeTasks.removeValue(forKey: taskID)
+            }
+            self.tasksLock.unlock()
+
+            guard isActive, !task.stopped else {
+                return
+            }
+
             block()
-        } else {
-            DispatchQueue.main.async(execute: block)
         }
     }
 

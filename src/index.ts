@@ -1,8 +1,10 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
+import { resolveBundledAssetUrl, type BundledAssetPlatform } from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
+  OpenWebViewOptions,
   ProxyDecision,
   ProxyHandler,
   ProxyRequestOverride,
@@ -36,7 +38,32 @@ const inAppBrowserImplementations = {
   web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
 };
 
-const InAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
+function bundledAssetPlatform(): BundledAssetPlatform {
+  return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+}
+
+function resolveNativeWebViewUrl(url: string): string {
+  const resolution = resolveBundledAssetUrl(url, bundledAssetPlatform());
+  if (resolution === null) {
+    throw new Error('Invalid bundled asset path');
+  }
+  return resolution.url;
+}
+
+function withNativeBundledAssetUrl<T extends { url: string }>(options: T): T {
+  if (!Capacitor.isNativePlatform()) {
+    return options;
+  }
+  return { ...options, url: resolveNativeWebViewUrl(options.url) };
+}
+
+const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
+
+const InAppBrowser: InAppBrowserPlugin = {
+  ...baseInAppBrowser,
+  openWebView: (options: OpenWebViewOptions) => baseInAppBrowser.openWebView(withNativeBundledAssetUrl(options)),
+  setUrl: (options) => baseInAppBrowser.setUrl(withNativeBundledAssetUrl(options)),
+};
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -148,18 +175,4 @@ const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> 
 };
 
 export * from './definitions';
-export {
-  BUNDLED_ASSET_DEFAULTS,
-  containsPathTraversal,
-  handlerSchemeForPlatform,
-  isAbsoluteUrl,
-  isBundledLocalUrl,
-  isRelativeBundledPath,
-  normalizeBundledPath,
-  parseBundledLocalConfig,
-  resolveBundledAssetUrl,
-  type BundledAssetLocalConfig,
-  type BundledAssetPlatform,
-  type BundledAssetResolution,
-} from './bundled-asset-support';
 export { InAppBrowser, addProxyHandler };

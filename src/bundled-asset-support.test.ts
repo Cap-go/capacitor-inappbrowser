@@ -113,6 +113,9 @@ describe('bundled asset url resolution', () => {
     expect(resolveBundledAssetUrl('https://localhost/index.html', 'ios', localConfig)).toEqual({
       url: 'capacitor://localhost/index.html',
     });
+    expect(resolveBundledAssetUrl('https://user:pass@localhost/secure/index.html', 'ios', localConfig)).toEqual({
+      url: 'capacitor://user:pass@localhost/secure/index.html',
+    });
   });
 
   it('uses custom local config when provided', () => {

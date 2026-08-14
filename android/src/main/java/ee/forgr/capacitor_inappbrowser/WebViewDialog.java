@@ -346,6 +346,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new ConcurrentHashMap<>();
     private ProxyBridge proxyBridge;
     private volatile WebViewAssetLoader bundledAssetLoader;
+    private final Object bundledAssetLoaderLock = new Object();
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -4368,15 +4369,39 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void ensureBundledAssetLoader() {
-        if (bundledAssetLoader != null || _options == null) {
+        if (bundledAssetLoader != null || _options == null || !_options.getServeBundledAssets()) {
             return;
         }
 
-        bundledAssetLoader = BundledAssetSupport.createAssetLoader(
-            _context,
-            _options.getBundledAssetHost(),
-            _options.getBundledAssetScheme()
-        );
+        synchronized (bundledAssetLoaderLock) {
+            if (bundledAssetLoader != null) {
+                return;
+            }
+
+            bundledAssetLoader = BundledAssetSupport.createAssetLoader(
+                _context,
+                _options.getBundledAssetHost(),
+                _options.getBundledAssetScheme()
+            );
+        }
+    }
+
+    public void applyBundledAssetResolution(BundledAssetSupport.Resolution resolution, String localUrl) {
+        if (_options == null || resolution == null) {
+            return;
+        }
+
+        _options.setUrl(resolution.url);
+        _options.setServeBundledAssets(resolution.needsAssetLoader);
+        if (resolution.needsAssetLoader) {
+            BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
+            _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+            _options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+        }
+
+        synchronized (bundledAssetLoaderLock) {
+            bundledAssetLoader = null;
+        }
     }
 
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {

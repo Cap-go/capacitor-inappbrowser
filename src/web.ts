@@ -1,6 +1,5 @@
-import { Capacitor, WebPlugin } from '@capacitor/core';
+import { WebPlugin } from '@capacitor/core';
 
-import { resolveBundledAssetUrl, type BundledAssetPlatform } from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
   OpenWebViewOptions,
@@ -14,10 +13,6 @@ import type {
   OpenSecureWindowResponse,
   ScreenshotResult,
 } from './definitions';
-
-function bundledAssetPlatform(): BundledAssetPlatform {
-  return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
-}
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   clearAllCookies(): Promise<any> {
@@ -48,9 +43,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async openWebView(options: OpenWebViewOptions): Promise<any> {
-    const resolution = resolveBundledAssetUrl(options.url, bundledAssetPlatform());
-    console.log('openWebView', { ...options, url: resolution?.url ?? options.url });
-    return { ...options, url: resolution?.url ?? options.url };
+    console.log('openWebView', options);
+    return options;
   }
 
   async executeScript({ code }: { code: string }): Promise<any> {
@@ -89,8 +83,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async setUrl(options: { url: string }): Promise<any> {
-    const resolution = resolveBundledAssetUrl(options.url, bundledAssetPlatform());
-    console.log('setUrl', resolution?.url ?? options.url);
+    console.log('setUrl', options.url);
     return;
   }
 
