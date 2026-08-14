@@ -105,13 +105,13 @@ enum BundledAssetSupport {
             return true
         }
 
-        guard let dot = trimmed.lastIndex(of: ".") else {
+        guard let dot = trimmed.lastIndex(of: "."), dot > trimmed.startIndex else {
             return true
         }
 
         let extensionStart = trimmed.index(after: dot)
         guard extensionStart < trimmed.endIndex else {
-            return true
+            return false
         }
 
         let fileExtension = String(trimmed[extensionStart...]).lowercased()
