@@ -104,6 +104,10 @@ final class BundledAssetSupport {
                 return false;
             }
 
+            if (uri.getPort() != -1) {
+                return false;
+            }
+
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
             if (normalizedScheme.equalsIgnoreCase(localConfig.scheme) || normalizedScheme.equals(assetLoaderScheme(localConfig))) {
                 return true;

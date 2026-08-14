@@ -96,6 +96,7 @@ describe('bundled asset url resolution', () => {
     expect(resolveBundledAssetUrl('https://localhost/index.html', 'android')).toEqual({
       url: 'https://localhost/index.html',
     });
+    expect(isBundledLocalUrl('http://localhost:3000/index.html', { scheme: 'https', host: 'localhost' })).toBe(false);
   });
 
   it('uses custom local config when provided', () => {

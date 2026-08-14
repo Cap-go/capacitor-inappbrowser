@@ -71,6 +71,10 @@ enum BundledAssetSupport {
             return false
         }
 
+        if url.port != nil {
+            return false
+        }
+
         if scheme == localConfig.scheme || scheme == handlerScheme(for: localConfig) {
             return true
         }

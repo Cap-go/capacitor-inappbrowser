@@ -88,6 +88,10 @@ export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalCo
       return false;
     }
 
+    if (parsed.port !== '') {
+      return false;
+    }
+
     if (scheme === config.scheme || scheme === handlerSchemeForPlatform('android', config)) {
       return true;
     }
