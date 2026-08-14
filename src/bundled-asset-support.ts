@@ -25,7 +25,7 @@ export function isAbsoluteUrl(url: string): boolean {
 
 /** Returns true when any path segment is `..`. */
 export function containsPathTraversal(path: string): boolean {
-  return path.split('/').some((segment) => segment === '..');
+  return path.split('/').includes('..');
 }
 
 /**
