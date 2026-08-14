@@ -10,7 +10,6 @@ import {
 } from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
-  OpenOptions,
   OpenWebViewOptions,
   ProxyDecision,
   ProxyHandler,
@@ -87,9 +86,6 @@ const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(activePluginName, in
 
 const InAppBrowser = new Proxy(baseInAppBrowser, {
   get(target, prop, receiver) {
-    if (prop === 'open') {
-      return (options: OpenOptions) => target.open(prepareUrlOptions(options));
-    }
     if (prop === 'openWebView') {
       return (options: OpenWebViewOptions) => target.openWebView(prepareUrlOptions(options));
     }

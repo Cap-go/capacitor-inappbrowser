@@ -2374,21 +2374,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        guard let resolution = BundledAssetSupport.resolve(urlString, localURL: self.bridge?.config.localURL) else {
-            call.reject("Invalid bundled asset path")
+        if BundledAssetSupport.isRelativeBundledPath(urlString) {
+            call.reject("Bundled assets require openWebView()")
             return
         }
 
-        var resolvedUrlString = resolution.url
-        if let resolvedURL = URL(string: resolvedUrlString),
-           let scheme = resolvedURL.scheme?.lowercased(),
-           scheme == BundledAssetSupport.iosDefaults.scheme,
-           var components = URLComponents(url: resolvedURL, resolvingAgainstBaseURL: false) {
-            components.scheme = "https"
-            resolvedUrlString = components.url?.absoluteString ?? resolvedUrlString
-        }
-
-        guard let url = URL(string: resolvedUrlString),
+        guard let url = URL(string: urlString),
               let scheme = url.scheme?.lowercased(),
               ["http", "https"].contains(scheme) else {
             call.reject("Must provide a valid http(s) URL to open")

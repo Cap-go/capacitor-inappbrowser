@@ -815,12 +815,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        BundledAssetSupport.Resolution openResolution = BundledAssetSupport.resolve(url, getBridge());
-        if (openResolution == null) {
-            call.reject("Invalid bundled asset path");
+        if (BundledAssetSupport.isRelativeBundledPath(url)) {
+            call.reject("Bundled assets require openWebView()");
             return;
         }
-        url = openResolution.url;
         currentUrl = url;
         awaitCustomTabsClientIfNeeded();
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getCustomTabsSession());
