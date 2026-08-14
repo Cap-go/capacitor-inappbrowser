@@ -43,10 +43,9 @@ enum BundledAssetSupport {
         let navigationScheme = handlerScheme(for: localConfig)
 
         if isRelativeBundledPath(trimmed) {
-            guard !containsPathTraversal(trimmed) else {
+            guard let path = normalizeBundledPath(trimmed) else {
                 return nil
             }
-            let path = normalizeBundledPath(trimmed)
             return Resolution(url: "\(navigationScheme)://\(localConfig.host)\(path)")
         }
 

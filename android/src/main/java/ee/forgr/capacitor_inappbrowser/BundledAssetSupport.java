@@ -27,9 +27,15 @@ final class BundledAssetSupport {
     static final class Resolution {
 
         final String url;
+        final boolean needsAssetLoader;
 
         Resolution(String url) {
+            this(url, false);
+        }
+
+        Resolution(String url, boolean needsAssetLoader) {
             this.url = url;
+            this.needsAssetLoader = needsAssetLoader;
         }
     }
 
@@ -64,11 +70,15 @@ final class BundledAssetSupport {
     }
 
     static Resolution resolve(String url, Bridge bridge) {
-        String trimmed = url == null ? "" : url.trim();
         LocalConfig localConfig = parseLocalConfig(bridge != null ? bridge.getLocalUrl() : null);
         if (localConfig == null) {
             localConfig = new LocalConfig("https", "localhost");
         }
+        return resolve(url, localConfig);
+    }
+
+    static Resolution resolve(String url, LocalConfig localConfig) {
+        String trimmed = url == null ? "" : url.trim();
         String navigationScheme = assetLoaderScheme(localConfig);
 
         if (isRelativeBundledPath(trimmed)) {
@@ -76,15 +86,15 @@ final class BundledAssetSupport {
             if (path == null) {
                 return null;
             }
-            return new Resolution(navigationScheme + "://" + localConfig.host + path);
+            return new Resolution(navigationScheme + "://" + localConfig.host + path, true);
         }
 
         if (isBundledLocalUrl(trimmed, localConfig)) {
             String rewritten = rewriteBundledLocalUrl(trimmed, localConfig, navigationScheme);
-            return new Resolution(rewritten != null ? rewritten : trimmed);
+            return new Resolution(rewritten != null ? rewritten : trimmed, true);
         }
 
-        return new Resolution(trimmed);
+        return new Resolution(trimmed, false);
     }
 
     static boolean isBundledLocalUrl(String url, LocalConfig localConfig) {
@@ -162,6 +172,31 @@ final class BundledAssetSupport {
             }
         }
         return extension == null || extension.isEmpty() ? "text/html" : "application/octet-stream";
+    }
+
+    static String encodingForMimeType(String mimeType) {
+        if (mimeType == null || mimeType.isEmpty()) {
+            return null;
+        }
+
+        String normalized = mimeType.toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("text/")) {
+            return "utf-8";
+        }
+        if (
+            normalized.contains("javascript") ||
+            normalized.contains("json") ||
+            normalized.contains("xml") ||
+            normalized.endsWith("+json") ||
+            normalized.endsWith("+xml")
+        ) {
+            return "utf-8";
+        }
+        return null;
+    }
+
+    private static WebResourceResponse notFoundResponse(String path) {
+        return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", null, new java.io.ByteArrayInputStream(new byte[0]));
     }
 
     private static boolean isReservedWebScheme(String scheme) {
@@ -267,9 +302,10 @@ final class BundledAssetSupport {
 
             try {
                 InputStream stream = assetManager.open(assetPath);
-                return new WebResourceResponse(mimeTypeForPath(path), null, stream);
+                String mimeType = mimeTypeForPath(path);
+                return new WebResourceResponse(mimeType, encodingForMimeType(mimeType), stream);
             } catch (IOException error) {
-                return null;
+                return notFoundResponse(path);
             }
         }
     }

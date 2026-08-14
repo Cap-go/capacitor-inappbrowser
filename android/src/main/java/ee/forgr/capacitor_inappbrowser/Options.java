@@ -153,6 +153,7 @@ public class Options {
     private String url;
     private String bundledAssetHost = "localhost";
     private String bundledAssetScheme = "https";
+    private boolean serveBundledAssets = false;
     private JSObject headers;
     private String customUserAgent;
     private JSObject credentials;
@@ -519,6 +520,14 @@ public class Options {
         this.bundledAssetScheme = bundledAssetScheme.toLowerCase(Locale.ROOT);
     }
 
+    public boolean getServeBundledAssets() {
+        return serveBundledAssets;
+    }
+
+    public void setServeBundledAssets(boolean serveBundledAssets) {
+        this.serveBundledAssets = serveBundledAssets;
+    }
+
     public JSObject getHeaders() {
         return headers;
     }
@@ -812,6 +821,7 @@ public class Options {
         copy.setUrl("about:blank");
         copy.setBundledAssetHost(bundledAssetHost);
         copy.setBundledAssetScheme(bundledAssetScheme);
+        copy.setServeBundledAssets(serveBundledAssets);
         copy.setHeaders(headers);
         copy.setCustomUserAgent(customUserAgent);
         copy.setCredentials(credentials);

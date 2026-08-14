@@ -345,7 +345,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private String instanceId = "";
     private final Map<String, ProxiedRequest> proxiedRequestsHashmap = new ConcurrentHashMap<>();
     private ProxyBridge proxyBridge;
-    private WebViewAssetLoader bundledAssetLoader;
+    private volatile WebViewAssetLoader bundledAssetLoader;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -4380,6 +4380,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {
+        if (_options == null || !_options.getServeBundledAssets()) {
+            return null;
+        }
         ensureBundledAssetLoader();
         if (bundledAssetLoader == null) {
             return null;

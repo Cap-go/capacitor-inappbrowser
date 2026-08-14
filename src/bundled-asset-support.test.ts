@@ -96,13 +96,29 @@ describe('bundled asset url resolution', () => {
     expect(resolveBundledAssetUrl('https://localhost/index.html', 'android')).toEqual({
       url: 'https://localhost/index.html',
     });
-    expect(isBundledLocalUrl('http://localhost:3000/index.html', { scheme: 'https', host: 'localhost' })).toBe(false);
+    expect(
+      isBundledLocalUrl('http://localhost:3000/index.html', 'android', { scheme: 'https', host: 'localhost' }),
+    ).toBe(false);
+    expect(isBundledLocalUrl('capacitor://localhost/index.html', 'ios', { scheme: 'https', host: 'localhost' })).toBe(
+      true,
+    );
+  });
+
+  it('rewrites bundled local urls to the handler scheme on ios', () => {
+    const localConfig = parseBundledLocalConfig('https://localhost/');
+    expect(localConfig).not.toBeNull();
+    if (!localConfig) {
+      return;
+    }
+    expect(resolveBundledAssetUrl('https://localhost/index.html', 'ios', localConfig)).toEqual({
+      url: 'capacitor://localhost/index.html',
+    });
   });
 
   it('uses custom local config when provided', () => {
     const localConfig = parseBundledLocalConfig('https://example.com/');
     expect(localConfig).toEqual({ scheme: 'https', host: 'example.com' });
-    expect(isBundledLocalUrl('https://example.com/app/index.html', localConfig)).toBe(true);
+    expect(isBundledLocalUrl('https://example.com/app/index.html', 'android', localConfig)).toBe(true);
     expect(resolveBundledAssetUrl('/app/index.html', 'android', localConfig)).toEqual({
       url: 'https://example.com/app/index.html',
     });

@@ -41,40 +41,46 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
 
         let fileURL = URL(fileURLWithPath: filePath)
 
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            finish(task: urlSchemeTask, taskID: taskID) {
-                urlSchemeTask.didFailWithError(
-                    NSError(
-                        domain: "BundledAssetSchemeHandler",
-                        code: 404,
-                        userInfo: [NSLocalizedDescriptionKey: "Bundled asset not found: \(requestURL.path)"]
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                self.finish(task: urlSchemeTask, taskID: taskID) {
+                    urlSchemeTask.didFailWithError(
+                        NSError(
+                            domain: "BundledAssetSchemeHandler",
+                            code: 404,
+                            userInfo: [NSLocalizedDescriptionKey: "Bundled asset not found: \(requestURL.path)"]
+                        )
                     )
-                )
+                }
+                return
             }
-            return
-        }
 
-        do {
-            let data = try Data(contentsOf: fileURL)
-            let mimeType = mimeType(for: requestURL.pathExtension)
-            let response = HTTPURLResponse(
-                url: requestURL,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: [
-                    "Content-Type": mimeType,
-                    "Cache-Control": "no-cache"
-                ]
-            ) ?? URLResponse(url: requestURL, mimeType: mimeType, expectedContentLength: data.count, textEncodingName: nil)
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let mimeType = self.mimeType(for: requestURL.pathExtension)
+                let response = HTTPURLResponse(
+                    url: requestURL,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: [
+                        "Content-Type": mimeType,
+                        "Cache-Control": "no-cache"
+                    ]
+                ) ?? URLResponse(url: requestURL, mimeType: mimeType, expectedContentLength: data.count, textEncodingName: nil)
 
-            finish(task: urlSchemeTask, taskID: taskID) {
-                urlSchemeTask.didReceive(response)
-                urlSchemeTask.didReceive(data)
-                urlSchemeTask.didFinish()
-            }
-        } catch {
-            finish(task: urlSchemeTask, taskID: taskID) {
-                urlSchemeTask.didFailWithError(error)
+                self.finish(task: urlSchemeTask, taskID: taskID) {
+                    urlSchemeTask.didReceive(response)
+                    urlSchemeTask.didReceive(data)
+                    urlSchemeTask.didFinish()
+                }
+            } catch {
+                self.finish(task: urlSchemeTask, taskID: taskID) {
+                    urlSchemeTask.didFailWithError(error)
+                }
             }
         }
     }
@@ -97,7 +103,11 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
             return
         }
 
-        block()
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
     }
 
     private func mimeType(for pathExtension: String) -> String {
@@ -133,7 +143,7 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 }
 
-private var bundledAssetStoppedKey = malloc(1)
+private var bundledAssetStoppedKey: UInt8 = 0
 
 private extension WKURLSchemeTask {
     var stopped: Bool {
@@ -141,7 +151,7 @@ private extension WKURLSchemeTask {
             objc_getAssociatedObject(self, &bundledAssetStoppedKey) as? Bool ?? false
         }
         set {
-            objc_setAssociatedObject(self, &bundledAssetStoppedKey, newValue, .OBJC_ASSOCIATION_ASSIGN)
+            objc_setAssociatedObject(self, &bundledAssetStoppedKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
     }
 }

@@ -2,6 +2,8 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class BundledAssetSupportTests: XCTestCase {
+    deinit {}
+
     func testResolveRelativePathForCapacitorLocalURL() {
         let localURL = URL(string: "capacitor://localhost")!
         let resolution = BundledAssetSupport.resolve("/page.html", localURL: localURL)
@@ -15,6 +17,13 @@ final class BundledAssetSupportTests: XCTestCase {
 
         XCTAssertEqual(resolution?.url, "capacitor://localhost/page.html")
         XCTAssertEqual(BundledAssetSupport.handlerScheme(for: BundledAssetSupport.parseLocalConfig(from: localURL)!), "capacitor")
+    }
+
+    func testRewritesBundledLocalUrlToHandlerScheme() {
+        let localURL = URL(string: "https://localhost")!
+        let resolution = BundledAssetSupport.resolve("https://localhost/index.html", localURL: localURL)
+
+        XCTAssertEqual(resolution?.url, "capacitor://localhost/index.html")
     }
 
     func testRejectsPathTraversal() {

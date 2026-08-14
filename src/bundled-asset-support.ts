@@ -73,7 +73,11 @@ export function handlerSchemeForPlatform(platform: BundledAssetPlatform, localCo
   return localConfig.scheme;
 }
 
-export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalConfig | null): boolean {
+export function isBundledLocalUrl(
+  url: string,
+  platform: BundledAssetPlatform,
+  localConfig?: BundledAssetLocalConfig | null,
+): boolean {
   if (!isAbsoluteUrl(url)) {
     return false;
   }
@@ -82,7 +86,7 @@ export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalCo
     const parsed = new URL(url);
     const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
     const host = parsed.hostname.toLowerCase();
-    const config = localConfig ?? BUNDLED_ASSET_DEFAULTS.android;
+    const config = localConfig ?? BUNDLED_ASSET_DEFAULTS[platform];
 
     if (host !== config.host) {
       return false;
@@ -92,7 +96,7 @@ export function isBundledLocalUrl(url: string, localConfig?: BundledAssetLocalCo
       return false;
     }
 
-    if (scheme === config.scheme || scheme === handlerSchemeForPlatform('android', config)) {
+    if (scheme === config.scheme || scheme === handlerSchemeForPlatform(platform, config)) {
       return true;
     }
 
@@ -125,8 +129,10 @@ function rewriteBundledLocalUrl(
       return null;
     }
 
-    parsed.protocol = `${navigationScheme}:`;
-    return parsed.toString();
+    const pathname = parsed.pathname || '/';
+    const search = parsed.search;
+    const hash = parsed.hash;
+    return `${navigationScheme}://${host}${pathname}${search}${hash}`;
   } catch {
     return null;
   }
@@ -151,7 +157,7 @@ export function resolveBundledAssetUrl(
     };
   }
 
-  if (isBundledLocalUrl(trimmed, config)) {
+  if (isBundledLocalUrl(trimmed, platform, config)) {
     const rewritten = rewriteBundledLocalUrl(trimmed, config, navigationScheme);
     return {
       url: rewritten ?? trimmed,

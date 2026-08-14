@@ -2070,7 +2070,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         let bundledAssetHandler = BundledAssetSchemeHandler()
         self.bundledAssetSchemeHandler = bundledAssetHandler
-        webConfiguration.setURLSchemeHandler(bundledAssetHandler, forURLScheme: bundledAssetLocalScheme)
+        if webConfiguration.urlSchemeHandler(forURLScheme: bundledAssetLocalScheme) == nil {
+            webConfiguration.setURLSchemeHandler(bundledAssetHandler, forURLScheme: bundledAssetLocalScheme)
+        }
 
         if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
             addProxyBridgeUserScripts(to: userContentController)

@@ -1231,6 +1231,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func applyBundledAssetSettings(to webViewController: WKWebViewController) {
+        // Scheme handlers are registered once during initWebview; localURL is fixed for the app lifetime.
         let localConfig = bundledAssetLocalConfig()
         webViewController.bundledAssetLocalScheme = BundledAssetSupport.handlerScheme(for: localConfig)
         webViewController.bundledAssetLocalHost = localConfig.host

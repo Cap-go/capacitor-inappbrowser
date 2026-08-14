@@ -358,16 +358,22 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return dialog;
     }
 
-    private void applyBundledAssetOptions(Options options, String url) {
-        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+    private boolean applyBundledAssetOptions(Options options, String url) {
+        Bridge bridge = getBridge();
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, bridge);
         if (resolution == null) {
-            options.setUrl(url);
-            return;
+            return false;
         }
         options.setUrl(resolution.url);
-        BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(getBridge().getLocalUrl());
-        options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
-        options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+        options.setServeBundledAssets(resolution.needsAssetLoader);
+        if (resolution.needsAssetLoader) {
+            BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(
+                bridge != null ? bridge.getLocalUrl() : null
+            );
+            options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
+            options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+        }
+        return true;
     }
 
     private void notifyPopupWindowOpened(String popupId, String parentId, String popupUrl, boolean visible) {
@@ -765,6 +771,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
 
         BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, getBridge());
+        if (resolution == null) {
+            call.reject("Invalid bundled asset path");
+            return;
+        }
         final String resolvedUrl = resolution.url;
         currentUrl = resolvedUrl;
         this.getActivity().runOnUiThread(
@@ -1071,7 +1081,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
         final String webViewId = UUID.randomUUID().toString();
         final Options options = new Options();
-        applyBundledAssetOptions(options, url);
+        if (!applyBundledAssetOptions(options, url)) {
+            call.reject("Invalid bundled asset path");
+            return;
+        }
         currentUrl = options.getUrl();
         options.setHeaders(call.getObject("headers"));
         options.setCustomUserAgent(call.getString("customUserAgent"));
