@@ -2350,6 +2350,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     mFilePathCallback = filePathCallback;
+                    mPendingAcceptTypes = fileChooserParams.getAcceptTypes();
+                    mPendingMultiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
 
                     // Direct check for capture attribute in URL (fallback method)
                     boolean isCaptureInUrl;
@@ -2607,12 +2609,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
                 }
 
+                private String[] mPendingAcceptTypes;
+                private boolean mPendingMultiple;
+
                 /**
                  * Fall back to file picker when camera launch fails
                  */
                 private void fallbackToFilePicker() {
                     if (mFilePathCallback != null) {
-                        openFileChooser(mFilePathCallback, "image/*", false);
+                        openFileChooser(
+                            mFilePathCallback,
+                            mPendingAcceptTypes != null ? mPendingAcceptTypes : new String[] { "image/*" },
+                            mPendingMultiple
+                        );
                     }
                 }
 
@@ -4065,6 +4074,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (accept == null || accept.isEmpty() || accept.equals("undefined")) {
             return null;
         }
+        // MIME types are case-insensitive — normalize so classification and EXTRA_MIME_TYPES
+        // always work on lowercase values
+        accept = accept.toLowerCase(java.util.Locale.ROOT);
         if (accept.contains("/")) {
             // Already a MIME type
             return accept;
@@ -4172,6 +4184,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             // If no app can handle the specific MIME type, try with a more generic one
             Log.e("InAppBrowser", "No app available for types: " + java.util.Arrays.toString(acceptTypes) + ", trying with */*");
             intent.setType("*/*");
+            intent.removeExtra(Intent.EXTRA_MIME_TYPES);
             try {
                 if (activity instanceof androidx.activity.ComponentActivity) {
                     androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
