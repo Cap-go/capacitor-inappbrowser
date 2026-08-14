@@ -105,8 +105,12 @@ enum BundledAssetSupport {
             return true
         }
 
-        guard let dot = trimmed.lastIndex(of: "."), dot > trimmed.startIndex else {
-            return dot == trimmed.startIndex ? false : true
+        guard let dot = trimmed.lastIndex(of: ".") else {
+            return true
+        }
+
+        if dot == trimmed.startIndex {
+            return false
         }
 
         let extensionStart = trimmed.index(after: dot)
