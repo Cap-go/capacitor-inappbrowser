@@ -82,6 +82,8 @@ public class BundledAssetSupportTest {
         assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("index.html?v=2"));
         assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("www.example.com"));
         assertFalse(BundledAssetSupport.isLikelyBundledRelativePath(".env"));
+        assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("assets/.env"));
+        assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("file."));
         assertFalse(BundledAssetSupport.isLikelyBundledRelativePath("https://example.com"));
     }
 }

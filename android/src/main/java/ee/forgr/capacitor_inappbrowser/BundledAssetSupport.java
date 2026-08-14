@@ -49,7 +49,7 @@ final class BundledAssetSupport {
     private BundledAssetSupport() {}
 
     static LocalConfig parseLocalConfig(String localUrl) {
-        if (localUrl == null || localUrl.isBlank()) {
+        if (isBlank(localUrl)) {
             return null;
         }
 
@@ -134,7 +134,7 @@ final class BundledAssetSupport {
     }
 
     static boolean isRelativeBundledPath(String url) {
-        if (url == null || url.isBlank()) {
+        if (isBlank(url)) {
             return false;
         }
         return !isAbsoluteUrl(url);
@@ -169,6 +169,10 @@ final class BundledAssetSupport {
         }
 
         String trimmed = stripPathQueryAndFragment(url.trim());
+        if (finalPathComponentStartsWithDot(trimmed)) {
+            return false;
+        }
+
         if (trimmed.startsWith("/") || trimmed.contains("/")) {
             return true;
         }
@@ -183,6 +187,26 @@ final class BundledAssetSupport {
 
         String extension = trimmed.substring(dot + 1).toLowerCase(Locale.ROOT);
         return BUNDLED_ASSET_EXTENSIONS.contains(extension);
+    }
+
+    private static boolean isBlank(String value) {
+        if (value == null || value.isEmpty()) {
+            return true;
+        }
+
+        for (int index = 0; index < value.length(); index++) {
+            if (!Character.isWhitespace(value.charAt(index))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean finalPathComponentStartsWithDot(String path) {
+        int lastSlash = path.lastIndexOf('/');
+        String finalComponent = lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        return !finalComponent.isEmpty() && finalComponent.charAt(0) == '.';
     }
 
     private static String stripPathQueryAndFragment(String path) {

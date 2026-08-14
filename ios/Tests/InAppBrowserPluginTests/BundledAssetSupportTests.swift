@@ -49,4 +49,15 @@ final class BundledAssetSupportTests: XCTestCase {
         XCTAssertEqual(BundledAssetSupport.routeAssetPath(for: "/dashboard", basePath: basePath), "/tmp/public/index.html")
         XCTAssertEqual(BundledAssetSupport.routeAssetPath(for: "/assets/app.js", basePath: basePath), "/tmp/public/assets/app.js")
     }
+
+    func testDistinguishesBundledPathsFromBareHostnames() {
+        XCTAssertTrue(BundledAssetSupport.isLikelyBundledRelativePath("/index.html"))
+        XCTAssertTrue(BundledAssetSupport.isLikelyBundledRelativePath("assets/page.html"))
+        XCTAssertTrue(BundledAssetSupport.isLikelyBundledRelativePath("index.html?v=2"))
+        XCTAssertFalse(BundledAssetSupport.isLikelyBundledRelativePath("www.example.com"))
+        XCTAssertFalse(BundledAssetSupport.isLikelyBundledRelativePath(".env"))
+        XCTAssertFalse(BundledAssetSupport.isLikelyBundledRelativePath("assets/.env"))
+        XCTAssertFalse(BundledAssetSupport.isLikelyBundledRelativePath("file."))
+        XCTAssertFalse(BundledAssetSupport.isLikelyBundledRelativePath("https://example.com"))
+    }
 }

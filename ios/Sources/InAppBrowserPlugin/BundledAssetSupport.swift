@@ -101,6 +101,10 @@ enum BundledAssetSupport {
         }
 
         let trimmed = stripPathQueryAndFragment(urlString.trimmingCharacters(in: .whitespacesAndNewlines))
+        if finalPathComponentStartsWithDot(trimmed) {
+            return false
+        }
+
         if trimmed.hasPrefix("/") || trimmed.contains("/") {
             return true
         }
@@ -120,6 +124,14 @@ enum BundledAssetSupport {
 
         let fileExtension = String(trimmed[extensionStart...]).lowercased()
         return bundledAssetExtensions.contains(fileExtension)
+    }
+
+    private static func finalPathComponentStartsWithDot(_ path: String) -> Bool {
+        let finalComponent = path.split(separator: "/").last.map(String.init) ?? path
+        guard let first = finalComponent.first else {
+            return false
+        }
+        return first == "."
     }
 
     private static func stripPathQueryAndFragment(_ path: String) -> String {
