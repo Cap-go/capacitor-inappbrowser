@@ -170,3 +170,16 @@ export function resolveBundledAssetUrl(
     url: trimmed,
   };
 }
+
+export function resolveLegacyNativeWebViewUrl(url: string, platform: BundledAssetPlatform): string {
+  if (!isRelativeBundledPath(url)) {
+    return url;
+  }
+
+  const resolution = resolveBundledAssetUrl(url, platform);
+  if (resolution === null) {
+    throw new Error('Invalid bundled asset path');
+  }
+
+  return resolution.url;
+}

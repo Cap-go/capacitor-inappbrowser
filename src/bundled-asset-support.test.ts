@@ -9,6 +9,7 @@ import {
   normalizeBundledPath,
   parseBundledLocalConfig,
   resolveBundledAssetUrl,
+  resolveLegacyNativeWebViewUrl,
 } from './bundled-asset-support';
 
 describe('bundled asset path helpers', () => {
@@ -125,5 +126,20 @@ describe('bundled asset url resolution', () => {
     expect(resolveBundledAssetUrl('/app/index.html', 'android', localConfig)).toEqual({
       url: 'https://example.com/app/index.html',
     });
+  });
+});
+
+describe('legacy native webview url fallback', () => {
+  it('rewrites relative bundled paths for legacy native resolution', () => {
+    expect(resolveLegacyNativeWebViewUrl('/index.html', 'ios')).toBe('capacitor://localhost/index.html');
+    expect(resolveLegacyNativeWebViewUrl('assets/app.js', 'android')).toBe('https://localhost/assets/app.js');
+  });
+
+  it('keeps remote urls unchanged for legacy native resolution', () => {
+    expect(resolveLegacyNativeWebViewUrl('https://example.com/page.html', 'ios')).toBe('https://example.com/page.html');
+  });
+
+  it('rejects path traversal for legacy native resolution', () => {
+    expect(() => resolveLegacyNativeWebViewUrl('/../secret.txt', 'ios')).toThrow('Invalid bundled asset path');
   });
 });

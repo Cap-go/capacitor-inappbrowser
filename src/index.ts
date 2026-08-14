@@ -1,7 +1,12 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
-import { containsPathTraversal, isRelativeBundledPath } from './bundled-asset-support';
+import {
+  containsPathTraversal,
+  isRelativeBundledPath,
+  resolveLegacyNativeWebViewUrl,
+  type BundledAssetPlatform,
+} from './bundled-asset-support';
 import type {
   InAppBrowserPlugin,
   OpenWebViewOptions,
@@ -44,21 +49,34 @@ function assertValidBundledAssetPath(url: string): void {
   }
 }
 
-const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(resolvePluginName(), inAppBrowserImplementations);
+const activePluginName = resolvePluginName();
+
+function bundledAssetPlatform(): BundledAssetPlatform {
+  return Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+}
+
+function prepareWebViewOptions<T extends { url: string }>(options: T): T {
+  assertValidBundledAssetPath(options.url);
+
+  if (!Capacitor.isNativePlatform() || activePluginName !== PREVIOUS_PLUGIN_NAME) {
+    return options;
+  }
+
+  return {
+    ...options,
+    url: resolveLegacyNativeWebViewUrl(options.url, bundledAssetPlatform()),
+  };
+}
+
+const baseInAppBrowser = registerPlugin<InAppBrowserPlugin>(activePluginName, inAppBrowserImplementations);
 
 const InAppBrowser = new Proxy(baseInAppBrowser, {
   get(target, prop, receiver) {
     if (prop === 'openWebView') {
-      return (options: OpenWebViewOptions) => {
-        assertValidBundledAssetPath(options.url);
-        return target.openWebView(options);
-      };
+      return (options: OpenWebViewOptions) => target.openWebView(prepareWebViewOptions(options));
     }
     if (prop === 'setUrl') {
-      return (options: Parameters<InAppBrowserPlugin['setUrl']>[0]) => {
-        assertValidBundledAssetPath(options.url);
-        return target.setUrl(options);
-      };
+      return (options: Parameters<InAppBrowserPlugin['setUrl']>[0]) => target.setUrl(prepareWebViewOptions(options));
     }
 
     const value = Reflect.get(target, prop, receiver);
