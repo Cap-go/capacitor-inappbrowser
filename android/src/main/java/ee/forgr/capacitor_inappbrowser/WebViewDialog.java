@@ -2368,8 +2368,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         isCaptureInUrl = false;
                     }
 
-                    // For image inputs, try to detect capture attribute using JavaScript
-                    if (acceptType.equals("image/*")) {
+                    // For image-only inputs, try to detect capture attribute using JavaScript.
+                    // Mixed accept lists (e.g. "image/*,application/pdf") must skip the camera
+                    // path entirely — the camera can only produce images, so routing a mixed
+                    // request to it would make the non-image types unselectable.
+                    if (acceptType.equals("image/*") && !hasNonImageAcceptType(fileChooserParams.getAcceptTypes())) {
                         // Check if HTML content contains capture attribute on file inputs (synchronous check)
                         webView.evaluateJavascript(
                             "document.querySelector('input[type=\"file\"][capture]') !== null",
@@ -4068,6 +4071,24 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             preShowSemaphore = null;
             preShowError = null;
         }
+    }
+
+    private static boolean hasNonImageAcceptType(String[] acceptTypes) {
+        if (acceptTypes == null) {
+            return false;
+        }
+        for (String entry : acceptTypes) {
+            if (entry == null) {
+                continue;
+            }
+            for (String part : entry.split(",")) {
+                String mime = acceptEntryToMimeType(part.trim());
+                if (mime != null && !mime.startsWith("image/")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String acceptEntryToMimeType(String accept) {
