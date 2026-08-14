@@ -2469,7 +2469,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 Log.d("InAppBrowser", "No capture attribute detected, using file picker");
                                 openFileChooser(
                                     filePathCallback,
-                                    acceptType,
+                                    fileChooserParams.getAcceptTypes(),
                                     fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE
                                 );
                             });
@@ -2478,7 +2478,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     // For non-image types, use regular file picker
-                    openFileChooser(filePathCallback, acceptType, fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                    openFileChooser(filePathCallback, fileChooserParams.getAcceptTypes(), fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
                     return true;
                 }
 
@@ -4061,44 +4061,75 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
-    private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
-        mFilePathCallback = filePathCallback;
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+    private static String acceptEntryToMimeType(String accept) {
+        if (accept == null || accept.isEmpty() || accept.equals("undefined")) {
+            return null;
+        }
+        if (accept.contains("/")) {
+            // Already a MIME type
+            return accept;
+        }
+        if (!accept.startsWith(".")) {
+            // Unknown token — ignore
+            return null;
+        }
+        return android.webkit.MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(accept.substring(1).toLowerCase(java.util.Locale.ROOT));
+    }
 
-        // Fix MIME type handling
-        if (acceptType == null || acceptType.isEmpty() || acceptType.equals("undefined")) {
-            acceptType = "*/*";
-        } else {
-            // Handle common web input accept types
-            if (acceptType.equals("image/*")) {
-                // Keep as is - image/*
-            } else if (acceptType.contains("image/")) {
-                // Specific image type requested but keep it general for better compatibility
-                acceptType = "image/*";
-            } else if (acceptType.equals("audio/*") || acceptType.contains("audio/")) {
-                acceptType = "audio/*";
-            } else if (acceptType.equals("video/*") || acceptType.contains("video/")) {
-                acceptType = "video/*";
-            } else if (acceptType.startsWith(".") || acceptType.contains(",")) {
-                // Handle file extensions like ".pdf, .docx" by using a general mime type
-                if (acceptType.contains(".pdf")) {
-                    acceptType = "application/pdf";
-                } else if (acceptType.contains(".doc") || acceptType.contains(".docx")) {
-                    acceptType = "application/msword";
-                } else if (acceptType.contains(".xls") || acceptType.contains(".xlsx")) {
-                    acceptType = "application/vnd.ms-excel";
-                } else if (acceptType.contains(".txt") || acceptType.contains(".text")) {
-                    acceptType = "text/plain";
-                } else {
-                    // Default for extension lists
-                    acceptType = "*/*";
+    private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
+        openFileChooser(filePathCallback, new String[] { acceptType }, isMultiple);
+    }
+
+    private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String[] acceptTypes, boolean isMultiple) {
+        mFilePathCallback = filePathCallback;
+
+        // Preserve the page's FULL accept list: normalize every entry to a MIME type and
+        // advertise all of them via EXTRA_MIME_TYPES. Truncating to the first entry made
+        // mixed inputs (e.g. "image/png,...,application/pdf") image-only, which Android's
+        // photo-picker GET_CONTENT takeover then routes to the photo picker, so documents
+        // could never be selected.
+        java.util.LinkedHashSet<String> mimeTypes = new java.util.LinkedHashSet<>();
+        if (acceptTypes != null) {
+            for (String entry : acceptTypes) {
+                if (entry == null) {
+                    continue;
+                }
+                for (String part : entry.split(",")) {
+                    String mime = acceptEntryToMimeType(part.trim());
+                    if (mime != null) {
+                        mimeTypes.add(mime);
+                    }
                 }
             }
         }
+        if (mimeTypes.contains("*/*")) {
+            mimeTypes.clear();
+        }
 
-        Log.d("InAppBrowser", "File picker using MIME type: " + acceptType);
-        intent.setType(acceptType);
+        // Media-only requests keep GET_CONTENT so the system photo picker/gallery handles
+        // them; anything else uses OPEN_DOCUMENT, whose SAF picker cannot be intercepted by
+        // the photo-picker takeover or OEM galleries.
+        boolean mediaOnly = !mimeTypes.isEmpty();
+        for (String mime : mimeTypes) {
+            if (!(mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/"))) {
+                mediaOnly = false;
+                break;
+            }
+        }
+        Intent intent = new Intent(mediaOnly ? Intent.ACTION_GET_CONTENT : Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+
+        if (mimeTypes.size() == 1) {
+            intent.setType(mimeTypes.iterator().next());
+        } else {
+            intent.setType("*/*");
+            if (!mimeTypes.isEmpty()) {
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toArray(new String[0]));
+            }
+        }
+
+        Log.d("InAppBrowser", "File picker using action: " + intent.getAction() + ", MIME types: " + mimeTypes);
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
 
         try {
@@ -4139,7 +4170,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         } catch (ActivityNotFoundException e) {
             // If no app can handle the specific MIME type, try with a more generic one
-            Log.e("InAppBrowser", "No app available for type: " + acceptType + ", trying with */*");
+            Log.e("InAppBrowser", "No app available for types: " + java.util.Arrays.toString(acceptTypes) + ", trying with */*");
             intent.setType("*/*");
             try {
                 if (activity instanceof androidx.activity.ComponentActivity) {
