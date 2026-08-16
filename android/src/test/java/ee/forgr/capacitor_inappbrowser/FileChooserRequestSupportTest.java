@@ -4,8 +4,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.webkit.ValueCallback;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import org.junit.Test;
 
 public class FileChooserRequestSupportTest {
@@ -28,12 +31,12 @@ public class FileChooserRequestSupportTest {
         RecordingCallback secondCallback = new RecordingCallback();
         FileChooserRequestSupport.FileChooserRequest first = new FileChooserRequestSupport.FileChooserRequest(
             firstCallback,
-            "image/*",
+            new String[] { "image/*" },
             false
         );
         FileChooserRequestSupport.FileChooserRequest second = new FileChooserRequestSupport.FileChooserRequest(
             secondCallback,
-            "application/pdf",
+            new String[] { "application/pdf" },
             true
         );
 
@@ -47,12 +50,12 @@ public class FileChooserRequestSupportTest {
         RecordingCallback secondCallback = new RecordingCallback();
         FileChooserRequestSupport.FileChooserRequest first = new FileChooserRequestSupport.FileChooserRequest(
             firstCallback,
-            "image/*",
+            new String[] { "image/*" },
             false
         );
         FileChooserRequestSupport.FileChooserRequest second = new FileChooserRequestSupport.FileChooserRequest(
             secondCallback,
-            "image/*",
+            new String[] { "image/*" },
             false
         );
 
@@ -66,7 +69,11 @@ public class FileChooserRequestSupportTest {
     @Test
     public void activeRequestReceivesCompletion() {
         RecordingCallback callback = new RecordingCallback();
-        FileChooserRequestSupport.FileChooserRequest request = new FileChooserRequestSupport.FileChooserRequest(callback, "image/*", false);
+        FileChooserRequestSupport.FileChooserRequest request = new FileChooserRequestSupport.FileChooserRequest(
+            callback,
+            new String[] { "image/*" },
+            false
+        );
         Uri[] cameraResult = new Uri[1];
 
         assertTrue(FileChooserRequestSupport.completeIfActive(request, request, cameraResult));
@@ -77,7 +84,11 @@ public class FileChooserRequestSupportTest {
     @Test
     public void cancelNotifiesCallbackWithNull() {
         RecordingCallback callback = new RecordingCallback();
-        FileChooserRequestSupport.FileChooserRequest request = new FileChooserRequestSupport.FileChooserRequest(callback, "*/*", false);
+        FileChooserRequestSupport.FileChooserRequest request = new FileChooserRequestSupport.FileChooserRequest(
+            callback,
+            new String[] { "*/*" },
+            false
+        );
 
         FileChooserRequestSupport.cancel(request);
 
@@ -91,12 +102,12 @@ public class FileChooserRequestSupportTest {
         RecordingCallback secondCallback = new RecordingCallback();
         FileChooserRequestSupport.FileChooserRequest first = new FileChooserRequestSupport.FileChooserRequest(
             firstCallback,
-            "image/*",
+            new String[] { "image/*" },
             false
         );
         FileChooserRequestSupport.FileChooserRequest second = new FileChooserRequestSupport.FileChooserRequest(
             secondCallback,
-            "image/*",
+            new String[] { "image/*" },
             false
         );
 

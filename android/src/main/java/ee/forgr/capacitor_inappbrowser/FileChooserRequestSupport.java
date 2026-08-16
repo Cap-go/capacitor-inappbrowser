@@ -11,18 +11,14 @@ final class FileChooserRequestSupport {
 
     static final class FileChooserRequest {
 
-        private static long nextId = 0;
-
-        final long id;
         final ValueCallback<Uri[]> callback;
-        final String acceptType;
+        final String[] acceptTypes;
         final boolean multiple;
         Uri tempCameraUri;
 
-        FileChooserRequest(ValueCallback<Uri[]> callback, String acceptType, boolean multiple) {
-            this.id = ++nextId;
+        FileChooserRequest(ValueCallback<Uri[]> callback, String[] acceptTypes, boolean multiple) {
             this.callback = callback;
-            this.acceptType = acceptType;
+            this.acceptTypes = acceptTypes;
             this.multiple = multiple;
         }
     }
