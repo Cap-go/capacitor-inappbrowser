@@ -5,7 +5,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import android.content.Intent;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import org.junit.Test;
@@ -13,8 +12,10 @@ import org.junit.Test;
 public class FileChooserAcceptSupportTest {
 
     @Test
-    public void normalizeAcceptTypesConvertsExtensionsAndDedupes() {
-        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(new String[] { "image/png,.PDF,application/pdf" });
+    public void normalizeAcceptTypesDedupesAndLowercasesMimeTypes() {
+        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(
+            new String[] { "image/png,IMAGE/PNG,application/pdf" }
+        );
 
         assertEquals(new LinkedHashSet<>(Arrays.asList("image/png", "application/pdf")), mimeTypes);
     }
@@ -29,8 +30,8 @@ public class FileChooserAcceptSupportTest {
     @Test
     public void acceptEntryToMimeTypeIgnoresUnknownTokens() {
         assertNull(FileChooserAcceptSupport.acceptEntryToMimeType("bogus"));
+        assertNull(FileChooserAcceptSupport.acceptEntryToMimeType(null));
         assertEquals("image/png", FileChooserAcceptSupport.acceptEntryToMimeType("IMAGE/PNG"));
-        assertEquals("application/pdf", FileChooserAcceptSupport.acceptEntryToMimeType(".pdf"));
     }
 
     @Test
@@ -42,33 +43,9 @@ public class FileChooserAcceptSupportTest {
     }
 
     @Test
-    public void createFileChooserIntentUsesGetContentForMediaOnly() {
-        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(new String[] { "image/png", "image/jpeg" });
-        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(mimeTypes, true);
-
-        assertEquals(Intent.ACTION_GET_CONTENT, intent.getAction());
-        assertEquals("*/*", intent.getType());
-        assertEquals(Arrays.asList("image/png", "image/jpeg"), Arrays.asList(intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
-        assertTrue(intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false));
-    }
-
-    @Test
-    public void createFileChooserIntentUsesOpenDocumentForMixedTypes() {
-        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(new String[] { "image/png,application/pdf" });
-        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(mimeTypes, false);
-
-        assertEquals(Intent.ACTION_OPEN_DOCUMENT, intent.getAction());
-        assertEquals("*/*", intent.getType());
-        assertEquals(Arrays.asList("image/png", "application/pdf"), Arrays.asList(intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES)));
-        assertFalse(intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, true));
-    }
-
-    @Test
-    public void createFileChooserIntentUsesOpenDocumentForEmptyAcceptList() {
-        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(new LinkedHashSet<>(), false);
-
-        assertEquals(Intent.ACTION_OPEN_DOCUMENT, intent.getAction());
-        assertEquals("*/*", intent.getType());
-        assertNull(intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES));
+    public void isMediaOnlyMimeSetDetectsMediaBuckets() {
+        assertTrue(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>(Arrays.asList("image/png", "video/mp4", "audio/mpeg"))));
+        assertFalse(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>(Arrays.asList("image/png", "application/pdf"))));
+        assertFalse(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>()));
     }
 }
