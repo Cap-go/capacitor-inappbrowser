@@ -49,16 +49,57 @@ final class FileChooserAcceptSupport {
     }
 
     static boolean isImageOnlyAcceptTypes(String[] acceptTypes) {
-        LinkedHashSet<String> mimeTypes = normalizeAcceptTypes(acceptTypes);
-        if (mimeTypes.isEmpty()) {
+        boolean foundImage = false;
+        if (acceptTypes == null) {
             return false;
         }
-        for (String mime : mimeTypes) {
-            if (!mime.startsWith("image/")) {
-                return false;
+        for (String entry : acceptTypes) {
+            if (entry == null) {
+                continue;
+            }
+            for (String part : entry.split(",")) {
+                String token = part.trim();
+                if (token.isEmpty() || token.equals("undefined")) {
+                    continue;
+                }
+                String mime = acceptEntryToMimeType(token);
+                if (mime == null || mime.equals("*/*")) {
+                    return false;
+                }
+                if (!mime.startsWith("image/")) {
+                    return false;
+                }
+                foundImage = true;
             }
         }
-        return true;
+        return foundImage;
+    }
+
+    static boolean isMediaOnlyAcceptTypes(String[] acceptTypes) {
+        boolean foundMedia = false;
+        if (acceptTypes == null) {
+            return false;
+        }
+        for (String entry : acceptTypes) {
+            if (entry == null) {
+                continue;
+            }
+            for (String part : entry.split(",")) {
+                String token = part.trim();
+                if (token.isEmpty() || token.equals("undefined")) {
+                    continue;
+                }
+                String mime = acceptEntryToMimeType(token);
+                if (mime == null || mime.equals("*/*")) {
+                    return false;
+                }
+                if (!(mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/"))) {
+                    return false;
+                }
+                foundMedia = true;
+            }
+        }
+        return foundMedia;
     }
 
     static boolean isMediaOnlyMimeSet(Set<String> mimeTypes) {
@@ -73,9 +114,14 @@ final class FileChooserAcceptSupport {
         return true;
     }
 
-    static Intent createFileChooserIntent(Set<String> mimeTypes, boolean multiple) {
-        boolean mediaOnly = isMediaOnlyMimeSet(mimeTypes);
-        Intent intent = new Intent(mediaOnly ? Intent.ACTION_GET_CONTENT : Intent.ACTION_OPEN_DOCUMENT);
+    static boolean useGetContentAction(String[] acceptTypes) {
+        LinkedHashSet<String> mimeTypes = normalizeAcceptTypes(acceptTypes);
+        return isMediaOnlyAcceptTypes(acceptTypes) && mimeTypes.size() == 1;
+    }
+
+    static Intent createFileChooserIntent(String[] acceptTypes, boolean multiple) {
+        LinkedHashSet<String> mimeTypes = normalizeAcceptTypes(acceptTypes);
+        Intent intent = new Intent(useGetContentAction(acceptTypes) ? Intent.ACTION_GET_CONTENT : Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
 
         if (mimeTypes.size() == 1) {

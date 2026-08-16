@@ -4122,7 +4122,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
         java.util.LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(request.acceptTypes);
-        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(mimeTypes, request.multiple);
+        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(request.acceptTypes, request.multiple);
 
         Log.d("InAppBrowser", "File picker using action: " + intent.getAction() + ", MIME types: " + mimeTypes);
 
