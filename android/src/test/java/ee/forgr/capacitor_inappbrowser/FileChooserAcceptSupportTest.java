@@ -57,13 +57,6 @@ public class FileChooserAcceptSupportTest {
     }
 
     @Test
-    public void isMediaOnlyMimeSetDetectsMediaBuckets() {
-        assertTrue(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>(Arrays.asList("image/png", "video/mp4", "audio/mpeg"))));
-        assertFalse(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>(Arrays.asList("image/png", "application/pdf"))));
-        assertFalse(FileChooserAcceptSupport.isMediaOnlyMimeSet(new LinkedHashSet<>()));
-    }
-
-    @Test
     public void useGetContentActionOnlyForSingleTypeMediaLists() {
         assertTrue(FileChooserAcceptSupport.useGetContentAction(new String[] { "image/*" }));
         assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { "image/png", "image/jpeg" }));

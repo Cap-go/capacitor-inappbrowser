@@ -4,7 +4,7 @@ import android.content.Intent;
 import android.webkit.MimeTypeMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Normalizes WebView file-input accept attributes into Android file-chooser intents.
@@ -49,34 +49,18 @@ final class FileChooserAcceptSupport {
     }
 
     static boolean isImageOnlyAcceptTypes(String[] acceptTypes) {
-        boolean foundImage = false;
-        if (acceptTypes == null) {
-            return false;
-        }
-        for (String entry : acceptTypes) {
-            if (entry == null) {
-                continue;
-            }
-            for (String part : entry.split(",")) {
-                String token = part.trim();
-                if (token.isEmpty() || token.equals("undefined")) {
-                    continue;
-                }
-                String mime = acceptEntryToMimeType(token);
-                if (mime == null || mime.equals("*/*")) {
-                    return false;
-                }
-                if (!mime.startsWith("image/")) {
-                    return false;
-                }
-                foundImage = true;
-            }
-        }
-        return foundImage;
+        return matchesAllResolvedAcceptTypes(acceptTypes, (mime) -> mime.startsWith("image/"));
     }
 
     static boolean isMediaOnlyAcceptTypes(String[] acceptTypes) {
-        boolean foundMedia = false;
+        return matchesAllResolvedAcceptTypes(
+            acceptTypes,
+            (mime) -> mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/")
+        );
+    }
+
+    private static boolean matchesAllResolvedAcceptTypes(String[] acceptTypes, Predicate<String> mimePredicate) {
+        boolean foundMatch = false;
         if (acceptTypes == null) {
             return false;
         }
@@ -93,25 +77,13 @@ final class FileChooserAcceptSupport {
                 if (mime == null || mime.equals("*/*")) {
                     return false;
                 }
-                if (!(mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/"))) {
+                if (!mimePredicate.test(mime)) {
                     return false;
                 }
-                foundMedia = true;
+                foundMatch = true;
             }
         }
-        return foundMedia;
-    }
-
-    static boolean isMediaOnlyMimeSet(Set<String> mimeTypes) {
-        if (mimeTypes.isEmpty()) {
-            return false;
-        }
-        for (String mime : mimeTypes) {
-            if (!(mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/"))) {
-                return false;
-            }
-        }
-        return true;
+        return foundMatch;
     }
 
     static boolean useGetContentAction(String[] acceptTypes) {
