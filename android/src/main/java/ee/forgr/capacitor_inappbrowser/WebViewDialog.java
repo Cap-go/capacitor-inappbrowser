@@ -2323,21 +2323,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     ValueCallback<Uri[]> filePathCallback,
                     FileChooserParams fileChooserParams
                 ) {
-                    // Get the accept type safely
-                    String acceptType;
-                    if (
-                        fileChooserParams.getAcceptTypes() != null &&
-                        fileChooserParams.getAcceptTypes().length > 0 &&
-                        !TextUtils.isEmpty(fileChooserParams.getAcceptTypes()[0])
-                    ) {
-                        acceptType = fileChooserParams.getAcceptTypes()[0];
-                    } else {
-                        acceptType = "*/*";
+                    String[] acceptTypes = fileChooserParams.getAcceptTypes();
+                    if (acceptTypes == null || acceptTypes.length == 0) {
+                        acceptTypes = new String[] { "*/*" };
                     }
 
                     // DEBUG: Log details about the file chooser request
                     Log.d("InAppBrowser", "onShowFileChooser called");
-                    Log.d("InAppBrowser", "Accept type: " + acceptType);
+                    Log.d("InAppBrowser", "Accept types: " + Arrays.toString(acceptTypes));
                     Log.d("InAppBrowser", "Current URL: " + getUrl());
                     Log.d("InAppBrowser", "Original URL: " + (webView.getOriginalUrl() != null ? webView.getOriginalUrl() : "null"));
                     Log.d(
@@ -2350,7 +2343,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                     // Check if the file chooser is already open
                     final boolean isMultiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
-                    beginFileChooserRequest(filePathCallback, acceptType, isMultiple);
+                    beginFileChooserRequest(filePathCallback, acceptTypes, isMultiple);
                     final FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
 
                     // Direct check for capture attribute in URL (fallback method)
@@ -2368,8 +2361,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         isCaptureInUrl = false;
                     }
 
-                    // For image inputs, try to detect capture attribute using JavaScript
-                    if (acceptType.equals("image/*")) {
+                    // For image-only inputs, try to detect capture attribute using JavaScript.
+                    // Mixed accept lists (e.g. "image/*,application/pdf") must skip the camera
+                    // path entirely — the camera can only produce images.
+                    if (FileChooserAcceptSupport.isImageOnlyAcceptTypes(acceptTypes)) {
                         // Check if HTML content contains capture attribute on file inputs (synchronous check)
                         webView.evaluateJavascript(
                             "document.querySelector('input[type=\"file\"][capture]') !== null",
@@ -4091,11 +4086,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
-    private void beginFileChooserRequest(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
+    private void beginFileChooserRequest(ValueCallback<Uri[]> filePathCallback, String[] acceptTypes, boolean isMultiple) {
         if (activeFileChooserRequest != null) {
             FileChooserRequestSupport.cancel(activeFileChooserRequest);
         }
-        activeFileChooserRequest = new FileChooserRequestSupport.FileChooserRequest(filePathCallback, acceptType, isMultiple);
+        activeFileChooserRequest = new FileChooserRequestSupport.FileChooserRequest(filePathCallback, acceptTypes, isMultiple);
         syncFileChooserPublicFields();
     }
 
@@ -4126,45 +4121,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
             return;
         }
-        String acceptType = request.acceptType;
-        boolean isMultiple = request.multiple;
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        java.util.LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(request.acceptTypes);
+        Intent intent = FileChooserAcceptSupport.createFileChooserIntent(request.acceptTypes, request.multiple);
 
-        // Fix MIME type handling
-        if (acceptType == null || acceptType.isEmpty() || acceptType.equals("undefined")) {
-            acceptType = "*/*";
-        } else {
-            // Handle common web input accept types
-            if (acceptType.equals("image/*")) {
-                // Keep as is - image/*
-            } else if (acceptType.contains("image/")) {
-                // Specific image type requested but keep it general for better compatibility
-                acceptType = "image/*";
-            } else if (acceptType.equals("audio/*") || acceptType.contains("audio/")) {
-                acceptType = "audio/*";
-            } else if (acceptType.equals("video/*") || acceptType.contains("video/")) {
-                acceptType = "video/*";
-            } else if (acceptType.startsWith(".") || acceptType.contains(",")) {
-                // Handle file extensions like ".pdf, .docx" by using a general mime type
-                if (acceptType.contains(".pdf")) {
-                    acceptType = "application/pdf";
-                } else if (acceptType.contains(".doc") || acceptType.contains(".docx")) {
-                    acceptType = "application/msword";
-                } else if (acceptType.contains(".xls") || acceptType.contains(".xlsx")) {
-                    acceptType = "application/vnd.ms-excel";
-                } else if (acceptType.contains(".txt") || acceptType.contains(".text")) {
-                    acceptType = "text/plain";
-                } else {
-                    // Default for extension lists
-                    acceptType = "*/*";
-                }
-            }
-        }
-
-        Log.d("InAppBrowser", "File picker using MIME type: " + acceptType);
-        intent.setType(acceptType);
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, isMultiple);
+        Log.d("InAppBrowser", "File picker using action: " + intent.getAction() + ", MIME types: " + mimeTypes);
 
         try {
             if (activity instanceof androidx.activity.ComponentActivity) {
@@ -4207,8 +4167,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         } catch (ActivityNotFoundException e) {
             // If no app can handle the specific MIME type, try with a more generic one
-            Log.e("InAppBrowser", "No app available for type: " + acceptType + ", trying with */*");
+            Log.e("InAppBrowser", "No app available for types: " + mimeTypes + ", trying with */*");
             intent.setType("*/*");
+            intent.removeExtra(Intent.EXTRA_MIME_TYPES);
             try {
                 if (activity instanceof androidx.activity.ComponentActivity) {
                     androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
