@@ -43,16 +43,16 @@ public class FileChooserAcceptSupportTest {
     }
 
     @Test
-    public void unresolvedExtensionPreventsImageOnlyCaptureRouting() {
-        assertFalse(FileChooserAcceptSupport.isImageOnlyAcceptTypes(new String[] { ".custom,image/*" }));
-        assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { ".custom,image/*" }));
+    public void unresolvedTokenPreventsImageOnlyCaptureRouting() {
+        assertFalse(FileChooserAcceptSupport.isImageOnlyAcceptTypes(new String[] { "bogus,image/*" }));
+        assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { "bogus,image/*" }));
     }
 
     @Test
     public void isMediaOnlyAcceptTypesDetectsMediaBucketsFromRawEntries() {
         assertTrue(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { "image/png", "video/mp4", "audio/mpeg" }));
         assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { "image/png", "application/pdf" }));
-        assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { ".custom", "image/*" }));
+        assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { "bogus,image/*" }));
         assertFalse(FileChooserAcceptSupport.isMediaOnlyAcceptTypes(new String[] { "*/*" }));
     }
 
@@ -69,6 +69,6 @@ public class FileChooserAcceptSupportTest {
         assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { "image/png", "image/jpeg" }));
         assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { "image/*", "video/*" }));
         assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { "image/png", "application/pdf" }));
-        assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { ".custom", "image/*" }));
+        assertFalse(FileChooserAcceptSupport.useGetContentAction(new String[] { "bogus,image/*" }));
     }
 }
