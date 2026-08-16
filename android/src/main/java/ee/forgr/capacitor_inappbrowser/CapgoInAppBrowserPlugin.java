@@ -574,9 +574,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             }
 
             // Send the result to WebView and clean up
-            webViewDialog.mFilePathCallback.onReceiveValue(results);
-            webViewDialog.mFilePathCallback = null;
-            webViewDialog.tempCameraUri = null;
+            webViewDialog.completeLegacyFileChooserResult(results);
         }
     }
 

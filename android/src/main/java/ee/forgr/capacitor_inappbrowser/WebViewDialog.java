@@ -412,6 +412,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
     public ValueCallback<Uri> mUploadMessage;
     public ValueCallback<Uri[]> mFilePathCallback;
+    FileChooserRequestSupport.FileChooserRequest activeFileChooserRequest;
     private boolean openWebViewResolved;
     private boolean isDismissing = false;
     private PermissionRequest pendingCameraLaunchPermissionRequest;
@@ -2348,12 +2349,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     );
 
                     // Check if the file chooser is already open
-                    if (mFilePathCallback != null) {
-                        mFilePathCallback.onReceiveValue(null);
-                        mFilePathCallback = null;
-                    }
-
-                    mFilePathCallback = filePathCallback;
+                    final boolean isMultiple = fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE;
+                    beginFileChooserRequest(filePathCallback, acceptType, isMultiple);
+                    final FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
 
                     // Direct check for capture attribute in URL (fallback method)
                     boolean isCaptureInUrl;
@@ -2428,12 +2426,16 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             """;
 
                         webView.evaluateJavascript(js, (value) -> {
+                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                return;
+                            }
+
                             Log.d("InAppBrowser", "Capture attribute JS result: " + value);
 
                             // If we already found capture in URL, use that directly
                             if (isCaptureInUrl) {
                                 Log.d("InAppBrowser", "Using capture from URL: " + captureMode);
-                                launchCamera(captureMode.equals("user"));
+                                launchCamera(captureMode.equals("user"), request);
                                 return;
                             }
 
@@ -2444,7 +2446,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 Log.d("InAppBrowser", "Found capture attribute: " + captureValue);
 
                                 if (!captureValue.isEmpty()) {
-                                    activity.runOnUiThread(() -> launchCamera(captureValue.equals("user")));
+                                    activity.runOnUiThread(() -> launchCamera(captureValue.equals("user"), request));
                                     return;
                                 }
                             }
@@ -2452,6 +2454,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             // Look for hints in the web page source
                             Log.d("InAppBrowser", "Looking for camera hints in page content");
                             webView.evaluateJavascript("(function() { return document.documentElement.innerHTML; })()", (htmlSource) -> {
+                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                    return;
+                                }
+
                                 if (htmlSource != null && htmlSource.length() > 10) {
                                     boolean hasCameraOrSelfieKeyword =
                                         htmlSource.contains("capture=") || htmlSource.contains("camera") || htmlSource.contains("selfie");
@@ -2464,25 +2470,21 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                         (currentUrl.contains("selfie") || currentUrl.contains("camera") || currentUrl.contains("photo"))
                                     ) {
                                         Log.d("InAppBrowser", "URL suggests camera usage, launching camera");
-                                        activity.runOnUiThread(() -> launchCamera(currentUrl.contains("selfie")));
+                                        activity.runOnUiThread(() -> launchCamera(currentUrl.contains("selfie"), request));
                                         return;
                                     }
                                 }
 
                                 // If all detection methods fail, fall back to regular file picker
                                 Log.d("InAppBrowser", "No capture attribute detected, using file picker");
-                                openFileChooser(
-                                    filePathCallback,
-                                    acceptType,
-                                    fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE
-                                );
+                                openFileChooser(request);
                             });
                         });
                         return true;
                     }
 
                     // For non-image types, use regular file picker
-                    openFileChooser(filePathCallback, acceptType, fileChooserParams.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                    openFileChooser(request);
                     return true;
                 }
 
@@ -2490,7 +2492,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                  * Launch the camera app for capturing images
                  * @param useFrontCamera true to use front camera, false for back camera
                  */
-                private void launchCamera(boolean useFrontCamera) {
+                private void launchCamera(boolean useFrontCamera, FileChooserRequestSupport.FileChooserRequest request) {
+                    if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                        return;
+                    }
+
                     Log.d("InAppBrowser", "Launching camera, front camera: " + useFrontCamera);
 
                     // First check if we have camera permission
@@ -2514,8 +2520,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                     Log.d("InAppBrowser", "Ignoring delayed camera permission grant during dismiss");
                                     return;
                                 }
+                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                    return;
+                                }
                                 // Permission granted, now launch the camera
-                                launchCameraWithPermission(useFrontCamera);
+                                launchCameraWithPermission(useFrontCamera, request);
                             }
 
                             @Override
@@ -2525,9 +2534,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                     Log.d("InAppBrowser", "Ignoring delayed camera permission denial during dismiss");
                                     return;
                                 }
+                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                    return;
+                                }
                                 // Permission denied, fall back to file picker
                                 Log.e("InAppBrowser", "Camera permission denied, falling back to file picker");
-                                fallbackToFilePicker();
+                                fallbackToFilePicker(request);
                             }
                         };
 
@@ -2539,13 +2551,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
 
                     // If we can't request permission, try launching directly
-                    launchCameraWithPermission(useFrontCamera);
+                    launchCameraWithPermission(useFrontCamera, request);
                 }
 
                 /**
                  * Launch camera after permission is granted
                  */
-                private void launchCameraWithPermission(boolean useFrontCamera) {
+                private void launchCameraWithPermission(boolean useFrontCamera, FileChooserRequestSupport.FileChooserRequest request) {
+                    if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                        return;
+                    }
+
                     try {
                         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                         if (takePictureIntent.resolveActivity(activity.getPackageManager()) != null) {
@@ -2554,17 +2570,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 photoFile = createImageFile();
                             } catch (IOException ex) {
                                 Log.e("InAppBrowser", "Error creating image file", ex);
-                                fallbackToFilePicker();
+                                fallbackToFilePicker(request);
                                 return;
                             }
 
                             if (photoFile != null) {
-                                tempCameraUri = FileProvider.getUriForFile(
+                                request.tempCameraUri = FileProvider.getUriForFile(
                                     activity,
                                     activity.getPackageName() + ".fileprovider",
                                     photoFile
                                 );
-                                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, tempCameraUri);
+                                syncFileChooserPublicFields();
+                                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, request.tempCameraUri);
 
                                 if (useFrontCamera) {
                                     takePictureIntent.putExtra("android.intent.extras.CAMERA_FACING", 1);
@@ -2580,15 +2597,23 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                                 "camera_capture",
                                                 new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
                                                 (result) -> {
-                                                    if (result.getResultCode() == Activity.RESULT_OK) {
-                                                        if (tempCameraUri != null) {
-                                                            mFilePathCallback.onReceiveValue(new Uri[] { tempCameraUri });
-                                                        }
-                                                    } else {
-                                                        mFilePathCallback.onReceiveValue(null);
+                                                    if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                                        return;
                                                     }
-                                                    mFilePathCallback = null;
-                                                    tempCameraUri = null;
+                                                    Uri[] results = null;
+                                                    if (result.getResultCode() == Activity.RESULT_OK && request.tempCameraUri != null) {
+                                                        results = new Uri[] { request.tempCameraUri };
+                                                    }
+                                                    if (
+                                                        FileChooserRequestSupport.completeIfActive(
+                                                            request,
+                                                            activeFileChooserRequest,
+                                                            results
+                                                        )
+                                                    ) {
+                                                        request.tempCameraUri = null;
+                                                        clearActiveFileChooserRequest(request);
+                                                    }
                                                 }
                                             )
                                             .launch(takePictureIntent);
@@ -2598,26 +2623,27 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                     }
                                 } catch (SecurityException e) {
                                     Log.e("InAppBrowser", "Security exception launching camera: " + e.getMessage(), e);
-                                    fallbackToFilePicker();
+                                    fallbackToFilePicker(request);
                                 }
                             } else {
                                 Log.e("InAppBrowser", "Failed to create photo URI, falling back to file picker");
-                                fallbackToFilePicker();
+                                fallbackToFilePicker(request);
                             }
                         }
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Camera launch failed: " + e.getMessage(), e);
-                        fallbackToFilePicker();
+                        fallbackToFilePicker(request);
                     }
                 }
 
                 /**
                  * Fall back to file picker when camera launch fails
                  */
-                private void fallbackToFilePicker() {
-                    if (mFilePathCallback != null) {
-                        openFileChooser(mFilePathCallback, "image/*", false);
+                private void fallbackToFilePicker(FileChooserRequestSupport.FileChooserRequest request) {
+                    if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                        return;
                     }
+                    openFileChooser(request);
                 }
 
                 // Grant permissions for cam
@@ -4065,8 +4091,43 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
-    private void openFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
-        mFilePathCallback = filePathCallback;
+    private void beginFileChooserRequest(ValueCallback<Uri[]> filePathCallback, String acceptType, boolean isMultiple) {
+        if (activeFileChooserRequest != null) {
+            FileChooserRequestSupport.cancel(activeFileChooserRequest);
+        }
+        activeFileChooserRequest = new FileChooserRequestSupport.FileChooserRequest(filePathCallback, acceptType, isMultiple);
+        syncFileChooserPublicFields();
+    }
+
+    private void clearActiveFileChooserRequest(FileChooserRequestSupport.FileChooserRequest request) {
+        if (activeFileChooserRequest == request) {
+            activeFileChooserRequest = null;
+            syncFileChooserPublicFields();
+        }
+    }
+
+    private void syncFileChooserPublicFields() {
+        mFilePathCallback = activeFileChooserRequest != null ? activeFileChooserRequest.callback : null;
+        tempCameraUri = activeFileChooserRequest != null ? activeFileChooserRequest.tempCameraUri : null;
+    }
+
+    void completeLegacyFileChooserResult(Uri[] results) {
+        FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
+        if (request == null) {
+            return;
+        }
+        if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
+            request.tempCameraUri = null;
+            clearActiveFileChooserRequest(request);
+        }
+    }
+
+    private void openFileChooser(FileChooserRequestSupport.FileChooserRequest request) {
+        if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+            return;
+        }
+        String acceptType = request.acceptType;
+        boolean isMultiple = request.multiple;
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
 
@@ -4114,26 +4175,29 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         "file_chooser",
                         new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
                         (result) -> {
+                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                return;
+                            }
+                            Uri[] results = null;
                             if (result.getResultCode() == Activity.RESULT_OK) {
                                 Intent data = result.getData();
                                 if (data != null) {
                                     if (data.getClipData() != null) {
                                         // Handle multiple files
                                         int count = data.getClipData().getItemCount();
-                                        Uri[] results = new Uri[count];
+                                        results = new Uri[count];
                                         for (int i = 0; i < count; i++) {
                                             results[i] = data.getClipData().getItemAt(i).getUri();
                                         }
-                                        mFilePathCallback.onReceiveValue(results);
                                     } else if (data.getData() != null) {
                                         // Handle single file
-                                        mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
+                                        results = new Uri[] { data.getData() };
                                     }
                                 }
-                            } else {
-                                mFilePathCallback.onReceiveValue(null);
                             }
-                            mFilePathCallback = null;
+                            if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
+                                clearActiveFileChooserRequest(request);
+                            }
                         }
                     )
                     .launch(Intent.createChooser(intent, "Select File"));
@@ -4154,26 +4218,29 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                             "file_chooser",
                             new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
                             (result) -> {
+                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                    return;
+                                }
+                                Uri[] results = null;
                                 if (result.getResultCode() == Activity.RESULT_OK) {
                                     Intent data = result.getData();
                                     if (data != null) {
                                         if (data.getClipData() != null) {
                                             // Handle multiple files
                                             int count = data.getClipData().getItemCount();
-                                            Uri[] results = new Uri[count];
+                                            results = new Uri[count];
                                             for (int i = 0; i < count; i++) {
                                                 results[i] = data.getClipData().getItemAt(i).getUri();
                                             }
-                                            mFilePathCallback.onReceiveValue(results);
                                         } else if (data.getData() != null) {
                                             // Handle single file
-                                            mFilePathCallback.onReceiveValue(new Uri[] { data.getData() });
+                                            results = new Uri[] { data.getData() };
                                         }
                                     }
-                                } else {
-                                    mFilePathCallback.onReceiveValue(null);
                                 }
-                                mFilePathCallback = null;
+                                if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
+                                    clearActiveFileChooserRequest(request);
+                                }
                             }
                         )
                         .launch(Intent.createChooser(intent, "Select File"));
@@ -4184,9 +4251,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             } catch (ActivityNotFoundException ex) {
                 // If still failing, report error
                 Log.e("InAppBrowser", "No app can handle file picker", ex);
-                if (mFilePathCallback != null) {
-                    mFilePathCallback.onReceiveValue(null);
-                    mFilePathCallback = null;
+                if (FileChooserRequestSupport.cancelIfActive(request, activeFileChooserRequest)) {
+                    clearActiveFileChooserRequest(request);
                 }
             }
         }
@@ -6258,11 +6324,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
 
                 // Clear any pending callbacks to prevent memory leaks
-                if (mFilePathCallback != null) {
-                    mFilePathCallback.onReceiveValue(null);
-                    mFilePathCallback = null;
+                if (activeFileChooserRequest != null) {
+                    FileChooserRequestSupport.cancel(activeFileChooserRequest);
+                    activeFileChooserRequest = null;
+                    syncFileChooserPublicFields();
                 }
-                tempCameraUri = null;
 
                 // Clear file inputs for security/privacy before destroying WebView
                 try {
