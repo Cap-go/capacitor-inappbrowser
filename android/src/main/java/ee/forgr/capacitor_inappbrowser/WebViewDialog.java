@@ -3513,7 +3513,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        boolean layoutBehindNavigationBar = SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION.SDK_INT, isEdgeToEdge);
+        boolean layoutBehindNavigationBar =
+            !backLayerActive && SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION.SDK_INT, isEdgeToEdge);
         boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(
             _options.getEnabledSafeMargin(),
             isEdgeToEdge,
