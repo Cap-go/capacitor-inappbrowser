@@ -20,7 +20,6 @@ import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebView;
-import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -63,8 +62,7 @@ import org.json.JSONObject;
         @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }),
         @Permission(alias = "microphone", strings = { Manifest.permission.RECORD_AUDIO }),
         @Permission(alias = "storage", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
-    },
-    requestCodes = { WebViewDialog.FILE_CHOOSER_REQUEST_CODE }
+    }
 )
 public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.PermissionHandler {
 
@@ -108,7 +106,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     private boolean currentPermissionNeedsCamera = false;
     private boolean currentPermissionNeedsMicrophone = false;
 
-    private ActivityResultLauncher<Intent> fileChooserLauncher;
     private ActivityResultLauncher<String[]> webPermissionLauncher;
     private PluginCall pendingCameraPermissionCall;
 
@@ -118,10 +115,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     @Override
     public void load() {
         super.load();
-        fileChooserLauncher = getActivity().registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            this::handleFileChooserResult
-        );
         webPermissionLauncher = getActivity().registerForActivityResult(
             new ActivityResultContracts.RequestMultiplePermissions(),
             this::handleWebPermissionResult
@@ -525,59 +518,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return targetWebViews;
     }
 
-    private WebViewDialog findFileChooserDialog() {
-        if (activeWebViewId != null) {
-            WebViewDialog dialog = webViewDialogs.get(activeWebViewId);
-            if (dialog != null && dialog.mFilePathCallback != null) {
-                return dialog;
-            }
-        }
-
-        if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
-            return webViewDialog;
-        }
-
-        for (WebViewDialog dialog : webViewDialogs.values()) {
-            if (dialog != null && dialog.mFilePathCallback != null) {
-                return dialog;
-            }
-        }
-
-        return null;
-    }
-
-    private void handleFileChooserResult(ActivityResult result) {
-        WebViewDialog webViewDialog = findFileChooserDialog();
-        if (webViewDialog != null && webViewDialog.mFilePathCallback != null) {
-            Uri[] results = null;
-            Intent data = result.getData();
-
-            if (result.getResultCode() == Activity.RESULT_OK) {
-                // Handle camera capture result
-                if (webViewDialog.tempCameraUri != null && (data == null || data.getData() == null)) {
-                    results = new Uri[] { webViewDialog.tempCameraUri };
-                }
-                // Handle regular file picker result
-                else if (data != null) {
-                    if (data.getClipData() != null) {
-                        // Handle multiple files
-                        int count = data.getClipData().getItemCount();
-                        results = new Uri[count];
-                        for (int i = 0; i < count; i++) {
-                            results[i] = data.getClipData().getItemAt(i).getUri();
-                        }
-                    } else if (data.getData() != null) {
-                        // Handle single file
-                        results = new Uri[] { data.getData() };
-                    }
-                }
-            }
-
-            // Send the result to WebView and clean up
-            webViewDialog.completeLegacyFileChooserResult(results);
-        }
-    }
-
     public void handleMicrophonePermissionRequest(PermissionRequest request) {
         if (request == null) {
             return;
@@ -796,6 +736,15 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         );
     }
 
+    private CustomTabColorSchemeParams buildCustomTabColorScheme(int colorInt) {
+        return applyCustomTabNavigationBarColor(new CustomTabColorSchemeParams.Builder().setToolbarColor(colorInt), colorInt).build();
+    }
+
+    @SuppressWarnings("deprecation")
+    private CustomTabColorSchemeParams.Builder applyCustomTabNavigationBarColor(CustomTabColorSchemeParams.Builder builder, int colorInt) {
+        return builder.setNavigationBarColor(colorInt);
+    }
+
     @PluginMethod
     public void open(PluginCall call) {
         String url = call.getString("url");
@@ -828,10 +777,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         if (toolbarColor != null) {
             try {
                 int colorInt = Color.parseColor(toolbarColor);
-                CustomTabColorSchemeParams colorParams = new CustomTabColorSchemeParams.Builder()
-                    .setToolbarColor(colorInt)
-                    .setNavigationBarColor(colorInt)
-                    .build();
+                CustomTabColorSchemeParams colorParams = buildCustomTabColorScheme(colorInt);
                 builder.setDefaultColorSchemeParams(colorParams);
                 builder.setColorSchemeParams(CustomTabsIntent.COLOR_SCHEME_DARK, colorParams);
             } catch (IllegalArgumentException e) {
