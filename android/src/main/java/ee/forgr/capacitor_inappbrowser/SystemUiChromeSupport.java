@@ -62,7 +62,7 @@ final class SystemUiChromeSupport {
         }
 
         if (edgeToEdge) {
-            WindowCompat.enableEdgeToEdge(window);
+            setDecorFitsSystemWindows(window, false);
             if (shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
                 applyLegacySystemBarColors(window, Color.TRANSPARENT, Color.TRANSPARENT);
             }
