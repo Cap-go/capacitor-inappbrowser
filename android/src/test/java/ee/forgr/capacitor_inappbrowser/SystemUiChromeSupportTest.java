@@ -26,4 +26,11 @@ public class SystemUiChromeSupportTest {
         assertTrue(SystemUiChromeSupport.shouldUsePreApi30LayoutFlags(Build.VERSION_CODES.Q));
         assertFalse(SystemUiChromeSupport.shouldUsePreApi30LayoutFlags(Build.VERSION_CODES.R));
     }
+
+    @Test
+    public void layoutBehindNavigationBarOnlyOnPreApi30NonEdgeToEdge() {
+        assertTrue(SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION_CODES.Q, false));
+        assertFalse(SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION_CODES.R, false));
+        assertFalse(SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION_CODES.Q, true));
+    }
 }

@@ -30,6 +30,10 @@ final class SystemUiChromeSupport {
         return sdkInt < Build.VERSION_CODES.R;
     }
 
+    static boolean usesLayoutBehindNavigationBar(int sdkInt, boolean edgeToEdge) {
+        return !edgeToEdge && shouldUsePreApi30LayoutFlags(sdkInt);
+    }
+
     static void setDecorFitsSystemWindows(Window window, boolean decorFitsSystemWindows) {
         if (window == null) {
             return;

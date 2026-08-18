@@ -348,6 +348,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         );
         dialog.setInstanceId(webViewId);
         dialog.activity = CapgoInAppBrowserPlugin.this.getActivity();
+        dialog.bindToHostActivity();
         registerWebView(webViewId, dialog, makeActive);
         return dialog;
     }
@@ -742,6 +743,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     @SuppressWarnings("deprecation")
     private CustomTabColorSchemeParams.Builder applyCustomTabNavigationBarColor(CustomTabColorSchemeParams.Builder builder, int colorInt) {
+        // androidx.browser 1.9.0 still exposes only setNavigationBarColor; no non-deprecated replacement.
         return builder.setNavigationBarColor(colorInt);
     }
 

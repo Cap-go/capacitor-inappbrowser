@@ -70,7 +70,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.activity.ComponentActivity;
-import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -417,9 +416,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     FileChooserRequestSupport.FileChooserRequest activeFileChooserRequest;
     private ActivityResultLauncher<Intent> cameraCaptureLauncher;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
-    private String cameraCaptureLauncherKey;
-    private String fileChooserLauncherKey;
-    private OnBackPressedCallback backPressedCallback;
     private boolean openWebViewResolved;
     private boolean isDismissing = false;
     private PermissionRequest pendingCameraLaunchPermissionRequest;
@@ -452,6 +448,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     public void setInstanceId(String id) {
         this.instanceId = id != null ? id : "";
+    }
+
+    void bindToHostActivity() {
+        ensureFileChooserLaunchers();
+        registerDialogBackHandler();
     }
 
     public String getInstanceId() {
@@ -691,7 +692,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             super.hide();
         }
         refreshInsetsForHostingLayer();
-        syncBackPressedCallbackEnabled();
         return true;
     }
 
@@ -706,7 +706,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
         applyDimensions();
         refreshInsetsForHostingLayer();
-        syncBackPressedCallbackEnabled();
     }
 
     /**
@@ -2852,44 +2851,35 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         // Capacitor activities handle orientation themselves; refresh dialog layout explicitly.
-        ensureFileChooserLaunchers();
-        registerBackPressedHandler();
         registerConfigurationCallbacks();
     }
 
-    private void registerBackPressedHandler() {
-        if (backPressedCallback != null || !(activity instanceof ComponentActivity componentActivity)) {
-            return;
-        }
-
-        backPressedCallback = new OnBackPressedCallback(false) {
-            @Override
-            public void handleOnBackPressed() {
-                handleBrowserBackNavigation();
+    private void registerDialogBackHandler() {
+        setOnKeyListener((dialogInterface, keyCode, event) -> {
+            if (keyCode != KeyEvent.KEYCODE_BACK) {
+                return false;
             }
-        };
-        componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity, backPressedCallback);
-        syncBackPressedCallbackEnabled();
+            if (event.getAction() != KeyEvent.ACTION_UP) {
+                return true;
+            }
+            if (!shouldConsumeBackPress()) {
+                return false;
+            }
+            handleBrowserBackNavigation();
+            return true;
+        });
     }
 
     private boolean shouldConsumeBackPress() {
         return isShowing() && !isHiddenModeActive && !backLayerActive;
     }
 
-    private void syncBackPressedCallbackEnabled() {
-        if (backPressedCallback != null) {
-            backPressedCallback.setEnabled(shouldConsumeBackPress());
-        }
-    }
-
-    private void unregisterBackPressedHandler() {
-        if (backPressedCallback != null) {
-            backPressedCallback.remove();
-            backPressedCallback = null;
-        }
-    }
-
     private void handleBrowserBackNavigation() {
+        if (_options == null) {
+            dismiss();
+            return;
+        }
+
         if (
             _webView != null &&
             _webView.canGoBack() &&
@@ -2904,7 +2894,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         String currentUrl = getUrl();
-        _options.getCallbacks().closeEvent(currentUrl);
+        if (_options.getCallbacks() != null) {
+            _options.getCallbacks().closeEvent(currentUrl);
+        }
         dismiss();
     }
 
@@ -2959,7 +2951,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         isHiddenModeActive = true;
-        syncBackPressedCallbackEnabled();
     }
 
     private void restoreVisibleMode() {
@@ -2997,7 +2988,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
-        syncBackPressedCallbackEnabled();
     }
 
     public void setHidden(boolean hidden) {
@@ -3040,7 +3030,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_options != null) {
             _options.setHidden(hidden);
         }
-        syncBackPressedCallbackEnabled();
     }
 
     public boolean isHiddenModeActive() {
@@ -3524,7 +3513,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isEdgeToEdge);
+        boolean layoutBehindNavigationBar = SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION.SDK_INT, isEdgeToEdge);
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(
+            _options.getEnabledSafeMargin(),
+            isEdgeToEdge,
+            layoutBehindNavigationBar
+        );
         int statusBarTop = SafeAreaInsetsSupport.resolveStatusBarTop(
             bars.top,
             bars.bottom,
@@ -4105,21 +4099,19 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         String launcherSuffix = (instanceId != null && !instanceId.isEmpty() ? instanceId + "_" : "") + Integer.toHexString(hashCode());
         if (cameraCaptureLauncher == null) {
-            cameraCaptureLauncherKey = "inappbrowser_camera_capture_" + launcherSuffix;
             cameraCaptureLauncher = componentActivity
                 .getActivityResultRegistry()
                 .register(
-                    cameraCaptureLauncherKey,
+                    "inappbrowser_camera_capture_" + launcherSuffix,
                     new ActivityResultContracts.StartActivityForResult(),
                     this::handleCameraCaptureActivityResult
                 );
         }
         if (fileChooserLauncher == null) {
-            fileChooserLauncherKey = "inappbrowser_file_chooser_" + launcherSuffix;
             fileChooserLauncher = componentActivity
                 .getActivityResultRegistry()
                 .register(
-                    fileChooserLauncherKey,
+                    "inappbrowser_file_chooser_" + launcherSuffix,
                     new ActivityResultContracts.StartActivityForResult(),
                     this::handleFileChooserActivityResult
                 );
@@ -4127,10 +4119,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void clearActivityResultLaunchers() {
-        cameraCaptureLauncherKey = null;
-        cameraCaptureLauncher = null;
-        fileChooserLauncherKey = null;
-        fileChooserLauncher = null;
+        if (cameraCaptureLauncher != null) {
+            cameraCaptureLauncher.unregister();
+            cameraCaptureLauncher = null;
+        }
+        if (fileChooserLauncher != null) {
+            fileChooserLauncher.unregister();
+            fileChooserLauncher = null;
+        }
     }
 
     private void handleCameraCaptureActivityResult(ActivityResult result) {
@@ -6384,7 +6380,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         // Clear any remaining proxied requests
         proxiedRequestsHashmap.clear();
 
-        unregisterBackPressedHandler();
         clearActivityResultLaunchers();
 
         try {
