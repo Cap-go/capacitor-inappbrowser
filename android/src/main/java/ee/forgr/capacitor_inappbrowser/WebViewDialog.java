@@ -4103,8 +4103,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        String launcherSuffix =
-            (instanceId != null && !instanceId.isEmpty() ? instanceId + "_" : "") + Integer.toHexString(hashCode());
+        String launcherSuffix = (instanceId != null && !instanceId.isEmpty() ? instanceId + "_" : "") + Integer.toHexString(hashCode());
         if (cameraCaptureLauncher == null) {
             cameraCaptureLauncherKey = "inappbrowser_camera_capture_" + launcherSuffix;
             cameraCaptureLauncher = componentActivity
