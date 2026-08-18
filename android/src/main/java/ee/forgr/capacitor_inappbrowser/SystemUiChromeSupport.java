@@ -63,10 +63,7 @@ final class SystemUiChromeSupport {
 
         if (edgeToEdge) {
             setDecorFitsSystemWindows(window, false);
-            if (shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
-                applyLegacySystemBarColors(window, Color.TRANSPARENT, Color.TRANSPARENT);
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        } else if (!shouldUsePreApi30LayoutFlags(Build.VERSION.SDK_INT)) {
             setDecorFitsSystemWindows(window, true);
             applyLegacySystemBarColors(window, statusBarColor, navigationBarColor);
         } else {

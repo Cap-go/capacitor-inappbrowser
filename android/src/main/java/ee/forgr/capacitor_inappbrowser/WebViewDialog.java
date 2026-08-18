@@ -417,6 +417,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     FileChooserRequestSupport.FileChooserRequest activeFileChooserRequest;
     private ActivityResultLauncher<Intent> cameraCaptureLauncher;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
+    private String cameraCaptureLauncherKey;
+    private String fileChooserLauncherKey;
     private OnBackPressedCallback backPressedCallback;
     private boolean openWebViewResolved;
     private boolean isDismissing = false;
@@ -689,6 +691,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             super.hide();
         }
         refreshInsetsForHostingLayer();
+        syncBackPressedCallbackEnabled();
         return true;
     }
 
@@ -703,6 +706,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
         applyDimensions();
         refreshInsetsForHostingLayer();
+        syncBackPressedCallbackEnabled();
     }
 
     /**
@@ -2858,16 +2862,24 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        backPressedCallback = new OnBackPressedCallback(true) {
+        backPressedCallback = new OnBackPressedCallback(false) {
             @Override
             public void handleOnBackPressed() {
-                if (!isShowing()) {
-                    return;
-                }
                 handleBrowserBackNavigation();
             }
         };
         componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity, backPressedCallback);
+        syncBackPressedCallbackEnabled();
+    }
+
+    private boolean shouldConsumeBackPress() {
+        return isShowing() && !isHiddenModeActive && !backLayerActive;
+    }
+
+    private void syncBackPressedCallbackEnabled() {
+        if (backPressedCallback != null) {
+            backPressedCallback.setEnabled(shouldConsumeBackPress());
+        }
     }
 
     private void unregisterBackPressedHandler() {
@@ -2947,6 +2959,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         isHiddenModeActive = true;
+        syncBackPressedCallbackEnabled();
     }
 
     private void restoreVisibleMode() {
@@ -2984,6 +2997,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
+        syncBackPressedCallbackEnabled();
     }
 
     public void setHidden(boolean hidden) {
@@ -3026,6 +3040,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (_options != null) {
             _options.setHidden(hidden);
         }
+        syncBackPressedCallbackEnabled();
     }
 
     public boolean isHiddenModeActive() {
@@ -4088,27 +4103,35 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        String launcherSuffix = instanceId != null && !instanceId.isEmpty() ? instanceId : String.valueOf(hashCode());
+        String launcherSuffix =
+            (instanceId != null && !instanceId.isEmpty() ? instanceId + "_" : "") + Integer.toHexString(hashCode());
         if (cameraCaptureLauncher == null) {
+            cameraCaptureLauncherKey = "inappbrowser_camera_capture_" + launcherSuffix;
             cameraCaptureLauncher = componentActivity
                 .getActivityResultRegistry()
                 .register(
-                    "inappbrowser_camera_capture_" + launcherSuffix,
-                    componentActivity,
+                    cameraCaptureLauncherKey,
                     new ActivityResultContracts.StartActivityForResult(),
                     this::handleCameraCaptureActivityResult
                 );
         }
         if (fileChooserLauncher == null) {
+            fileChooserLauncherKey = "inappbrowser_file_chooser_" + launcherSuffix;
             fileChooserLauncher = componentActivity
                 .getActivityResultRegistry()
                 .register(
-                    "inappbrowser_file_chooser_" + launcherSuffix,
-                    componentActivity,
+                    fileChooserLauncherKey,
                     new ActivityResultContracts.StartActivityForResult(),
                     this::handleFileChooserActivityResult
                 );
         }
+    }
+
+    private void clearActivityResultLaunchers() {
+        cameraCaptureLauncherKey = null;
+        cameraCaptureLauncher = null;
+        fileChooserLauncherKey = null;
+        fileChooserLauncher = null;
     }
 
     private void handleCameraCaptureActivityResult(ActivityResult result) {
@@ -6363,6 +6386,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         proxiedRequestsHashmap.clear();
 
         unregisterBackPressedHandler();
+        clearActivityResultLaunchers();
 
         try {
             super.dismiss();
