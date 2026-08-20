@@ -69,7 +69,9 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
+import androidx.activity.ComponentActivity;
 import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.FileProvider;
@@ -409,10 +411,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private boolean preShowInjectedAtDocumentStart = false;
 
     public PermissionRequest currentPermissionRequest;
-    public static final int FILE_CHOOSER_REQUEST_CODE = 1000;
     public ValueCallback<Uri> mUploadMessage;
     public ValueCallback<Uri[]> mFilePathCallback;
     FileChooserRequestSupport.FileChooserRequest activeFileChooserRequest;
+    private ActivityResultLauncher<Intent> cameraCaptureLauncher;
+    private ActivityResultLauncher<Intent> fileChooserLauncher;
     private boolean openWebViewResolved;
     private boolean isDismissing = false;
     private PermissionRequest pendingCameraLaunchPermissionRequest;
@@ -445,6 +448,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     public void setInstanceId(String id) {
         this.instanceId = id != null ? id : "";
+    }
+
+    void bindToHostActivity() {
+        ensureFileChooserLaunchers();
+        registerDialogBackHandler();
     }
 
     public String getInstanceId() {
@@ -2116,10 +2124,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     public void presentWebView() {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setCancelable(true);
-        Objects.requireNonNull(getWindow()).setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
-        );
         setContentView(R.layout.activity_browser);
 
         // If custom dimensions are set, configure for touch passthrough
@@ -2143,18 +2147,10 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             if (appBar != null) appBar.setFitsSystemWindows(true);
         }
 
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // Set dimensions if specified, otherwise fullscreen
+        applyDimensions();
 
-        // Make status bar transparent
-        if (getWindow() != null) {
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-
-            // Add FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS flag to the window
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-
-            // On Android 30+ clear FLAG_TRANSLUCENT_STATUS flag
-            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        }
+        SystemUiChromeSupport.prepareInitialDialogWindow(getWindow());
 
         WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
             getWindow(),
@@ -2205,9 +2201,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     }
                 });
         }
-
-        // Set dimensions if specified, otherwise fullscreen
-        applyDimensions();
 
         this._webView = findViewById(R.id.browser_view);
 
@@ -2583,38 +2576,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                                 }
 
                                 try {
-                                    if (activity instanceof androidx.activity.ComponentActivity) {
-                                        androidx.activity.ComponentActivity componentActivity =
-                                            (androidx.activity.ComponentActivity) activity;
-                                        componentActivity
-                                            .getActivityResultRegistry()
-                                            .register(
-                                                "camera_capture",
-                                                new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                                                (result) -> {
-                                                    if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                                        return;
-                                                    }
-                                                    Uri[] results = null;
-                                                    if (result.getResultCode() == Activity.RESULT_OK && request.tempCameraUri != null) {
-                                                        results = new Uri[] { request.tempCameraUri };
-                                                    }
-                                                    if (
-                                                        FileChooserRequestSupport.completeIfActive(
-                                                            request,
-                                                            activeFileChooserRequest,
-                                                            results
-                                                        )
-                                                    ) {
-                                                        request.tempCameraUri = null;
-                                                        clearActiveFileChooserRequest(request);
-                                                    }
-                                                }
-                                            )
-                                            .launch(takePictureIntent);
+                                    ensureFileChooserLaunchers();
+                                    if (cameraCaptureLauncher != null) {
+                                        cameraCaptureLauncher.launch(takePictureIntent);
                                     } else {
-                                        // Fallback for non-ComponentActivity
-                                        activity.startActivityForResult(takePictureIntent, FILE_CHOOSER_REQUEST_CODE);
+                                        Log.e("InAppBrowser", "ComponentActivity required for camera capture, falling back to file picker");
+                                        fallbackToFilePicker(request);
                                     }
                                 } catch (SecurityException e) {
                                     Log.e("InAppBrowser", "Security exception launching camera: " + e.getMessage(), e);
@@ -2887,6 +2854,52 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         registerConfigurationCallbacks();
     }
 
+    private void registerDialogBackHandler() {
+        setOnKeyListener((dialogInterface, keyCode, event) -> {
+            if (keyCode != KeyEvent.KEYCODE_BACK) {
+                return false;
+            }
+            if (event.getAction() != KeyEvent.ACTION_UP) {
+                return true;
+            }
+            if (!shouldConsumeBackPress()) {
+                return false;
+            }
+            handleBrowserBackNavigation();
+            return true;
+        });
+    }
+
+    private boolean shouldConsumeBackPress() {
+        return isShowing() && !isHiddenModeActive && !backLayerActive;
+    }
+
+    private void handleBrowserBackNavigation() {
+        if (_options == null) {
+            dismiss();
+            return;
+        }
+
+        if (
+            _webView != null &&
+            _webView.canGoBack() &&
+            (TextUtils.equals(_options.getToolbarType(), "navigation") || _options.getActiveNativeNavigationForWebview())
+        ) {
+            _webView.goBack();
+            return;
+        }
+
+        if (_options.getDisableGoBackOnNativeApplication()) {
+            return;
+        }
+
+        String currentUrl = getUrl();
+        if (_options.getCallbacks() != null) {
+            _options.getCallbacks().closeEvent(currentUrl);
+        }
+        dismiss();
+    }
+
     private void applyHiddenMode() {
         Window window = getWindow();
         if (window == null) {
@@ -3033,7 +3046,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         // Check if we need Android 15+ specific fixes
-        boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
+        boolean isAndroid15Plus = SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT);
 
         View toolbarView = findViewById(R.id.tool_bar);
 
@@ -3062,69 +3075,54 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         // Handle window decoration - version-specific handling
         if (getWindow() != null) {
+            View decorView = getWindow().getDecorView();
+            Integer statusBarColor = null;
+            Integer navigationBarColor = Color.TRANSPARENT;
+            Boolean lightStatusBars = null;
+
             if (isAndroid15Plus) {
-                // Android 15+: Use edge-to-edge with proper insets handling
-                getWindow().setDecorFitsSystemWindows(false);
-                getWindow().setStatusBarColor(Color.TRANSPARENT);
-                getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-                WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-
-                // Set status bar text color
                 if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
                     try {
                         int backgroundColor = Color.parseColor(_options.getToolbarColor());
-                        boolean isDarkBackground = isDarkColor(backgroundColor);
-                        controller.setAppearanceLightStatusBars(!isDarkBackground);
+                        lightStatusBars = !isDarkColor(backgroundColor);
                     } catch (IllegalArgumentException e) {
                         // Ignore color parsing errors
                     }
                 }
-            } else if (Build.VERSION.SDK_INT >= 30) {
-                // Android 11-14: Keep navigation bar transparent but respect status bar
-                getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-                WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
-
-                // Set status bar color to match toolbar or use system default
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
                     try {
                         int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                        getWindow().setStatusBarColor(toolbarColor);
-                        boolean isDarkBackground = isDarkColor(toolbarColor);
-                        controller.setAppearanceLightStatusBars(!isDarkBackground);
+                        statusBarColor = toolbarColor;
+                        lightStatusBars = !isDarkColor(toolbarColor);
                     } catch (IllegalArgumentException e) {
-                        // Follow system theme if color parsing fails
                         boolean isDarkTheme = isDarkThemeEnabled();
-                        int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                        getWindow().setStatusBarColor(statusBarColor);
-                        controller.setAppearanceLightStatusBars(!isDarkTheme);
+                        statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+                        lightStatusBars = !isDarkTheme;
                     }
                 } else {
-                    // Follow system theme if no toolbar color provided
                     boolean isDarkTheme = isDarkThemeEnabled();
-                    int statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                    getWindow().setStatusBarColor(statusBarColor);
-                    controller.setAppearanceLightStatusBars(!isDarkTheme);
+                    statusBarColor = isDarkTheme ? Color.BLACK : Color.WHITE;
+                    lightStatusBars = !isDarkTheme;
                 }
             } else {
-                // Pre-Android 11: Use deprecated flags for edge-to-edge navigation bar only
-                getWindow()
-                    .getDecorView()
-                    .setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-
-                getWindow().setNavigationBarColor(Color.TRANSPARENT);
-
-                // Set status bar color to match toolbar
                 if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
                     try {
-                        int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                        getWindow().setStatusBarColor(toolbarColor);
+                        statusBarColor = Color.parseColor(_options.getToolbarColor());
                     } catch (IllegalArgumentException e) {
                         // Use system default
                     }
                 }
             }
+
+            SystemUiChromeSupport.applyDialogWindowChrome(
+                getWindow(),
+                decorView,
+                isAndroid15Plus,
+                statusBarColor,
+                navigationBarColor,
+                lightStatusBars
+            );
         }
 
         requestSafeAreaInsets();
@@ -3443,7 +3441,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        boolean isAndroid15Plus = Build.VERSION.SDK_INT >= 35;
+        boolean isAndroid15Plus = SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT);
         View toolbarView = findBrowserContentDescendant(R.id.tool_bar);
         applyWindowInsetsToWebView(windowInsets, isAndroid15Plus, toolbarView);
     }
@@ -3515,7 +3513,13 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(_options.getEnabledSafeMargin(), isEdgeToEdge);
+        boolean layoutBehindNavigationBar =
+            !backLayerActive && SystemUiChromeSupport.usesLayoutBehindNavigationBar(Build.VERSION.SDK_INT, isEdgeToEdge);
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(
+            _options.getEnabledSafeMargin(),
+            isEdgeToEdge,
+            layoutBehindNavigationBar
+        );
         int statusBarTop = SafeAreaInsetsSupport.resolveStatusBarTop(
             bars.top,
             bars.bottom,
@@ -4086,6 +4090,88 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
     }
 
+    private void ensureFileChooserLaunchers() {
+        if (!(activity instanceof ComponentActivity componentActivity)) {
+            return;
+        }
+        if (fileChooserLauncher != null && cameraCaptureLauncher != null) {
+            return;
+        }
+
+        String launcherSuffix = (instanceId != null && !instanceId.isEmpty() ? instanceId + "_" : "") + Integer.toHexString(hashCode());
+        if (cameraCaptureLauncher == null) {
+            cameraCaptureLauncher = componentActivity
+                .getActivityResultRegistry()
+                .register(
+                    "inappbrowser_camera_capture_" + launcherSuffix,
+                    new ActivityResultContracts.StartActivityForResult(),
+                    this::handleCameraCaptureActivityResult
+                );
+        }
+        if (fileChooserLauncher == null) {
+            fileChooserLauncher = componentActivity
+                .getActivityResultRegistry()
+                .register(
+                    "inappbrowser_file_chooser_" + launcherSuffix,
+                    new ActivityResultContracts.StartActivityForResult(),
+                    this::handleFileChooserActivityResult
+                );
+        }
+    }
+
+    private void clearActivityResultLaunchers() {
+        if (cameraCaptureLauncher != null) {
+            cameraCaptureLauncher.unregister();
+            cameraCaptureLauncher = null;
+        }
+        if (fileChooserLauncher != null) {
+            fileChooserLauncher.unregister();
+            fileChooserLauncher = null;
+        }
+    }
+
+    private void handleCameraCaptureActivityResult(ActivityResult result) {
+        FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
+        if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+            return;
+        }
+
+        Uri[] results = null;
+        if (result.getResultCode() == Activity.RESULT_OK && request.tempCameraUri != null) {
+            results = new Uri[] { request.tempCameraUri };
+        }
+        if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
+            request.tempCameraUri = null;
+            clearActiveFileChooserRequest(request);
+        }
+    }
+
+    private void handleFileChooserActivityResult(ActivityResult result) {
+        FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
+        if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+            return;
+        }
+
+        Uri[] results = null;
+        if (result.getResultCode() == Activity.RESULT_OK) {
+            Intent data = result.getData();
+            if (data != null) {
+                if (data.getClipData() != null) {
+                    int count = data.getClipData().getItemCount();
+                    results = new Uri[count];
+                    for (int i = 0; i < count; i++) {
+                        results[i] = data.getClipData().getItemAt(i).getUri();
+                    }
+                } else if (data.getData() != null) {
+                    results = new Uri[] { data.getData() };
+                }
+            }
+        }
+        if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
+            clearActiveFileChooserRequest(request);
+        }
+    }
+
     private void beginFileChooserRequest(ValueCallback<Uri[]> filePathCallback, String[] acceptTypes, boolean isMultiple) {
         if (activeFileChooserRequest != null) {
             FileChooserRequestSupport.cancel(activeFileChooserRequest);
@@ -4106,17 +4192,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         tempCameraUri = activeFileChooserRequest != null ? activeFileChooserRequest.tempCameraUri : null;
     }
 
-    void completeLegacyFileChooserResult(Uri[] results) {
-        FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
-        if (request == null) {
-            return;
-        }
-        if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
-            request.tempCameraUri = null;
-            clearActiveFileChooserRequest(request);
-        }
-    }
-
     private void openFileChooser(FileChooserRequestSupport.FileChooserRequest request) {
         if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
             return;
@@ -4127,88 +4202,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Log.d("InAppBrowser", "File picker using action: " + intent.getAction() + ", MIME types: " + mimeTypes);
 
         try {
-            if (activity instanceof androidx.activity.ComponentActivity) {
-                androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-                componentActivity
-                    .getActivityResultRegistry()
-                    .register(
-                        "file_chooser",
-                        new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                        (result) -> {
-                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                return;
-                            }
-                            Uri[] results = null;
-                            if (result.getResultCode() == Activity.RESULT_OK) {
-                                Intent data = result.getData();
-                                if (data != null) {
-                                    if (data.getClipData() != null) {
-                                        // Handle multiple files
-                                        int count = data.getClipData().getItemCount();
-                                        results = new Uri[count];
-                                        for (int i = 0; i < count; i++) {
-                                            results[i] = data.getClipData().getItemAt(i).getUri();
-                                        }
-                                    } else if (data.getData() != null) {
-                                        // Handle single file
-                                        results = new Uri[] { data.getData() };
-                                    }
-                                }
-                            }
-                            if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
-                                clearActiveFileChooserRequest(request);
-                            }
-                        }
-                    )
-                    .launch(Intent.createChooser(intent, "Select File"));
-            } else {
-                // Fallback for non-ComponentActivity
-                activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
-            }
+            launchFileChooserIntent(Intent.createChooser(intent, "Select File"), request);
         } catch (ActivityNotFoundException e) {
             // If no app can handle the specific MIME type, try with a more generic one
             Log.e("InAppBrowser", "No app available for types: " + mimeTypes + ", trying with */*");
             intent.setType("*/*");
             intent.removeExtra(Intent.EXTRA_MIME_TYPES);
             try {
-                if (activity instanceof androidx.activity.ComponentActivity) {
-                    androidx.activity.ComponentActivity componentActivity = (androidx.activity.ComponentActivity) activity;
-                    componentActivity
-                        .getActivityResultRegistry()
-                        .register(
-                            "file_chooser",
-                            new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                            (result) -> {
-                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                    return;
-                                }
-                                Uri[] results = null;
-                                if (result.getResultCode() == Activity.RESULT_OK) {
-                                    Intent data = result.getData();
-                                    if (data != null) {
-                                        if (data.getClipData() != null) {
-                                            // Handle multiple files
-                                            int count = data.getClipData().getItemCount();
-                                            results = new Uri[count];
-                                            for (int i = 0; i < count; i++) {
-                                                results[i] = data.getClipData().getItemAt(i).getUri();
-                                            }
-                                        } else if (data.getData() != null) {
-                                            // Handle single file
-                                            results = new Uri[] { data.getData() };
-                                        }
-                                    }
-                                }
-                                if (FileChooserRequestSupport.completeIfActive(request, activeFileChooserRequest, results)) {
-                                    clearActiveFileChooserRequest(request);
-                                }
-                            }
-                        )
-                        .launch(Intent.createChooser(intent, "Select File"));
-                } else {
-                    // Fallback for non-ComponentActivity
-                    activity.startActivityForResult(Intent.createChooser(intent, "Select File"), FILE_CHOOSER_REQUEST_CODE);
-                }
+                launchFileChooserIntent(Intent.createChooser(intent, "Select File"), request);
             } catch (ActivityNotFoundException ex) {
                 // If still failing, report error
                 Log.e("InAppBrowser", "No app can handle file picker", ex);
@@ -4217,6 +4218,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                 }
             }
         }
+    }
+
+    private void launchFileChooserIntent(Intent chooserIntent, FileChooserRequestSupport.FileChooserRequest request) {
+        ensureFileChooserLaunchers();
+        if (fileChooserLauncher == null) {
+            Log.e("InAppBrowser", "ComponentActivity required for file chooser");
+            if (FileChooserRequestSupport.cancelIfActive(request, activeFileChooserRequest)) {
+                clearActiveFileChooserRequest(request);
+            }
+            return;
+        }
+        fileChooserLauncher.launch(chooserIntent);
     }
 
     public void reload() {
@@ -4700,8 +4713,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
                 // Also ensure status bar gets the color
                 if (getWindow() != null) {
-                    // Set status bar color
-                    getWindow().setStatusBarColor(toolbarColor);
+                    SystemUiChromeSupport.applyLegacySystemBarColors(getWindow(), toolbarColor, null);
 
                     // Determine proper status bar text color (light or dark icons)
                     boolean isDarkBackground = isDarkColor(toolbarColor);
@@ -6166,21 +6178,6 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     @Override
-    public void onBackPressed() {
-        if (
-            _webView != null &&
-            _webView.canGoBack() &&
-            (TextUtils.equals(_options.getToolbarType(), "navigation") || _options.getActiveNativeNavigationForWebview())
-        ) {
-            _webView.goBack();
-        } else if (!_options.getDisableGoBackOnNativeApplication()) {
-            String currentUrl = getUrl();
-            _options.getCallbacks().closeEvent(currentUrl);
-            super.onBackPressed();
-        }
-    }
-
-    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         // Forward volume key events to the MainActivity
         switch (keyCode) {
@@ -6383,6 +6380,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         // Clear any remaining proxied requests
         proxiedRequestsHashmap.clear();
+
+        clearActivityResultLaunchers();
 
         try {
             super.dismiss();

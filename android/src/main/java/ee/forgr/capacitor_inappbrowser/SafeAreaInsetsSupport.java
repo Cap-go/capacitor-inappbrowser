@@ -122,9 +122,14 @@ final class SafeAreaInsetsSupport {
      * Whether the WebView container must be inset for the bottom system bar. On Android 15+ the dialog
      * is forced edge-to-edge (decorFitsSystemWindows=false), so the window always draws under the
      * navigation bar and insetting is mandatory to keep bottom content on-screen, regardless of the
-     * enabledSafeBottomMargin opt-in that older versions honour.
+     * enabledSafeBottomMargin opt-in that older versions honour. Pre-API 30 windows that lay out behind
+     * a transparent navigation bar need the same treatment.
      */
+    static boolean shouldInsetBottomForContainer(boolean enabledSafeBottomMargin, boolean isEdgeToEdge, boolean layoutBehindNavigationBar) {
+        return enabledSafeBottomMargin || isEdgeToEdge || layoutBehindNavigationBar;
+    }
+
     static boolean shouldInsetBottomForContainer(boolean enabledSafeBottomMargin, boolean isEdgeToEdge) {
-        return enabledSafeBottomMargin || isEdgeToEdge;
+        return shouldInsetBottomForContainer(enabledSafeBottomMargin, isEdgeToEdge, false);
     }
 }
