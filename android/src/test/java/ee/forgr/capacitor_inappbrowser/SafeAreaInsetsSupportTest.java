@@ -133,6 +133,11 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void bottomInsetForcedWhenLayoutBehindTransparentNavigationBar() {
+        assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, false, true));
+    }
+
+    @Test
     public void containerBottomPaddingAppliesNavigationBarWhenForcedByEdgeToEdge() {
         // Opt-in off, but edge-to-edge forces applyBottomInset=true, so the 126px nav bar still insets.
         boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true);
