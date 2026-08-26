@@ -52,6 +52,33 @@ final class BrowsingDataStoreSupportTests: XCTestCase {
         XCTAssertFalse(BrowsingDataStoreSupport.isHostAppWebsiteDataStore(store))
     }
 
+    func testOpenTimeClearingUsesCookiesOnlyWhenRequested() {
+        let dataTypes = BrowsingDataStoreSupport.websiteDataTypesForOpenTimeClearing(
+            clearCookies: true,
+            clearCache: false
+        )
+        XCTAssertEqual(dataTypes, Set([WKWebsiteDataTypeCookies]))
+    }
+
+    func testOpenTimeClearingUsesCacheTypesWhenRequested() {
+        let dataTypes = BrowsingDataStoreSupport.websiteDataTypesForOpenTimeClearing(
+            clearCookies: false,
+            clearCache: true
+        )
+        XCTAssertEqual(
+            dataTypes,
+            Set([WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache])
+        )
+    }
+
+    func testOpenTimeClearingUsesNoTypesWhenDisabled() {
+        let dataTypes = BrowsingDataStoreSupport.websiteDataTypesForOpenTimeClearing(
+            clearCookies: false,
+            clearCache: false
+        )
+        XCTAssertTrue(dataTypes.isEmpty)
+    }
+
     func testDefaultIsolatedStoreIsNotHostAppStoreOnModernOS() {
         let store = BrowsingDataStoreSupport.websiteDataStore(
             persistWebViewData: true,

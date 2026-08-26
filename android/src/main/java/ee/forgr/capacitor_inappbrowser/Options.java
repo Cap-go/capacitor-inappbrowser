@@ -204,6 +204,8 @@ public class Options {
     private boolean captureConsoleLogs = false;
     private boolean handleDownloads = false;
     private boolean persistWebViewData = true;
+    private boolean clearCookiesOnOpen = false;
+    private boolean clearCacheOnOpen = false;
     /** Accepted for API parity with iOS; Android cookies are already process-global. */
     private boolean useSharedDataStore = false;
     private InvisibilityMode invisibilityMode = InvisibilityMode.AWARE;
@@ -318,6 +320,22 @@ public class Options {
 
     public void setPersistWebViewData(boolean persistWebViewData) {
         this.persistWebViewData = persistWebViewData;
+    }
+
+    public boolean getClearCookiesOnOpen() {
+        return clearCookiesOnOpen;
+    }
+
+    public void setClearCookiesOnOpen(boolean clearCookiesOnOpen) {
+        this.clearCookiesOnOpen = clearCookiesOnOpen;
+    }
+
+    public boolean getClearCacheOnOpen() {
+        return clearCacheOnOpen;
+    }
+
+    public void setClearCacheOnOpen(boolean clearCacheOnOpen) {
+        this.clearCacheOnOpen = clearCacheOnOpen;
     }
 
     public boolean getUseSharedDataStore() {
@@ -857,6 +875,8 @@ public class Options {
         copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
         copy.setWidth(width);
         copy.setPersistWebViewData(persistWebViewData);
+        copy.setClearCookiesOnOpen(clearCookiesOnOpen);
+        copy.setClearCacheOnOpen(clearCacheOnOpen);
         copy.setUseSharedDataStore(useSharedDataStore);
         copy.setHeight(height);
         copy.setToBack(toBack);

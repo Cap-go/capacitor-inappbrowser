@@ -784,14 +784,37 @@ export interface OpenWebViewOptions {
    * IndexedDB, and session data.
    *
    * When false, iOS uses a non-persistent `WKWebsiteDataStore`. Android disables per-view cache and
-   * DOM/database storage where the system WebView supports it. Android cookies use the shared
-   * WebView cookie store; clearing them also affects the host WebView, so prefer per-URL cookie
-   * helpers instead of relying on process-global wipes.
+   * database storage where the system WebView supports it while keeping DOM storage available so
+   * SPAs can use `localStorage`. Android cookies use the shared WebView cookie store; clearing them
+   * also affects the host WebView, so prefer per-URL cookie helpers instead of relying on
+   * process-global wipes.
    *
    * @default true
    * @since 8.6.36
    */
   persistWebViewData?: boolean;
+  /**
+   * Clear all cookies from the InAppBrowser data store before the first navigation of this webview.
+   *
+   * Cordova `clearcache: 'yes'` parity. On Android, uses process-global `CookieManager.removeAllCookies()`
+   * and blocks until the wipe completes. On iOS, clears cookies from the webview's `WKWebsiteDataStore`
+   * (isolated plugin store by default). On Web this is a no-op.
+   *
+   * @default false
+   * @since 8.16.0
+   */
+  clearCookiesOnOpen?: boolean;
+  /**
+   * Clear cached website data before the first navigation of this webview.
+   *
+   * Cordova `cleardata: 'yes'` parity. On Android, calls `WebView.clearCache(true)` after the webview
+   * is created. On iOS, removes disk and memory cache from the webview's `WKWebsiteDataStore`.
+   * On Web this is a no-op.
+   *
+   * @default false
+   * @since 8.16.0
+   */
+  clearCacheOnOpen?: boolean;
   /**
    * Share the host Capacitor WebView's website data store (cookies, local storage, etc.).
    *
