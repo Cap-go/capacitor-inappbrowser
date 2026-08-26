@@ -2243,13 +2243,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (!_options.getPersistWebViewData()) {
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.getSettings().setDatabaseEnabled(false);
-            _webView.getSettings().setDomStorageEnabled(false);
             _webView.clearCache(true);
             _webView.clearHistory();
             _webView.clearFormData();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                CookieManager.getInstance().setAcceptThirdPartyCookies(_webView, false);
-            }
         }
         _webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
         injectDocumentStartJavaScriptInterface();
@@ -2783,6 +2779,15 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         Map<String, String> requestHeaders = buildRequestHeadersExcludingUserAgent();
         applyWebViewUserAgent();
+
+        if (_options.getClearCookiesOnOpen() || _options.getClearCacheOnOpen()) {
+            OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation(
+                CookieManager.getInstance(),
+                _webView,
+                _options.getClearCookiesOnOpen(),
+                _options.getClearCacheOnOpen()
+            );
+        }
 
         // Load URL with optional HTTP method and body
         String httpMethod = _options.getHttpMethod();

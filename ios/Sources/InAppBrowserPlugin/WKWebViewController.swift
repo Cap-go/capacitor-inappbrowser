@@ -432,6 +432,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var captureConsoleLogs = false
     open var persistWebViewData = true
     open var useSharedDataStore = false
+    open var clearCookiesOnOpen = false
+    open var clearCacheOnOpen = false
     open var handleDownloads = false
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
@@ -2256,7 +2258,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         if let sourceValue = self.source, !waitsForPopupNavigation {
-            self.load(source: sourceValue)
+            let dataStore = webConfiguration.websiteDataStore
+            BrowsingDataStoreSupport.applyOpenTimeClearing(
+                to: dataStore,
+                clearCookies: clearCookiesOnOpen,
+                clearCache: clearCacheOnOpen
+            ) { [weak self] in
+                guard let self else { return }
+                self.load(source: sourceValue)
+            }
         } else if self.source == nil {
             print("[\(type(of: self))][Error] Invalid url")
         }
@@ -2314,6 +2324,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.initialWebConfiguration = configuration
         self.persistWebViewData = parent.persistWebViewData
         self.useSharedDataStore = parent.useSharedDataStore
+        self.clearCookiesOnOpen = parent.clearCookiesOnOpen
+        self.clearCacheOnOpen = parent.clearCacheOnOpen
         self.enableReloadGesture = parent.enableReloadGesture
         self.disableOverscroll = parent.disableOverscroll
         self.proxyRequests = parent.proxyRequests

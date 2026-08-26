@@ -342,6 +342,37 @@ enum BrowsingDataStoreSupport {
         }
         return []
     }
+
+    static func websiteDataTypesForOpenTimeClearing(clearCookies: Bool, clearCache: Bool) -> Set<String> {
+        var dataTypes = Set<String>()
+        if clearCookies {
+            dataTypes.insert(WKWebsiteDataTypeCookies)
+        }
+        if clearCache {
+            dataTypes.insert(WKWebsiteDataTypeDiskCache)
+            dataTypes.insert(WKWebsiteDataTypeMemoryCache)
+        }
+        return dataTypes
+    }
+
+    static func applyOpenTimeClearing(
+        to dataStore: WKWebsiteDataStore,
+        clearCookies: Bool,
+        clearCache: Bool,
+        completion: @escaping () -> Void
+    ) {
+        let dataTypes = websiteDataTypesForOpenTimeClearing(clearCookies: clearCookies, clearCache: clearCache)
+        guard !dataTypes.isEmpty else {
+            completion()
+            return
+        }
+
+        dataStore.removeData(
+            ofTypes: dataTypes,
+            modifiedSince: Date(timeIntervalSince1970: 0),
+            completionHandler: completion
+        )
+    }
 }
 
 enum ReloadGestureSupport {
@@ -1337,6 +1368,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let handleDownloads = call.getBool("handleDownloads", false)
         let persistWebViewData = call.getBool("persistWebViewData", true)
         let useSharedDataStore = call.getBool("useSharedDataStore", false)
+        let clearCookiesOnOpen = call.getBool("clearCookiesOnOpen", false)
+        let clearCacheOnOpen = call.getBool("clearCacheOnOpen", false)
         let invisibilityModeRaw = call.getString("invisibilityMode", "AWARE")
         self.invisibilityMode = InvisibilityMode(rawValue: invisibilityModeRaw.uppercased()) ?? .aware
 
@@ -1497,6 +1530,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.openBlankTargetInWebView = openBlankTargetInWebView
             webViewController.persistWebViewData = persistWebViewData
             webViewController.useSharedDataStore = useSharedDataStore
+            webViewController.clearCookiesOnOpen = clearCookiesOnOpen
+            webViewController.clearCacheOnOpen = clearCacheOnOpen
             webViewController.setHeaders(headers: headers)
             if let customUserAgent = call.getString("customUserAgent"), !customUserAgent.isEmpty {
                 webViewController.customUserAgent = customUserAgent
