@@ -70,6 +70,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -337,6 +338,12 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private SwipeRefreshLayout swipeRefreshLayout;
     private boolean reloadFromGestureInProgress = false;
     private WebView _webView;
+    // HTML5/iframe fullscreen (e.g. embedded YouTube) routes through WebChromeClient custom views.
+    private View customFullscreenView;
+    private WebChromeClient.CustomViewCallback customViewCallback;
+    private FrameLayout fullscreenContainer;
+    private Window customFullscreenWindow;
+    private OnBackPressedCallback customFullscreenBackCallback;
     private Toolbar _toolbar;
     private Options _options = null;
     private final Context _context;
@@ -2305,6 +2312,17 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                     return super.onConsoleMessage(consoleMessage);
                 }
 
+                // Enable HTML5/iframe fullscreen (e.g. embedded YouTube player fullscreen button).
+                @Override
+                public void onShowCustomView(View view, WebChromeClient.CustomViewCallback callback) {
+                    showCustomFullscreenView(view, callback);
+                }
+
+                @Override
+                public void onHideCustomView() {
+                    exitCustomFullscreenView();
+                }
+
                 // Enable file open dialog
                 @Override
                 public boolean onShowFileChooser(
@@ -2880,6 +2898,11 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void handleBrowserBackNavigation() {
+        if (WebViewCustomFullscreenSupport.shouldConsumeBackPress(customFullscreenView != null)) {
+            exitCustomFullscreenView();
+            return;
+        }
+
         if (_options == null) {
             dismiss();
             return;
@@ -2903,6 +2926,120 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _options.getCallbacks().closeEvent(currentUrl);
         }
         dismiss();
+    }
+
+    // Shows a native fullscreen view requested via the HTML5 Fullscreen API (e.g. embedded YouTube).
+    private void showCustomFullscreenView(View view, WebChromeClient.CustomViewCallback callback) {
+        if (WebViewCustomFullscreenSupport.shouldRejectDuplicateShow(customFullscreenView != null)) {
+            callback.onCustomViewHidden();
+            return;
+        }
+
+        Window window = resolveCustomFullscreenWindow();
+        View decorView = window != null ? window.getDecorView() : null;
+        if (!(decorView instanceof ViewGroup)) {
+            callback.onCustomViewHidden();
+            return;
+        }
+
+        customFullscreenView = view;
+        customViewCallback = callback;
+        customFullscreenWindow = window;
+
+        if (fullscreenContainer == null) {
+            fullscreenContainer = new FrameLayout(getContext());
+            fullscreenContainer.setBackgroundColor(Color.BLACK);
+        } else if (fullscreenContainer.getParent() instanceof ViewGroup oldParent) {
+            oldParent.removeView(fullscreenContainer);
+        }
+        ((ViewGroup) decorView).addView(
+            fullscreenContainer,
+            new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        );
+        fullscreenContainer.addView(
+            view,
+            new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        );
+        fullscreenContainer.setVisibility(View.VISIBLE);
+
+        if (_webView != null) {
+            _webView.setVisibility(View.INVISIBLE);
+        }
+
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        decorView.setSystemUiVisibility(WebViewCustomFullscreenSupport.immersiveFullscreenSystemUiVisibility());
+
+        if (WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(backLayerActive)) {
+            registerCustomFullscreenBackHandler();
+        }
+    }
+
+    private Window resolveCustomFullscreenWindow() {
+        if (WebViewCustomFullscreenSupport.shouldUseHostActivityWindow(backLayerActive) && activity != null) {
+            Window hostWindow = activity.getWindow();
+            if (hostWindow != null) {
+                return hostWindow;
+            }
+        }
+        return getWindow();
+    }
+
+    private void registerCustomFullscreenBackHandler() {
+        if (!(activity instanceof ComponentActivity componentActivity) || customFullscreenBackCallback != null) {
+            return;
+        }
+        customFullscreenBackCallback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (WebViewCustomFullscreenSupport.isCustomFullscreenActive(customFullscreenView)) {
+                    exitCustomFullscreenView();
+                }
+            }
+        };
+        componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity, customFullscreenBackCallback);
+    }
+
+    private void unregisterCustomFullscreenBackHandler() {
+        if (customFullscreenBackCallback != null) {
+            customFullscreenBackCallback.remove();
+            customFullscreenBackCallback = null;
+        }
+    }
+
+    private void exitCustomFullscreenView() {
+        if (!WebViewCustomFullscreenSupport.isCustomFullscreenActive(customFullscreenView)) {
+            return;
+        }
+
+        if (fullscreenContainer != null) {
+            fullscreenContainer.removeView(customFullscreenView);
+            fullscreenContainer.setVisibility(View.GONE);
+            if (fullscreenContainer.getParent() instanceof ViewGroup parent) {
+                parent.removeView(fullscreenContainer);
+            }
+        }
+        if (_webView != null) {
+            _webView.setVisibility(View.VISIBLE);
+        }
+
+        Window window = customFullscreenWindow != null ? customFullscreenWindow : getWindow();
+        if (window != null) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            window.getDecorView().setSystemUiVisibility(WebViewCustomFullscreenSupport.restoredSystemUiVisibility());
+            reapplyInsetsFromWindowRoot();
+            if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
+                refreshEdgeToEdgeChrome();
+            }
+        }
+
+        unregisterCustomFullscreenBackHandler();
+
+        if (customViewCallback != null) {
+            customViewCallback.onCustomViewHidden();
+        }
+        customFullscreenView = null;
+        customViewCallback = null;
+        customFullscreenWindow = null;
     }
 
     private void applyHiddenMode() {
@@ -6260,6 +6397,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
     @Override
     public void dismiss() {
+        exitCustomFullscreenView();
         unregisterConfigurationCallbacks();
         scheduleHostWebViewInsetRestore();
         detachBackLayer();
