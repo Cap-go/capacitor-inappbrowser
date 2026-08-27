@@ -36,4 +36,16 @@ public class WebViewCustomFullscreenSupportTest {
         assertTrue((flags & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
         assertTrue((flags & View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY) != 0);
     }
+
+    @Test
+    public void backLayerModeUsesHostActivityWindow() {
+        assertTrue(WebViewCustomFullscreenSupport.shouldUseHostActivityWindow(true));
+        assertFalse(WebViewCustomFullscreenSupport.shouldUseHostActivityWindow(false));
+    }
+
+    @Test
+    public void backLayerModeRegistersHostBackHandler() {
+        assertTrue(WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(true));
+        assertFalse(WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(false));
+    }
 }

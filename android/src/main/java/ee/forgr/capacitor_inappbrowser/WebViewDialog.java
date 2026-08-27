@@ -70,6 +70,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -341,6 +342,8 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private View customFullscreenView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private FrameLayout fullscreenContainer;
+    private Window customFullscreenWindow;
+    private OnBackPressedCallback customFullscreenBackCallback;
     private Toolbar _toolbar;
     private Options _options = null;
     private final Context _context;
@@ -2932,7 +2935,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             return;
         }
 
-        Window window = getWindow();
+        Window window = resolveCustomFullscreenWindow();
         View decorView = window != null ? window.getDecorView() : null;
         if (!(decorView instanceof ViewGroup)) {
             callback.onCustomViewHidden();
@@ -2941,15 +2944,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
 
         customFullscreenView = view;
         customViewCallback = callback;
+        customFullscreenWindow = window;
 
         if (fullscreenContainer == null) {
             fullscreenContainer = new FrameLayout(getContext());
             fullscreenContainer.setBackgroundColor(Color.BLACK);
-            ((ViewGroup) decorView).addView(
-                fullscreenContainer,
-                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            );
+        } else if (fullscreenContainer.getParent() instanceof ViewGroup oldParent) {
+            oldParent.removeView(fullscreenContainer);
         }
+        ((ViewGroup) decorView).addView(
+            fullscreenContainer,
+            new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        );
         fullscreenContainer.addView(
             view,
             new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -2960,9 +2966,43 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _webView.setVisibility(View.INVISIBLE);
         }
 
-        if (window != null) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-            decorView.setSystemUiVisibility(WebViewCustomFullscreenSupport.immersiveFullscreenSystemUiVisibility());
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        decorView.setSystemUiVisibility(WebViewCustomFullscreenSupport.immersiveFullscreenSystemUiVisibility());
+
+        if (WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(backLayerActive)) {
+            registerCustomFullscreenBackHandler();
+        }
+    }
+
+    private Window resolveCustomFullscreenWindow() {
+        if (WebViewCustomFullscreenSupport.shouldUseHostActivityWindow(backLayerActive) && activity != null) {
+            Window hostWindow = activity.getWindow();
+            if (hostWindow != null) {
+                return hostWindow;
+            }
+        }
+        return getWindow();
+    }
+
+    private void registerCustomFullscreenBackHandler() {
+        if (!(activity instanceof ComponentActivity componentActivity) || customFullscreenBackCallback != null) {
+            return;
+        }
+        customFullscreenBackCallback = new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (WebViewCustomFullscreenSupport.isCustomFullscreenActive(customFullscreenView)) {
+                    exitCustomFullscreenView();
+                }
+            }
+        };
+        componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity, customFullscreenBackCallback);
+    }
+
+    private void unregisterCustomFullscreenBackHandler() {
+        if (customFullscreenBackCallback != null) {
+            customFullscreenBackCallback.remove();
+            customFullscreenBackCallback = null;
         }
     }
 
@@ -2979,7 +3019,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             _webView.setVisibility(View.VISIBLE);
         }
 
-        Window window = getWindow();
+        Window window = customFullscreenWindow != null ? customFullscreenWindow : getWindow();
         if (window != null) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             window.getDecorView().setSystemUiVisibility(WebViewCustomFullscreenSupport.restoredSystemUiVisibility());
@@ -2989,11 +3029,14 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             }
         }
 
+        unregisterCustomFullscreenBackHandler();
+
         if (customViewCallback != null) {
             customViewCallback.onCustomViewHidden();
         }
         customFullscreenView = null;
         customViewCallback = null;
+        customFullscreenWindow = null;
     }
 
     private void applyHiddenMode() {

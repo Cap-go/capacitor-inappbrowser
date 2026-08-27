@@ -34,6 +34,14 @@ final class WebViewCustomFullscreenSupport {
         );
     }
 
+    static boolean shouldUseHostActivityWindow(boolean backLayerActive) {
+        return backLayerActive;
+    }
+
+    static boolean shouldRegisterHostBackHandler(boolean backLayerActive) {
+        return backLayerActive;
+    }
+
     @SuppressWarnings("deprecation")
     static int restoredSystemUiVisibility() {
         return View.SYSTEM_UI_FLAG_VISIBLE;
