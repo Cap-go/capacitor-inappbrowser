@@ -14,8 +14,8 @@ public class WebViewCustomFullscreenSupportTest {
     }
 
     @Test
-    public void customFullscreenActiveWhenViewIsPresent() {
-        assertTrue(WebViewCustomFullscreenSupport.isCustomFullscreenActive(new View(null)));
+    public void customFullscreenActiveForNonNullReference() {
+        assertTrue(WebViewCustomFullscreenSupport.isCustomFullscreenActive(new Object()));
     }
 
     @Test

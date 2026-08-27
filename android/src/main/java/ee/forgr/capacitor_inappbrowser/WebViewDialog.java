@@ -3014,6 +3014,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         if (fullscreenContainer != null) {
             fullscreenContainer.removeView(customFullscreenView);
             fullscreenContainer.setVisibility(View.GONE);
+            if (fullscreenContainer.getParent() instanceof ViewGroup parent) {
+                parent.removeView(fullscreenContainer);
+            }
         }
         if (_webView != null) {
             _webView.setVisibility(View.VISIBLE);

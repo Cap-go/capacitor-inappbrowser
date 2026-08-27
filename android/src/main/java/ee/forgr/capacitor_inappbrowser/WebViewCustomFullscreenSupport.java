@@ -10,7 +10,7 @@ final class WebViewCustomFullscreenSupport {
 
     private WebViewCustomFullscreenSupport() {}
 
-    static boolean isCustomFullscreenActive(View customFullscreenView) {
+    static boolean isCustomFullscreenActive(Object customFullscreenView) {
         return customFullscreenView != null;
     }
 
