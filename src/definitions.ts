@@ -1293,8 +1293,8 @@ export interface OpenWebViewOptions {
 
   /**
    * If true, the webView is inset by the bottom system bar (navigation bar) so bottom-anchored
-   * content stays reachable. On Android 15+ the browser window is always edge-to-edge, so the
-   * bottom inset is applied there regardless of this option.
+   * content stays reachable. When false (default), the webView can extend behind the navigation bar
+   * and apps can use `env(safe-area-inset-*)` for layout, matching the main Capacitor WebView.
    * @since 7.13.0
    * @default false
    * @example
