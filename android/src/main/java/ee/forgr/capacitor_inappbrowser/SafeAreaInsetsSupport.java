@@ -119,17 +119,32 @@ final class SafeAreaInsetsSupport {
     }
 
     /**
-     * Whether the WebView container must be inset for the bottom system bar. On Android 15+ the dialog
-     * is forced edge-to-edge (decorFitsSystemWindows=false), so the window always draws under the
-     * navigation bar and insetting is mandatory to keep bottom content on-screen, regardless of the
-     * enabledSafeBottomMargin opt-in that older versions honour. Pre-API 30 windows that lay out behind
-     * a transparent navigation bar need the same treatment.
+     * Whether the WebView container must be inset for the bottom system bar. Follows the
+     * enabledSafeBottomMargin opt-in on all API levels, including Android 15+ edge-to-edge windows,
+     * so disabling the flag matches Capacitor full-screen behaviour (#672). Pre-API 30 windows that
+     * lay out behind a transparent navigation bar still need the inset regardless of the opt-in.
      */
     static boolean shouldInsetBottomForContainer(boolean enabledSafeBottomMargin, boolean isEdgeToEdge, boolean layoutBehindNavigationBar) {
-        return enabledSafeBottomMargin || isEdgeToEdge || layoutBehindNavigationBar;
+        return enabledSafeBottomMargin || layoutBehindNavigationBar;
     }
 
     static boolean shouldInsetBottomForContainer(boolean enabledSafeBottomMargin, boolean isEdgeToEdge) {
         return shouldInsetBottomForContainer(enabledSafeBottomMargin, isEdgeToEdge, false);
+    }
+
+    /**
+     * CSS custom-property inset for the top safe area. Only published when enabledSafeTopMargin is
+     * on; otherwise apps rely on env(safe-area-inset-*) like the main Capacitor WebView (#672).
+     */
+    static int cssTopInset(boolean enabledSafeTopMargin, int containerTopPadding) {
+        return enabledSafeTopMargin ? Math.max(0, containerTopPadding) : 0;
+    }
+
+    /**
+     * CSS custom-property inset for the bottom safe area. Only published when enabledSafeBottomMargin
+     * is on; container padding and env() insets are handled separately (#672).
+     */
+    static int cssBottomInset(boolean enabledSafeBottomMargin, int safeBottomInset) {
+        return enabledSafeBottomMargin ? Math.max(0, safeBottomInset) : 0;
     }
 }

@@ -119,9 +119,9 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
-    public void bottomInsetIsForcedOnEdgeToEdgeEvenWithoutOptIn() {
-        // Android 15 forces edge-to-edge, so the nav-bar inset applies regardless of the opt-in.
-        assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true));
+    public void bottomInsetHonoursOptInOnEdgeToEdge() {
+        // Android 15+ is edge-to-edge, but the bottom inset still follows the opt-in (#672).
+        assertFalse(SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true));
         assertTrue(SafeAreaInsetsSupport.shouldInsetBottomForContainer(true, true));
     }
 
@@ -138,9 +138,26 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
-    public void containerBottomPaddingAppliesNavigationBarWhenForcedByEdgeToEdge() {
-        // Opt-in off, but edge-to-edge forces applyBottomInset=true, so the 126px nav bar still insets.
-        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true);
+    public void containerBottomPaddingAppliesNavigationBarWhenOptInEnabledOnEdgeToEdge() {
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(true, true);
         assertEquals(126, SafeAreaInsetsSupport.resolveContainerBottomPadding(applyBottomInset, 126, 0));
+    }
+
+    @Test
+    public void containerBottomPaddingSkipsNavigationBarWhenOptInDisabledOnEdgeToEdge() {
+        boolean applyBottomInset = SafeAreaInsetsSupport.shouldInsetBottomForContainer(false, true);
+        assertEquals(0, SafeAreaInsetsSupport.resolveContainerBottomPadding(applyBottomInset, 126, 0));
+    }
+
+    @Test
+    public void cssTopInsetFollowsSafeTopOption() {
+        assertEquals(87, SafeAreaInsetsSupport.cssTopInset(true, 87));
+        assertEquals(0, SafeAreaInsetsSupport.cssTopInset(false, 87));
+    }
+
+    @Test
+    public void cssBottomInsetFollowsSafeBottomOption() {
+        assertEquals(84, SafeAreaInsetsSupport.cssBottomInset(true, 84));
+        assertEquals(0, SafeAreaInsetsSupport.cssBottomInset(false, 84));
     }
 }

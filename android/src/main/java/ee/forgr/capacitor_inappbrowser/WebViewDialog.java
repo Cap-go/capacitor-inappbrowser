@@ -3579,7 +3579,9 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             container.setPadding(bars.left, padTop, bars.right, padBottom);
         }
 
-        injectSafeAreaCssVariables(padTop, padBottom, bars.left, bars.right);
+        int cssTop = SafeAreaInsetsSupport.cssTopInset(_options.getEnabledSafeTopMargin(), padTop);
+        int cssBottom = SafeAreaInsetsSupport.cssBottomInset(_options.getEnabledSafeMargin(), safeBottomInset);
+        injectSafeAreaCssVariables(cssTop, cssBottom, bars.left, bars.right);
     }
 
     private void configureBlankToolbarLayout() {
