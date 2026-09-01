@@ -2,15 +2,19 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.webkit.CookieManager;
 import android.webkit.WebView;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Applies cordova-style open-time cookie/cache clearing before the first navigation.
+ *
+ * CookieManager.removeAllCookies() delivers its callback on the calling thread's Looper.
+ * Never block that Looper waiting for the callback — that deadlocks the UI thread.
  */
 final class OpenTimeBrowsingDataClearSupport {
 
-    private static final long COOKIE_CLEAR_TIMEOUT_SECONDS = 10;
+    @FunctionalInterface
+    interface CookieClearer {
+        void clear(Runnable onCleared);
+    }
 
     private OpenTimeBrowsingDataClearSupport() {}
 
@@ -18,23 +22,43 @@ final class OpenTimeBrowsingDataClearSupport {
         CookieManager cookieManager,
         WebView webView,
         boolean clearCookiesOnOpen,
-        boolean clearCacheOnOpen
+        boolean clearCacheOnOpen,
+        Runnable onComplete
     ) {
-        if (clearCookiesOnOpen) {
-            final CountDownLatch latch = new CountDownLatch(1);
-            cookieManager.removeAllCookies((value) -> latch.countDown());
-            try {
-                if (!latch.await(COOKIE_CLEAR_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                    throw new IllegalStateException("Timed out waiting for cookie clear");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        applyBeforeFirstNavigation(
+            (onCleared) ->
+                cookieManager.removeAllCookies((value) -> {
+                    cookieManager.flush();
+                    if (webView == null || !webView.post(onCleared)) {
+                        onCleared.run();
+                    }
+                }),
+            webView,
+            clearCookiesOnOpen,
+            clearCacheOnOpen,
+            onComplete
+        );
+    }
+
+    static void applyBeforeFirstNavigation(
+        CookieClearer cookieClearer,
+        WebView webView,
+        boolean clearCookiesOnOpen,
+        boolean clearCacheOnOpen,
+        Runnable onComplete
+    ) {
+        Runnable finish = () -> {
+            if (clearCacheOnOpen && webView != null) {
+                webView.clearCache(true);
             }
-            cookieManager.flush();
+            onComplete.run();
+        };
+
+        if (!clearCookiesOnOpen) {
+            finish.run();
+            return;
         }
 
-        if (clearCacheOnOpen && webView != null) {
-            webView.clearCache(true);
-        }
+        cookieClearer.clear(finish);
     }
 }
