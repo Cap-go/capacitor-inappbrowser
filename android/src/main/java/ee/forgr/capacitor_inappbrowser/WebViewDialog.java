@@ -2798,10 +2798,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         Map<String, String> requestHeaders = buildRequestHeadersExcludingUserAgent();
         applyWebViewUserAgent();
 
+        // Parent already wiped cookies; a second process-global clear would delay popup handoff.
+        boolean clearCookiesOnOpen = _options.getClearCookiesOnOpen() && !_options.isPopupWindowMode();
         OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation(
-            CookieManager.getInstance(),
+            (onCleared) -> {
+                CookieManager cookieManager = CookieManager.getInstance();
+                cookieManager.removeAllCookies((value) -> {
+                    cookieManager.flush();
+                    new Handler(Looper.getMainLooper()).post(onCleared);
+                });
+            },
             _webView,
-            _options.getClearCookiesOnOpen(),
+            clearCookiesOnOpen,
             _options.getClearCacheOnOpen(),
             () -> continuePresentWebViewAfterOpenTimeClear(requestHeaders)
         );

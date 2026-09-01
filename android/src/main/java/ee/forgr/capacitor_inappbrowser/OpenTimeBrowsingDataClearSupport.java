@@ -1,6 +1,5 @@
 package ee.forgr.capacitor_inappbrowser;
 
-import android.webkit.CookieManager;
 import android.webkit.WebView;
 
 /**
@@ -17,28 +16,6 @@ final class OpenTimeBrowsingDataClearSupport {
     }
 
     private OpenTimeBrowsingDataClearSupport() {}
-
-    static void applyBeforeFirstNavigation(
-        CookieManager cookieManager,
-        WebView webView,
-        boolean clearCookiesOnOpen,
-        boolean clearCacheOnOpen,
-        Runnable onComplete
-    ) {
-        applyBeforeFirstNavigation(
-            (onCleared) ->
-                cookieManager.removeAllCookies((value) -> {
-                    cookieManager.flush();
-                    if (webView == null || !webView.post(onCleared)) {
-                        onCleared.run();
-                    }
-                }),
-            webView,
-            clearCookiesOnOpen,
-            clearCacheOnOpen,
-            onComplete
-        );
-    }
 
     static void applyBeforeFirstNavigation(
         CookieClearer cookieClearer,
