@@ -3,7 +3,6 @@ package ee.forgr.capacitor_inappbrowser;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentCallbacks2;
 import android.content.Context;
@@ -70,6 +69,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.Toolbar;
 import androidx.activity.ComponentActivity;
+import androidx.activity.ComponentDialog;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
@@ -141,7 +141,7 @@ import javax.net.ssl.X509TrustManager;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyRequestLocator {
+public class WebViewDialog extends ComponentDialog implements ProxyResponseRouting.ProxyRequestLocator {
 
     private static final long HOST_WEBVIEW_INSET_RETRY_DELAY_MS = 160L;
 
@@ -344,6 +344,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     private FrameLayout fullscreenContainer;
     private Window customFullscreenWindow;
     private OnBackPressedCallback customFullscreenBackCallback;
+    private OnBackPressedCallback dialogBackCallback;
     private Toolbar _toolbar;
     private Options _options = null;
     private final Context _context;
@@ -460,6 +461,18 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     void bindToHostActivity() {
         ensureFileChooserLaunchers();
         registerDialogBackHandler();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        syncDialogBackCallbackEnabled();
+    }
+
+    @Override
+    protected void onStop() {
+        syncDialogBackCallbackEnabled();
+        super.onStop();
     }
 
     public String getInstanceId() {
@@ -657,6 +670,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         backLayerActive = false;
         backLayerParent = null;
         restoreHostTransparency();
+        syncDialogBackCallbackEnabled();
     }
 
     private void attachContentToDialogWindow() {
@@ -699,6 +713,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
             super.hide();
         }
         refreshInsetsForHostingLayer();
+        syncDialogBackCallbackEnabled();
         return true;
     }
 
@@ -2878,54 +2893,70 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
     }
 
     private void registerDialogBackHandler() {
-        setOnKeyListener((dialogInterface, keyCode, event) -> {
-            if (keyCode != KeyEvent.KEYCODE_BACK) {
-                return false;
+        if (dialogBackCallback != null) {
+            return;
+        }
+        // Predictive back (API 33+) never delivers KEYCODE_BACK to Dialog OnKeyListener.
+        dialogBackCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                handleBrowserBackNavigation();
             }
-            if (event.getAction() != KeyEvent.ACTION_UP) {
-                return true;
-            }
-            if (!shouldConsumeBackPress()) {
-                return false;
-            }
-            handleBrowserBackNavigation();
-            return true;
-        });
+        };
+        getOnBackPressedDispatcher().addCallback(dialogBackCallback);
+        syncDialogBackCallbackEnabled();
+    }
+
+    private void syncDialogBackCallbackEnabled() {
+        if (dialogBackCallback != null) {
+            dialogBackCallback.setEnabled(shouldConsumeBackPress());
+        }
+    }
+
+    private void unregisterDialogBackHandler() {
+        if (dialogBackCallback != null) {
+            dialogBackCallback.remove();
+            dialogBackCallback = null;
+        }
     }
 
     private boolean shouldConsumeBackPress() {
-        return isShowing() && !isHiddenModeActive && !backLayerActive;
+        return WebViewBackNavigationSupport.shouldConsumeBackPress(isShowing(), isHiddenModeActive, backLayerActive);
     }
 
     private void handleBrowserBackNavigation() {
-        if (WebViewCustomFullscreenSupport.shouldConsumeBackPress(customFullscreenView != null)) {
-            exitCustomFullscreenView();
-            return;
-        }
-
         if (_options == null) {
             dismiss();
             return;
         }
 
-        if (
-            _webView != null &&
-            _webView.canGoBack() &&
-            (TextUtils.equals(_options.getToolbarType(), "navigation") || _options.getActiveNativeNavigationForWebview())
-        ) {
-            _webView.goBack();
-            return;
-        }
+        WebViewBackNavigationSupport.Action action = WebViewBackNavigationSupport.resolveAction(
+            WebViewCustomFullscreenSupport.shouldConsumeBackPress(customFullscreenView != null),
+            _webView != null && _webView.canGoBack(),
+            TextUtils.equals(_options.getToolbarType(), "navigation"),
+            _options.getActiveNativeNavigationForWebview(),
+            _options.getDisableGoBackOnNativeApplication()
+        );
 
-        if (_options.getDisableGoBackOnNativeApplication()) {
-            return;
+        switch (action) {
+            case EXIT_FULLSCREEN:
+                exitCustomFullscreenView();
+                return;
+            case WEBVIEW_GO_BACK:
+                if (_webView != null) {
+                    _webView.goBack();
+                }
+                return;
+            case IGNORE:
+                return;
+            case DISMISS:
+            default:
+                String currentUrl = getUrl();
+                if (_options.getCallbacks() != null) {
+                    _options.getCallbacks().closeEvent(currentUrl);
+                }
+                dismiss();
         }
-
-        String currentUrl = getUrl();
-        if (_options.getCallbacks() != null) {
-            _options.getCallbacks().closeEvent(currentUrl);
-        }
-        dismiss();
     }
 
     // Shows a native fullscreen view requested via the HTML5 Fullscreen API (e.g. embedded YouTube).
@@ -3093,6 +3124,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         }
 
         isHiddenModeActive = true;
+        syncDialogBackCallbackEnabled();
     }
 
     private void restoreVisibleMode() {
@@ -3130,6 +3162,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
+        syncDialogBackCallbackEnabled();
     }
 
     public void setHidden(boolean hidden) {
@@ -3155,6 +3188,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
                         // Set flag immediately to prevent race condition if setHidden(false)
                         // is called before the posted runnable executes
                         isHiddenModeActive = true;
+                        syncDialogBackCallbackEnabled();
                         decorView.post(this::applyHiddenMode);
                     } catch (Exception e) {
                         Log.w("InAppBrowser", "Unable to show dialog before hiding", e);
@@ -6527,6 +6561,7 @@ public class WebViewDialog extends Dialog implements ProxyResponseRouting.ProxyR
         proxiedRequestsHashmap.clear();
 
         clearActivityResultLaunchers();
+        unregisterDialogBackHandler();
 
         try {
             super.dismiss();
