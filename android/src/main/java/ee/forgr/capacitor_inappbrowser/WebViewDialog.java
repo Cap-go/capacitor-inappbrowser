@@ -2813,15 +2813,58 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         Map<String, String> requestHeaders = buildRequestHeadersExcludingUserAgent();
         applyWebViewUserAgent();
 
-        if (_options.getClearCookiesOnOpen() || _options.getClearCacheOnOpen()) {
-            OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation(
-                CookieManager.getInstance(),
-                _webView,
-                _options.getClearCookiesOnOpen(),
-                _options.getClearCacheOnOpen()
-            );
+        // Parent already wiped cookies; a second process-global clear would delay popup handoff.
+        boolean clearCookiesOnOpen = _options.getClearCookiesOnOpen() && !_options.isPopupWindowMode();
+        OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation(
+            (onCleared) -> {
+                CookieManager cookieManager = CookieManager.getInstance();
+                cookieManager.removeAllCookies((value) -> {
+                    cookieManager.flush();
+                    new Handler(Looper.getMainLooper()).post(onCleared);
+                });
+            },
+            _webView,
+            clearCookiesOnOpen,
+            _options.getClearCacheOnOpen(),
+            () -> continuePresentWebViewAfterOpenTimeClear(requestHeaders)
+        );
+    }
+
+    private void continuePresentWebViewAfterOpenTimeClear(Map<String, String> requestHeaders) {
+        if (_webView == null || _options == null) {
+            rejectOpenWebViewIfNeeded("WebView was dismissed before navigation");
+            return;
         }
 
+        try {
+            loadInitialWebViewContent(requestHeaders);
+            setupToolbar();
+            setWebViewClient();
+
+            if (this._options.isHidden()) {
+                if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
+                    show();
+                    if (!isHiddenModeActive) {
+                        applyHiddenMode();
+                    }
+                }
+                resolveOpenWebViewIfNeeded();
+            } else if (_options.isPopupWindowMode()) {
+                showAccordingToLayerModeOrFallback();
+            } else if (!this._options.isPresentAfterPageLoad()) {
+                showAccordingToLayerModeOrFallback();
+                resolveOpenWebViewIfNeeded();
+            }
+
+            // Capacitor activities handle orientation themselves; refresh dialog layout explicitly.
+            registerConfigurationCallbacks();
+        } catch (RuntimeException e) {
+            Log.e("InAppBrowser", "Failed to start WebView after open-time data clear", e);
+            rejectOpenWebViewIfNeeded("Failed to start WebView: " + e.getMessage());
+        }
+    }
+
+    private void loadInitialWebViewContent(Map<String, String> requestHeaders) {
         // Load URL with optional HTTP method and body
         String httpMethod = _options.getHttpMethod();
         String httpBody = _options.getHttpBody();
@@ -2869,27 +2912,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
             });
         }
-
-        setupToolbar();
-        setWebViewClient();
-
-        if (this._options.isHidden()) {
-            if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
-                show();
-                if (!isHiddenModeActive) {
-                    applyHiddenMode();
-                }
-            }
-            resolveOpenWebViewIfNeeded();
-        } else if (_options.isPopupWindowMode()) {
-            showAccordingToLayerModeOrFallback();
-        } else if (!this._options.isPresentAfterPageLoad()) {
-            showAccordingToLayerModeOrFallback();
-            resolveOpenWebViewIfNeeded();
-        }
-
-        // Capacitor activities handle orientation themselves; refresh dialog layout explicitly.
-        registerConfigurationCallbacks();
     }
 
     private void registerDialogBackHandler() {

@@ -797,8 +797,8 @@ export interface OpenWebViewOptions {
    * Clear all cookies from the InAppBrowser data store before the first navigation of this webview.
    *
    * Cordova `clearcache: 'yes'` parity. On Android, uses process-global `CookieManager.removeAllCookies()`
-   * and blocks until the wipe completes. On iOS, clears cookies from the webview's `WKWebsiteDataStore`
-   * (isolated plugin store by default). On Web this is a no-op.
+   * and starts the first navigation after the wipe callback (does not block the UI thread). On iOS, clears
+   * cookies from the webview's `WKWebsiteDataStore` (isolated plugin store by default). On Web this is a no-op.
    *
    * @default false
    * @since 8.16.0
