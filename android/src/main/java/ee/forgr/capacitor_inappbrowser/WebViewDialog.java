@@ -2172,7 +2172,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         // Set dimensions if specified, otherwise fullscreen
         applyDimensions();
 
-        SystemUiChromeSupport.prepareInitialDialogWindow(getWindow());
+        SystemUiChromeSupport.prepareInitialDialogWindow(getWindow(), findViewById(R.id.status_bar_color_view));
 
         WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
             getWindow(),
@@ -3020,7 +3020,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        decorView.setSystemUiVisibility(WebViewCustomFullscreenSupport.immersiveFullscreenSystemUiVisibility());
+        WebViewCustomFullscreenSupport.enterImmersiveFullscreen(window, decorView);
 
         if (WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(backLayerActive)) {
             registerCustomFullscreenBackHandler();
@@ -3078,7 +3078,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         Window window = customFullscreenWindow != null ? customFullscreenWindow : getWindow();
         if (window != null) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-            window.getDecorView().setSystemUiVisibility(WebViewCustomFullscreenSupport.restoredSystemUiVisibility());
+            WebViewCustomFullscreenSupport.exitImmersiveFullscreen(window, window.getDecorView());
             reapplyInsetsFromWindowRoot();
             if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
                 refreshEdgeToEdgeChrome();
@@ -3275,7 +3275,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (getWindow() != null) {
             View decorView = getWindow().getDecorView();
             Integer statusBarColor = null;
-            Integer navigationBarColor = Color.TRANSPARENT;
             Boolean lightStatusBars = null;
 
             if (isAndroid15Plus) {
@@ -3316,9 +3315,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             SystemUiChromeSupport.applyDialogWindowChrome(
                 getWindow(),
                 decorView,
+                findViewById(R.id.status_bar_color_view),
                 isAndroid15Plus,
                 statusBarColor,
-                navigationBarColor,
                 lightStatusBars
             );
         }
@@ -4913,7 +4912,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 // Also ensure status bar gets the color
                 if (getWindow() != null) {
-                    SystemUiChromeSupport.applyLegacySystemBarColors(getWindow(), toolbarColor, null);
+                    SystemUiChromeSupport.applyLegacyStatusBarColorViaView(findViewById(R.id.status_bar_color_view), toolbarColor);
 
                     // Determine proper status bar text color (light or dark icons)
                     boolean isDarkBackground = isDarkColor(toolbarColor);
