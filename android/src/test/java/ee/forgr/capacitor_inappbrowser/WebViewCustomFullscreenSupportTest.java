@@ -1,9 +1,9 @@
 package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import android.view.View;
 import org.junit.Test;
 
 public class WebViewCustomFullscreenSupportTest {
@@ -31,10 +31,13 @@ public class WebViewCustomFullscreenSupportTest {
     }
 
     @Test
-    public void immersiveFlagsIncludeFullscreenAndImmersiveSticky() {
-        int flags = WebViewCustomFullscreenSupport.immersiveFullscreenSystemUiVisibility();
-        assertTrue((flags & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
-        assertTrue((flags & View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY) != 0);
+    public void enterImmersiveFullscreenReturnsNullForMissingWindowOrDecorView() {
+        assertNull(WebViewCustomFullscreenSupport.enterImmersiveFullscreen(null, null));
+    }
+
+    @Test
+    public void exitImmersiveFullscreenAcceptsMissingWindowOrDecorView() {
+        WebViewCustomFullscreenSupport.exitImmersiveFullscreen(null, null);
     }
 
     @Test

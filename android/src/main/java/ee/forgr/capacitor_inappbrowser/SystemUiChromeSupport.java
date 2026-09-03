@@ -41,14 +41,14 @@ final class SystemUiChromeSupport {
         WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
     }
 
-    static void prepareInitialDialogWindow(Window window) {
+    static void prepareInitialDialogWindow(Window window, View statusBarColorView) {
         if (window == null) {
             return;
         }
 
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         if (shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
-            applyLegacySystemBarColors(window, Color.TRANSPARENT, null);
+            applyStatusBarColorView(statusBarColorView, 0, Color.TRANSPARENT);
             clearLegacyTranslucentStatusFlag(window);
         }
     }
@@ -56,9 +56,10 @@ final class SystemUiChromeSupport {
     static void applyDialogWindowChrome(
         Window window,
         View decorView,
+        View statusBarColorView,
+        int statusBarHeight,
         boolean edgeToEdge,
         Integer statusBarColor,
-        Integer navigationBarColor,
         Boolean lightStatusBars
     ) {
         if (window == null || decorView == null) {
@@ -69,10 +70,14 @@ final class SystemUiChromeSupport {
             setDecorFitsSystemWindows(window, false);
         } else if (!shouldUsePreApi30LayoutFlags(Build.VERSION.SDK_INT)) {
             setDecorFitsSystemWindows(window, true);
-            applyLegacySystemBarColors(window, statusBarColor, navigationBarColor);
+            if (shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
+                applyStatusBarColorView(statusBarColorView, statusBarHeight, statusBarColor);
+            }
         } else {
-            applyPreApi30LayoutBehindNavigationBar(decorView);
-            applyLegacySystemBarColors(window, statusBarColor, navigationBarColor);
+            setDecorFitsSystemWindows(window, false);
+            if (shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
+                applyStatusBarColorView(statusBarColorView, statusBarHeight, statusBarColor);
+            }
         }
 
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, decorView);
@@ -81,23 +86,20 @@ final class SystemUiChromeSupport {
         }
     }
 
-    @SuppressWarnings("deprecation")
-    private static void applyPreApi30LayoutBehindNavigationBar(View decorView) {
-        decorView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-    }
-
-    @SuppressWarnings("deprecation")
-    static void applyLegacySystemBarColors(Window window, Integer statusBarColor, Integer navigationBarColor) {
-        if (window == null || !shouldApplyLegacySystemBarColors(Build.VERSION.SDK_INT)) {
+    static void applyStatusBarColorView(View statusBarColorView, int statusBarHeight, Integer statusBarColor) {
+        if (statusBarColorView == null || statusBarColor == null) {
             return;
         }
 
-        if (statusBarColor != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(statusBarColor);
+        if (statusBarHeight > 0) {
+            android.view.ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+            if (params != null) {
+                params.height = statusBarHeight;
+                statusBarColorView.setLayoutParams(params);
+            }
         }
-        if (navigationBarColor != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setNavigationBarColor(navigationBarColor);
-        }
+        statusBarColorView.setBackgroundColor(statusBarColor);
+        statusBarColorView.setVisibility(View.VISIBLE);
     }
 
     @SuppressWarnings("deprecation")

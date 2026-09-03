@@ -744,6 +744,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     @SuppressWarnings("deprecation")
     private CustomTabColorSchemeParams.Builder applyCustomTabNavigationBarColor(CustomTabColorSchemeParams.Builder builder, int colorInt) {
         // androidx.browser 1.9.0 still exposes only setNavigationBarColor; no non-deprecated replacement.
+        // Kept intentionally so Custom Tabs navigation bar color customization remains available to callers.
+        // Play Console may still flag this call site until androidx.browser ships a replacement API.
         return builder.setNavigationBarColor(colorInt);
     }
 
