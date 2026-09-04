@@ -63,4 +63,28 @@ public class WebViewBackNavigationSupportTest {
             WebViewBackNavigationSupport.resolveAction(false, false, false, false, false)
         );
     }
+
+    @Test
+    public void dialogNotCancelableOnBackWhenStayInWebViewEnabled() {
+        assertFalse(WebViewBackNavigationSupport.isCancelableOnBack(true));
+        assertTrue(WebViewBackNavigationSupport.isCancelableOnBack(false));
+    }
+
+    @Test
+    public void activityBackHandlerRegisteredForBackLayerOrStayInWebView() {
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, true, false, false));
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, true));
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, true, false, true));
+    }
+
+    @Test
+    public void activityBackHandlerNotRegisteredForNormalDismissibleDialog() {
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, false));
+    }
+
+    @Test
+    public void activityBackHandlerNotRegisteredWhenHiddenOrNotVisible() {
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, true, true));
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, false, false, true));
+    }
 }
