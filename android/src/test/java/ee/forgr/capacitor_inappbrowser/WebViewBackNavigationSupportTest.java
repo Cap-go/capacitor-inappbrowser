@@ -71,20 +71,31 @@ public class WebViewBackNavigationSupportTest {
     }
 
     @Test
-    public void activityBackHandlerRegisteredForBackLayerOrStayInWebView() {
-        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, true, false, false));
-        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, true));
-        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, true, false, true));
+    public void activityBackHandlerRegisteredForDisableGoBackWhenActive() {
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, true, true));
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, true, false, true, true));
+    }
+
+    @Test
+    public void activityBackHandlerRegisteredForBackLayerWhenActiveRegardlessOfDisableGoBackFlag() {
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, true, false, false, true));
+        assertTrue(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, true, false, true, true));
     }
 
     @Test
     public void activityBackHandlerNotRegisteredForNormalDismissibleDialog() {
-        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, false));
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, false, true));
     }
 
     @Test
     public void activityBackHandlerNotRegisteredWhenHiddenOrNotVisible() {
-        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, true, true));
-        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, false, false, true));
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, true, true, true));
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, false, false, true, true));
+    }
+
+    @Test
+    public void activityBackHandlerNotRegisteredForInactiveDialog() {
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(true, false, false, true, false));
+        assertFalse(WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(false, true, false, false, false));
     }
 }

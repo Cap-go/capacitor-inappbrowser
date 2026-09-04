@@ -346,6 +346,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private OnBackPressedCallback customFullscreenBackCallback;
     private OnBackPressedCallback dialogBackCallback;
     private OnBackPressedCallback dialogActivityBackCallback;
+    private boolean activeForBackNavigation = true;
     private Toolbar _toolbar;
     private Options _options = null;
     private final Context _context;
@@ -2965,8 +2966,29 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             isShowing(),
             backLayerActive,
             isHiddenModeActive,
-            _options != null && _options.getDisableGoBackOnNativeApplication()
+            _options != null && _options.getDisableGoBackOnNativeApplication(),
+            activeForBackNavigation
         );
+    }
+
+    void setActiveForBackNavigation(boolean active) {
+        if (activeForBackNavigation == active) {
+            return;
+        }
+        activeForBackNavigation = active;
+        syncBackNavigationHandlers();
+    }
+
+    boolean isActiveForBackNavigation() {
+        return activeForBackNavigation;
+    }
+
+    boolean isBackLayerActive() {
+        return backLayerActive;
+    }
+
+    boolean isActivityBackHandlerEnabled() {
+        return dialogActivityBackCallback != null && dialogActivityBackCallback.isEnabled();
     }
 
     private void unregisterDialogBackHandler() {

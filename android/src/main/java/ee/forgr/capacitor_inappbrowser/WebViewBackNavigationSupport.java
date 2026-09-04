@@ -40,8 +40,12 @@ final class WebViewBackNavigationSupport {
         boolean isShowing,
         boolean backLayerActive,
         boolean hiddenMode,
-        boolean disableGoBackOnNativeApplication
+        boolean disableGoBackOnNativeApplication,
+        boolean isActiveForBackNavigation
     ) {
+        if (!isActiveForBackNavigation) {
+            return false;
+        }
         if (hiddenMode) {
             return false;
         }
