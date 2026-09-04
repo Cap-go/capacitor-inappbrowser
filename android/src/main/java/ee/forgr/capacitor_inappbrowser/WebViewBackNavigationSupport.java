@@ -22,6 +22,39 @@ final class WebViewBackNavigationSupport {
         return isShowing && !hiddenMode && !backLayerActive;
     }
 
+    /**
+     * When {@code disableGoBackOnNativeApplication} is true, the dialog must not be cancelable on
+     * back/gesture. Otherwise {@link androidx.activity.ComponentDialog}'s built-in back callback
+     * dismisses the dialog before our handler can return {@link Action#IGNORE}.
+     */
+    static boolean isCancelableOnBack(boolean disableGoBackOnNativeApplication) {
+        return !disableGoBackOnNativeApplication;
+    }
+
+    /**
+     * Activity-level back handling is required when the overlay is hosted on the activity window
+     * (back layer) or when predictive-back can bypass the dialog dispatcher while the flag blocks
+     * dismiss.
+     */
+    static boolean shouldRegisterActivityBackHandler(
+        boolean isShowing,
+        boolean backLayerActive,
+        boolean hiddenMode,
+        boolean disableGoBackOnNativeApplication,
+        boolean isActiveForBackNavigation
+    ) {
+        if (!isActiveForBackNavigation) {
+            return false;
+        }
+        if (hiddenMode) {
+            return false;
+        }
+        if (!isShowing && !backLayerActive) {
+            return false;
+        }
+        return backLayerActive || disableGoBackOnNativeApplication;
+    }
+
     static Action resolveAction(
         boolean customFullscreenActive,
         boolean webViewCanGoBack,

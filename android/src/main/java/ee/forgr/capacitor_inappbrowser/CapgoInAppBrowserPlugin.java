@@ -428,12 +428,21 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         webViewStack.addLast(id);
         if (makeActive || activeWebViewId == null || webViewDialog == null) {
             setActiveWebView(id, dialog);
+        } else {
+            dialog.setActiveForBackNavigation(false);
         }
     }
 
     private void setActiveWebView(String id, WebViewDialog dialog) {
         activeWebViewId = id;
         webViewDialog = dialog;
+        syncActiveWebViewBackNavigation();
+    }
+
+    private void syncActiveWebViewBackNavigation() {
+        for (Map.Entry<String, WebViewDialog> entry : webViewDialogs.entrySet()) {
+            entry.getValue().setActiveForBackNavigation(java.util.Objects.equals(entry.getKey(), activeWebViewId));
+        }
     }
 
     private void unregisterWebView(String id) {
@@ -441,6 +450,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         webViewStack.remove(id);
         activeWebViewId = webViewStack.peekLast();
         webViewDialog = activeWebViewId != null ? webViewDialogs.get(activeWebViewId) : null;
+        syncActiveWebViewBackNavigation();
         if (webViewDialog != null) {
             String url = webViewDialog.getUrl();
             if (url != null) {

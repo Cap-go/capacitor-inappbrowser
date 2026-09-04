@@ -345,6 +345,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private Window customFullscreenWindow;
     private OnBackPressedCallback customFullscreenBackCallback;
     private OnBackPressedCallback dialogBackCallback;
+    private OnBackPressedCallback dialogActivityBackCallback;
+    private boolean activeForBackNavigation = true;
     private Toolbar _toolbar;
     private Options _options = null;
     private final Context _context;
@@ -461,17 +463,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     void bindToHostActivity() {
         ensureFileChooserLaunchers();
         registerDialogBackHandler();
+        registerDialogActivityBackHandler();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
     }
 
     @Override
     protected void onStop() {
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
         super.onStop();
     }
 
@@ -670,7 +673,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         backLayerActive = false;
         backLayerParent = null;
         restoreHostTransparency();
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
     }
 
     private void attachContentToDialogWindow() {
@@ -713,7 +716,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             super.hide();
         }
         refreshInsetsForHostingLayer();
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
         return true;
     }
 
@@ -2145,7 +2148,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
     public void presentWebView() {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        setCancelable(true);
+        applyBackNavigationPolicy();
         setContentView(R.layout.activity_browser);
 
         // If custom dimensions are set, configure for touch passthrough
@@ -2926,19 +2929,76 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
         };
         getOnBackPressedDispatcher().addCallback(dialogBackCallback);
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
     }
 
-    private void syncDialogBackCallbackEnabled() {
+    private void registerDialogActivityBackHandler() {
+        if (!(activity instanceof ComponentActivity componentActivity) || dialogActivityBackCallback != null) {
+            return;
+        }
+        dialogActivityBackCallback = new OnBackPressedCallback(false) {
+            @Override
+            public void handleOnBackPressed() {
+                handleBrowserBackNavigation();
+            }
+        };
+        componentActivity.getOnBackPressedDispatcher().addCallback(componentActivity, dialogActivityBackCallback);
+        syncBackNavigationHandlers();
+    }
+
+    void applyBackNavigationPolicy() {
+        boolean disableGoBack = _options != null && _options.getDisableGoBackOnNativeApplication();
+        setCancelable(WebViewBackNavigationSupport.isCancelableOnBack(disableGoBack));
+        syncBackNavigationHandlers();
+    }
+
+    private void syncBackNavigationHandlers() {
         if (dialogBackCallback != null) {
             dialogBackCallback.setEnabled(shouldConsumeBackPress());
         }
+        if (dialogActivityBackCallback != null) {
+            dialogActivityBackCallback.setEnabled(shouldRegisterActivityBackHandler());
+        }
+    }
+
+    private boolean shouldRegisterActivityBackHandler() {
+        return WebViewBackNavigationSupport.shouldRegisterActivityBackHandler(
+            isShowing(),
+            backLayerActive,
+            isHiddenModeActive,
+            _options != null && _options.getDisableGoBackOnNativeApplication(),
+            activeForBackNavigation
+        );
+    }
+
+    void setActiveForBackNavigation(boolean active) {
+        if (activeForBackNavigation == active) {
+            return;
+        }
+        activeForBackNavigation = active;
+        syncBackNavigationHandlers();
+    }
+
+    boolean isActiveForBackNavigation() {
+        return activeForBackNavigation;
+    }
+
+    boolean isBackLayerActive() {
+        return backLayerActive;
+    }
+
+    boolean isActivityBackHandlerEnabled() {
+        return dialogActivityBackCallback != null && dialogActivityBackCallback.isEnabled();
     }
 
     private void unregisterDialogBackHandler() {
         if (dialogBackCallback != null) {
             dialogBackCallback.remove();
             dialogBackCallback = null;
+        }
+        if (dialogActivityBackCallback != null) {
+            dialogActivityBackCallback.remove();
+            dialogActivityBackCallback = null;
         }
     }
 
@@ -3146,7 +3206,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         isHiddenModeActive = true;
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
     }
 
     private void restoreVisibleMode() {
@@ -3184,7 +3244,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         previousWebViewAlpha = 1f;
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
-        syncDialogBackCallbackEnabled();
+        syncBackNavigationHandlers();
     }
 
     public void setHidden(boolean hidden) {
@@ -3210,7 +3270,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         // Set flag immediately to prevent race condition if setHidden(false)
                         // is called before the posted runnable executes
                         isHiddenModeActive = true;
-                        syncDialogBackCallbackEnabled();
+                        syncBackNavigationHandlers();
                         decorView.post(this::applyHiddenMode);
                     } catch (Exception e) {
                         Log.w("InAppBrowser", "Unable to show dialog before hiding", e);
