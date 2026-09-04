@@ -5,6 +5,10 @@ import WebKit
 extension WKWebView {
     private static var _overriddenSchemes = Set<String>()
     private static let _overriddenSchemesLock = NSLock()
+    private static var _originalHandlesURLSchemeIMP: IMP?
+
+    // Original +[WKWebView handlesURLScheme:] IMP (saved before swizzle).
+    private typealias HandlesURLSchemeIMP = @convention(c) (AnyClass, Selector, NSString) -> Bool
 
     private static let _swizzleOnce: Void = {
         let original = class_getClassMethod(WKWebView.self, #selector(WKWebView.handlesURLScheme(_:)))
@@ -18,6 +22,7 @@ extension WKWebView {
             return
         }
 
+        _originalHandlesURLSchemeIMP = method_getImplementation(original)
         method_exchangeImplementations(original, swizzled)
     }()
 
@@ -28,7 +33,14 @@ extension WKWebView {
         _overriddenSchemesLock.unlock()
 
         if isOverridden { return false }
-        return _capgo_handlesURLScheme(urlScheme)
+
+        guard let imp = _originalHandlesURLSchemeIMP else {
+            print("[InAppBrowser][Proxy] WARNING: Original handlesURLScheme IMP missing; assuming not handled")
+            return false
+        }
+
+        let original: HandlesURLSchemeIMP = unsafeBitCast(imp, to: HandlesURLSchemeIMP.self)
+        return original(WKWebView.self, #selector(WKWebView.handlesURLScheme(_:)), urlScheme as NSString)
     }
 
     static func enableCustomSchemeHandling(for schemes: [String]) {
