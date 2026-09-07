@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -9,12 +10,14 @@ import android.content.Context;
 import android.os.Message;
 import android.view.View;
 import android.webkit.PermissionRequest;
+import android.webkit.WebView;
 import android.widget.FrameLayout;
 import androidx.activity.ComponentActivity;
 import androidx.activity.ComponentDialog;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.OnBackPressedDispatcher;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import java.lang.reflect.Field;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -91,6 +94,54 @@ public class WebViewDialogBackNavigationRobolectricTest {
 
         assertTrue(dialog.isShowing());
         dialog.getOnBackPressedDispatcher().onBackPressed();
+        assertTrue(dialog.isShowing());
+    }
+
+    @Test
+    public void webViewDialogWithActiveNativeNavigationAndDisableGoBackGoesBackInHistory() throws Exception {
+        ActivityController<ComponentActivity> controller = Robolectric.buildActivity(ComponentActivity.class).setup();
+        ComponentActivity activity = controller.get();
+        activity.setContentView(new FrameLayout(activity));
+
+        Options options = new Options();
+        options.setDisableGoBackOnNativeApplication(true);
+        options.setActiveNativeNavigationForWebview(true);
+
+        WebViewDialog dialog = createBoundDialog(activity, options);
+        TrackingWebView trackingWebView = new TrackingWebView(activity);
+        trackingWebView.canGoBackResult = true;
+        setWebView(dialog, trackingWebView);
+        showDialog(dialog);
+
+        assertTrue(dialog.isShowing());
+        assertEquals(0, trackingWebView.goBackCallCount);
+
+        dialog.getOnBackPressedDispatcher().onBackPressed();
+
+        assertEquals(1, trackingWebView.goBackCallCount);
+        assertTrue(dialog.isShowing());
+    }
+
+    @Test
+    public void webViewDialogWithActiveNativeNavigationAndDisableGoBackStaysOpenWhenNoHistory() throws Exception {
+        ActivityController<ComponentActivity> controller = Robolectric.buildActivity(ComponentActivity.class).setup();
+        ComponentActivity activity = controller.get();
+        activity.setContentView(new FrameLayout(activity));
+
+        Options options = new Options();
+        options.setDisableGoBackOnNativeApplication(true);
+        options.setActiveNativeNavigationForWebview(true);
+
+        WebViewDialog dialog = createBoundDialog(activity, options);
+        TrackingWebView trackingWebView = new TrackingWebView(activity);
+        trackingWebView.canGoBackResult = false;
+        setWebView(dialog, trackingWebView);
+        showDialog(dialog);
+
+        assertTrue(dialog.isShowing());
+        dialog.getOnBackPressedDispatcher().onBackPressed();
+
+        assertEquals(0, trackingWebView.goBackCallCount);
         assertTrue(dialog.isShowing());
     }
 
@@ -267,6 +318,32 @@ public class WebViewDialogBackNavigationRobolectricTest {
         View overlayContent = dialog.findViewById(R.id.coordinator_layout);
         assertNotNull(overlayContent);
         return overlayContent;
+    }
+
+    private static void setWebView(WebViewDialog dialog, WebView webView) throws Exception {
+        Field field = WebViewDialog.class.getDeclaredField("_webView");
+        field.setAccessible(true);
+        field.set(dialog, webView);
+    }
+
+    private static class TrackingWebView extends WebView {
+
+        boolean canGoBackResult;
+        int goBackCallCount;
+
+        TrackingWebView(Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean canGoBack() {
+            return canGoBackResult;
+        }
+
+        @Override
+        public void goBack() {
+            goBackCallCount++;
+        }
     }
 
     private static WebViewDialog.PermissionHandler noopPermissionHandler() {

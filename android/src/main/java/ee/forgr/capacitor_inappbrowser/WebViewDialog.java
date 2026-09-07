@@ -469,7 +469,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     @Override
     protected void onStart() {
         super.onStart();
-        syncBackNavigationHandlers();
+        // ComponentDialog registers its own back callback in onCreate; re-add ours last so
+        // handleBrowserBackNavigation runs before the built-in cancel callback (LIFO order).
+        ensureDialogBackHandlerOnTop();
     }
 
     @Override
@@ -2921,6 +2923,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (dialogBackCallback != null) {
             return;
         }
+        ensureDialogBackHandlerOnTop();
+    }
+
+    /**
+     * Re-register the dialog back callback so it sits above {@link ComponentDialog}'s built-in
+     * callback. That callback is always enabled and consumes back without dismissing when
+     * {@link #setCancelable(boolean)} is false, which would block webview history navigation.
+     */
+    private void ensureDialogBackHandlerOnTop() {
+        if (dialogBackCallback != null) {
+            dialogBackCallback.remove();
+            dialogBackCallback = null;
+        }
         // Predictive back (API 33+) never delivers KEYCODE_BACK to Dialog OnKeyListener.
         dialogBackCallback = new OnBackPressedCallback(false) {
             @Override
@@ -2949,7 +2964,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     void applyBackNavigationPolicy() {
         boolean disableGoBack = _options != null && _options.getDisableGoBackOnNativeApplication();
         setCancelable(WebViewBackNavigationSupport.isCancelableOnBack(disableGoBack));
-        syncBackNavigationHandlers();
+        if (isShowing()) {
+            ensureDialogBackHandlerOnTop();
+        } else {
+            syncBackNavigationHandlers();
+        }
     }
 
     private void syncBackNavigationHandlers() {
