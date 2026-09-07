@@ -25,7 +25,9 @@ final class WebViewBackNavigationSupport {
     /**
      * When {@code disableGoBackOnNativeApplication} is true, the dialog must not be cancelable on
      * back/gesture. Otherwise {@link androidx.activity.ComponentDialog}'s built-in back callback
-     * dismisses the dialog before our handler can return {@link Action#IGNORE}.
+     * dismisses the dialog before our handler can return {@link Action#IGNORE}. While cancelable is
+     * false that built-in callback still consumes back without dismissing, so {@link WebViewDialog}
+     * must keep its own callback registered last on the dispatcher.
      */
     static boolean isCancelableOnBack(boolean disableGoBackOnNativeApplication) {
         return !disableGoBackOnNativeApplication;
