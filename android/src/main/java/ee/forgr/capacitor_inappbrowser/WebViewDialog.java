@@ -2214,9 +2214,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                                 boolean isDarkBackground = isDarkColor(toolbarColor);
                                 insetsController.setAppearanceLightStatusBars(!isDarkBackground);
                             } catch (IllegalArgumentException e) {
-                                // Fallback to default black if color parsing fails
-                                statusBarColorView.setBackgroundColor(Color.BLACK);
-                                insetsController.setAppearanceLightStatusBars(false);
+                                int fallbackColor = resolveWindowBackgroundColor();
+                                statusBarColorView.setBackgroundColor(fallbackColor);
+                                insetsController.setAppearanceLightStatusBars(!isDarkThemeEnabled());
                             }
                         } else {
                             // Follow system dark mode if no toolbar color provided
