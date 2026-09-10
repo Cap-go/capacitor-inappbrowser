@@ -3450,6 +3450,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         Integer previousScreenHeightDp = lastConfiguration != null ? lastConfiguration.screenHeightDp : null;
         Integer previousSmallestScreenWidthDp = lastConfiguration != null ? lastConfiguration.smallestScreenWidthDp : null;
         Integer previousDensityDpi = lastConfiguration != null ? lastConfiguration.densityDpi : null;
+        Integer previousUiMode = lastConfiguration != null ? lastConfiguration.uiMode : null;
 
         int currentOrientation = newConfig != null ? newConfig.orientation : (previousOrientation != null ? previousOrientation : 0);
         int currentScreenWidthDp =
@@ -3461,6 +3462,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 ? newConfig.smallestScreenWidthDp
                 : (previousSmallestScreenWidthDp != null ? previousSmallestScreenWidthDp : 0);
         int currentDensityDpi = newConfig != null ? newConfig.densityDpi : (previousDensityDpi != null ? previousDensityDpi : 0);
+        int currentUiMode = newConfig != null ? newConfig.uiMode : (previousUiMode != null ? previousUiMode : 0);
 
         boolean shouldRefresh = OrientationLayoutSupport.shouldRefreshBrowserLayout(
             previousOrientation,
@@ -3468,11 +3470,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             previousScreenHeightDp,
             previousSmallestScreenWidthDp,
             previousDensityDpi,
+            previousUiMode,
             currentOrientation,
             currentScreenWidthDp,
             currentScreenHeightDp,
             currentSmallestScreenWidthDp,
-            currentDensityDpi
+            currentDensityDpi,
+            currentUiMode
         );
 
         if (newConfig != null) {
@@ -3513,6 +3517,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         ensureContentBrowserMatchParentHeight();
+        applyWindowBackgroundColor();
 
         boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
         if (isBlankToolbar) {
