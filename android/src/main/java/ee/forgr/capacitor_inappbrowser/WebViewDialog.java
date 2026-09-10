@@ -3599,18 +3599,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         appBarLayout.setStateListAnimator(null);
         appBarLayout.setOutlineProvider(null);
 
-        int backgroundColor = Color.BLACK;
-        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
-            try {
-                backgroundColor = Color.parseColor(_options.getToolbarColor());
-            } catch (IllegalArgumentException e) {
-                Log.e("InAppBrowser", "Invalid toolbar color, using black: " + e.getMessage());
-            }
-        } else {
-            backgroundColor = isDarkThemeEnabled() ? Color.BLACK : Color.WHITE;
-        }
-
-        final int finalBgColor = backgroundColor;
+        final int finalBgColor = resolveWindowBackgroundColor();
         _webView.post(() -> {
             if (_webView == null) {
                 return;
