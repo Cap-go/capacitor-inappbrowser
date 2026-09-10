@@ -22,4 +22,14 @@ final class CloseButtonPositionSupport {
         }
         return null;
     }
+
+    /**
+     * Keeps the layout's edge nudge pointing outwards for the resolved gravity.
+     * Resolves start/end against the layout direction so RTL mirrors correctly.
+     */
+    static float mirroredTranslationX(int gravity, int layoutDirection, float translationX) {
+        int absoluteGravity = Gravity.getAbsoluteGravity(gravity, layoutDirection);
+        float outwards = Math.abs(translationX);
+        return absoluteGravity == Gravity.RIGHT ? outwards : -outwards;
+    }
 }
