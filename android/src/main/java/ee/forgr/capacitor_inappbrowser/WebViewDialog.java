@@ -3624,6 +3624,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
             applyAppBarTopInset(appBarLayout, appBarHandlesTopInset(toolbarView) ? statusBarHeight : 0);
             appBarLayout.setBackgroundColor(finalBgColor);
+
+            Window window = getWindow();
+            if (window != null) {
+                WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(window, window.getDecorView());
+                insetsController.setAppearanceLightStatusBars(!isDarkColor(finalBgColor));
+            }
         });
     }
 
