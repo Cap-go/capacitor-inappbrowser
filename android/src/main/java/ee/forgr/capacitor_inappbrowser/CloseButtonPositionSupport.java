@@ -7,6 +7,9 @@ import android.view.Gravity;
  */
 final class CloseButtonPositionSupport {
 
+    /** End padding that visually matches the start side's toolbar content inset. */
+    static final int END_PADDING_DP = 20;
+
     private CloseButtonPositionSupport() {}
 
     /** Toolbar gravity for the option value, or {@code null} to keep the layout default. */
@@ -18,11 +21,5 @@ final class CloseButtonPositionSupport {
             return Gravity.END;
         }
         return null;
-    }
-
-    /** Keeps the layout's edge nudge pointing outwards for the resolved gravity. */
-    static float mirroredTranslationX(int gravity, float translationX) {
-        float outwards = Math.abs(translationX);
-        return gravity == Gravity.END ? outwards : -outwards;
     }
 }

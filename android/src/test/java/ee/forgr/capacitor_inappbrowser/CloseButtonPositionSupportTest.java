@@ -19,11 +19,4 @@ public class CloseButtonPositionSupportTest {
         assertNull(CloseButtonPositionSupport.gravityFor(null));
         assertNull(CloseButtonPositionSupport.gravityFor("left"));
     }
-
-    @Test
-    public void nudgeAlwaysPointsOutwards() {
-        assertEquals(-8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.START, -8f), 0f);
-        assertEquals(8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.END, -8f), 0f);
-        assertEquals(8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.END, 8f), 0f);
-    }
 }
