@@ -1,12 +1,26 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.graphics.Color;
 import android.os.Build;
 import org.junit.Test;
 
 public class SystemUiChromeSupportTest {
+
+    @Test
+    public void windowBackgroundFollowsToolbarColorWhenSet() {
+        assertEquals(0xFF123456, SystemUiChromeSupport.resolveWindowBackgroundColor(0xFF123456, true));
+        assertEquals(0xFF123456, SystemUiChromeSupport.resolveWindowBackgroundColor(0xFF123456, false));
+    }
+
+    @Test
+    public void windowBackgroundFollowsThemeWithoutToolbarColor() {
+        assertEquals(Color.BLACK, SystemUiChromeSupport.resolveWindowBackgroundColor(null, true));
+        assertEquals(Color.WHITE, SystemUiChromeSupport.resolveWindowBackgroundColor(null, false));
+    }
 
     @Test
     public void edgeToEdgeChromeRequiredFromApi35() {

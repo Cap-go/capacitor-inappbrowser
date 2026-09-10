@@ -3874,6 +3874,29 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private int resolveWindowBackgroundColor() {
+        Integer toolbarColor = null;
+        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
+            try {
+                toolbarColor = Color.parseColor(_options.getToolbarColor());
+            } catch (IllegalArgumentException e) {
+                Log.e("InAppBrowser", "Invalid toolbar color, using theme default: " + e.getMessage());
+            }
+        }
+        return SystemUiChromeSupport.resolveWindowBackgroundColor(toolbarColor, isDarkThemeEnabled());
+    }
+
+    private void applyWindowBackgroundColor() {
+        // Custom dimensions keep the window transparent for touch passthrough
+        if (_options.getWidth() != null || _options.getHeight() != null) {
+            return;
+        }
+        Window window = getWindow();
+        if (window != null) {
+            window.getDecorView().setBackgroundColor(resolveWindowBackgroundColor());
+        }
+    }
+
     private int getSystemStatusBarHeight() {
         int resourceId = getContext().getResources().getIdentifier("status_bar_height", "dimen", "android");
         if (resourceId <= 0) {
@@ -4951,6 +4974,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void setupToolbar() {
         _toolbar = findViewById(R.id.tool_bar);
+        applyWindowBackgroundColor();
 
         // Apply toolbar color early, for ALL toolbar types, before any view configuration
         if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
@@ -5110,41 +5134,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             configureBlankToolbarLayout();
             requestSafeAreaInsets();
 
-            // Also set window background color to match status bar for blank toolbar
+            // Without a toolbar the status bar view is the only chrome, so it follows the window color
             View statusBarColorView = findViewById(R.id.status_bar_color_view);
-            if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
-                try {
-                    int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                    if (getWindow() != null) {
-                        getWindow().getDecorView().setBackgroundColor(toolbarColor);
-                    }
-                    // Also set status bar color view background if available
-                    if (statusBarColorView != null) {
-                        statusBarColorView.setBackgroundColor(toolbarColor);
-                    }
-                } catch (IllegalArgumentException e) {
-                    // Fallback to system default if color parsing fails
-                    boolean isDarkTheme = isDarkThemeEnabled();
-                    int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                    if (getWindow() != null) {
-                        getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
-                    }
-                    // Also set status bar color view background if available
-                    if (statusBarColorView != null) {
-                        statusBarColorView.setBackgroundColor(windowBackgroundColor);
-                    }
-                }
-            } else {
-                // Follow system dark mode
-                boolean isDarkTheme = isDarkThemeEnabled();
-                int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                if (getWindow() != null) {
-                    getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
-                }
-                // Also set status bar color view background if available
-                if (statusBarColorView != null) {
-                    statusBarColorView.setBackgroundColor(windowBackgroundColor);
-                }
+            if (statusBarColorView != null) {
+                statusBarColorView.setBackgroundColor(resolveWindowBackgroundColor());
             }
         } else {
             _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);

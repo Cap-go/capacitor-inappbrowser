@@ -34,6 +34,17 @@ final class SystemUiChromeSupport {
         return !edgeToEdge && shouldUsePreApi30LayoutFlags(sdkInt);
     }
 
+    /**
+     * Color painted behind the browser content, visible in the system bar insets. Follows the toolbar
+     * color when one is set, otherwise the system theme, so the dialog theme's default never shows.
+     */
+    static int resolveWindowBackgroundColor(Integer toolbarColor, boolean darkTheme) {
+        if (toolbarColor != null) {
+            return toolbarColor;
+        }
+        return darkTheme ? Color.BLACK : Color.WHITE;
+    }
+
     static void setDecorFitsSystemWindows(Window window, boolean decorFitsSystemWindows) {
         if (window == null) {
             return;
