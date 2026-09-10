@@ -4972,55 +4972,55 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         // Apply toolbar color early, for ALL toolbar types, before any view configuration
         if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
+            int toolbarColor;
             try {
-                int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                _toolbar.setBackgroundColor(toolbarColor);
+                toolbarColor = Color.parseColor(_options.getToolbarColor());
+            } catch (IllegalArgumentException e) {
+                Log.e("InAppBrowser", "Invalid toolbar color, using theme default: " + e.getMessage());
+                toolbarColor = resolveWindowBackgroundColor();
+            }
 
-                // Get toolbar title and ensure it gets the right color
-                TextView titleText = _toolbar.findViewById(R.id.titleText);
+            _toolbar.setBackgroundColor(toolbarColor);
 
-                // Determine icon and text color
-                cachedTitleIconDrawable = null;
-                cachedTitleIconResolved = false;
+            // Get toolbar title and ensure it gets the right color
+            TextView titleText = _toolbar.findViewById(R.id.titleText);
 
-                int iconColor;
-                if (_options.getToolbarTextColor() != null && !_options.getToolbarTextColor().isEmpty()) {
-                    try {
-                        iconColor = Color.parseColor(_options.getToolbarTextColor());
-                    } catch (IllegalArgumentException e) {
-                        // Fallback to automatic detection if parsing fails
-                        boolean isDarkBackground = isDarkColor(toolbarColor);
-                        iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
-                    }
-                } else {
-                    // No explicit toolbarTextColor, use automatic detection based on background
+            // Determine icon and text color
+            cachedTitleIconDrawable = null;
+            cachedTitleIconResolved = false;
+
+            int iconColor;
+            if (_options.getToolbarTextColor() != null && !_options.getToolbarTextColor().isEmpty()) {
+                try {
+                    iconColor = Color.parseColor(_options.getToolbarTextColor());
+                } catch (IllegalArgumentException e) {
+                    // Fallback to automatic detection if parsing fails
                     boolean isDarkBackground = isDarkColor(toolbarColor);
                     iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
                 }
+            } else {
+                // No explicit toolbarTextColor, use automatic detection based on background
+                boolean isDarkBackground = isDarkColor(toolbarColor);
+                iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
+            }
 
-                // Store for later use with navigation buttons
-                this.iconColor = iconColor;
+            // Store for later use with navigation buttons
+            this.iconColor = iconColor;
 
-                // Set title text color directly
-                titleText.setTextColor(iconColor);
+            // Set title text color directly
+            titleText.setTextColor(iconColor);
 
-                // Apply colors to all buttons
-                applyColorToAllButtons(toolbarColor, iconColor);
+            // Apply colors to all buttons
+            applyColorToAllButtons(toolbarColor, iconColor);
 
-                // Also ensure status bar gets the color
-                if (getWindow() != null) {
-                    SystemUiChromeSupport.applyLegacyStatusBarColorViaView(findViewById(R.id.status_bar_color_view), toolbarColor);
+            // Also ensure status bar gets the color
+            if (getWindow() != null) {
+                SystemUiChromeSupport.applyLegacyStatusBarColorViaView(findViewById(R.id.status_bar_color_view), toolbarColor);
 
-                    // Determine proper status bar text color (light or dark icons)
-                    boolean isDarkBackground = isDarkColor(toolbarColor);
-                    WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
-                        getWindow(),
-                        getWindow().getDecorView()
-                    );
-                    insetsController.setAppearanceLightStatusBars(!isDarkBackground);
-                }
-            } catch (IllegalArgumentException e) {
-                Log.e("InAppBrowser", "Invalid toolbar color: " + _options.getToolbarColor());
+                // Determine proper status bar text color (light or dark icons)
+                boolean isDarkBackground = isDarkColor(toolbarColor);
+                WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+                insetsController.setAppearanceLightStatusBars(!isDarkBackground);
             }
         }
 
