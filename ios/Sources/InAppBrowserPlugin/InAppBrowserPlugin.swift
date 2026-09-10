@@ -1349,6 +1349,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("closeAction must be 'close' or 'hide'")
             return
         }
+        let closeButtonPositionOption = call.getString("closeButtonPosition")?.lowercased()
+        let closeButtonPosition = CloseButtonPositionSupport.navigationBarPosition(for: closeButtonPositionOption)
+        guard closeButtonPositionOption == nil || closeButtonPosition != nil else {
+            call.reject("closeButtonPosition must be 'start' or 'end'")
+            return
+        }
         let titleFontFamily = call.getString("titleFontFamily")
         let isInspectable = call.getBool("isInspectable", self.bridge?.config.isWebDebuggable ?? false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
@@ -1658,6 +1664,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Add share button to right navigation bar
                     webViewController.rightNavigaionBarItemTypes.append(.activity)
                 }
+            }
+
+            // An explicit closeButtonPosition wins over the toolbarType/showArrow defaults above
+            if let closeButtonPosition = closeButtonPosition {
+                webViewController.doneBarButtonItemPosition = closeButtonPosition
             }
 
             // Set buttonNearDoneIcon if provided

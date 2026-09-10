@@ -114,6 +114,17 @@ export enum CloseAction {
   HIDE = 'hide',
 }
 
+export enum CloseButtonPosition {
+  /**
+   * Leading edge of the toolbar (left in left-to-right layouts).
+   */
+  START = 'start',
+  /**
+   * Trailing edge of the toolbar (right in left-to-right layouts).
+   */
+  END = 'end',
+}
+
 export interface ToolbarTitleIconOptions {
   ios?: {
     iconType: 'sf-symbol' | 'asset';
@@ -1024,6 +1035,18 @@ export interface OpenWebViewOptions {
    * closeAction: CloseAction.HIDE
    */
   closeAction?: CloseAction;
+  /**
+   * Where the native toolbar close button is placed.
+   *
+   * When omitted, each platform keeps its convention: Android places the close button at the
+   * start, iOS at the end (or at the start when `showArrow` is true). Setting this option
+   * overrides that placement on both platforms.
+   *
+   * @since 8.17.0
+   * @example
+   * closeButtonPosition: CloseButtonPosition.END
+   */
+  closeButtonPosition?: CloseButtonPosition;
   /**
    * Captures the visible webview and includes it as `screenshot` in `hideEvent`
    * before the toolbar close button hides the webview.

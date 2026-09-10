@@ -5007,6 +5007,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         ImageButton closeButtonView = _toolbar.findViewById(R.id.closeButton);
+        Integer closeButtonGravity = CloseButtonPositionSupport.gravityFor(_options.getCloseButtonPosition());
+        if (closeButtonGravity != null && closeButtonView.getLayoutParams() instanceof Toolbar.LayoutParams closeButtonParams) {
+            closeButtonParams.gravity = closeButtonGravity;
+            closeButtonView.setLayoutParams(closeButtonParams);
+            // Toolbar only insets the start edge by default; give the end edge the same inset and
+            // mirror the edge nudge from tool_bar.xml so both placements end up symmetric
+            if (closeButtonGravity == Gravity.END) {
+                _toolbar.setContentInsetsRelative(_toolbar.getContentInsetStart(), _toolbar.getContentInsetStart());
+            }
+            closeButtonView.setTranslationX(
+                CloseButtonPositionSupport.mirroredTranslationX(closeButtonGravity, closeButtonView.getTranslationX())
+            );
+        }
         closeButtonView.setOnClickListener(
             new View.OnClickListener() {
                 @Override
