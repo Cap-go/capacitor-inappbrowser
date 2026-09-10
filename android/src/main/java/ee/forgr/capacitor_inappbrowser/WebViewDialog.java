@@ -5009,12 +5009,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ImageButton closeButtonView = _toolbar.findViewById(R.id.closeButton);
         Integer closeButtonGravity = CloseButtonPositionSupport.gravityFor(_options.getCloseButtonPosition());
         if (closeButtonGravity != null && closeButtonView.getLayoutParams() instanceof Toolbar.LayoutParams closeButtonParams) {
-            closeButtonParams.gravity = closeButtonGravity;
+            int verticalGravity = closeButtonParams.gravity & Gravity.VERTICAL_GRAVITY_MASK;
+            closeButtonParams.gravity = verticalGravity | closeButtonGravity;
             closeButtonView.setLayoutParams(closeButtonParams);
             closeButtonView.setTranslationX(
                 CloseButtonPositionSupport.mirroredTranslationX(
                     closeButtonGravity,
-                    closeButtonView.getLayoutDirection(),
+                    _context.getResources().getConfiguration().getLayoutDirection(),
                     closeButtonView.getTranslationX()
                 )
             );

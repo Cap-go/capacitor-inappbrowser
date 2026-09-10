@@ -3,11 +3,14 @@ package ee.forgr.capacitor_inappbrowser;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import android.content.res.Configuration;
 import android.view.Gravity;
 import android.view.View;
+import java.util.Locale;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 @RunWith(RobolectricTestRunner.class)
@@ -37,5 +40,17 @@ public class CloseButtonPositionSupportTest {
     public void nudgeAlwaysPointsOutwardsInRtl() {
         assertEquals(8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.START, View.LAYOUT_DIRECTION_RTL, -8f), 0f);
         assertEquals(-8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.END, View.LAYOUT_DIRECTION_RTL, -8f), 0f);
+    }
+
+    @Test
+    public void nudgeUsesConfigurationLayoutDirectionForRtlLocales() {
+        Configuration configuration = RuntimeEnvironment.getApplication().getResources().getConfiguration();
+        configuration.setLocale(Locale.forLanguageTag("ar"));
+        configuration.setLayoutDirection(Locale.forLanguageTag("ar"));
+
+        int layoutDirection = configuration.getLayoutDirection();
+        assertEquals(View.LAYOUT_DIRECTION_RTL, layoutDirection);
+        assertEquals(8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.START, layoutDirection, -8f), 0f);
+        assertEquals(-8f, CloseButtonPositionSupport.mirroredTranslationX(Gravity.END, layoutDirection, -8f), 0f);
     }
 }
