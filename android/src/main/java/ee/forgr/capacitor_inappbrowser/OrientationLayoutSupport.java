@@ -16,11 +16,13 @@ final class OrientationLayoutSupport {
         Integer previousScreenHeightDp,
         Integer previousSmallestScreenWidthDp,
         Integer previousDensityDpi,
+        Integer previousUiMode,
         int currentOrientation,
         int currentScreenWidthDp,
         int currentScreenHeightDp,
         int currentSmallestScreenWidthDp,
-        int currentDensityDpi
+        int currentDensityDpi,
+        int currentUiMode
     ) {
         if (previousOrientation == null) {
             return true;
@@ -35,7 +37,9 @@ final class OrientationLayoutSupport {
             previousSmallestScreenWidthDp == null ||
             previousSmallestScreenWidthDp != currentSmallestScreenWidthDp ||
             previousDensityDpi == null ||
-            previousDensityDpi != currentDensityDpi
+            previousDensityDpi != currentDensityDpi ||
+            previousUiMode == null ||
+            previousUiMode != currentUiMode
         );
     }
 }

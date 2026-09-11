@@ -2214,9 +2214,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                                 boolean isDarkBackground = isDarkColor(toolbarColor);
                                 insetsController.setAppearanceLightStatusBars(!isDarkBackground);
                             } catch (IllegalArgumentException e) {
-                                // Fallback to default black if color parsing fails
-                                statusBarColorView.setBackgroundColor(Color.BLACK);
-                                insetsController.setAppearanceLightStatusBars(false);
+                                int fallbackColor = resolveWindowBackgroundColor();
+                                statusBarColorView.setBackgroundColor(fallbackColor);
+                                insetsController.setAppearanceLightStatusBars(!isDarkThemeEnabled());
                             }
                         } else {
                             // Follow system dark mode if no toolbar color provided
@@ -3450,6 +3450,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         Integer previousScreenHeightDp = lastConfiguration != null ? lastConfiguration.screenHeightDp : null;
         Integer previousSmallestScreenWidthDp = lastConfiguration != null ? lastConfiguration.smallestScreenWidthDp : null;
         Integer previousDensityDpi = lastConfiguration != null ? lastConfiguration.densityDpi : null;
+        Integer previousUiMode = lastConfiguration != null ? lastConfiguration.uiMode : null;
 
         int currentOrientation = newConfig != null ? newConfig.orientation : (previousOrientation != null ? previousOrientation : 0);
         int currentScreenWidthDp =
@@ -3461,6 +3462,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 ? newConfig.smallestScreenWidthDp
                 : (previousSmallestScreenWidthDp != null ? previousSmallestScreenWidthDp : 0);
         int currentDensityDpi = newConfig != null ? newConfig.densityDpi : (previousDensityDpi != null ? previousDensityDpi : 0);
+        int currentUiMode = newConfig != null ? newConfig.uiMode : (previousUiMode != null ? previousUiMode : 0);
 
         boolean shouldRefresh = OrientationLayoutSupport.shouldRefreshBrowserLayout(
             previousOrientation,
@@ -3468,11 +3470,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             previousScreenHeightDp,
             previousSmallestScreenWidthDp,
             previousDensityDpi,
+            previousUiMode,
             currentOrientation,
             currentScreenWidthDp,
             currentScreenHeightDp,
             currentSmallestScreenWidthDp,
-            currentDensityDpi
+            currentDensityDpi,
+            currentUiMode
         );
 
         if (newConfig != null) {
@@ -3513,6 +3517,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         ensureContentBrowserMatchParentHeight();
+        applyWindowBackgroundColor();
 
         boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
         if (isBlankToolbar) {
@@ -3599,18 +3604,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         appBarLayout.setStateListAnimator(null);
         appBarLayout.setOutlineProvider(null);
 
-        int backgroundColor = Color.BLACK;
-        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
-            try {
-                backgroundColor = Color.parseColor(_options.getToolbarColor());
-            } catch (IllegalArgumentException e) {
-                Log.e("InAppBrowser", "Invalid toolbar color, using black: " + e.getMessage());
-            }
-        } else {
-            backgroundColor = isDarkThemeEnabled() ? Color.BLACK : Color.WHITE;
-        }
-
-        final int finalBgColor = backgroundColor;
+        final int finalBgColor = resolveWindowBackgroundColor();
         _webView.post(() -> {
             if (_webView == null) {
                 return;
@@ -3630,6 +3624,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
             applyAppBarTopInset(appBarLayout, appBarHandlesTopInset(toolbarView) ? statusBarHeight : 0);
             appBarLayout.setBackgroundColor(finalBgColor);
+
+            Window window = getWindow();
+            if (window != null) {
+                WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(window, window.getDecorView());
+                insetsController.setAppearanceLightStatusBars(!isDarkColor(finalBgColor));
+            }
         });
     }
 
@@ -3871,6 +3871,29 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams) contentBrowserLayout.getLayoutParams();
             layoutParams.setBehavior(null);
             contentBrowserLayout.setLayoutParams(layoutParams);
+        }
+    }
+
+    private int resolveWindowBackgroundColor() {
+        Integer toolbarColor = null;
+        if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
+            try {
+                toolbarColor = Color.parseColor(_options.getToolbarColor());
+            } catch (IllegalArgumentException e) {
+                Log.e("InAppBrowser", "Invalid toolbar color, using theme default: " + e.getMessage());
+            }
+        }
+        return SystemUiChromeSupport.resolveWindowBackgroundColor(toolbarColor, isDarkThemeEnabled());
+    }
+
+    private void applyWindowBackgroundColor() {
+        // Custom dimensions keep the window transparent for touch passthrough
+        if (_options.getWidth() != null || _options.getHeight() != null) {
+            return;
+        }
+        Window window = getWindow();
+        if (window != null) {
+            window.getDecorView().setBackgroundColor(resolveWindowBackgroundColor());
         }
     }
 
@@ -4951,58 +4974,59 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void setupToolbar() {
         _toolbar = findViewById(R.id.tool_bar);
+        applyWindowBackgroundColor();
 
         // Apply toolbar color early, for ALL toolbar types, before any view configuration
         if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
+            int toolbarColor;
             try {
-                int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                _toolbar.setBackgroundColor(toolbarColor);
+                toolbarColor = Color.parseColor(_options.getToolbarColor());
+            } catch (IllegalArgumentException e) {
+                Log.e("InAppBrowser", "Invalid toolbar color, using theme default: " + e.getMessage());
+                toolbarColor = resolveWindowBackgroundColor();
+            }
 
-                // Get toolbar title and ensure it gets the right color
-                TextView titleText = _toolbar.findViewById(R.id.titleText);
+            _toolbar.setBackgroundColor(toolbarColor);
 
-                // Determine icon and text color
-                cachedTitleIconDrawable = null;
-                cachedTitleIconResolved = false;
+            // Get toolbar title and ensure it gets the right color
+            TextView titleText = _toolbar.findViewById(R.id.titleText);
 
-                int iconColor;
-                if (_options.getToolbarTextColor() != null && !_options.getToolbarTextColor().isEmpty()) {
-                    try {
-                        iconColor = Color.parseColor(_options.getToolbarTextColor());
-                    } catch (IllegalArgumentException e) {
-                        // Fallback to automatic detection if parsing fails
-                        boolean isDarkBackground = isDarkColor(toolbarColor);
-                        iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
-                    }
-                } else {
-                    // No explicit toolbarTextColor, use automatic detection based on background
+            // Determine icon and text color
+            cachedTitleIconDrawable = null;
+            cachedTitleIconResolved = false;
+
+            int iconColor;
+            if (_options.getToolbarTextColor() != null && !_options.getToolbarTextColor().isEmpty()) {
+                try {
+                    iconColor = Color.parseColor(_options.getToolbarTextColor());
+                } catch (IllegalArgumentException e) {
+                    // Fallback to automatic detection if parsing fails
                     boolean isDarkBackground = isDarkColor(toolbarColor);
                     iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
                 }
+            } else {
+                // No explicit toolbarTextColor, use automatic detection based on background
+                boolean isDarkBackground = isDarkColor(toolbarColor);
+                iconColor = isDarkBackground ? Color.WHITE : Color.BLACK;
+            }
 
-                // Store for later use with navigation buttons
-                this.iconColor = iconColor;
+            // Store for later use with navigation buttons
+            this.iconColor = iconColor;
 
-                // Set title text color directly
-                titleText.setTextColor(iconColor);
+            // Set title text color directly
+            titleText.setTextColor(iconColor);
 
-                // Apply colors to all buttons
-                applyColorToAllButtons(toolbarColor, iconColor);
+            // Apply colors to all buttons
+            applyColorToAllButtons(toolbarColor, iconColor);
 
-                // Also ensure status bar gets the color
-                if (getWindow() != null) {
-                    SystemUiChromeSupport.applyLegacyStatusBarColorViaView(findViewById(R.id.status_bar_color_view), toolbarColor);
+            // Also ensure status bar gets the color
+            if (getWindow() != null) {
+                SystemUiChromeSupport.applyLegacyStatusBarColorViaView(findViewById(R.id.status_bar_color_view), toolbarColor);
 
-                    // Determine proper status bar text color (light or dark icons)
-                    boolean isDarkBackground = isDarkColor(toolbarColor);
-                    WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(
-                        getWindow(),
-                        getWindow().getDecorView()
-                    );
-                    insetsController.setAppearanceLightStatusBars(!isDarkBackground);
-                }
-            } catch (IllegalArgumentException e) {
-                Log.e("InAppBrowser", "Invalid toolbar color: " + _options.getToolbarColor());
+                // Determine proper status bar text color (light or dark icons)
+                boolean isDarkBackground = isDarkColor(toolbarColor);
+                WindowInsetsControllerCompat insetsController = new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+                insetsController.setAppearanceLightStatusBars(!isDarkBackground);
             }
         }
 
@@ -5132,41 +5156,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             configureBlankToolbarLayout();
             requestSafeAreaInsets();
 
-            // Also set window background color to match status bar for blank toolbar
+            // Without a toolbar the status bar view is the only chrome, so it follows the window color
             View statusBarColorView = findViewById(R.id.status_bar_color_view);
-            if (_options.getToolbarColor() != null && !_options.getToolbarColor().isEmpty()) {
-                try {
-                    int toolbarColor = Color.parseColor(_options.getToolbarColor());
-                    if (getWindow() != null) {
-                        getWindow().getDecorView().setBackgroundColor(toolbarColor);
-                    }
-                    // Also set status bar color view background if available
-                    if (statusBarColorView != null) {
-                        statusBarColorView.setBackgroundColor(toolbarColor);
-                    }
-                } catch (IllegalArgumentException e) {
-                    // Fallback to system default if color parsing fails
-                    boolean isDarkTheme = isDarkThemeEnabled();
-                    int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                    if (getWindow() != null) {
-                        getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
-                    }
-                    // Also set status bar color view background if available
-                    if (statusBarColorView != null) {
-                        statusBarColorView.setBackgroundColor(windowBackgroundColor);
-                    }
-                }
-            } else {
-                // Follow system dark mode
-                boolean isDarkTheme = isDarkThemeEnabled();
-                int windowBackgroundColor = isDarkTheme ? Color.BLACK : Color.WHITE;
-                if (getWindow() != null) {
-                    getWindow().getDecorView().setBackgroundColor(windowBackgroundColor);
-                }
-                // Also set status bar color view background if available
-                if (statusBarColorView != null) {
-                    statusBarColorView.setBackgroundColor(windowBackgroundColor);
-                }
+            if (statusBarColorView != null) {
+                statusBarColorView.setBackgroundColor(resolveWindowBackgroundColor());
             }
         } else {
             _toolbar.findViewById(R.id.forwardButton).setVisibility(View.GONE);
