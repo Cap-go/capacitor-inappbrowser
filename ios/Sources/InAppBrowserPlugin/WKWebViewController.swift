@@ -1504,19 +1504,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
 
             // Create buttonNearDone button with the correct tint color if it doesn't already exist
-            if buttonNearDoneIcon != nil &&
-                navigationItem.rightBarButtonItems?.count == 1 &&
-                navigationItem.rightBarButtonItems?.first == doneBarButtonItem {
-
-                // Create a properly tinted button
-                let buttonItem = UIBarButtonItem(image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                                                 style: .plain,
-                                                 target: self,
-                                                 action: #selector(buttonNearDoneDidClick))
-                buttonItem.tintColor = tintColor
-
-                // Add it to right items
-                navigationItem.rightBarButtonItems?.append(buttonItem)
+            if buttonNearDoneIcon != nil {
+                if doneBarButtonItemPosition == .left,
+                   navigationItem.leftBarButtonItems?.count == 1,
+                   navigationItem.leftBarButtonItems?.first == doneBarButtonItem {
+                    let buttonItem = makeButtonNearDoneBarButtonItem(tintColor: tintColor)
+                    navigationItem.leftBarButtonItems?.append(buttonItem)
+                } else if doneBarButtonItemPosition == .right,
+                          navigationItem.rightBarButtonItems?.count == 1,
+                          navigationItem.rightBarButtonItems?.first == doneBarButtonItem {
+                    let buttonItem = makeButtonNearDoneBarButtonItem(tintColor: tintColor)
+                    navigationItem.rightBarButtonItems?.append(buttonItem)
+                }
             }
         }
         updateTitleAppearance()
@@ -2424,32 +2423,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         // Force add buttonNearDone if it's not visible yet
         if buttonNearDoneIcon != nil {
-            // Check if button already exists in the navigation bar
-            let buttonExists = navigationItem.rightBarButtonItems?.contains { item in
-                return item.action == #selector(buttonNearDoneDidClick)
-            } ?? false
+            let doneOnLeft = doneBarButtonItemPosition == .left
+            let existingItems = doneOnLeft ? navigationItem.leftBarButtonItems : navigationItem.rightBarButtonItems
+            let buttonExists = buttonNearDoneAlreadyExists(in: existingItems)
 
             if !buttonExists {
-                // Create and add the button directly
-                let buttonItem = UIBarButtonItem(
-                    image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                    style: .plain,
-                    target: self,
-                    action: #selector(buttonNearDoneDidClick)
-                )
-
-                // Apply tint color
-                if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
-                    buttonItem.tintColor = tintColor
-                }
-
-                // Add to right items
-                if navigationItem.rightBarButtonItems == nil {
-                    navigationItem.rightBarButtonItems = [buttonItem]
+                let buttonItem = makeButtonNearDoneBarButtonItem()
+                if doneOnLeft {
+                    if navigationItem.leftBarButtonItems == nil {
+                        navigationItem.leftBarButtonItems = [buttonItem]
+                    } else {
+                        var items = navigationItem.leftBarButtonItems ?? []
+                        items.append(buttonItem)
+                        navigationItem.leftBarButtonItems = items
+                    }
                 } else {
-                    var items = navigationItem.rightBarButtonItems ?? []
-                    items.append(buttonItem)
-                    navigationItem.rightBarButtonItems = items
+                    if navigationItem.rightBarButtonItems == nil {
+                        navigationItem.rightBarButtonItems = [buttonItem]
+                    } else {
+                        var items = navigationItem.rightBarButtonItems ?? []
+                        items.append(buttonItem)
+                        navigationItem.rightBarButtonItems = items
+                    }
                 }
 
                 print("[DEBUG] Force added buttonNearDone in viewDidAppear")
@@ -2745,7 +2740,7 @@ fileprivate extension WKWebViewController {
             break
         }
 
-        navigationItem.leftBarButtonItems = leftNavigationBarItemTypes.map {
+        var leftBarButtons = leftNavigationBarItemTypes.map {
             barButtonItemType in
             if let barButtonItem = barButtonItem(barButtonItemType) {
                 return barButtonItem
@@ -2761,46 +2756,16 @@ fileprivate extension WKWebViewController {
             return UIBarButtonItem()
         }
 
-        // If we have buttonNearDoneIcon and the first (or only) right button is the done button
-        if buttonNearDoneIcon != nil &&
-            ((rightBarButtons.count == 1 && rightBarButtons[0] == doneBarButtonItem) ||
-                (rightBarButtons.isEmpty && doneBarButtonItemPosition == .right) ||
-                rightBarButtons.contains(doneBarButtonItem)) {
+        appendButtonNearDoneIfNeeded(
+            to: &leftBarButtons,
+            doneExpectedOnThisSide: doneBarButtonItemPosition == .left
+        )
+        appendButtonNearDoneIfNeeded(
+            to: &rightBarButtons,
+            doneExpectedOnThisSide: doneBarButtonItemPosition == .right
+        )
 
-            // Check if button already exists to avoid duplicates
-            let buttonExists = rightBarButtons.contains { item in
-                let selector = #selector(buttonNearDoneDidClick)
-                return item.action == selector
-            }
-
-            if !buttonExists {
-                // Create button with proper tint and template rendering mode
-                let buttonItem = UIBarButtonItem(
-                    image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
-                    style: .plain,
-                    target: self,
-                    action: #selector(buttonNearDoneDidClick)
-                )
-
-                // Apply tint from navigation bar or from tintColor property
-                if let tintColor = self.tintColor ?? self.navigationController?.navigationBar.tintColor {
-                    buttonItem.tintColor = tintColor
-                }
-
-                // Make sure the done button is there before adding this one
-                if rightBarButtons.isEmpty && doneBarButtonItemPosition == .right {
-                    rightBarButtons.append(doneBarButtonItem)
-                }
-
-                // Add the button
-                rightBarButtons.append(buttonItem)
-
-                print("[DEBUG] Added buttonNearDone to right bar buttons, icon: \(String(describing: buttonNearDoneIcon))")
-            } else {
-                print("[DEBUG] buttonNearDone already exists in right bar buttons")
-            }
-        }
-
+        navigationItem.leftBarButtonItems = leftBarButtons
         navigationItem.rightBarButtonItems = rightBarButtons
 
         // After all buttons are set up, apply tint color
@@ -3062,6 +3027,41 @@ fileprivate extension WKWebViewController {
     // Public method for safe back navigation
     @objc func forwardDidClick(sender: AnyObject) {
         webView?.goForward()
+    }
+
+    func makeButtonNearDoneBarButtonItem(tintColor: UIColor? = nil) -> UIBarButtonItem {
+        let buttonItem = UIBarButtonItem(
+            image: buttonNearDoneIcon?.withRenderingMode(.alwaysTemplate),
+            style: .plain,
+            target: self,
+            action: #selector(buttonNearDoneDidClick)
+        )
+        if let resolvedTint = tintColor ?? self.tintColor ?? self.navigationController?.navigationBar.tintColor {
+            buttonItem.tintColor = resolvedTint
+        }
+        return buttonItem
+    }
+
+    func buttonNearDoneAlreadyExists(in barButtons: [UIBarButtonItem]?) -> Bool {
+        barButtons?.contains { $0.action == #selector(buttonNearDoneDidClick) } ?? false
+    }
+
+    func appendButtonNearDoneIfNeeded(to barButtons: inout [UIBarButtonItem], doneExpectedOnThisSide: Bool) {
+        guard buttonNearDoneIcon != nil else { return }
+
+        let shouldAdd = (barButtons.count == 1 && barButtons[0] == doneBarButtonItem) ||
+            (barButtons.isEmpty && doneExpectedOnThisSide) ||
+            barButtons.contains(doneBarButtonItem)
+        guard shouldAdd else { return }
+        guard !buttonNearDoneAlreadyExists(in: barButtons) else { return }
+
+        if barButtons.isEmpty && doneExpectedOnThisSide {
+            barButtons.append(doneBarButtonItem)
+        }
+
+        barButtons.append(makeButtonNearDoneBarButtonItem())
+        let side = doneExpectedOnThisSide ? "expected" : "other"
+        print("[DEBUG] Added buttonNearDone to \(side) bar buttons, icon: \(String(describing: buttonNearDoneIcon))")
     }
 
     @objc func buttonNearDoneDidClick(sender: AnyObject) {

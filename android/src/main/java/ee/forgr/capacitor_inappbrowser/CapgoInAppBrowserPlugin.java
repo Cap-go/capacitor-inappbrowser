@@ -1072,6 +1072,15 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
         options.setCloseAction(closeAction);
+        String closeButtonPosition = call.getString("closeButtonPosition");
+        if (closeButtonPosition != null) {
+            closeButtonPosition = closeButtonPosition.toLowerCase(Locale.ROOT);
+            if (CloseButtonPositionSupport.gravityFor(closeButtonPosition) == null) {
+                call.reject("closeButtonPosition must be 'start' or 'end'");
+                return;
+            }
+        }
+        options.setCloseButtonPosition(closeButtonPosition);
         options.setTitleFontFamily(call.getString("titleFontFamily"));
         JSObject titleIconObj = call.getObject("titleIcon");
         if (titleIconObj != null) {

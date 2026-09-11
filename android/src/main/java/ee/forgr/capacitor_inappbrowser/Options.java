@@ -146,6 +146,7 @@ public class Options {
     private String CloseModalCancel;
     private ButtonNearDone buttonNearDone;
     private String closeAction = "close";
+    private String closeButtonPosition;
     private String titleFontFamily;
     private ButtonNearDone titleIcon;
     private String CloseModalOk;
@@ -464,6 +465,14 @@ public class Options {
 
     public void setCloseAction(String closeAction) {
         this.closeAction = closeAction;
+    }
+
+    public String getCloseButtonPosition() {
+        return closeButtonPosition;
+    }
+
+    public void setCloseButtonPosition(String closeButtonPosition) {
+        this.closeButtonPosition = closeButtonPosition;
     }
 
     public String getTitleFontFamily() {
@@ -834,6 +843,7 @@ public class Options {
         copy.setCloseModalURLPattern(closeModalURLPattern);
         copy.setButtonNearDone(buttonNearDone);
         copy.setCloseAction(closeAction);
+        copy.setCloseButtonPosition(closeButtonPosition);
         copy.setTitleFontFamily(titleFontFamily);
         copy.setTitleIcon(titleIcon);
         copy.setUrl("about:blank");

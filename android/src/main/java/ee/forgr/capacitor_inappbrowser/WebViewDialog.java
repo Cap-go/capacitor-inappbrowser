@@ -5007,6 +5007,28 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         ImageButton closeButtonView = _toolbar.findViewById(R.id.closeButton);
+        Integer closeButtonGravity = CloseButtonPositionSupport.gravityFor(_options.getCloseButtonPosition());
+        if (closeButtonGravity != null && closeButtonView.getLayoutParams() instanceof Toolbar.LayoutParams closeButtonParams) {
+            int verticalGravity = closeButtonParams.gravity & Gravity.VERTICAL_GRAVITY_MASK;
+            closeButtonParams.gravity = verticalGravity | closeButtonGravity;
+            closeButtonView.setLayoutParams(closeButtonParams);
+            closeButtonView.setTranslationX(
+                CloseButtonPositionSupport.mirroredTranslationX(
+                    closeButtonGravity,
+                    _context.getResources().getConfiguration().getLayoutDirection(),
+                    closeButtonView.getTranslationX()
+                )
+            );
+            // Toolbar only insets the start edge; pad the logical end so the icon keeps clear of the screen edge
+            if (closeButtonGravity == Gravity.END) {
+                closeButtonView.setPaddingRelative(
+                    closeButtonView.getPaddingStart(),
+                    closeButtonView.getPaddingTop(),
+                    (int) getPixels(CloseButtonPositionSupport.END_PADDING_DP),
+                    closeButtonView.getPaddingBottom()
+                );
+            }
+        }
         closeButtonView.setOnClickListener(
             new View.OnClickListener() {
                 @Override
