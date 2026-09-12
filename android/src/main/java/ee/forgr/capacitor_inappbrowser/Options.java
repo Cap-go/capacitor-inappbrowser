@@ -197,6 +197,16 @@ public class Options {
     private boolean hidden = false;
     private boolean toBack = false;
     private boolean transparentBackground = true;
+    private boolean fullscreen = false;
+
+    public boolean isFullscreen() {
+        return fullscreen;
+    }
+
+    public void setFullscreen(boolean fullscreen) {
+        this.fullscreen = fullscreen;
+    }
+
     private boolean showScreenshotButton = false;
     private boolean screenshotOnHide = false;
     private boolean allowWebViewJsVisibilityControl = false;

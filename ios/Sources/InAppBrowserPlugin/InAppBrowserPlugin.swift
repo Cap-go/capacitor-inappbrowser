@@ -453,6 +453,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "goBack", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "open", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openWebView", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setFullscreen", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getFullscreen", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearCookies", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCookies", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearAllCookies", returnType: CAPPluginReturnPromise),
@@ -554,6 +556,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func unregisterWebView(id: String) {
+        webViewControllers[id]?.setBrowserFullscreen(false)
         detachFramedOverlayWebView(id: id)
         detachLayeredWebView(id: id)
         if let webView = webViewControllers[id]?.capableWebView {
@@ -648,7 +651,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return nil
         }
 
-        let navigationController = UINavigationController(rootViewController: popupController)
+        let navigationController = BrowserNavigationController(rootViewController: popupController)
         cloneNavigationAppearance(from: parentController.navigationController, to: navigationController)
         let shouldActivatePopup = ActiveWebViewSupport.shouldActivateNewWebView(
             isHidden: shouldHidePopup,
@@ -1462,6 +1465,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let height = call.getFloat("height")
         let xPos = call.getFloat("x")
         let yPos = call.getFloat("y")
+        let fullscreen = call.getBool("fullscreen", false)
+        if fullscreen && (toBack || width != nil || height != nil || xPos != nil || yPos != nil) {
+            call.reject("Fullscreen is not supported for framed or behind-host WebViews")
+            return
+        }
 
         // Read disableOverscroll option (iOS only - controls WebView bounce effect)
         let disableOverscroll = call.getBool("disableOverscroll", false)
@@ -1722,7 +1730,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
-            self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
+            self.navigationWebViewController = BrowserNavigationController(rootViewController: webViewController)
             if let navigationController = self.navigationWebViewController {
                 self.registerWebView(id: webViewId, webView: webViewController, navigationController: navigationController)
             }
@@ -1824,6 +1832,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             }
 
+            webViewController.pendingStartupFullscreen = fullscreen && UIApplication.shared.applicationState == .active
+
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
@@ -1921,6 +1931,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.isHidden = hidden
 
             if hidden {
+                webViewController.setBrowserFullscreen(false)
                 if let resolvedId {
                     self.detachFramedOverlayWebView(id: resolvedId)
                     self.detachLayeredWebView(id: resolvedId)
@@ -2014,6 +2025,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             let transparentBackground = call.getBool("transparentBackground", true)
+            webViewController.setBrowserFullscreen(false)
             self.dismissNavigationControllerIfPresented(navigationController) {
                 webViewController.isLayeredBehind = true
                 webViewController.transparentHostBackground = transparentBackground
@@ -2633,6 +2645,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func appWillResignActive(_ notification: NSNotification) {
+        for controller in webViewControllers.values {
+            controller.setBrowserFullscreen(false)
+        }
         self.showPrivacyScreen()
     }
 
@@ -2948,3 +2963,50 @@ extension CapgoInAppBrowserPlugin {
 
 }
 
+
+extension CapgoInAppBrowserPlugin {
+    @objc func setFullscreen(_ call: CAPPluginCall) {
+        guard let value = call.options["enabled"] as? NSNumber,
+              CFGetTypeID(value) == CFBooleanGetTypeID() else {
+            call.reject("enabled must be a boolean")
+            return
+        }
+        let enabled = value.boolValue
+        DispatchQueue.main.async {
+            guard let id = call.getString("id") ?? self.activeWebViewId,
+                  let controller = self.webViewControllers[id],
+                  controller.capableWebView != nil else {
+                call.reject("WebView is not initialized or does not support fullscreen")
+                return
+            }
+            if enabled {
+                guard controller.supportsBrowserFullscreen,
+                      let navigation = self.navigationControllers[id],
+                      navigation.presentingViewController != nil,
+                      navigation.presentedViewController == nil,
+                      controller.presentedViewController == nil,
+                      controller.viewIfLoaded?.window != nil,
+                      controller.capableWebView?.superview === controller.view,
+                      UIApplication.shared.applicationState == .active else {
+                    call.reject("Fullscreen requires a visible, frontmost, unframed WebView")
+                    return
+                }
+            }
+            controller.setBrowserFullscreen(enabled)
+            call.resolve()
+        }
+    }
+
+    @objc func getFullscreen(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let id = call.getString("id") ?? self.activeWebViewId,
+                  let controller = self.webViewControllers[id],
+                  controller.capableWebView != nil else {
+                call.reject("WebView is not initialized or does not support fullscreen")
+                return
+            }
+            call.resolve(["enabled": controller.isBrowserFullscreen])
+        }
+    }
+
+}

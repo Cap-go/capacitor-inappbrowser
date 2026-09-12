@@ -444,6 +444,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var capBrowserPlugin: CapgoInAppBrowserPlugin?
     open var isInspectable: Bool = false
     var instanceId: String = ""
+    var browserFullscreen = BrowserFullscreenState()
+
+    override open var prefersStatusBarHidden: Bool { isBrowserFullscreen }
+    override open var prefersHomeIndicatorAutoHidden: Bool { isBrowserFullscreen }
+
     var shareDisclaimer: [String: Any]?
     var shareSubject: String?
     var didpageInit = false
@@ -1232,6 +1237,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         hostView.insertSubview(backgroundView, at: 0)
         backgroundView.translatesAutoresizingMaskIntoConstraints = false
         backgroundView.backgroundColor = color
+        backgroundView.isHidden = isBrowserFullscreen
 
         var constraints = [
             backgroundView.topAnchor.constraint(equalTo: hostView.topAnchor),
@@ -2372,7 +2378,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func applyNavigationVisibility() {
-        navigationController?.setNavigationBarHidden(blankNavigationTab, animated: false)
+        navigationController?.setNavigationBarHidden(isBrowserFullscreen || blankNavigationTab, animated: false)
         // Always hide toolbar since we never want it.
         navigationController?.setToolbarHidden(true, animated: false)
     }
@@ -2403,6 +2409,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             } else {
                 setupStatusBarBackground(color: UIColor.white)
             }
+        }
+
+        // Apply only when presented; hidden startup must not change the host's system bars.
+        if pendingStartupFullscreen {
+            setBrowserFullscreen(UIApplication.shared.applicationState == .active)
         }
 
         // Update status bar style
@@ -2459,7 +2470,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     override open func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        rollbackState()
+        if isBeingDismissed || isMovingFromParent || navigationController?.isBeingDismissed == true {
+            setBrowserFullscreen(false)
+        }
+        if !isBrowserFullscreen {
+            rollbackState()
+        }
     }
 
     override open func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
@@ -2594,6 +2610,7 @@ public extension WKWebViewController {
     }
 
     func cleanupWebView() {
+        setBrowserFullscreen(false)
         guard let webView = self.webView else { return }
         webView.stopLoading()
         previewItemURL = nil
@@ -3642,6 +3659,10 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
+        if navigationAction.targetFrame?.isMainFrame == true {
+            exitFullscreenIfOriginChanges(to: url)
+        }
+
         if handleDownloads, url.scheme?.lowercased() == "blob" {
             handleBlobDownloadFromPage(
                 blobUrl: url.absoluteString,
@@ -3717,6 +3738,9 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     public func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if navigationResponse.isForMainFrame {
+            exitFullscreenIfOriginChanges(to: navigationResponse.response.url)
+        }
         if shouldInterceptDownload(for: navigationResponse) {
             decisionHandler(.download)
             return
@@ -3732,10 +3756,6 @@ extension WKWebViewController: WKNavigationDelegate {
 
     public func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         register(download: download, response: navigationResponse.response)
-        stopReloadGesture()
-    }
-
-    public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         stopReloadGesture()
     }
 
@@ -3791,6 +3811,7 @@ extension WKWebViewController: WKNavigationDelegate {
 
     /// Update dimensions at runtime
     func updateDimensions(width: CGFloat?, height: CGFloat?, xPos: CGFloat?, yPos: CGFloat?) {
+        setBrowserFullscreen(false)
         // Update stored dimensions
         if let width = width {
             customWidth = width
@@ -3810,6 +3831,10 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     func updateSafeTopMargin(_ enabled: Bool) {
+        if isBrowserFullscreen && !browserFullscreen.applyingLayout {
+            browserFullscreen.baseline?.safeTop = enabled
+            return
+        }
         guard enabled != self.enabledSafeTopMargin else { return }
         self.enabledSafeTopMargin = enabled
         guard let webView = self.webView else { return }
@@ -3832,6 +3857,10 @@ extension WKWebViewController: WKNavigationDelegate {
     }
 
     func updateSafeBottomMargin(_ enabled: Bool) {
+        if isBrowserFullscreen && !browserFullscreen.applyingLayout {
+            browserFullscreen.baseline?.safeBottom = enabled
+            return
+        }
         guard enabled != self.enabledSafeBottomMargin else { return }
         self.enabledSafeBottomMargin = enabled
         guard let webView = self.webView else { return }

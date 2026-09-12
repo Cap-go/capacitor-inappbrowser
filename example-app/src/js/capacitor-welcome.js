@@ -12,6 +12,7 @@ import { setupProxyDemoButtons } from './proxy-demo.js';
 import { setupProxyRegression } from './proxy-regression.js';
 import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
+import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
 
 // Default URL configuration
@@ -152,6 +153,17 @@ window.customElements.define(
         <p>
           <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
         </p>
+        <h2>Fullscreen</h2>
+        <p>
+          <label><input type="checkbox" id="fullscreen-start" checked /> Start fullscreen</label>
+          <label><input type="checkbox" id="fullscreen-hidden" /> Open hidden</label>
+          <label><input type="checkbox" id="fullscreen-deferred" /> Wait for page load</label>
+        </p>
+        <p>
+          <button class="button" id="fullscreen-open">Open fullscreen demo</button>
+          <button class="button" id="fullscreen-show" disabled>Show demo</button>
+        </p>
+        <p id="fullscreen-status">Open the demo to check native fullscreen and retained page state.</p>
         <h2>Proxy Regression</h2>
         <p>
           Run a self-contained proxy flow that serves the page, script, fetch, and XHR through <code>addProxyHandler()</code>.
@@ -791,6 +803,7 @@ window.customElements.define(
       }
 
       setupProxyDemoButtons(self.shadowRoot);
+      setupFullscreenDemo(self.shadowRoot);
 
       // Custom URL handler
       self.shadowRoot

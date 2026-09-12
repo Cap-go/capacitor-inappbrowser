@@ -338,6 +338,132 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private SwipeRefreshLayout swipeRefreshLayout;
     private boolean reloadFromGestureInProgress = false;
     private WebView _webView;
+    private FullscreenWindowState nativeFullscreenWindow;
+    private FullscreenWindowState mediaFullscreenWindow;
+    private android.widget.Button fullscreenExitButton;
+    private java.util.function.Consumer<Boolean> fullscreenChangeListener;
+    private final java.util.Map<View, Integer> fullscreenVisibility = new java.util.HashMap<>();
+    private int[] fullscreenPadding;
+    private String fullscreenOrigin;
+
+    public void setFullscreenChangeListener(java.util.function.Consumer<Boolean> listener) {
+        fullscreenChangeListener = listener;
+    }
+
+    public boolean isFullscreen() {
+        return nativeFullscreenWindow != null;
+    }
+
+    public void clearFullscreen() {
+        if (_options != null) _options.setFullscreen(false);
+        exitCustomFullscreenView();
+        setFullscreen(false);
+    }
+
+    public void setFullscreen(boolean enabled) {
+        if (!enabled && _options != null) _options.setFullscreen(false);
+        if (enabled == isFullscreen()) return;
+        if (enabled) {
+            if (
+                _webView == null ||
+                !activeForBackNavigation ||
+                isDismissing ||
+                isHiddenModeActive ||
+                (_options != null &&
+                    (_options.isHidden() ||
+                        _options.isToBack() ||
+                        _options.getWidth() != null ||
+                        _options.getHeight() != null ||
+                        _options.getX() != null ||
+                        _options.getY() != null)) ||
+                backLayerActive ||
+                getWindow() == null
+            ) {
+                throw new IllegalStateException("Fullscreen requires a visible, full-size front WebView");
+            }
+            // Finish media first: its saved window state must not outlive the browser baseline.
+            exitCustomFullscreenView();
+            nativeFullscreenWindow = new FullscreenWindowState(getWindow());
+            fullscreenOrigin = origin(_webView.getUrl() != null ? _webView.getUrl() : _options.getUrl());
+            for (int id : new int[] { R.id.app_bar_layout, R.id.status_bar_color_view }) {
+                View view = findBrowserContentDescendant(id);
+                if (view != null) {
+                    fullscreenVisibility.put(view, view.getVisibility());
+                    view.setVisibility(View.GONE);
+                }
+            }
+            View container = findBrowserContentDescendant(R.id.content_browser_layout);
+            if (container != null) {
+                fullscreenPadding = new int[] {
+                    container.getPaddingLeft(),
+                    container.getPaddingTop(),
+                    container.getPaddingRight(),
+                    container.getPaddingBottom()
+                };
+                container.setPadding(0, 0, 0, 0);
+            }
+            nativeFullscreenWindow.enter();
+            fullscreenExitButton = new android.widget.Button(getContext());
+            fullscreenExitButton.setText("↙");
+            fullscreenExitButton.setContentDescription(getContext().getString(R.string.exit_fullscreen));
+            fullscreenExitButton.setOnClickListener((v) -> clearFullscreen());
+            fullscreenExitButton.setElevation(100 * getContext().getResources().getDisplayMetrics().density);
+            int size = Math.round(48 * getContext().getResources().getDisplayMetrics().density);
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
+            ((ViewGroup) getWindow().getDecorView()).addView(fullscreenExitButton, params);
+            ViewCompat.setOnApplyWindowInsetsListener(fullscreenExitButton, (v, insets) -> {
+                updateFullscreenExitInsets(insets);
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(fullscreenExitButton);
+        } else {
+            exitCustomFullscreenView();
+            FullscreenWindowState baseline = nativeFullscreenWindow;
+            nativeFullscreenWindow = null;
+            if (fullscreenExitButton != null && fullscreenExitButton.getParent() instanceof ViewGroup parent) parent.removeView(
+                fullscreenExitButton
+            );
+            fullscreenExitButton = null;
+            for (java.util.Map.Entry<View, Integer> entry : fullscreenVisibility.entrySet()) entry.getKey().setVisibility(entry.getValue());
+            fullscreenVisibility.clear();
+            View container = findBrowserContentDescendant(R.id.content_browser_layout);
+            if (container != null && fullscreenPadding != null) container.setPadding(
+                fullscreenPadding[0],
+                fullscreenPadding[1],
+                fullscreenPadding[2],
+                fullscreenPadding[3]
+            );
+            fullscreenPadding = null;
+            baseline.restore();
+            reapplyInsetsFromWindowRoot();
+        }
+        if (fullscreenChangeListener != null) fullscreenChangeListener.accept(enabled);
+    }
+
+    private void updateFullscreenExitInsets(WindowInsetsCompat insets) {
+        if (fullscreenExitButton == null || insets == null) return;
+        Insets safe = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) fullscreenExitButton.getLayoutParams();
+        params.topMargin = safe.top;
+        params.rightMargin = safe.right;
+        fullscreenExitButton.setLayoutParams(params);
+    }
+
+    private static String origin(String url) {
+        if (url == null) return null;
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (scheme == null || host == null) return url;
+            int port = uri.getPort();
+            if (port == -1) port = "https".equalsIgnoreCase(scheme) ? 443 : 80;
+            return scheme.toLowerCase(java.util.Locale.ROOT) + "://" + host.toLowerCase(java.util.Locale.ROOT) + ":" + port;
+        } catch (Exception error) {
+            return url;
+        }
+    }
+
     // HTML5/iframe fullscreen (e.g. embedded YouTube) routes through WebChromeClient custom views.
     private View customFullscreenView;
     private WebChromeClient.CustomViewCallback customViewCallback;
@@ -469,6 +595,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     @Override
     protected void onStart() {
         super.onStart();
+        if (_options != null && _options.isFullscreen() && !_options.isHidden()) {
+            _options.setFullscreen(false);
+            setFullscreen(true);
+        }
         // ComponentDialog registers its own back callback in onCreate; re-add ours last so
         // handleBrowserBackNavigation runs before the built-in cancel callback (LIFO order).
         ensureDialogBackHandlerOnTop();
@@ -690,6 +820,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     public boolean sendToBack(boolean transparentBackground) {
+        clearFullscreen();
         if (_options != null) {
             _options.setToBack(true);
             _options.setTransparentBackground(transparentBackground);
@@ -917,7 +1048,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 Log.e("InAppBrowser", "Cannot hide - activity is null");
                 return;
             }
-            activity.runOnUiThread(() -> setHidden(true));
+            activity.runOnUiThread(() -> {
+                clearFullscreen();
+                setHidden(true);
+            });
         }
 
         @JavascriptInterface
@@ -2154,7 +2288,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         setContentView(R.layout.activity_browser);
 
         // If custom dimensions are set, configure for touch passthrough
-        if (_options != null && (_options.getWidth() != null || _options.getHeight() != null)) {
+        if (
+            _options != null &&
+            (_options.getWidth() != null || _options.getHeight() != null || _options.getX() != null || _options.getY() != null)
+        ) {
             Window window = getWindow();
             if (window != null) {
                 // Make the dialog background transparent
@@ -2842,9 +2979,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         try {
-            loadInitialWebViewContent(requestHeaders);
             setupToolbar();
             setWebViewClient();
+            loadInitialWebViewContent(requestHeaders);
 
             if (this._options.isHidden()) {
                 if (_options.isPopupWindowMode() || _options.getInvisibilityMode() == Options.InvisibilityMode.FAKE_VISIBLE) {
@@ -2994,6 +3131,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (activeForBackNavigation == active) {
             return;
         }
+        if (!active && (isFullscreen() || customFullscreenView != null)) clearFullscreen();
         activeForBackNavigation = active;
         syncBackNavigationHandlers();
     }
@@ -3022,10 +3160,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private boolean shouldConsumeBackPress() {
-        return WebViewBackNavigationSupport.shouldConsumeBackPress(isShowing(), isHiddenModeActive, backLayerActive);
+        return isFullscreen() || WebViewBackNavigationSupport.shouldConsumeBackPress(isShowing(), isHiddenModeActive, backLayerActive);
     }
 
     private void handleBrowserBackNavigation() {
+        if (isFullscreen()) {
+            clearFullscreen();
+            return;
+        }
         if (_options == null) {
             dismiss();
             return;
@@ -3098,8 +3240,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             _webView.setVisibility(View.INVISIBLE);
         }
 
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        WebViewCustomFullscreenSupport.enterImmersiveFullscreen(window, decorView);
+        mediaFullscreenWindow = new FullscreenWindowState(window);
+        mediaFullscreenWindow.enter();
+        if (fullscreenExitButton != null) fullscreenExitButton.bringToFront();
 
         if (WebViewCustomFullscreenSupport.shouldRegisterHostBackHandler(backLayerActive)) {
             registerCustomFullscreenBackHandler();
@@ -3154,15 +3297,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             _webView.setVisibility(View.VISIBLE);
         }
 
-        Window window = customFullscreenWindow != null ? customFullscreenWindow : getWindow();
-        if (window != null) {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-            WebViewCustomFullscreenSupport.exitImmersiveFullscreen(window, window.getDecorView());
-            reapplyInsetsFromWindowRoot();
-            if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
-                refreshEdgeToEdgeChrome();
-            }
+        if (mediaFullscreenWindow != null) {
+            mediaFullscreenWindow.restore();
+            mediaFullscreenWindow = null;
         }
+        if (nativeFullscreenWindow != null) nativeFullscreenWindow.enter();
+        else reapplyInsetsFromWindowRoot();
 
         unregisterCustomFullscreenBackHandler();
 
@@ -3267,6 +3407,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     public void setHidden(boolean hidden) {
+        if (hidden && (isFullscreen() || (_options != null && !_options.isHidden()))) clearFullscreen();
         if (hidden) {
             if (!isHiddenModeActive) {
                 if (getWindow() == null) {
@@ -3306,6 +3447,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         if (_options != null) {
             _options.setHidden(hidden);
+            if (!hidden && _options.isFullscreen() && isShowing()) {
+                _options.setFullscreen(false);
+                setFullscreen(true);
+            }
         }
     }
 
@@ -3496,6 +3641,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
      * after portrait↔landscape transitions.
      */
     private void refreshLayoutForConfigurationChange() {
+        if (isFullscreen()) {
+            nativeFullscreenWindow.enter();
+            updateFullscreenExitInsets(ViewCompat.getRootWindowInsets(getWindow().getDecorView()));
+            return;
+        }
         if (isDismissing || _webView == null) {
             return;
         }
@@ -3676,6 +3826,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
+        if (isFullscreen()) {
+            updateFullscreenExitInsets(windowInsets);
+            return;
+        }
         Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
         Insets navigationBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
         Insets systemGestures = windowInsets.getInsets(WindowInsetsCompat.Type.systemGestures());
@@ -6294,8 +6448,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
 
                 @Override
+                public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                    clearFullscreen();
+                    dismiss();
+                    return true;
+                }
+
+                @Override
                 public void onPageStarted(WebView view, String url, Bitmap favicon) {
                     super.onPageStarted(view, url, favicon);
+                    if (
+                        (isFullscreen() && !java.util.Objects.equals(fullscreenOrigin, origin(url))) ||
+                        (_options.isFullscreen() && !java.util.Objects.equals(origin(_options.getUrl()), origin(url)))
+                    ) clearFullscreen();
                     if (view == null || _webView == null) {
                         return;
                     }
@@ -6338,13 +6503,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 @Override
                 public void onPageFinished(WebView view, String url) {
                     super.onPageFinished(view, url);
-                    if (view == null || _webView == null) {
+                    if (view == null || _webView != view || isDismissing) {
                         return;
                     }
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
-                        if (_options.isPresentAfterPageLoad()) {
+                        if (_options.isPresentAfterPageLoad() && !_options.isHidden()) {
                             boolean usePreShowScript =
                                 _options.getPreShowScript() != null &&
                                 !_options.getPreShowScript().isEmpty() &&
@@ -6365,7 +6530,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                                                 new Runnable() {
                                                     @Override
                                                     public void run() {
-                                                        showAccordingToLayerModeOrFallback();
+                                                        if (isDismissing || _webView != view) return;
+                                                        // Visibility can change while the pre-show script is running.
+                                                        if (!_options.isHidden()) showAccordingToLayerModeOrFallback();
                                                         resolveOpenWebViewIfNeeded();
                                                     }
                                                 }
@@ -6531,7 +6698,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     @Override
     public void dismiss() {
-        exitCustomFullscreenView();
+        clearFullscreen();
         unregisterConfigurationCallbacks();
         scheduleHostWebViewInsetRestore();
         detachBackLayer();
@@ -6948,6 +7115,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 ? Base64.encodeToString(httpBody.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP)
                 : "";
 
+        // View.post waits for attachment; deferred presentation waits for this first load to finish.
+        // Dispatch through the main looper so hidden and present-after-load WebViews can start loading.
         executorService.execute(() -> {
             NativeRequestContext requestContext = new NativeRequestContext(
                 initialUrl,
@@ -6970,7 +7139,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (_webView == null) {
                         return;
                     }
-                    _webView.post(() -> loadInitialUrlDirect(initialDirectHeaders, initialMethod, httpBody));
+                    mainHandler.post(() -> loadInitialUrlDirect(initialDirectHeaders, initialMethod, httpBody));
                     return;
                 }
 
@@ -6986,7 +7155,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     return;
                 }
 
-                _webView.post(() -> {
+                mainHandler.post(() -> {
                     if (_webView == null) {
                         return;
                     }
@@ -7001,7 +7170,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     ProxyRequestSupport.createNativeRequestFailureBody(initialUrl, error),
                     StandardCharsets.UTF_8
                 );
-                _webView.post(() -> {
+                mainHandler.post(() -> {
                     if (_webView == null) {
                         return;
                     }
@@ -7686,6 +7855,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
      * Update dimensions at runtime
      */
     public void updateDimensions(Integer width, Integer height, Integer x, Integer y) {
+        clearFullscreen();
         // Update options
         if (width != null) {
             _options.setWidth(width);
