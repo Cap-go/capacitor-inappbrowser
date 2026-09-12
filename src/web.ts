@@ -43,6 +43,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async openWebView(options: OpenWebViewOptions): Promise<any> {
+    if (options.fullscreen) {
+      throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+    }
     console.log('openWebView', options);
     return options;
   }
@@ -124,6 +127,16 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   async setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setEnabledSafeTopMargin not supported on web', options);
     return;
+  }
+
+  async setFullscreen(options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setFullscreen not supported on web', options);
+    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+  }
+
+  async getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }> {
+    console.log('getFullscreen not supported on web', options);
+    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
   }
 
   async setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {

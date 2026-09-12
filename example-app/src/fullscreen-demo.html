@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Fullscreen demo</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body {
+        margin: 0;
+        padding: max(64px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        font: 17px system-ui;
+        background: #13233b;
+        color: #fff;
+      }
+      button,
+      input {
+        font: inherit;
+        padding: 12px;
+        margin: 4px 0;
+      }
+      input,
+      video {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      a {
+        color: #9ae4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Fullscreen demo</h1>
+    <p>The native top-right button exits fullscreen. On Android, Back exits before navigating history.</p>
+    <button data-action="enter">Enter fullscreen</button>
+    <button data-action="exit">Exit fullscreen</button>
+    <button data-action="state">Read state</button>
+    <button data-action="hide">Hide for 2 seconds</button>
+    <p>
+      <label>Text retained across transitions <input id="draft" placeholder="Type something" /></label>
+    </p>
+    <button id="history">Add history entry</button>
+    <p><a href="https://example.com">Navigate to another origin (exits fullscreen)</a></p>
+    <pre id="state">Waiting for host state</pre>
+    <pre id="retained"></pre>
+    <label>Video URL for nested fullscreen <input id="video-url" type="url" placeholder="https://…/video.mp4" /></label>
+    <button id="load-video">Load video</button>
+    <video id="video" controls playsinline></video>
+    <script>
+      const token = String(Date.now());
+      let ticks = 0;
+      let historyEntries = 0;
+      document.cookie = `fullscreenDemo=${token}; path=/; SameSite=Lax`;
+      const send = (action) => window.mobileApp?.postMessage({ detail: { type: 'fullscreenDemo', action } });
+      for (const button of document.querySelectorAll('[data-action]')) {
+        button.addEventListener('click', () => send(button.dataset.action));
+      }
+      document.querySelector('#history').addEventListener('click', () => {
+        history.pushState({}, '', `#entry-${++historyEntries}`);
+      });
+      document.querySelector('#load-video').addEventListener('click', () => {
+        document.querySelector('#video').src = document.querySelector('#video-url').value;
+      });
+      window.addEventListener('messageFromNative', (event) => {
+        if (event.detail?.type === 'fullscreenDemo') {
+          document.querySelector('#state').textContent = event.detail.error || `Fullscreen: ${event.detail.enabled}`;
+        }
+      });
+      setInterval(() => {
+        document.querySelector('#retained').textContent =
+          `Page token: ${token}\nCounter: ${++ticks}\nCookie: ${document.cookie}\nURL: ${location.href}`;
+      }, 1000);
+      send('state');
+    </script>
+  </body>
+</html>

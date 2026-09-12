@@ -13,6 +13,14 @@ export interface UrlEvent {
   url: string;
 }
 
+/** A change to host-controlled fullscreen; independent of HTML/video fullscreen. */
+export interface FullscreenChangeEvent {
+  /** Webview instance id. */
+  id: string;
+  /** Whether fullscreen is currently applied to the visible webview. */
+  enabled: boolean;
+}
+
 /**
  * Event emitted when the managed webview intercepts a non-standard custom scheme
  * and hands it to the operating system.
@@ -657,6 +665,25 @@ export interface CloseWebviewOptions {
 }
 
 export interface OpenWebViewOptions {
+  /**
+   * Present this webview in immersive fullscreen from its first visible frame.
+   * Hides native navigation and system bars and provides a native exit-fullscreen button.
+   * The same webview, page state, cookies, and history are retained on entry and exit.
+   * Exiting restores the configured toolbar and safe-area settings.
+   *
+   * Applies before presentation, including when `isPresentAfterPageLoad` is true.
+   * With `hidden: true`, waits for the first `show()` without changing the host's system bars.
+   * Subsequent hide/show or background/resume cycles do not re-enter fullscreen automatically.
+   * Only supported on iOS and Android for full-size, frontmost `openWebView` presentations.
+   * Custom dimensions and `toBack: true` are unsupported. The Web implementation rejects `true`.
+   * Permission prompts, if needed, are the host application's responsibility.
+   *
+   * @default false
+   * @example
+   * fullscreen: true,
+   * toolbarType: ToolBarType.NAVIGATION // Restored when the user exits fullscreen
+   */
+  fullscreen?: boolean;
   /**
    * Target URL to load.
    *
@@ -1656,6 +1683,17 @@ export interface InAppBrowserPlugin {
   addListener(eventName: 'urlChangeEvent', listenerFunc: UrlChangeListener): Promise<PluginListenerHandle>;
 
   /**
+   * Listen for applied fullscreen changes, including startup entry, the native exit button,
+   * Android Back, and native lifecycle cleanup. Register before opening to observe startup entry.
+   * Repeated requests for the current state do not emit duplicate events.
+   * This event describes host-controlled fullscreen, not HTML/video fullscreen.
+   */
+  addListener(
+    eventName: 'fullscreenChange',
+    listenerFunc: (event: FullscreenChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
    * Listen for buttonNearDone clicks.
    *
    * The event payload contains the webview `id`.
@@ -1835,6 +1873,27 @@ export interface InAppBrowserPlugin {
    * @returns Promise that resolves when dimensions are updated
    */
   updateDimensions(options: DimensionOptions & { id?: string }): Promise<void>;
+
+  /**
+   * Enter or exit immersive fullscreen without recreating or reloading the webview.
+   * When `id` is omitted, targets the active webview. Repeated calls are idempotent.
+   * Entry requires a visible, frontmost, full-size `openWebView` on iOS or Android.
+   * Missing webviews, invalid arguments, custom dimensions, behind-host presentations,
+   * and the Web platform reject. Use the opening `fullscreen` option for an initially hidden webview.
+   * Disabling also cancels any pending fullscreen-at-launch request.
+   *
+   * Native exit controls, backgrounding, hiding, closing, cross-origin navigation, and renderer
+   * termination restore the original chrome even when host JavaScript cannot respond.
+   */
+  setFullscreen(options: { enabled: boolean; id?: string }): Promise<void>;
+
+  /**
+   * Read the applied host-controlled fullscreen state of an `openWebView`.
+   * When `id` is omitted, targets the active webview. Initially hidden fullscreen webviews
+   * report `false` until their first presentation. Missing webviews and Web usage reject.
+   * HTML/video fullscreen does not change this value.
+   */
+  getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }>;
 
   /**
    * Sets the enabled safe top margin of the webview at runtime.

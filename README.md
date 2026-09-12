@@ -217,7 +217,7 @@ All CCT options are Android-only and safely ignored on iOS. See [`OpenOptions`](
 
 ### Open WebView with Custom Dimensions
 
-By default, the webview opens in fullscreen. You can set custom dimensions to control the size and position:
+By default, the WebView fills the available screen and retains its configured toolbar. You can set custom dimensions to control the size and position:
 
 ```js
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
@@ -259,9 +259,44 @@ InAppBrowser.openWebView({
 
 Web platform is not supported. Use `window.open` instead.
 
-### Open WebView in Full Screen Mode
+### Fullscreen at launch and during a session
 
-To open the webview in true full screen mode (content extends behind the status bar), set `enabledSafeTopMargin` to `false`:
+Set `fullscreen: true` to present a native WebView in fullscreen from its first visible frame:
+
+```ts
+import { InAppBrowser, ToolBarType } from '@capgo/capacitor-inappbrowser';
+
+const listener = await InAppBrowser.addListener('fullscreenChange', ({ id, enabled }) => {
+  console.log('Fullscreen changed', id, enabled);
+});
+
+const { id } = await InAppBrowser.openWebView({
+  url: 'https://example.com',
+  toolbarType: ToolBarType.NAVIGATION,
+  fullscreen: true,
+});
+
+await InAppBrowser.setFullscreen({ id, enabled: false });
+await InAppBrowser.setFullscreen({ id, enabled: true });
+const { enabled } = await InAppBrowser.getFullscreen({ id });
+
+// When the host no longer needs updates:
+await listener.remove();
+```
+
+Fullscreen hides native navigation and system bars. A native exit button stays above the page at the top-right safe-area inset. Android Back exits fullscreen before navigating page history. Exiting restores the configured toolbar and safe-area settings. Entry and exit keep the same WebView, including its JavaScript state, cookies, and history.
+
+The opening option defaults to `false`. It also works with `isPresentAfterPageLoad: true` and `hidden: true`. An initially hidden WebView applies fullscreen when first shown; until then, `getFullscreen()` reports `false` and the host's system bars stay unchanged. Calling `setFullscreen({ id, enabled: false })` cancels that pending startup request.
+
+Backgrounding, hiding, closing, cross-origin navigation, and renderer termination exit fullscreen through native cleanup. Showing or resuming the WebView afterward does not enter fullscreen again. The host receives a `fullscreenChange` event for each applied change, including native exit controls. Register the listener before opening to observe initial entry.
+
+These APIs control the browser's presentation independently of HTML/video fullscreen. They support full-size, frontmost `openWebView` presentations on iOS and Android. Runtime entry into a hidden WebView, custom dimensions, behind-host presentations, and missing target IDs reject. Web usage is unsupported. Permission prompts are the host application's responsibility.
+
+The example app's Fullscreen section includes launch options and an interactive page for runtime entry, exit, hide/show, history, form, cookie, and counter checks.
+
+### Extend content behind the status bar
+
+To extend content behind the status bar, set `enabledSafeTopMargin` to `false`:
 
 ```js
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
@@ -277,7 +312,7 @@ This option works independently of the toolbar type:
 - **iOS**: The webview extends behind the status bar, providing true edge-to-edge content
 - **Android**: The top margin is disabled, allowing content to fill the entire screen
 
-Perfect for immersive experiences like video players, games, or full-screen web applications. Can be combined with any `toolbarType` setting.
+This setting controls the content inset. Use `fullscreen` to hide native navigation and system bars as well.
 
 ### Proxy examples
 
@@ -632,6 +667,7 @@ await InAppBrowser.openWebView({
 * [`takeScreenshot(...)`](#takescreenshot)
 * [`setUrl(...)`](#seturl)
 * [`addListener('urlChangeEvent', ...)`](#addlistenerurlchangeevent-)
+* [`addListener('fullscreenChange', ...)`](#addlistenerfullscreenchange-)
 * [`addListener('buttonNearDoneClick', ...)`](#addlistenerbuttonneardoneclick-)
 * [`addListener('closeEvent', ...)`](#addlistenercloseevent-)
 * [`addListener('hideEvent', ...)`](#addlistenerhideevent-)
@@ -652,6 +688,8 @@ await InAppBrowser.openWebView({
 * [`removeAllListeners()`](#removealllisteners)
 * [`reload(...)`](#reload)
 * [`updateDimensions(...)`](#updatedimensions)
+* [`setFullscreen(...)`](#setfullscreen)
+* [`getFullscreen(...)`](#getfullscreen)
 * [`setEnabledSafeTopMargin(...)`](#setenabledsafetopmargin)
 * [`setEnabledSafeBottomMargin(...)`](#setenabledsafebottommargin)
 * [`openSecureWindow(...)`](#opensecurewindow)
@@ -1025,6 +1063,27 @@ Listen for url change, only for openWebView
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 **Since:** 0.0.1
+
+--------------------
+
+
+### addListener('fullscreenChange', ...)
+
+```typescript
+addListener(eventName: 'fullscreenChange', listenerFunc: (event: FullscreenChangeEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for applied fullscreen changes, including startup entry, the native exit button,
+Android Back, and native lifecycle cleanup. Register before opening to observe startup entry.
+Repeated requests for the current state do not emit duplicate events.
+This event describes host-controlled fullscreen, not HTML/video fullscreen.
+
+| Param              | Type                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'fullscreenChange'</code>                                                             |
+| **`listenerFunc`** | <code>(event: <a href="#fullscreenchangeevent">FullscreenChangeEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
@@ -1425,6 +1484,49 @@ When `id` is omitted, targets the active webview.
 --------------------
 
 
+### setFullscreen(...)
+
+```typescript
+setFullscreen(options: { enabled: boolean; id?: string; }) => Promise<void>
+```
+
+Enter or exit immersive fullscreen without recreating or reloading the webview.
+When `id` is omitted, targets the active webview. Repeated calls are idempotent.
+Entry requires a visible, frontmost, full-size `openWebView` on iOS or Android.
+Missing webviews, invalid arguments, custom dimensions, behind-host presentations,
+and the Web platform reject. Use the opening `fullscreen` option for an initially hidden webview.
+Disabling also cancels any pending fullscreen-at-launch request.
+
+Native exit controls, backgrounding, hiding, closing, cross-origin navigation, and renderer
+termination restore the original chrome even when host JavaScript cannot respond.
+
+| Param         | Type                                            |
+| ------------- | ----------------------------------------------- |
+| **`options`** | <code>{ enabled: boolean; id?: string; }</code> |
+
+--------------------
+
+
+### getFullscreen(...)
+
+```typescript
+getFullscreen(options?: { id?: string | undefined; } | undefined) => Promise<{ enabled: boolean; }>
+```
+
+Read the applied host-controlled fullscreen state of an `openWebView`.
+When `id` is omitted, targets the active webview. Initially hidden fullscreen webviews
+report `false` until their first presentation. Missing webviews and Web usage reject.
+HTML/video fullscreen does not change this value.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ id?: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ enabled: boolean; }&gt;</code>
+
+--------------------
+
+
 ### setEnabledSafeTopMargin(...)
 
 ```typescript
@@ -1574,6 +1676,7 @@ See the README section "openSecureWindow (OAuth)" for full setup examples.
 
 | Prop                                   | Type                                                                                                                                                                   | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Default                                                       | Since  |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------ |
+| **`fullscreen`**                       | <code>boolean</code>                                                                                                                                                   | Present this webview in immersive fullscreen from its first visible frame. Hides native navigation and system bars and provides a native exit-fullscreen button. The same webview, page state, cookies, and history are retained on entry and exit. Exiting restores the configured toolbar and safe-area settings. Applies before presentation, including when `isPresentAfterPageLoad` is true. With `hidden: true`, waits for the first `show()` without changing the host's system bars. Subsequent hide/show or background/resume cycles do not re-enter fullscreen automatically. Only supported on iOS and Android for full-size, frontmost `openWebView` presentations. Custom dimensions and `toBack: true` are unsupported. The Web implementation rejects `true`. Permission prompts, if needed, are the host application's responsibility.                                                                 | <code>false</code>                                            |        |
 | **`url`**                              | <code>string</code>                                                                                                                                                    | Target URL to load. Remote `http://` and `https://` URLs are loaded as-is. To open bundled web assets from the app bundle without running a local HTTP server, pass a relative path such as `/index.html` or `assets/page.html`. The plugin resolves it to the Capacitor local URL for the current platform (defaults: `capacitor://localhost/...` on iOS, `https://localhost/...` on Android; actual scheme and host follow the app's configured Capacitor local URL) and serves files from the packaged `public/` directory, or `www/` on iOS when `public/` is absent.                                                                                                                                                                                                                                                                                                                                              |                                                               | 0.1.0  |
 | **`headers`**                          | <code><a href="#headers">Headers</a></code>                                                                                                                            | <a href="#headers">Headers</a> to send with the request.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                               | 0.1.0  |
 | **`customUserAgent`**                  | <code>string</code>                                                                                                                                                    | Custom User-Agent string for the webview. When set, replaces the system default webview User-Agent on iOS and Android. Takes precedence over a `User-Agent` entry in `headers`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                               | 8.13.0 |
@@ -1722,6 +1825,16 @@ Any regex property that is omitted is treated as a wildcard.
 | --------- | ------------------- | ------------------------- | ----- |
 | **`id`**  | <code>string</code> | Webview instance id.      |       |
 | **`url`** | <code>string</code> | Emit when the url changes | 0.0.1 |
+
+
+#### FullscreenChangeEvent
+
+A change to host-controlled fullscreen; independent of HTML/video fullscreen.
+
+| Prop          | Type                 | Description                                                     |
+| ------------- | -------------------- | --------------------------------------------------------------- |
+| **`id`**      | <code>string</code>  | Webview instance id.                                            |
+| **`enabled`** | <code>boolean</code> | Whether fullscreen is currently applied to the visible webview. |
 
 
 #### ButtonNearDoneEvent
