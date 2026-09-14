@@ -6,6 +6,100 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class BrowserFullscreenTests: XCTestCase {
+    private final class BridgeHost: CAPBridgeViewController {
+        var contentDirectory = FileManager.default.temporaryDirectory
+
+        override func instanceDescriptor() -> InstanceDescriptor {
+            let descriptor = InstanceDescriptor()
+            descriptor.appLocation = contentDirectory
+            return descriptor
+        }
+    }
+
+    @MainActor
+    private func call(_ method: (CAPPluginCall) -> Void, options: [String: Any] = [:]) async throws -> [String: Any] {
+        try await withCheckedThrowingContinuation { continuation in
+            let call = CAPPluginCall(callbackId: UUID().uuidString, methodName: "test", options: options, success: { result, _ in
+                continuation.resume(returning: result?.data ?? [:])
+            }, error: { error in
+                continuation.resume(throwing: NSError(domain: "FullscreenTests", code: 1,
+                                                      userInfo: [NSLocalizedDescriptionKey: error?.message ?? "Plugin call failed"]))
+            })
+            if let call {
+                method(call)
+            } else {
+                continuation.resume(throwing: NSError(domain: "FullscreenTests", code: 2))
+            }
+        }
+    }
+
+    @MainActor
+    func testDeferredPresentationBecomesActiveForFullscreenCommandsAndResume() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try "<html></html>".write(to: directory.appendingPathComponent("index.html"), atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let host = BridgeHost()
+        host.contentDirectory = directory
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        let plugin = CapgoInAppBrowserPlugin()
+        try XCTUnwrap(host.bridge as? CapacitorBridge).registerPluginInstance(plugin)
+
+        let firstResult = try await call(plugin.openWebView, options: [
+            "url": "https://first.example.test", "fullscreen": true, "isPresentAfterPageLoad": true
+        ])
+        let first = try XCTUnwrap(plugin.webViewController)
+        first.capableWebView?.navigationDelegate = nil
+        let firstNavigation = try XCTUnwrap(plugin.navigationWebViewController)
+        let firstId = try XCTUnwrap(firstResult["id"] as? String)
+        let secondResult = try await call(plugin.openWebView, options: [
+            "url": "https://second.example.test", "isPresentAfterPageLoad": true
+        ])
+        let second = try XCTUnwrap(plugin.webViewController)
+        let secondId = try XCTUnwrap(secondResult["id"] as? String)
+        second.capableWebView?.navigationDelegate = nil
+        let secondNavigation = try XCTUnwrap(plugin.navigationWebViewController)
+        XCTAssertTrue(plugin.presentView(webViewId: secondId, isAnimated: false))
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            secondNavigation.presentingViewController != nil && !secondNavigation.isBeingPresented
+        }, object: nil)], timeout: 5)
+
+        XCTAssertTrue(plugin.presentView(webViewId: firstId, isAnimated: false))
+        await fulfillment(of: [XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            firstNavigation.presentingViewController != nil && !firstNavigation.isBeingPresented
+        }, object: nil)], timeout: 5)
+        XCTAssertTrue(plugin.webViewController === first)
+        let state = try await call(plugin.getFullscreen)
+        XCTAssertEqual(state["enabled"] as? Bool, true)
+        _ = try await call(plugin.setFullscreen, options: ["enabled": false])
+        XCTAssertFalse(first.isBrowserFullscreen)
+        XCTAssertFalse(second.isBrowserFullscreen)
+        first.pendingStartupFullscreen = true
+        plugin.appDidBecomeActive(NSNotification(name: UIApplication.didBecomeActiveNotification, object: nil))
+        XCTAssertTrue(first.isBrowserFullscreen)
+
+        _ = try await call(plugin.close, options: ["id": firstId])
+        _ = try await call(plugin.close, options: ["id": secondId])
+        window.isHidden = true
+    }
+
+    @MainActor
+    func testPendingStartupKeepsItsOriginWhenSetUrlReplacesTheSource() throws {
+        for (url, pending) in [("https://example.com/next", true), ("https://other.example.com", false)] {
+            let controller = WKWebViewController(source: .remote(URL(string: "https://example.com/start")!))
+            controller.pendingStartupFullscreen = true
+            // setUrl replaces source before WebKit delivers its navigation decision.
+            let destination = try XCTUnwrap(URL(string: url))
+            controller.source = .remote(destination)
+            controller.exitFullscreenIfOriginChanges(to: destination)
+            XCTAssertEqual(controller.pendingStartupFullscreen, pending)
+            XCTAssertFalse(controller.isBrowserFullscreen)
+            controller.cleanupWebView()
+        }
+    }
+
     func testOriginsNormalizeDefaultPortsButRejectSchemeHostAndPortChanges() {
         let origin = URL(string: "https://example.com/start")!
         XCTAssertTrue(BrowserFullscreenOrigin.isSame(origin, URL(string: "https://example.com:443/next#section")))

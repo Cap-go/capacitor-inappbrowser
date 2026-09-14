@@ -57,7 +57,13 @@ extension WKWebViewController {
     var isBrowserFullscreen: Bool { browserFullscreen.enabled }
     var pendingStartupFullscreen: Bool {
         get { browserFullscreen.pendingStartup }
-        set { browserFullscreen.pendingStartup = newValue }
+        set {
+            browserFullscreen.pendingStartup = newValue
+            if newValue {
+                // setUrl can replace source before WebKit delivers its navigation decision.
+                browserFullscreen.origin = source?.remoteURL ?? capableWebView?.url
+            }
+        }
     }
 
     public func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

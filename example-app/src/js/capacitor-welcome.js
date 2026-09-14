@@ -686,10 +686,12 @@ window.customElements.define(
         lastUrl: 'none',
       });
 
-      async function fetchHiddenDomContent({ statusText, resultDiv, domOutput }) {
+      async function fetchHiddenDomContent({ id, statusText, resultDiv, domOutput }) {
+        if (!id || id !== hiddenWebViewId) return;
         statusText.textContent = 'Refreshing DOM content...';
         try {
           await InAppBrowser.executeScript({
+            id,
             code: `
               (function() {
                 var domContent = document.documentElement.outerHTML;
@@ -712,8 +714,10 @@ window.customElements.define(
               })();
             `,
           });
+          if (id !== hiddenWebViewId) return;
           statusText.textContent = 'DOM refresh triggered. Waiting for content...';
         } catch (scriptError) {
+          if (id !== hiddenWebViewId) return;
           console.error('Script execution error:', scriptError);
           statusText.textContent = 'Error refreshing DOM: ' + scriptError.message;
           resultDiv.style.display = 'none';
@@ -1259,11 +1263,25 @@ window.customElements.define(
         });
 
       let hiddenWebViewListenerHandles = [];
+      let hiddenWebViewId;
+      let hiddenDomTimer;
+      let hiddenWebViewRun = 0;
 
       async function removeHiddenWebViewListeners() {
+        hiddenWebViewRun++;
+        clearTimeout(hiddenDomTimer);
+        hiddenDomTimer = undefined;
+        hiddenWebViewId = undefined;
         const handles = hiddenWebViewListenerHandles;
         hiddenWebViewListenerHandles = [];
         await Promise.all(handles.map((handle) => handle.remove()));
+      }
+
+      async function addHiddenWebViewListener(id, event, listener) {
+        if (hiddenWebViewId !== id) return;
+        const handle = await InAppBrowser.addListener(event, listener);
+        if (hiddenWebViewId === id) hiddenWebViewListenerHandles.push(handle);
+        else await handle.remove();
       }
 
       // Hidden WebView Test
@@ -1271,19 +1289,27 @@ window.customElements.define(
         .querySelector('#test-hidden-webview')
         .addEventListener('click', async function (e) {
           const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          const openButton = e.currentTarget;
+          openButton.disabled = true;
           const resultDiv = self.shadowRoot.querySelector('#hidden-webview-result');
           const metricsDiv = self.shadowRoot.querySelector('#hidden-webview-metrics');
           const domOutput = self.shadowRoot.querySelector('#dom-content-output');
           const metricsOutput = self.shadowRoot.querySelector('#metrics-output');
           const fakeVisibleToggle = self.shadowRoot.querySelector('#hidden-fake-visible-toggle');
 
+          let run;
           try {
             statusText.textContent = 'Opening hidden webview...';
             resultDiv.style.display = 'none';
             metricsDiv.style.display = 'none';
 
-            await removeHiddenWebViewListeners();
-            await InAppBrowser.openWebView({
+            const previousId = hiddenWebViewId;
+            const cleanup = removeHiddenWebViewListeners();
+            run = hiddenWebViewRun;
+            await cleanup;
+            if (previousId) await InAppBrowser.close({ id: previousId });
+            if (run !== hiddenWebViewRun) return;
+            const { id } = await InAppBrowser.openWebView({
               url: 'https://example.com',
               hidden: true,
               invisibilityMode:
@@ -1304,48 +1330,63 @@ window.customElements.define(
               },
             });
 
+            if (run !== hiddenWebViewRun) {
+              await InAppBrowser.close({ id });
+              return;
+            }
+            hiddenWebViewId = id;
             statusText.textContent = 'WebView opened (hidden). Waiting for page load...';
 
-            hiddenWebViewListenerHandles.push(
-              await InAppBrowser.addListener('messageFromWebview', (event) => {
-                console.log('Message from hidden webview:', event);
-                if (event.detail && event.detail.type === 'domContent') {
-                  statusText.textContent = `DOM extracted from: ${event.detail.title} (${event.detail.url})`;
-                  domOutput.textContent = event.detail.content;
-                  resultDiv.style.display = 'block';
-                } else if (event.detail && event.detail.type === 'visibilityState') {
-                  statusText.textContent = `document.visibilityState: ${event.detail.state}`;
-                } else if (event.detail && event.detail.type === 'dimensions') {
-                  statusText.textContent = 'Dimensions received.';
-                  metricsOutput.textContent = JSON.stringify(event.detail.data, null, 2);
-                  metricsDiv.style.display = 'block';
-                }
-              }),
-            );
+            await addHiddenWebViewListener(id, 'messageFromWebview', (event) => {
+              if (event.id !== id || hiddenWebViewId !== id) return;
+              console.log('Message from hidden webview:', event);
+              if (event.detail && event.detail.type === 'domContent') {
+                statusText.textContent = `DOM extracted from: ${event.detail.title} (${event.detail.url})`;
+                domOutput.textContent = event.detail.content;
+                resultDiv.style.display = 'block';
+              } else if (event.detail && event.detail.type === 'visibilityState') {
+                statusText.textContent = `document.visibilityState: ${event.detail.state}`;
+              } else if (event.detail && event.detail.type === 'dimensions') {
+                statusText.textContent = 'Dimensions received.';
+                metricsOutput.textContent = JSON.stringify(event.detail.data, null, 2);
+                metricsDiv.style.display = 'block';
+              }
+            });
 
-            hiddenWebViewListenerHandles.push(
-              await InAppBrowser.addListener('buttonNearDoneClick', async () => {
-                try {
-                  await InAppBrowser.hide();
-                } catch (e) {
-                  console.error('Error hiding webview from toolbar button:', e);
-                }
-              }),
-            );
+            await addHiddenWebViewListener(id, 'buttonNearDoneClick', async (event) => {
+              if (event.id !== id || hiddenWebViewId !== id) return;
+              try {
+                await InAppBrowser.hide({ id });
+              } catch (e) {
+                console.error('Error hiding webview from toolbar button:', e);
+              }
+            });
 
-            hiddenWebViewListenerHandles.push(
-              await InAppBrowser.addListener('browserPageLoaded', async () => {
-                statusText.textContent = 'Page loaded! Extracting DOM content...';
+            await addHiddenWebViewListener(id, 'browserPageLoaded', (event) => {
+              if (event.id !== id || hiddenWebViewId !== id) return;
+              statusText.textContent = 'Page loaded! Extracting DOM content...';
 
-                setTimeout(async () => {
-                  await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
-                }, 500);
-              }),
-            );
+              clearTimeout(hiddenDomTimer);
+              hiddenDomTimer = setTimeout(async () => {
+                await fetchHiddenDomContent({ id, statusText, resultDiv, domOutput });
+              }, 500);
+            });
+            await addHiddenWebViewListener(id, 'closeEvent', async (event) => {
+              if (event.id !== id || hiddenWebViewId !== id) return;
+              const cleanup = removeHiddenWebViewListeners();
+              const closedRun = hiddenWebViewRun;
+              await cleanup;
+              if (closedRun === hiddenWebViewRun) statusText.textContent = 'Hidden webview closed.';
+            });
           } catch (e) {
+            if (run !== hiddenWebViewRun) return;
+            const id = hiddenWebViewId;
             await removeHiddenWebViewListeners();
+            if (id) await InAppBrowser.close({ id }).catch(console.error);
             console.error('Error with hidden webview:', e);
             statusText.textContent = 'Error: ' + e.message;
+          } finally {
+            openButton.disabled = false;
           }
         });
 
@@ -1354,11 +1395,16 @@ window.customElements.define(
         .querySelector('#close-hidden-webview')
         .addEventListener('click', async function (e) {
           const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          let closedRun;
           try {
-            await InAppBrowser.close();
-            await removeHiddenWebViewListeners();
-            statusText.textContent = 'Hidden webview closed.';
+            const id = hiddenWebViewId;
+            const cleanup = removeHiddenWebViewListeners();
+            closedRun = hiddenWebViewRun;
+            await cleanup;
+            if (id) await InAppBrowser.close({ id });
+            if (closedRun === hiddenWebViewRun) statusText.textContent = 'Hidden webview closed.';
           } catch (e) {
+            if (closedRun !== hiddenWebViewRun) return;
             console.error('Error closing hidden webview:', e);
             statusText.textContent = 'Error closing: ' + e.message;
           }
@@ -1368,9 +1414,12 @@ window.customElements.define(
         .querySelector('#check-hidden-visibility')
         .addEventListener('click', async function (e) {
           const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          const id = hiddenWebViewId;
+          if (!id) return;
           try {
             statusText.textContent = 'Checking document.visibilityState...';
             await InAppBrowser.executeScript({
+              id,
               code: `
                   (function() {
                     var state = document.visibilityState;
@@ -1391,6 +1440,7 @@ window.customElements.define(
                 `,
             });
           } catch (e) {
+            if (id !== hiddenWebViewId) return;
             console.error('Error checking visibility:', e);
             statusText.textContent = 'Hidden webview not open or script failed.';
           }
@@ -1400,9 +1450,12 @@ window.customElements.define(
         .querySelector('#check-hidden-dimensions')
         .addEventListener('click', async function (e) {
           const statusText = self.shadowRoot.querySelector('#hidden-status-text');
+          const id = hiddenWebViewId;
+          if (!id) return;
           try {
             statusText.textContent = 'Checking dimensions...';
             await InAppBrowser.executeScript({
+              id,
               code: `
                   (function() {
                     var data = {
@@ -1446,6 +1499,7 @@ window.customElements.define(
                 `,
             });
           } catch (e) {
+            if (id !== hiddenWebViewId) return;
             console.error('Error checking dimensions:', e);
             statusText.textContent = 'Hidden webview not open or script failed.';
           }
@@ -1457,7 +1511,7 @@ window.customElements.define(
           const statusText = self.shadowRoot.querySelector('#hidden-status-text');
           const resultDiv = self.shadowRoot.querySelector('#hidden-webview-result');
           const domOutput = self.shadowRoot.querySelector('#dom-content-output');
-          await fetchHiddenDomContent({ statusText, resultDiv, domOutput });
+          await fetchHiddenDomContent({ id: hiddenWebViewId, statusText, resultDiv, domOutput });
         });
 
       // Test webapp with activity toolbar (comparison test)

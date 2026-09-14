@@ -242,6 +242,79 @@ public class WebViewFullscreenRobolectricTest {
     }
 
     @Test
+    public void backExitsNestedMediaBeforeBrowserFullscreen() throws Exception {
+        Fixture f = new Fixture(false, false);
+        f.dialog.applyBackNavigationPolicy();
+        int flags = f.dialog.getWindow().getAttributes().flags;
+        f.dialog.setFullscreen(true);
+        Method show = WebViewDialog.class.getDeclaredMethod(
+            "showCustomFullscreenView",
+            View.class,
+            WebChromeClient.CustomViewCallback.class
+        );
+        show.setAccessible(true);
+        List<Boolean> hidden = new ArrayList<>();
+        View video = new View(f.activity);
+        show.invoke(f.dialog, video, (WebChromeClient.CustomViewCallback) () -> hidden.add(true));
+
+        f.dialog.getOnBackPressedDispatcher().onBackPressed();
+
+        assertTrue("First Back must retain browser fullscreen", f.dialog.isFullscreen());
+        assertNull(video.getParent());
+        assertEquals(View.VISIBLE, f.webView.getVisibility());
+        assertEquals(View.GONE, f.toolbar.getVisibility());
+        assertEquals(List.of(true), hidden);
+        assertEquals(List.of(true), f.events);
+        assertTrue(f.dialog.isShowing());
+
+        f.dialog.getOnBackPressedDispatcher().onBackPressed();
+
+        assertFalse(f.dialog.isFullscreen());
+        assertEquals(flags, f.dialog.getWindow().getAttributes().flags);
+        assertEquals(View.VISIBLE, f.toolbar.getVisibility());
+        assertEquals(List.of(true), hidden);
+        assertEquals(List.of(true, false), f.events);
+        assertTrue(f.dialog.isShowing());
+    }
+
+    @Test
+    @Config(sdk = { 24, 34, 35 })
+    public void fullscreenInsetsKeepContentAboveKeyboardAndRestoreBaseline() throws Exception {
+        Fixture f = new Fixture(false, false);
+        f.dialog.setFullscreen(true);
+        Method applyInsets = WebViewDialog.class.getDeclaredMethod(
+            "applyWindowInsetsToWebView",
+            WindowInsetsCompat.class,
+            boolean.class,
+            View.class
+        );
+        applyInsets.setAccessible(true);
+        for (boolean keyboardVisible : new boolean[] { true, false }) {
+            WindowInsetsCompat insets = new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(10, 25, 15, 30))
+                .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, keyboardVisible ? 300 : 0))
+                .setVisible(WindowInsetsCompat.Type.ime(), keyboardVisible)
+                .build();
+            applyInsets.invoke(f.dialog, insets, android.os.Build.VERSION.SDK_INT >= 35, f.toolbar);
+            assertEquals(0, f.container.getPaddingLeft());
+            assertEquals(0, f.container.getPaddingTop());
+            assertEquals(0, f.container.getPaddingRight());
+            assertEquals(keyboardVisible ? 300 : 0, f.container.getPaddingBottom());
+            assertEquals(View.GONE, f.toolbar.getVisibility());
+            assertTrue(f.dialog.isFullscreen());
+            assertEquals(List.of(true), f.events);
+        }
+
+        f.dialog.setFullscreen(false);
+
+        assertEquals(1, f.container.getPaddingLeft());
+        assertEquals(20, f.container.getPaddingTop());
+        assertEquals(3, f.container.getPaddingRight());
+        assertEquals(40, f.container.getPaddingBottom());
+        assertEquals(View.VISIBLE, f.toolbar.getVisibility());
+    }
+
+    @Test
     public void hiddenAndCustomSizedTargetsReject() throws Exception {
         Fixture f = new Fixture(false, true);
         assertThrows(IllegalStateException.class, () -> f.dialog.setFullscreen(true));

@@ -3200,6 +3200,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void handleBrowserBackNavigation() {
+        if (WebViewCustomFullscreenSupport.shouldConsumeBackPress(customFullscreenView != null)) {
+            exitCustomFullscreenView();
+            return;
+        }
         if (isFullscreen()) {
             clearFullscreen();
             return;
@@ -3863,6 +3867,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         if (isFullscreen()) {
             updateFullscreenExitInsets(windowInsets);
+            View container = findBrowserContentDescendant(R.id.content_browser_layout);
+            if (container != null) {
+                // FLAG_FULLSCREEN disables adjustResize even before Android 15; keep only the keyboard inset.
+                int imeBottom = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+                    ? windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                    : 0;
+                container.setPadding(0, 0, 0, imeBottom);
+            }
             return;
         }
         Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());

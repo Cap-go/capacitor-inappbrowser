@@ -829,7 +829,15 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         dismissActiveKeyboard()
         let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
         presentNavigationControllerSafely(navigationController, from: presenter, animated: isAnimated) { presented in
-            if !presented {
+            if presented {
+                if let resolvedId,
+                   let controller = self.webViewControllers[resolvedId],
+                   self.navigationControllers[resolvedId] === navigationController,
+                   navigationController.presentedViewController == nil,
+                   !navigationController.isBeingDismissed {
+                    self.setActiveWebView(id: resolvedId, webView: controller, navigationController: navigationController)
+                }
+            } else {
                 // openWebView already resolves with the webView id on success.
                 // Resolving here caused a double-resolve (empty, then with id). See #631.
                 self.currentPluginCall?.reject("Failed to present webview")
