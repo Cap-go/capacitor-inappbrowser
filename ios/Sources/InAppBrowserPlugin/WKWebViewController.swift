@@ -2413,8 +2413,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         // Apply only when presented; hidden startup must not change the host's system bars.
-        if pendingStartupFullscreen {
-            setBrowserFullscreen(UIApplication.shared.applicationState == .active)
+        if pendingStartupFullscreen && UIApplication.shared.applicationState == .active {
+            setBrowserFullscreen(true)
         }
 
         // Update status bar style

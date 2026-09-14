@@ -622,13 +622,22 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     @Override
     protected void onStart() {
         super.onStart();
-        if (_options != null && _options.isFullscreen() && !_options.isHidden()) {
-            _options.setFullscreen(false);
-            setFullscreen(true);
-        }
+        applyStartupFullscreen();
         // ComponentDialog registers its own back callback in onCreate; re-add ours last so
         // handleBrowserBackNavigation runs before the built-in cancel callback (LIFO order).
         ensureDialogBackHandlerOnTop();
+    }
+
+    private void applyStartupFullscreen() {
+        if (_options != null && _options.isFullscreen() && !_options.isHidden()) {
+            _options.setFullscreen(false);
+            try {
+                setFullscreen(true);
+            } catch (IllegalStateException error) {
+                // Deferred presentation or page-initiated show may target an inactive WebView.
+                Log.w("InAppBrowser", "Skipping deferred fullscreen entry: " + error.getMessage());
+            }
+        }
     }
 
     @Override
@@ -3474,9 +3483,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         if (_options != null) {
             _options.setHidden(hidden);
-            if (!hidden && _options.isFullscreen() && isShowing()) {
-                _options.setFullscreen(false);
-                setFullscreen(true);
+            if (isShowing()) {
+                applyStartupFullscreen();
             }
         }
     }

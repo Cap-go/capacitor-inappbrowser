@@ -159,6 +159,37 @@ public class WebViewFullscreenRobolectricTest {
     }
 
     @Test
+    public void inactiveHiddenStartupSkipsFullscreenWhenPageShowsItself() throws Exception {
+        Fixture pending = new Fixture(true, true);
+        pending.dialog.setActiveForBackNavigation(false);
+        Fixture active = new Fixture(true, false);
+
+        pending.dialog.setHidden(false);
+
+        assertTrue(pending.dialog.isShowing());
+        assertFalse(pending.dialog.isFullscreen());
+        assertFalse(pending.options.isFullscreen());
+        assertTrue(pending.events.isEmpty());
+        assertTrue(active.dialog.isFullscreen());
+        pending.dialog.setActiveForBackNavigation(true);
+        pending.dialog.setHidden(false);
+        assertFalse(pending.dialog.isFullscreen());
+    }
+
+    @Test
+    public void inactiveStartupSkipsFullscreenAtPresentation() throws Exception {
+        Fixture pending = new Fixture(true, true);
+        pending.dialog.setActiveForBackNavigation(false);
+        pending.options.setHidden(false);
+
+        pending.dialog.onStart();
+
+        assertFalse(pending.dialog.isFullscreen());
+        assertFalse(pending.options.isFullscreen());
+        assertTrue(pending.events.isEmpty());
+    }
+
+    @Test
     public void hideClearsFullscreenWithoutDestroyingWebView() throws Exception {
         Fixture f = new Fixture(true, false);
         Object parent = f.webView.getParent();

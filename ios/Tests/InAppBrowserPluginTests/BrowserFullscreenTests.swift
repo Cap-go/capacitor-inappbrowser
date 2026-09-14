@@ -1,4 +1,5 @@
 import Capacitor
+import ObjectiveC
 import UIKit
 import WebKit
 import XCTest
@@ -85,6 +86,89 @@ final class BrowserFullscreenTests: XCTestCase {
         XCTAssertTrue(navigation.isNavigationBarHidden)
         XCTAssertFalse(controller.enabledSafeTopMargin)
         XCTAssertFalse(controller.enabledSafeBottomMargin)
+        controller.cleanupWebView()
+    }
+
+    @MainActor
+    func testInactiveFirstAppearanceKeepsStartupPending() throws {
+        let controller = WKWebViewController(source: .remote(URL(string: "https://example.com")!))
+        let navigation = BrowserNavigationController(rootViewController: controller)
+        navigation.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+        controller.pendingStartupFullscreen = true
+        let getter = try XCTUnwrap(class_getInstanceMethod(UIApplication.self, #selector(getter: UIApplication.applicationState)))
+        let inactive: @convention(block) (UIApplication) -> Int = { _ in UIApplication.State.inactive.rawValue }
+        let implementation = imp_implementationWithBlock(inactive)
+        let original = method_setImplementation(getter, implementation)
+        defer {
+            method_setImplementation(getter, original)
+            imp_removeBlock(implementation)
+            controller.cleanupWebView()
+        }
+
+        controller.viewWillAppear(false)
+
+        XCTAssertTrue(controller.pendingStartupFullscreen)
+        XCTAssertFalse(controller.isBrowserFullscreen)
+        XCTAssertFalse(navigation.isNavigationBarHidden)
+    }
+
+    @MainActor
+    func testBecomingActiveAppliesVisibleStartupOnlyOnce() async {
+        let controller = WKWebViewController(source: .remote(URL(string: "https://example.com")!))
+        let navigation = BrowserNavigationController(rootViewController: controller)
+        let presenter = UIViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = presenter
+        window.makeKeyAndVisible()
+        await withCheckedContinuation { continuation in
+            presenter.present(navigation, animated: false) { continuation.resume() }
+        }
+        let plugin = CapgoInAppBrowserPlugin()
+        plugin.webViewController = controller
+        plugin.navigationWebViewController = navigation
+        // Model a startup request that was still pending when presentation finished inactive.
+        controller.pendingStartupFullscreen = true
+        let notification = NSNotification(name: UIApplication.didBecomeActiveNotification, object: nil)
+        plugin.appDidBecomeActive(notification)
+        XCTAssertTrue(controller.isBrowserFullscreen)
+        XCTAssertFalse(controller.pendingStartupFullscreen)
+        controller.setBrowserFullscreen(false)
+        plugin.appDidBecomeActive(notification)
+        XCTAssertFalse(controller.isBrowserFullscreen)
+        await withCheckedContinuation { continuation in
+            presenter.dismiss(animated: false) { continuation.resume() }
+        }
+        window.isHidden = true
+        controller.cleanupWebView()
+    }
+
+    @MainActor
+    func testBecomingActiveLeavesHiddenStartupPendingUntilPresentation() async {
+        let controller = WKWebViewController(source: .remote(URL(string: "https://example.com")!))
+        let navigation = BrowserNavigationController(rootViewController: controller)
+        let plugin = CapgoInAppBrowserPlugin()
+        plugin.webViewController = controller
+        plugin.navigationWebViewController = navigation
+        controller.pendingStartupFullscreen = true
+        plugin.appDidBecomeActive(NSNotification(name: UIApplication.didBecomeActiveNotification, object: nil))
+        XCTAssertTrue(controller.pendingStartupFullscreen)
+        XCTAssertFalse(controller.isBrowserFullscreen)
+        XCTAssertNil(controller.viewIfLoaded?.window)
+
+        let presenter = UIViewController()
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = presenter
+        window.makeKeyAndVisible()
+        await withCheckedContinuation { continuation in
+            presenter.present(navigation, animated: false) { continuation.resume() }
+        }
+        XCTAssertTrue(controller.isBrowserFullscreen)
+        XCTAssertFalse(controller.pendingStartupFullscreen)
+        await withCheckedContinuation { continuation in
+            presenter.dismiss(animated: false) { continuation.resume() }
+        }
+        window.isHidden = true
         controller.cleanupWebView()
     }
 

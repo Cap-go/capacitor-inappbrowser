@@ -1832,7 +1832,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
             }
 
-            webViewController.pendingStartupFullscreen = fullscreen && UIApplication.shared.applicationState == .active
+            webViewController.pendingStartupFullscreen = fullscreen
 
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
@@ -2642,6 +2642,15 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func appDidBecomeActive(_ notification: NSNotification) {
         self.hidePrivacyScreen()
+        guard let controller = webViewController,
+              controller.pendingStartupFullscreen,
+              let navigation = controller.navigationController,
+              navigation.presentingViewController != nil,
+              navigation.presentedViewController == nil,
+              controller.presentedViewController == nil,
+              controller.viewIfLoaded?.window != nil,
+              controller.capableWebView?.superview === controller.viewIfLoaded else { return }
+        controller.setBrowserFullscreen(true)
     }
 
     @objc func appWillResignActive(_ notification: NSNotification) {
