@@ -3,10 +3,17 @@ package ee.forgr.capacitor_inappbrowser;
 import static org.junit.Assert.*;
 
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 import androidx.activity.ComponentActivity;
+import androidx.appcompat.view.ContextThemeWrapper;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.core.graphics.Insets;
+import androidx.core.view.WindowInsetsCompat;
+import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.button.MaterialButton;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -29,6 +36,7 @@ public class WebViewFullscreenRobolectricTest {
         WebView webView;
         androidx.swiperefreshlayout.widget.SwipeRefreshLayout container;
         View toolbar;
+        CoordinatorLayout root;
         List<Boolean> events = new ArrayList<>();
 
         Fixture(boolean startup, boolean hidden) throws Exception {
@@ -38,17 +46,24 @@ public class WebViewFullscreenRobolectricTest {
             options.setHidden(hidden);
             dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
             dialog.activity = activity;
-            FrameLayout root = new FrameLayout(activity);
+            root = new CoordinatorLayout(activity);
             root.setId(R.id.coordinator_layout);
             container = new androidx.swiperefreshlayout.widget.SwipeRefreshLayout(activity);
             container.setId(R.id.content_browser_layout);
             container.setPadding(1, 20, 3, 40);
             webView = new WebView(activity);
             container.addView(webView);
-            toolbar = new View(activity);
+            toolbar = new AppBarLayout(new ContextThemeWrapper(activity, R.style.InAppBrowserMaterialTheme));
+            toolbar.setLayoutParams(new CoordinatorLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 100));
+            CoordinatorLayout.LayoutParams contentParams = new CoordinatorLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            contentParams.setBehavior(new AppBarLayout.ScrollingViewBehavior());
+            container.setLayoutParams(contentParams);
             toolbar.setId(R.id.app_bar_layout);
-            root.addView(container);
             root.addView(toolbar);
+            root.addView(container);
             dialog.setContentView(root);
             Field field = WebViewDialog.class.getDeclaredField("_webView");
             field.setAccessible(true);
@@ -79,6 +94,44 @@ public class WebViewFullscreenRobolectricTest {
         assertEquals(40, f.container.getPaddingBottom());
         assertEquals(List.of(true, false), f.events);
         assertSame(parent, f.webView.getParent());
+    }
+
+    @Test
+    public void runtimeFullscreenFillsMeasuredWindowAndRestoresToolbarLayout() throws Exception {
+        Fixture f = new Fixture(false, false);
+        CoordinatorLayout.LayoutParams params = (CoordinatorLayout.LayoutParams) f.container.getLayoutParams();
+        Object behavior = params.getBehavior();
+        Object parent = f.webView.getParent();
+        for (int[] size : new int[][] { { 400, 800 }, { 800, 400 }, { 400, 800 } }) {
+            f.root.measure(
+                View.MeasureSpec.makeMeasureSpec(size[0], View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(size[1], View.MeasureSpec.EXACTLY)
+            );
+            f.root.layout(0, 0, size[0], size[1]);
+            assertEquals(100, f.container.getTop());
+            assertEquals(size[1] - 100, f.container.getHeight());
+
+            f.dialog.setFullscreen(true);
+            f.root.measure(
+                View.MeasureSpec.makeMeasureSpec(size[0], View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(size[1], View.MeasureSpec.EXACTLY)
+            );
+            f.root.layout(0, 0, size[0], size[1]);
+            assertEquals("Fullscreen must remove the measured toolbar offset", 0, f.container.getTop());
+            assertEquals(size[1], f.container.getHeight());
+            assertEquals(size[0], f.container.getWidth());
+            assertSame(parent, f.webView.getParent());
+
+            f.dialog.setFullscreen(false);
+            f.root.measure(
+                View.MeasureSpec.makeMeasureSpec(size[0], View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(size[1], View.MeasureSpec.EXACTLY)
+            );
+            f.root.layout(0, 0, size[0], size[1]);
+            assertEquals(100, f.container.getTop());
+            assertEquals(size[1] - 100, f.container.getHeight());
+            assertSame(behavior, params.getBehavior());
+        }
     }
 
     @Test
@@ -121,9 +174,15 @@ public class WebViewFullscreenRobolectricTest {
         Fixture f = new Fixture(true, false);
         Field field = WebViewDialog.class.getDeclaredField("fullscreenExitButton");
         field.setAccessible(true);
-        View button = (View) field.get(f.dialog);
+        MaterialButton button = (MaterialButton) field.get(f.dialog);
         assertEquals("Exit fullscreen", button.getContentDescription());
-        assertTrue(button.getLayoutParams().width >= 48);
+        float density = f.activity.getResources().getDisplayMetrics().density;
+        assertTrue(button.getLayoutParams().width >= 48 * density);
+        assertTrue(button.getLayoutParams().height >= 48 * density);
+        assertNotNull(button.getIcon());
+        assertEquals("", button.getText().toString());
+        assertFalse(button.isCheckable());
+        assertTrue(button.getStateListShapeAppearanceModel().isStateful());
         button.performClick();
         assertFalse(f.dialog.isFullscreen());
         assertTrue(f.dialog.isShowing());
@@ -202,22 +261,38 @@ public class WebViewFullscreenRobolectricTest {
         rotate.invoke(f.dialog);
         assertTrue(f.dialog.isFullscreen());
         assertEquals(View.GONE, f.toolbar.getVisibility());
-        Method insets = WebViewDialog.class.getDeclaredMethod("updateFullscreenExitInsets", androidx.core.view.WindowInsetsCompat.class);
+        Method insets = WebViewDialog.class.getDeclaredMethod("updateFullscreenExitInsets", WindowInsetsCompat.class);
         insets.setAccessible(true);
-        insets.invoke(
-            f.dialog,
-            new androidx.core.view.WindowInsetsCompat.Builder()
-                .setInsetsIgnoringVisibility(
-                    androidx.core.view.WindowInsetsCompat.Type.systemBars(),
-                    androidx.core.graphics.Insets.of(0, 25, 30, 0)
-                )
-                .build()
-        );
         Field buttonField = WebViewDialog.class.getDeclaredField("fullscreenExitButton");
         buttonField.setAccessible(true);
-        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) ((View) buttonField.get(f.dialog)).getLayoutParams();
-        assertEquals(25, params.topMargin);
-        assertEquals(30, params.rightMargin);
+        View button = (View) buttonField.get(f.dialog);
+        int margin = f.activity.getResources().getDimensionPixelSize(R.dimen.fullscreen_exit_margin);
+        // Portrait cutout, then landscape with the cutout on either side and a side navigation bar.
+        for (Insets cutout : new Insets[] { Insets.of(0, 32, 0, 0), Insets.of(32, 0, 0, 0), Insets.of(0, 0, 32, 0) }) {
+            WindowInsetsCompat rotatedInsets = new WindowInsetsCompat.Builder()
+                .setInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 25, 0, 0))
+                .setInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 30, 0))
+                .setInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout(), cutout)
+                .setVisible(WindowInsetsCompat.Type.systemBars(), false)
+                .build();
+            insets.invoke(f.dialog, rotatedInsets);
+            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) button.getLayoutParams();
+            assertEquals(cutout.top + margin, params.topMargin);
+            assertEquals(Math.max(cutout.right, 30) + margin, params.rightMargin);
+            assertTrue(f.dialog.isFullscreen());
+        }
+        // A transient status bar must not cover the exit target.
+        insets.invoke(
+            f.dialog,
+            new WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 25, 0, 0)).build()
+        );
+        assertEquals(25 + margin, ((FrameLayout.LayoutParams) button.getLayoutParams()).topMargin);
+    }
+
+    @Test
+    @Config(sdk = { 24, 34 }, qualifiers = "night")
+    public void exitButtonSupportsDarkModeWithoutMaterialHostTheme() throws Exception {
+        exitButtonIsAccessibleAndDoesNotClose();
     }
 
     @Test

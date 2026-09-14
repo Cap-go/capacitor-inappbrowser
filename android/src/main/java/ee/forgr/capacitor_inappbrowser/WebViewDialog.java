@@ -40,6 +40,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -74,6 +75,8 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.view.ContextThemeWrapper;
+import androidx.appcompat.widget.TooltipCompat;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.FileProvider;
 import androidx.core.content.res.ResourcesCompat;
@@ -91,6 +94,8 @@ import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGParseException;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PluginCall;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.color.DynamicColors;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -340,10 +345,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private WebView _webView;
     private FullscreenWindowState nativeFullscreenWindow;
     private FullscreenWindowState mediaFullscreenWindow;
-    private android.widget.Button fullscreenExitButton;
+    private MaterialButton fullscreenExitButton;
     private java.util.function.Consumer<Boolean> fullscreenChangeListener;
     private final java.util.Map<View, Integer> fullscreenVisibility = new java.util.HashMap<>();
     private int[] fullscreenPadding;
+    private CoordinatorLayout.Behavior<?> fullscreenContentBehavior;
     private String fullscreenOrigin;
 
     public void setFullscreenChangeListener(java.util.function.Consumer<Boolean> listener) {
@@ -401,16 +407,27 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     container.getPaddingBottom()
                 };
                 container.setPadding(0, 0, 0, 0);
+                if (container.getLayoutParams() instanceof CoordinatorLayout.LayoutParams params) {
+                    // A hidden appbar retains its measured height; its scrolling behavior still reserves that space.
+                    fullscreenContentBehavior = params.getBehavior();
+                    params.setBehavior(null);
+                    container.setLayoutParams(params);
+                }
             }
             nativeFullscreenWindow.enter();
-            fullscreenExitButton = new android.widget.Button(getContext());
-            fullscreenExitButton.setText("↙");
-            fullscreenExitButton.setContentDescription(getContext().getString(R.string.exit_fullscreen));
+            // Scope Material styling to the overlay, including hosts without a Material theme.
+            Context buttonContext = DynamicColors.wrapContextIfAvailable(
+                new ContextThemeWrapper(getContext(), com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar)
+            );
+            ViewGroup decor = (ViewGroup) getWindow().getDecorView();
+            fullscreenExitButton = (MaterialButton) LayoutInflater.from(buttonContext).inflate(
+                R.layout.fullscreen_exit_button,
+                decor,
+                false
+            );
+            TooltipCompat.setTooltipText(fullscreenExitButton, getContext().getString(R.string.exit_fullscreen));
             fullscreenExitButton.setOnClickListener((v) -> clearFullscreen());
-            fullscreenExitButton.setElevation(100 * getContext().getResources().getDisplayMetrics().density);
-            int size = Math.round(48 * getContext().getResources().getDisplayMetrics().density);
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(size, size, Gravity.TOP | Gravity.RIGHT);
-            ((ViewGroup) getWindow().getDecorView()).addView(fullscreenExitButton, params);
+            decor.addView(fullscreenExitButton);
             ViewCompat.setOnApplyWindowInsetsListener(fullscreenExitButton, (v, insets) -> {
                 updateFullscreenExitInsets(insets);
                 return insets;
@@ -434,6 +451,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 fullscreenPadding[3]
             );
             fullscreenPadding = null;
+            if (container != null && container.getLayoutParams() instanceof CoordinatorLayout.LayoutParams params) {
+                params.setBehavior(fullscreenContentBehavior);
+                container.setLayoutParams(params);
+            }
+            fullscreenContentBehavior = null;
             baseline.restore();
             reapplyInsetsFromWindowRoot();
         }
@@ -442,10 +464,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void updateFullscreenExitInsets(WindowInsetsCompat insets) {
         if (fullscreenExitButton == null || insets == null) return;
-        Insets safe = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+        // Hidden status bars need no space in landscape; cutouts and navigation gestures always do.
+        Insets safe = Insets.max(
+            insets.getInsets(WindowInsetsCompat.Type.systemBars()),
+            insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars() | WindowInsetsCompat.Type.displayCutout())
+        );
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) fullscreenExitButton.getLayoutParams();
-        params.topMargin = safe.top;
-        params.rightMargin = safe.right;
+        int margin = getContext().getResources().getDimensionPixelSize(R.dimen.fullscreen_exit_margin);
+        params.topMargin = safe.top + margin;
+        params.rightMargin = safe.right + margin;
         fullscreenExitButton.setLayoutParams(params);
     }
 

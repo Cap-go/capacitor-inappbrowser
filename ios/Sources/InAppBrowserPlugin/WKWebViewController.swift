@@ -1478,6 +1478,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         syncWebViewSafeAreaLayout()
+        updateFullscreenExitButtonPosition()
         refreshWebViewViewportIfNeeded()
     }
 

@@ -137,6 +137,40 @@ final class BrowserFullscreenTests: XCTestCase {
     }
 
     @MainActor
+    func testExitButtonPositionAdaptsToOrientationAndKeepsTheTouchTarget() throws {
+        let controller = WKWebViewController(source: nil)
+        let navigation = BrowserNavigationController(rootViewController: controller)
+        navigation.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+        controller.setBrowserFullscreen(true)
+        let button = try XCTUnwrap(controller.browserFullscreen.exitButton)
+        let top = try XCTUnwrap(controller.browserFullscreen.exitButtonTop)
+        let trailing = try XCTUnwrap(controller.browserFullscreen.exitButtonTrailing)
+
+        controller.view.bounds.size = CGSize(width: 393, height: 852)
+        controller.viewDidLayoutSubviews()
+        XCTAssertEqual(trailing.constant, 0)
+        XCTAssertEqual(controller.view.safeAreaInsets.top + top.constant,
+                       max(8, controller.view.safeAreaInsets.top - 8))
+
+        controller.view.bounds.size = CGSize(width: 852, height: 393)
+        controller.viewDidLayoutSubviews()
+        XCTAssertEqual(top.constant, 8)
+        XCTAssertEqual(trailing.constant, 8)
+        XCTAssertTrue(controller.browserFullscreen.exitButton === button)
+        XCTAssertEqual(button.constraints.filter { $0.constant == 44 }.count, 2)
+
+        controller.view.bounds.size = CGSize(width: 393, height: 852)
+        controller.viewDidLayoutSubviews()
+        XCTAssertEqual(trailing.constant, 0)
+        XCTAssertGreaterThanOrEqual(controller.view.safeAreaInsets.top + top.constant, 8)
+        controller.setBrowserFullscreen(false)
+        XCTAssertNil(controller.browserFullscreen.exitButtonTop)
+        XCTAssertNil(controller.browserFullscreen.exitButtonTrailing)
+        controller.cleanupWebView()
+    }
+
+    @MainActor
     func testFramedAndBehindHostViewsCannotEnterFullscreen() {
         let controller = WKWebViewController(source: .remote(URL(string: "https://example.com")!))
         controller.customHeight = 300

@@ -8,7 +8,11 @@
     <style>
       body {
         margin: 0;
-        padding: max(64px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+        padding:
+          max(64px, env(safe-area-inset-top))
+          calc(20px + max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px)))
+          max(24px, env(safe-area-inset-bottom))
+          calc(20px + max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px)));
         font: 17px system-ui;
         background: #13233b;
         color: #fff;

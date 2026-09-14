@@ -7,6 +7,8 @@ struct BrowserFullscreenState {
     var baseline: BrowserFullscreenBaseline?
     var origin: URL?
     var exitButton: UIButton?
+    var exitButtonTop: NSLayoutConstraint?
+    var exitButtonTrailing: NSLayoutConstraint?
     var applyingLayout = false
 }
 
@@ -88,29 +90,46 @@ extension WKWebViewController {
             navigationController.setToolbarHidden(true, animated: false)
             updateSafeTopMargin(false)
             updateSafeBottomMargin(false)
-            let button = UIButton(type: .system)
-            button.setImage(UIImage(systemName: "arrow.down.right.and.arrow.up.left"), for: .normal)
+            var configuration: UIButton.Configuration
+            if #available(iOS 26.0, *) {
+                configuration = .glass()
+            } else {
+                configuration = .gray()
+                configuration.background.visualEffect = UIBlurEffect(style: .systemChromeMaterial)
+                configuration.background.backgroundColor = .clear
+            }
+            configuration.cornerStyle = .capsule
+            configuration.contentInsets = .zero
+            configuration.image = UIImage(systemName: "arrow.down.right.and.arrow.up.left")
+            configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+            configuration.baseForegroundColor = .label
+            let button = UIButton(configuration: configuration)
             button.accessibilityLabel = NSLocalizedString("Exit fullscreen", comment: "Browser fullscreen exit button")
+            button.accessibilityHint = NSLocalizedString("Restores the browser controls", comment: "Browser fullscreen exit hint")
             button.accessibilityIdentifier = "inappbrowser.exitFullscreen"
-            button.tintColor = .white
-            button.backgroundColor = UIColor.black.withAlphaComponent(0.7)
-            button.layer.cornerRadius = 22
+            button.isPointerInteractionEnabled = true
             button.translatesAutoresizingMaskIntoConstraints = false
             button.addTarget(self, action: #selector(exitBrowserFullscreen), for: .touchUpInside)
             view.addSubview(button)
+            let top = button.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+            let trailing = button.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor)
             NSLayoutConstraint.activate([
-                button.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-                button.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -8),
+                top, trailing,
                 button.widthAnchor.constraint(equalToConstant: 44),
                 button.heightAnchor.constraint(equalToConstant: 44)
             ])
             browserFullscreen.exitButton = button
+            browserFullscreen.exitButtonTop = top
+            browserFullscreen.exitButtonTrailing = trailing
+            updateFullscreenExitButtonPosition()
         } else {
             browserFullscreen.enabled = false
             // Close nested video natively even when page JavaScript is stalled.
             capableWebView?.closeAllMediaPresentations(completionHandler: nil)
             browserFullscreen.exitButton?.removeFromSuperview()
             browserFullscreen.exitButton = nil
+            browserFullscreen.exitButtonTop = nil
+            browserFullscreen.exitButtonTrailing = nil
             if let baseline = browserFullscreen.baseline {
                 navigationController?.modalPresentationCapturesStatusBarAppearance =
                     baseline.capturesStatusBarAppearance
@@ -129,6 +148,15 @@ extension WKWebViewController {
         navigationController?.presentingViewController?.setNeedsStatusBarAppearanceUpdate()
         navigationController?.setNeedsUpdateOfHomeIndicatorAutoHidden()
         capBrowserPlugin?.notifyListeners("fullscreenChange", data: ["id": instanceId, "enabled": enabled])
+    }
+
+    func updateFullscreenExitButtonPosition() {
+        guard let top = browserFullscreen.exitButtonTop,
+              let trailing = browserFullscreen.exitButtonTrailing else { return }
+        let isLandscape = view.bounds.width > view.bounds.height
+        // Keep the portrait control near the top while preserving an inset on displays without a cutout.
+        top.constant = isLandscape ? 8 : max(-8, 8 - view.safeAreaInsets.top)
+        trailing.constant = isLandscape ? 8 : 0
     }
 
     @objc func exitBrowserFullscreen() {
