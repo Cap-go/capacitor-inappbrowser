@@ -18,12 +18,19 @@ function resolveUnderRoot(p, rootDir) {
   if (!rootDir) {
     return filePath;
   }
-  const root = path.resolve(rootDir);
-  const rel = path.relative(root, filePath);
+  let root;
+  let resolvedPath;
+  try {
+    root = fs.realpathSync.native(rootDir);
+    resolvedPath = fs.realpathSync.native(filePath);
+  } catch {
+    return null;
+  }
+  const rel = path.relative(root, resolvedPath);
   if (rel.startsWith("..") || path.isAbsolute(rel)) {
     return null;
   }
-  return filePath;
+  return resolvedPath;
 }
 
 export function readText(p, rootDir) {
