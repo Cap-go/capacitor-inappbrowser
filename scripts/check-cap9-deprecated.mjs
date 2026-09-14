@@ -10,8 +10,8 @@
  *   node scripts/check-cap9-deprecated.mjs --dir path
  */
 
-import fs from "node:fs";
 import path from "node:path";
+import { exists, parseArgs, readText, walkFiles } from "./cap-plugin-check-shared.mjs";
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -94,90 +94,31 @@ const RULES = [
 const CORDova_SPM_LINE =
   /\.product\s*\(\s*name\s*:\s*"Cordova"\s*,\s*package\s*:\s*"capacitor-swift-pm"\s*\)/;
 
-function readText(p) {
-  try {
-    return fs.readFileSync(p, "utf8");
-  } catch {
-    return "";
-  }
-}
-
-function exists(p) {
-  try {
-    fs.accessSync(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function parseArgs(argv) {
-  const out = { dir: process.cwd() };
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--dir" || a === "--pluginDir") {
-      out.dir = path.resolve(argv[++i] || ".");
-      continue;
-    }
-  }
-  return out;
-}
-
-function walkFiles(rootDir, exts) {
-  const out = [];
-  const stack = [rootDir];
-  while (stack.length) {
-    const dir = stack.pop();
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const e of entries) {
-      if (e.isDirectory()) {
-        if (SKIP_DIRS.has(e.name)) continue;
-        stack.push(path.join(dir, e.name));
-        continue;
-      }
-      if (!e.isFile()) continue;
-      for (const ext of exts) {
-        if (e.name.endsWith(ext)) {
-          out.push(path.join(dir, e.name));
-          break;
-        }
-      }
-    }
-  }
-  out.sort();
-  return out;
-}
-
 function collectScanRoots(pluginDir, pkg) {
   const cap = typeof pkg.capacitor === "object" && pkg.capacitor ? pkg.capacitor : {};
   const roots = [];
   if (cap.android) {
     const androidMain = path.join(pluginDir, "android", "src", "main");
-    if (exists(androidMain)) roots.push(androidMain);
+    if (exists(androidMain, pluginDir)) roots.push(androidMain);
   }
   if (cap.ios) {
     const iosSources = path.join(pluginDir, "ios", "Sources");
-    if (exists(iosSources)) roots.push(iosSources);
+    if (exists(iosSources, pluginDir)) roots.push(iosSources);
     else {
       const iosDir = path.join(pluginDir, "ios");
-      if (exists(iosDir)) roots.push(iosDir);
+      if (exists(iosDir, pluginDir)) roots.push(iosDir);
     }
   }
   const packageSwift = path.join(pluginDir, "Package.swift");
-  if (exists(packageSwift)) roots.push(packageSwift);
+  if (exists(packageSwift, pluginDir)) roots.push(packageSwift);
   return roots;
 }
 
-function scanFile(filePath, rule) {
+function scanFile(filePath, rule, pluginDir) {
   const ext = path.extname(filePath);
   if (!rule.exts.includes(ext)) return [];
 
-  const txt = readText(filePath);
+  const txt = readText(filePath, pluginDir);
   const lines = txt.split(/\r?\n/);
   const hits = [];
   for (let i = 0; i < lines.length; i++) {
@@ -197,14 +138,14 @@ const args = parseArgs(process.argv);
 const pluginDir = args.dir;
 const pkgPath = path.join(pluginDir, "package.json");
 
-if (!exists(pkgPath)) {
+if (!exists(pkgPath, pluginDir)) {
   console.error(`[cap9-deprecated] ERROR: missing package.json in ${pluginDir}`);
   process.exit(2);
 }
 
 let pkg;
 try {
-  pkg = JSON.parse(readText(pkgPath));
+  pkg = JSON.parse(readText(pkgPath, pluginDir));
 } catch (e) {
   console.error(`[cap9-deprecated] ERROR: invalid package.json (${pkgPath}): ${e?.message || e}`);
   process.exit(2);
@@ -223,13 +164,13 @@ for (const root of scanRoots) {
     files.push(root);
     continue;
   }
-  files.push(...walkFiles(root, allExts));
+  files.push(...walkFiles(root, allExts, SKIP_DIRS));
 }
 
 const violations = [];
 for (const file of files) {
   for (const rule of RULES) {
-    const hits = scanFile(file, rule);
+    const hits = scanFile(file, rule, pluginDir);
     for (const hit of hits) {
       violations.push({
         rule: rule.id,
