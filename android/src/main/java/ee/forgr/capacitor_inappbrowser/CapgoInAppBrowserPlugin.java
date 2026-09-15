@@ -339,6 +339,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     private WebViewDialog createManagedDialog(String webViewId, Options options, boolean makeActive) {
+        if (fullscreenPaused) options.setFullscreen(false);
         WebViewDialog dialog = new WebViewDialog(
             getContext(),
             android.R.style.Theme_NoTitleBar,
@@ -346,6 +347,12 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             CapgoInAppBrowserPlugin.this,
             getBridge().getWebView()
         );
+        dialog.setFullscreenChangeListener((enabled) -> {
+            JSObject event = new JSObject();
+            event.put("id", webViewId);
+            event.put("enabled", enabled);
+            notifyListeners("fullscreenChange", event);
+        });
         dialog.setInstanceId(webViewId);
         dialog.activity = CapgoInAppBrowserPlugin.this.getActivity();
         dialog.bindToHostActivity();
@@ -1355,9 +1362,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             options.setY(y);
         }
 
+        options.setFullscreen(Boolean.TRUE.equals(call.getBoolean("fullscreen", false)));
         options.setHidden(Boolean.TRUE.equals(call.getBoolean("hidden", false)));
         options.setToBack(Boolean.TRUE.equals(call.getBoolean("toBack", false)));
         options.setTransparentBackground(call.getBoolean("transparentBackground", true));
+        if (options.isFullscreen() && (options.isToBack() || width != null || height != null || x != null || y != null)) {
+            call.reject("Fullscreen requires a full-size front WebView");
+            return;
+        }
         boolean allowWebViewJsVisibilityControl = getConfig().getBoolean("allowWebViewJsVisibilityControl", false);
         options.setAllowWebViewJsVisibilityControl(allowWebViewJsVisibilityControl);
         options.setInvisibilityMode(Options.InvisibilityMode.fromString(call.getString("invisibilityMode", "AWARE")));
@@ -1445,6 +1457,50 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         );
     }
 
+    private boolean fullscreenPaused;
+
+    @PluginMethod
+    public void setFullscreen(PluginCall call) {
+        Object enabled = call.getData().opt("enabled");
+        if (!(enabled instanceof Boolean)) {
+            call.reject("enabled must be a boolean");
+            return;
+        }
+        String id = resolveTargetId(call);
+        getActivity().runOnUiThread(() -> {
+            WebViewDialog dialog = resolveDialog(id);
+            if (dialog == null) {
+                call.reject("WebView is not initialized");
+                return;
+            }
+            if ((Boolean) enabled && (!dialog.isShowing() || fullscreenPaused)) {
+                call.reject("Application is in background");
+                return;
+            }
+            try {
+                dialog.setFullscreen((Boolean) enabled);
+                call.resolve();
+            } catch (IllegalStateException error) {
+                call.reject(error.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void getFullscreen(PluginCall call) {
+        String id = resolveTargetId(call);
+        getActivity().runOnUiThread(() -> {
+            WebViewDialog dialog = resolveDialog(id);
+            if (dialog == null) {
+                call.reject("WebView is not initialized");
+                return;
+            }
+            JSObject result = new JSObject();
+            result.put("enabled", dialog.isFullscreen());
+            call.resolve(result);
+        });
+    }
+
     @PluginMethod
     public void hide(PluginCall call) {
         String targetId = resolveTargetId(call);
@@ -1463,6 +1519,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         call.reject("WebView is not initialized");
                         return;
                     }
+                    dialog.clearFullscreen();
                     dialog.setHidden(true);
                     call.resolve();
                 }
@@ -1488,6 +1545,9 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         call.reject("WebView is not initialized");
                         return;
                     }
+                    if (dialog.getInstanceId() != null) {
+                        setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
                     dialog.setHidden(false);
                     Options options = dialog.getOptions();
                     if (options != null && options.isToBack()) {
@@ -1497,9 +1557,6 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                         }
                     } else {
                         dialog.bringToFrontLayer();
-                    }
-                    if (dialog.getInstanceId() != null) {
-                        setActiveWebView(dialog.getInstanceId(), dialog);
                     }
                     call.resolve();
                 }
@@ -1881,6 +1938,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnResume() {
+        fullscreenPaused = false;
         customTabsLifecycleSupport.onResume(customTabsBinder);
 
         // If we have a saved call and user returned without callback, reject
@@ -1891,6 +1949,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     protected void handleOnPause() {
+        fullscreenPaused = true;
+        for (WebViewDialog dialog : webViewDialogs.values()) dialog.clearFullscreen();
         customTabsLifecycleSupport.onPause(customTabsBinder);
     }
 
