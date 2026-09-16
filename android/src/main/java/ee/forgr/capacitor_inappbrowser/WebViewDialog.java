@@ -475,6 +475,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     @Override
+    public void show() {
+        super.show();
+        // Dialog.show() calls onStart() before mShowing = true, so the sync in onStart() always
+        // leaves the back callback disabled; re-sync now that the dialog is actually showing.
+        syncBackNavigationHandlers();
+    }
+
+    @Override
     protected void onStop() {
         syncBackNavigationHandlers();
         super.onStop();
