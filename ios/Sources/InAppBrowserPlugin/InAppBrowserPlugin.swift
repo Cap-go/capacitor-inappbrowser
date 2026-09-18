@@ -507,6 +507,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var safariViewController: SFSafariViewController?
     private var safariOpenedUrl: String?
     private var openSecureWindowCall: CAPPluginCall?
+    private var authSession: ASWebAuthenticationSession?
 
     private func setup() {
         self.isSetupDone = true
@@ -2759,10 +2760,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         // Open the URL in a secure browser window
         DispatchQueue.main.async {
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme) {
-                callbackURL, error in
-
-                // Clean up the stored call
-                self.openSecureWindowCall = nil
+                [weak self] callbackURL, error in
+                self?.authSession = nil
+                self?.openSecureWindowCall = nil
 
                 if let error = error {
                     // Handle error (e.g., user cancelled)
@@ -2787,6 +2787,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // Present the session
             session.prefersEphemeralWebBrowserSession = prefersEphemeral
             session.presentationContextProvider = self
+            self.authSession = session
             session.start()
         }
     }
