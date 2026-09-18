@@ -570,4 +570,9 @@ public class ProxyRequestSupportTest {
         rawHeaders.put("Ignored", null);
         assertEquals(Map.of("Content-Type", "text/html"), ProxyRequestSupport.normalizeLegacyStringMap(rawHeaders));
     }
+
+    @Test
+    public void copyProxyDecisionReturnsNullForNullInput() {
+        assertNull(ProxyRequestSupport.copyProxyDecision(null));
+    }
 }

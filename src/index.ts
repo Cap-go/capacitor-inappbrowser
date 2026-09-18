@@ -177,36 +177,44 @@ async function sendProxyDecision(
   }
 }
 
-const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> => {
-  return InAppBrowser.addListener('proxyRequest', async (event) => {
-    let decision: ProxyDecision | null = null;
-
-    try {
-      const result = await callback(event);
-      if (result === null) {
-        decision = null;
-      } else if (isProxyDecision(result)) {
-        decision = result;
-      } else if (isProxyRequestOverride(result)) {
-        decision = { request: result };
-      } else if (isProxyResponse(result)) {
-        decision = { response: result };
-      } else {
-        const cloned = result.clone();
-        const buffer = await cloned.arrayBuffer();
-        decision = {
-          response: {
-            body: arrayBufferToBase64(buffer),
-            status: result.status,
-            headers: headersToRecord(result.headers),
-          },
-        };
-      }
-    } catch (_error) {
-      decision = null;
+async function resolveProxyHandlerDecision(
+  callback: ProxyHandler,
+  event: Parameters<ProxyHandler>[0],
+): Promise<ProxyDecision | null> {
+  try {
+    const result = await callback(event);
+    if (result === null) {
+      return null;
     }
+    if (isProxyDecision(result)) {
+      return result;
+    }
+    if (isProxyRequestOverride(result)) {
+      return { request: result };
+    }
+    if (isProxyResponse(result)) {
+      return { response: result };
+    }
+    const cloned = result.clone();
+    const buffer = await cloned.arrayBuffer();
+    return {
+      response: {
+        body: arrayBufferToBase64(buffer),
+        status: result.status,
+        headers: headersToRecord(result.headers),
+      },
+    };
+  } catch (_error) {
+    return null;
+  }
+}
 
-    await sendProxyDecision(event.requestId, event.webviewId, decision, event.phase);
+const addProxyHandler = (callback: ProxyHandler): Promise<PluginListenerHandle> => {
+  return InAppBrowser.addListener('proxyRequest', (event) => {
+    void (async () => {
+      const decision = await resolveProxyHandlerDecision(callback, event);
+      await sendProxyDecision(event.requestId, event.webviewId, decision, event.phase);
+    })();
   });
 };
 

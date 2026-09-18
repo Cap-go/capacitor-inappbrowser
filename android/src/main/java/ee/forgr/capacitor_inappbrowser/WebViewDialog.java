@@ -6845,23 +6845,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     public void addProxiedRequest(String key, ProxiedRequest request) {
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.put(key, request);
-        }
+        proxiedRequestsHashmap.put(key, request);
     }
 
     public ProxiedRequest getProxiedRequest(String key) {
-        synchronized (proxiedRequestsHashmap) {
-            ProxiedRequest request = proxiedRequestsHashmap.get(key);
-            proxiedRequestsHashmap.remove(key);
-            return request;
-        }
+        ProxiedRequest request = proxiedRequestsHashmap.get(key);
+        proxiedRequestsHashmap.remove(key);
+        return request;
     }
 
     public void removeProxiedRequest(String key) {
-        synchronized (proxiedRequestsHashmap) {
-            proxiedRequestsHashmap.remove(key);
-        }
+        proxiedRequestsHashmap.remove(key);
     }
 
     private String loadProxyBridgeScript() {

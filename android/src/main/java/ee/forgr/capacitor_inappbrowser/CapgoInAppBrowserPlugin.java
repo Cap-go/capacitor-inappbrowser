@@ -1791,10 +1791,12 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             return;
         }
 
-        PROXY_RESPONSE_EXECUTOR.execute(() -> {
-            dialog.handleProxyResponse(requestId, decision);
-            call.resolve();
-        });
+        // Resolve immediately so Capacitor can accept the next proxy response while this one is
+        // still being applied on a worker thread. Deferring resolve() until after handleProxyResponse
+        // serialized parallel proxy completions on Android (issue #548).
+        final JSObject decisionForWorker = ProxyRequestSupport.copyProxyDecision(decision);
+        call.resolve();
+        PROXY_RESPONSE_EXECUTOR.execute(() -> dialog.handleProxyResponse(requestId, decisionForWorker));
     }
 
     @PluginMethod
