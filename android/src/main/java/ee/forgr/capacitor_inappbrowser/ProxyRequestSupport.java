@@ -1044,4 +1044,15 @@ final class ProxyRequestSupport {
         }
         return url.getDefaultPort();
     }
+
+    static JSObject copyProxyDecision(JSObject decision) {
+        if (decision == null) {
+            return null;
+        }
+        try {
+            return JSObject.fromJSONObject(new JSONObject(decision.toString()));
+        } catch (JSONException error) {
+            return null;
+        }
+    }
 }
