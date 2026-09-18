@@ -2752,6 +2752,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        if self.openSecureWindowCall != nil || self.authSession != nil {
+            call.reject("An authentication session is already in progress")
+            return
+        }
+
         // Store the call for later resolution
         self.openSecureWindowCall = call
 
@@ -2761,8 +2766,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackURLScheme) {
                 [weak self] callbackURL, error in
-                self?.authSession = nil
-                self?.openSecureWindowCall = nil
+                guard let self = self, self.openSecureWindowCall === call else {
+                    return
+                }
+                self.authSession = nil
+                self.openSecureWindowCall = nil
 
                 if let error = error {
                     // Handle error (e.g., user cancelled)
@@ -2788,7 +2796,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             session.prefersEphemeralWebBrowserSession = prefersEphemeral
             session.presentationContextProvider = self
             self.authSession = session
-            session.start()
+            if !session.start() {
+                self.authSession = nil
+                self.openSecureWindowCall = nil
+                call.reject("Failed to start authentication session")
+            }
         }
     }
 }
