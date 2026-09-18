@@ -15,12 +15,16 @@ enum PreferredContentModeSupport {
     static func resolve(
         perOpenValue: String?,
         pluginConfigValue: String?,
+        legacyPluginConfigValue: String?,
         capacitorConfigValue: String?
     ) -> String? {
         if let perOpenValue, let normalized = normalizedMode(perOpenValue) {
             return normalized
         }
         if let pluginConfigValue, let normalized = normalizedMode(pluginConfigValue) {
+            return normalized
+        }
+        if let legacyPluginConfigValue, let normalized = normalizedMode(legacyPluginConfigValue) {
             return normalized
         }
         if let capacitorConfigValue, let normalized = normalizedMode(capacitorConfigValue) {

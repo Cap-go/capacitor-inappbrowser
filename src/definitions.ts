@@ -1021,8 +1021,9 @@ export interface OpenWebViewOptions {
    *
    * Resolution order when opening a webview:
    * 1. This per-open value
-   * 2. Plugin config `plugins.CapgoInAppBrowser.preferredContentMode` (or legacy `InAppBrowser`)
-   * 3. Capacitor config `ios.preferredContentMode`
+   * 2. Plugin config `plugins.CapgoInAppBrowser.preferredContentMode`
+   * 3. Legacy plugin config `plugins.InAppBrowser.preferredContentMode`
+   * 4. Capacitor config `ios.preferredContentMode`
    *
    * When unset at all levels, the system default applies (device-recommended).
    *

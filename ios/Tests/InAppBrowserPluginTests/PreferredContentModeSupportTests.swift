@@ -17,6 +17,7 @@ final class PreferredContentModeSupportTests: XCTestCase {
         let resolved = PreferredContentModeSupport.resolve(
             perOpenValue: "desktop",
             pluginConfigValue: "mobile",
+            legacyPluginConfigValue: "recommended",
             capacitorConfigValue: "recommended"
         )
         XCTAssertEqual(resolved, "desktop")
@@ -26,15 +27,27 @@ final class PreferredContentModeSupportTests: XCTestCase {
         let resolved = PreferredContentModeSupport.resolve(
             perOpenValue: nil,
             pluginConfigValue: "mobile",
-            capacitorConfigValue: "desktop"
+            legacyPluginConfigValue: "desktop",
+            capacitorConfigValue: "recommended"
         )
         XCTAssertEqual(resolved, "mobile")
+    }
+
+    func testResolveFallsBackToLegacyPluginConfig() {
+        let resolved = PreferredContentModeSupport.resolve(
+            perOpenValue: nil,
+            pluginConfigValue: nil,
+            legacyPluginConfigValue: "desktop",
+            capacitorConfigValue: "recommended"
+        )
+        XCTAssertEqual(resolved, "desktop")
     }
 
     func testResolveFallsBackToCapacitorConfig() {
         let resolved = PreferredContentModeSupport.resolve(
             perOpenValue: nil,
             pluginConfigValue: nil,
+            legacyPluginConfigValue: nil,
             capacitorConfigValue: "desktop"
         )
         XCTAssertEqual(resolved, "desktop")
@@ -45,6 +58,7 @@ final class PreferredContentModeSupportTests: XCTestCase {
             PreferredContentModeSupport.resolve(
                 perOpenValue: nil,
                 pluginConfigValue: nil,
+                legacyPluginConfigValue: nil,
                 capacitorConfigValue: nil
             )
         )

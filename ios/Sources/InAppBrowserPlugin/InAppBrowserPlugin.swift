@@ -1376,6 +1376,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let preferredContentMode = PreferredContentModeSupport.resolve(
             perOpenValue: call.getString("preferredContentMode"),
             pluginConfigValue: self.getConfig().getString("preferredContentMode"),
+            legacyPluginConfigValue: self.bridge?.config.getPluginConfig("InAppBrowser").getString("preferredContentMode"),
             capacitorConfigValue: self.bridge?.config.preferredContentMode
         )
         let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
