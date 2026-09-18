@@ -1368,6 +1368,16 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         self.isHidden = hidden
         let hiddenPopupWindow = call.getBool("hiddenPopupWindow", false)
         let allowWebViewJsVisibilityControl = self.getConfig().getBoolean("allowWebViewJsVisibilityControl", false)
+        if let rawPreferredContentMode = call.getString("preferredContentMode"),
+           PreferredContentModeSupport.normalizedMode(rawPreferredContentMode) == nil {
+            call.reject("preferredContentMode must be 'recommended', 'mobile', or 'desktop'")
+            return
+        }
+        let preferredContentMode = PreferredContentModeSupport.resolve(
+            perOpenValue: call.getString("preferredContentMode"),
+            pluginConfigValue: self.getConfig().getString("preferredContentMode"),
+            capacitorConfigValue: self.bridge?.config.preferredContentMode
+        )
         let allowScreenshotsFromWebPage = call.getBool("allowScreenshotsFromWebPage", false)
         let screenshotOnHide = call.getBool("screenshotOnHide", false)
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
@@ -1526,6 +1536,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.source = webSource
             webViewController.setCredentials(credentials: credentials)
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
+            webViewController.preferredContentMode = preferredContentMode
             webViewController.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
             webViewController.captureConsoleLogs = captureConsoleLogs
             webViewController.proxyRequests = legacyProxyRequests.isEnabled

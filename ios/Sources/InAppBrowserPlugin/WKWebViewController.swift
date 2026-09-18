@@ -435,6 +435,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var clearCookiesOnOpen = false
     open var clearCacheOnOpen = false
     open var handleDownloads = false
+    open var preferredContentMode: String?
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
     open var cookies: [HTTPCookie]?
@@ -2051,6 +2052,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.edgesForExtendedLayout = [.bottom]
 
         let webConfiguration = initialWebConfiguration ?? WKWebViewConfiguration()
+        if let preferredContentMode {
+            PreferredContentModeSupport.apply(to: webConfiguration, mode: preferredContentMode)
+        }
         webConfiguration.websiteDataStore = BrowsingDataStoreSupport.websiteDataStore(
             persistWebViewData: persistWebViewData,
             useSharedDataStore: useSharedDataStore
@@ -2340,6 +2344,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.captureConsoleLogs = parent.captureConsoleLogs
         self.allowWebViewJsVisibilityControl = parent.allowWebViewJsVisibilityControl
         self.allowScreenshotsFromWebPage = parent.allowScreenshotsFromWebPage
+        self.preferredContentMode = parent.preferredContentMode
         self.handleDownloads = parent.handleDownloads
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition

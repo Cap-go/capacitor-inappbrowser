@@ -114,6 +114,13 @@ export enum CloseAction {
   HIDE = 'hide',
 }
 
+/**
+ * Web content rendering mode for managed WKWebViews on iOS.
+ *
+ * @since 8.18.0
+ */
+export type PreferredContentMode = 'recommended' | 'mobile' | 'desktop';
+
 export enum CloseButtonPosition {
   /**
    * Leading edge of the toolbar (left in left-to-right layouts).
@@ -1006,6 +1013,26 @@ export interface OpenWebViewOptions {
    * Test URL: https://capgo.app
    */
   isPresentAfterPageLoad?: boolean;
+  /**
+   * Web content rendering mode for the managed WKWebView.
+   *
+   * Controls whether pages load with mobile or desktop layout on iPad.
+   * Matches Capacitor's `ios.preferredContentMode` behavior.
+   *
+   * Resolution order when opening a webview:
+   * 1. This per-open value
+   * 2. Plugin config `plugins.CapgoInAppBrowser.preferredContentMode` (or legacy `InAppBrowser`)
+   * 3. Capacitor config `ios.preferredContentMode`
+   *
+   * When unset at all levels, the system default applies (device-recommended).
+   *
+   * **iOS only** — ignored on Android and Web.
+   *
+   * @since 8.18.0
+   * @example
+   * preferredContentMode: "mobile"
+   */
+  preferredContentMode?: PreferredContentMode;
   /**
    * Whether the website in the webview is inspectable or not, ios only
    * @default false
