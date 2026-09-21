@@ -2,6 +2,8 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class DownloadPreviewSupportTests: XCTestCase {
+    deinit {}
+
     func testNormalizesSupportedModes() {
         XCTAssertEqual(DownloadPreviewSupport.normalizedMode("inAppBrowser"), "inAppBrowser")
         XCTAssertEqual(DownloadPreviewSupport.normalizedMode("SYSTEMPREVIEW"), "systemPreview")
