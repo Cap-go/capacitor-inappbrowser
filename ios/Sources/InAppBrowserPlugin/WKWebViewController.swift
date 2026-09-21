@@ -427,6 +427,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open internal(set) var url: URL?
     open var tintColor: UIColor?
     open var allowsFileURL = true
+    open var downloadPreview = DownloadPreviewSupport.defaultMode
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
     open var captureConsoleLogs = false
@@ -769,7 +770,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
         DispatchQueue.main.async {
-            if self.allowsFileURL && self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
+            if DownloadPreviewSupport.usesInAppBrowserPreview(self.downloadPreview) &&
+                self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
                 let accessURL = fileURL.deletingLastPathComponent()
                 self.source = .file(fileURL, access: accessURL)
                 self.load(file: fileURL, access: accessURL)
@@ -2346,6 +2348,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowScreenshotsFromWebPage = parent.allowScreenshotsFromWebPage
         self.preferredContentMode = parent.preferredContentMode
         self.handleDownloads = parent.handleDownloads
+        self.downloadPreview = parent.downloadPreview
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition
         self.showArrowAsClose = parent.showArrowAsClose

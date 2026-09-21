@@ -1117,6 +1117,18 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         options.setAllowScreenshotsFromWebPage(Boolean.TRUE.equals(call.getBoolean("allowScreenshotsFromWebPage", false)));
         options.setCaptureConsoleLogs(Boolean.TRUE.equals(call.getBoolean("captureConsoleLogs", false)));
         options.setHandleDownloads(Boolean.TRUE.equals(call.getBoolean("handleDownloads", false)));
+        String downloadPreview = call.getString("downloadPreview", "inAppBrowser");
+        if (downloadPreview != null) {
+            String normalizedDownloadPreview = downloadPreview.toLowerCase(Locale.ROOT);
+            if ("inappbrowser".equals(normalizedDownloadPreview)) {
+                options.setDownloadPreview("inAppBrowser");
+            } else if ("systempreview".equals(normalizedDownloadPreview)) {
+                options.setDownloadPreview("systemPreview");
+            } else {
+                call.reject("downloadPreview must be 'inAppBrowser' or 'systemPreview'");
+                return;
+            }
+        }
 
         options.setPersistWebViewData(call.getBoolean("persistWebViewData", true));
         options.setClearCookiesOnOpen(Boolean.TRUE.equals(call.getBoolean("clearCookiesOnOpen", false)));
