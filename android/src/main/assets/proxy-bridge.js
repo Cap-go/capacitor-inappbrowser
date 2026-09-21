@@ -81,7 +81,7 @@
   function resolveProxyBridgeUrl(rawUrl, baseUrl) {
     try {
       return new URL(rawUrl, baseUrl).href;
-    } catch (_error) {
+    } catch (e) {
       return null;
     }
   }
@@ -130,7 +130,7 @@
           form.requestSubmit();
         }
         return;
-      } catch (_error) {
+      } catch (e) {
         delete form.__capgoSkipNextProxySubmit;
       }
     }
@@ -168,7 +168,7 @@
     if (proxyRegexSource) {
       try {
         proxyRequestPattern = new RegExp(proxyRegexSource);
-      } catch (_error) {
+      } catch (e) {
         proxyRequestPattern = null;
       }
     }
@@ -209,7 +209,7 @@
       if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//)) {
         try {
           return new URL(url, getDocumentBaseUrl()).href;
-        } catch (_error) {
+        } catch (e) {
           return url;
         }
       }
@@ -289,7 +289,7 @@
       if (submitter instanceof HTMLElement) {
         try {
           return new FormData(form, submitter);
-        } catch (_error) {
+        } catch (e) {
         }
       }
       return new FormData(form);
@@ -450,7 +450,7 @@
         let proxyUrl;
         try {
           proxyUrl = yield storeInterceptedRequest(url, method, headers, body, credentialsMode);
-        } catch (_error) {
+        } catch (e) {
           return originalFetch.call(window, input, init);
         }
         const proxyResponse = yield originalFetch.call(globalThis, proxyUrl, {

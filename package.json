@@ -65,27 +65,26 @@
     "@capacitor/core": "^8.0.0",
     "@capacitor/docgen": "^0.3.1",
     "@capacitor/ios": "^8.0.0",
-    "@ionic/eslint-config": "^0.4.0",
+    "@ionic/eslint-config": "^0.5.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
     "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
+    "@typescript/typescript6": "^6.0.2",
     "esbuild": "^0.28.0",
-    "eslint": "^8.57.1",
-    "eslint-plugin-import": "^2.31.0",
+    "eslint": "^10.0.0",
     "husky": "^9.1.7",
-    "prettier": "^3.6.2",
-    "prettier-plugin-java": "^2.7.7",
+    "prettier": "3.8.4",
+    "prettier-plugin-java": "2.9.7",
     "rimraf": "^6.1.0",
     "rollup": "^4.53.2",
     "swiftlint": "^2.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.0",
     "prettier-pretty-check": "^0.2.0"
   },
   "peerDependencies": {
     "@capacitor/core": ">=8.0.0"
-  },
-  "eslintConfig": {
-    "extends": "@ionic/eslint-config/recommended"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": {

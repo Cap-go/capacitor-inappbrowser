@@ -1394,7 +1394,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             availableResources.append(drawables[i].getName()).append(", ");
         }
         if (drawables.length > 10) {
-            availableResources.append("... (").append(drawables.length - 10).append(" more)");
+            availableResources
+                .append("... (")
+                .append(drawables.length - 10)
+                .append(" more)");
         }
         return availableResources;
     }
