@@ -36,7 +36,7 @@ import {
   if (proxyRegexSource) {
     try {
       proxyRequestPattern = new RegExp(proxyRegexSource);
-    } catch (_error) {
+    } catch {
       proxyRequestPattern = null;
     }
   }
@@ -85,7 +85,7 @@ import {
     if (url && !url.match(/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//)) {
       try {
         return new URL(url, getDocumentBaseUrl()).href;
-      } catch (_error) {
+      } catch {
         return url;
       }
     }
@@ -181,7 +181,7 @@ import {
     if (submitter instanceof HTMLElement) {
       try {
         return new FormData(form, submitter as HTMLButtonElement | HTMLInputElement);
-      } catch (_error) {
+      } catch {
         // Fall back to the form-only constructor on older WebViews.
       }
     }
@@ -371,7 +371,7 @@ import {
     let proxyUrl: string;
     try {
       proxyUrl = await storeInterceptedRequest(url, method, headers, body, credentialsMode);
-    } catch (_error) {
+    } catch {
       return originalFetch.call(window, input, init);
     }
     const proxyResponse = await originalFetch.call(globalThis, proxyUrl, {

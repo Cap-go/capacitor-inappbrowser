@@ -67,7 +67,7 @@ export function ensureInferredContentType(headers: Record<string, string>, body:
 export function resolveProxyBridgeUrl(rawUrl: string, baseUrl: string): string | null {
   try {
     return new URL(rawUrl, baseUrl).href;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }
@@ -151,7 +151,7 @@ export function replaySubmitAfterProxyFailure(
         form.requestSubmit();
       }
       return;
-    } catch (_error) {
+    } catch {
       delete form.__capgoSkipNextProxySubmit;
     }
   }

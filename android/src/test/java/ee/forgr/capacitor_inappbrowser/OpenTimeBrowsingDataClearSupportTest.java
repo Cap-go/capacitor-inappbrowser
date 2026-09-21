@@ -42,12 +42,8 @@ public class OpenTimeBrowsingDataClearSupportTest {
         AtomicBoolean completed = new AtomicBoolean(false);
         AtomicBoolean cookieClearStarted = new AtomicBoolean(false);
 
-        OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation(
-            (onCleared) -> cookieClearStarted.set(true),
-            null,
-            false,
-            false,
-            () -> completed.set(true)
+        OpenTimeBrowsingDataClearSupport.applyBeforeFirstNavigation((onCleared) -> cookieClearStarted.set(true), null, false, false, () ->
+            completed.set(true)
         );
 
         assertFalse(cookieClearStarted.get());

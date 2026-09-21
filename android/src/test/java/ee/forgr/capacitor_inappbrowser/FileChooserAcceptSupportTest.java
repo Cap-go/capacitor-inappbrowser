@@ -13,9 +13,9 @@ public class FileChooserAcceptSupportTest {
 
     @Test
     public void normalizeAcceptTypesDedupesAndLowercasesMimeTypes() {
-        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(
-            new String[] { "image/png,IMAGE/PNG,application/pdf" }
-        );
+        LinkedHashSet<String> mimeTypes = FileChooserAcceptSupport.normalizeAcceptTypes(new String[] {
+            "image/png,IMAGE/PNG,application/pdf"
+        });
 
         assertEquals(new LinkedHashSet<>(Arrays.asList("image/png", "application/pdf")), mimeTypes);
     }

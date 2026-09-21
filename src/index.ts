@@ -204,7 +204,7 @@ async function resolveProxyHandlerDecision(
         headers: headersToRecord(result.headers),
       },
     };
-  } catch (_error) {
+  } catch {
     return null;
   }
 }

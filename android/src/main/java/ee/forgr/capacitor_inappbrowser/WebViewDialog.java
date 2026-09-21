@@ -2373,7 +2373,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         "Has camera permission: " +
                             (activity != null &&
                                 activity.checkSelfPermission(android.Manifest.permission.CAMERA) ==
-                                android.content.pm.PackageManager.PERMISSION_GRANTED)
+                                    android.content.pm.PackageManager.PERMISSION_GRANTED)
                     );
 
                     // Check if the file chooser is already open
@@ -6824,22 +6824,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (executorService.isShutdown()) {
             return;
         }
-        Thread shutdownThread = new Thread(
-            () -> {
-                try {
-                    executorService.shutdown();
-                    if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                        executorService.shutdownNow();
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+        Thread shutdownThread = new Thread(() -> {
+            try {
+                executorService.shutdown();
+                if (!executorService.awaitTermination(500, TimeUnit.MILLISECONDS)) {
                     executorService.shutdownNow();
-                } catch (Exception e) {
-                    Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
                 }
-            },
-            "InAppBrowser-ExecutorShutdown"
-        );
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                executorService.shutdownNow();
+            } catch (Exception e) {
+                Log.e("InAppBrowser", "Error shutting down executor: " + e.getMessage());
+            }
+        }, "InAppBrowser-ExecutorShutdown");
         shutdownThread.setDaemon(true);
         shutdownThread.start();
     }
