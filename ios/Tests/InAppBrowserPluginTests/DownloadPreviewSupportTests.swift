@@ -2,7 +2,9 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class DownloadPreviewSupportTests: XCTestCase {
-    deinit {}
+    deinit {
+        // Exists only to satisfy SwiftLint `required_deinit` (Sonar/CodeRabbit flag empty deinit).
+    }
 
     func testNormalizesSupportedModes() {
         XCTAssertEqual(DownloadPreviewSupport.normalizedMode("inAppBrowser"), "inAppBrowser")
