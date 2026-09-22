@@ -204,6 +204,8 @@ public class Options {
     private boolean allowScreenshotsFromWebPage = false;
     private boolean captureConsoleLogs = false;
     private boolean handleDownloads = false;
+    /** Accepted for API parity with iOS; Android already uses an external viewer for managed downloads. */
+    private String downloadPreview = "inAppBrowser";
     private boolean persistWebViewData = true;
     private boolean clearCookiesOnOpen = false;
     private boolean clearCacheOnOpen = false;
@@ -313,6 +315,14 @@ public class Options {
 
     public void setHandleDownloads(boolean handleDownloads) {
         this.handleDownloads = handleDownloads;
+    }
+
+    public String getDownloadPreview() {
+        return downloadPreview;
+    }
+
+    public void setDownloadPreview(String downloadPreview) {
+        this.downloadPreview = downloadPreview;
     }
 
     public boolean getPersistWebViewData() {
@@ -900,6 +910,7 @@ public class Options {
         copy.setAllowScreenshotsFromWebPage(allowScreenshotsFromWebPage);
         copy.setCaptureConsoleLogs(captureConsoleLogs);
         copy.setHandleDownloads(handleDownloads);
+        copy.setDownloadPreview(downloadPreview);
         copy.setInvisibilityMode(invisibilityMode);
         copy.setPopupWindowMode(true);
         copy.setHiddenPopupWindow(hiddenPopupWindow);

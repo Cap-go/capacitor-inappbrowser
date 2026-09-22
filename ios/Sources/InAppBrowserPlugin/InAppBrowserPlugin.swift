@@ -1384,6 +1384,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let screenshotOnHide = call.getBool("screenshotOnHide", false)
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
         let handleDownloads = call.getBool("handleDownloads", false)
+        if let rawDownloadPreview = call.getString("downloadPreview"),
+           DownloadPreviewSupport.normalizedMode(rawDownloadPreview) == nil {
+            call.reject("downloadPreview must be 'inAppBrowser' or 'systemPreview'")
+            return
+        }
+        let downloadPreview = DownloadPreviewSupport.resolve(perOpenValue: call.getString("downloadPreview"))
         let persistWebViewData = call.getBool("persistWebViewData", true)
         let useSharedDataStore = call.getBool("useSharedDataStore", false)
         let clearCookiesOnOpen = call.getBool("clearCookiesOnOpen", false)
@@ -1595,6 +1601,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.handleDownloads = handleDownloads
+            webViewController.downloadPreview = downloadPreview
 
             // Set native navigation gestures before view loads
             webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview

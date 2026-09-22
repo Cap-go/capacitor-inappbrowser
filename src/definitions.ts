@@ -359,6 +359,13 @@ export interface ConsoleMessageEvent {
 export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external';
 
 /**
+ * Where managed downloads are previewed after saving.
+ *
+ * @since 8.19.0
+ */
+export type DownloadPreview = 'inAppBrowser' | 'systemPreview';
+
+/**
  * Event emitted after a managed download is saved locally.
  *
  * @since 8.6.0
@@ -872,7 +879,7 @@ export interface OpenWebViewOptions {
    * When enabled:
    * - Standard attachment responses are written to a temporary file.
    * - `blob:` downloads are also captured when the platform supports them.
-   * - Previewable files reopen inside the in-app browser when possible.
+   * - Previewable files reopen inside the in-app browser when possible (see `downloadPreview`).
    * - Other files are handed off to the native preview or viewer flow.
    * - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.
    *
@@ -880,6 +887,18 @@ export interface OpenWebViewOptions {
    * @since 8.6.0
    */
   handleDownloads?: boolean;
+  /**
+   * Controls where managed downloads are previewed after saving.
+   *
+   * - `'inAppBrowser'` (default): Reopens previewable files (PDF, images, text, JSON) inside the same webview.
+   * - `'systemPreview'`: Opens the system Quick Look preview with share and Save to Files actions. iOS only; ignored on Android.
+   *
+   * Requires `handleDownloads: true`.
+   *
+   * @default "inAppBrowser"
+   * @since 8.19.0
+   */
+  downloadPreview?: DownloadPreview;
   /**
    * Share options for the webview. When provided, shows a disclaimer dialog before sharing content.
    * This is useful for:
