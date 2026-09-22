@@ -5,17 +5,17 @@
     "": {
       "name": "capacitor-app",
       "dependencies": {
-        "@capacitor/android": "^8.0.0",
+        "@capacitor/android": "^8.5.2",
         "@capacitor/camera": "^8.0.0",
-        "@capacitor/core": "^8.0.0",
-        "@capacitor/ios": "^8.0.0",
+        "@capacitor/core": "^8.5.2",
+        "@capacitor/ios": "^8.5.2",
         "@capacitor/splash-screen": "^8.0.0",
         "@capgo/capacitor-inappbrowser": "file:..",
         "@capgo/capacitor-updater": "^8.45.11",
       },
       "devDependencies": {
         "@capacitor/assets": "^3.0.5",
-        "@capacitor/cli": "^8.0.0",
+        "@capacitor/cli": "^8.5.2",
         "typescript": "^5.9.3",
         "vite": "^7.3.1",
       },
