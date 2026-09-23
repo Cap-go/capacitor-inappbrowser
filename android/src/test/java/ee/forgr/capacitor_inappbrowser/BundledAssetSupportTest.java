@@ -75,6 +75,27 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void rejectsUntrustedFileUrls() {
+        assertNull(BundledAssetSupport.resolve("file:///tmp/index.html", (Bridge) null));
+        assertNull(BundledAssetSupport.resolve("file:///data/data/com.example/files/secret.html", (Bridge) null));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///tmp/index.html"));
+    }
+
+    @Test
+    public void allowsTrustedBundledFileUrls() {
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/index.html"));
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/"));
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(
+            "file:///android_asset/public/index.html",
+            (Bridge) null
+        );
+
+        assertEquals("file:///android_asset/public/index.html", resolution.url);
+        assertFalse(resolution.needsAssetLoader);
+    }
+
+    @Test
     public void distinguishesBundledPathsFromBareHostnames() {
         assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("/index.html"));
         assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("assets/page.html"));

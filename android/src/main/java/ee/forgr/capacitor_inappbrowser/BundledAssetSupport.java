@@ -81,9 +81,41 @@ final class BundledAssetSupport {
         return resolve(url, localConfig);
     }
 
+    static boolean isFileUrl(String url) {
+        if (isBlank(url)) {
+            return false;
+        }
+
+        try {
+            return "file".equalsIgnoreCase(URI.create(url.trim()).getScheme());
+        } catch (IllegalArgumentException error) {
+            return false;
+        }
+    }
+
+    static boolean isTrustedBundledFileUrl(String url) {
+        if (!isFileUrl(url)) {
+            return false;
+        }
+
+        try {
+            String path = URI.create(url.trim()).getPath();
+            if (path == null || path.isEmpty()) {
+                return false;
+            }
+            return path.startsWith("/android_asset/") || "/android_asset".equals(path);
+        } catch (IllegalArgumentException error) {
+            return false;
+        }
+    }
+
     static Resolution resolve(String url, LocalConfig localConfig) {
         String trimmed = url == null ? "" : url.trim();
         String navigationScheme = assetLoaderScheme(localConfig);
+
+        if (isFileUrl(trimmed) && !isTrustedBundledFileUrl(trimmed)) {
+            return null;
+        }
 
         if (isRelativeBundledPath(trimmed)) {
             String path = normalizeBundledPath(trimmed);

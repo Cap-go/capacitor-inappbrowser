@@ -2444,17 +2444,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
+        _webView.getSettings().setDatabaseEnabled(true);
         _webView.getSettings().setDomStorageEnabled(true);
         _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
-        // TODO(#717): Replace deprecated file:// cross-origin settings with WebViewAssetLoader for
-        // non-bundled local content. Bundled assets already use BundledAssetSupport; general file://
-        // loading still relies on these APIs until a safe AssetLoader migration is done.
-        _webView.getSettings().setAllowFileAccessFromFileURLs(true);
-        _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        if (_options != null && BundledAssetSupport.isTrustedBundledFileUrl(_options.getUrl())) {
+            // Legacy bundled asset loading via file:///android_asset/ still needs these settings.
+            _webView.getSettings().setAllowFileAccessFromFileURLs(true);
+            _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        }
         if (!_options.getPersistWebViewData()) {
+            _webView.getSettings().setDatabaseEnabled(false);
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.clearCache(true);
             _webView.clearHistory();
@@ -4991,6 +4993,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         if (url == null || url.trim().isEmpty()) {
             Log.w("InAppBrowser", "Cannot set empty URL");
+            return;
+        }
+
+        if (BundledAssetSupport.isFileUrl(url) && !BundledAssetSupport.isTrustedBundledFileUrl(url)) {
+            Log.e("InAppBrowser", "Rejected untrusted file URL");
             return;
         }
 
