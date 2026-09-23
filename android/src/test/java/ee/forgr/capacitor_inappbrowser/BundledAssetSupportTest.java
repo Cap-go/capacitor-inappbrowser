@@ -86,10 +86,7 @@ public class BundledAssetSupportTest {
         assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/index.html"));
         assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/"));
 
-        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(
-            "file:///android_asset/public/index.html",
-            (Bridge) null
-        );
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("file:///android_asset/public/index.html", (Bridge) null);
 
         assertEquals("file:///android_asset/public/index.html", resolution.url);
         assertFalse(resolution.needsAssetLoader);
