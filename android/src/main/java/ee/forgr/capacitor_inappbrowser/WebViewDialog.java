@@ -3061,6 +3061,23 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             case DISMISS:
             default:
                 String currentUrl = getUrl();
+                Pattern urlPattern = _options.getCloseModalURLPattern();
+                if (_options.getCloseModal() && (urlPattern == null || urlPattern.matcher(currentUrl).find())) {
+                    // Confirm like the toolbar close button; OK does the same close as below
+                    new AlertDialog.Builder(_context)
+                        .setTitle(_options.getCloseModalTitle())
+                        .setMessage(_options.getCloseModalDescription())
+                        .setPositiveButton(_options.getCloseModalOk(), (dialog, which) -> {
+                            if (_options.getCallbacks() != null) {
+                                _options.getCallbacks().confirmBtnClicked(currentUrl);
+                                _options.getCallbacks().closeEvent(currentUrl);
+                            }
+                            dismiss();
+                        })
+                        .setNegativeButton(_options.getCloseModalCancel(), null)
+                        .show();
+                    return;
+                }
                 if (_options.getCallbacks() != null) {
                     _options.getCallbacks().closeEvent(currentUrl);
                 }
