@@ -81,6 +81,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.FileProvider;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.graphics.Insets;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -539,7 +540,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         @Override
-        public void onLowMemory() {}
+        @SuppressWarnings("deprecation")
+        public void onLowMemory() {
+            onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE);
+        }
 
         @Override
         public void onTrimMemory(int level) {}
@@ -2440,17 +2444,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-        _webView.getSettings().setDatabaseEnabled(true);
         _webView.getSettings().setDomStorageEnabled(true);
         _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
+        // TODO(#717): Replace deprecated file:// cross-origin settings with WebViewAssetLoader for
+        // non-bundled local content. Bundled assets already use BundledAssetSupport; general file://
+        // loading still relies on these APIs until a safe AssetLoader migration is done.
         _webView.getSettings().setAllowFileAccessFromFileURLs(true);
         _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
         if (!_options.getPersistWebViewData()) {
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
-            _webView.getSettings().setDatabaseEnabled(false);
             _webView.clearCache(true);
             _webView.clearHistory();
             _webView.clearFormData();
@@ -3349,8 +3354,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             mediaFullscreenWindow.restore();
             mediaFullscreenWindow = null;
         }
-        if (nativeFullscreenWindow != null) nativeFullscreenWindow.enter();
-        else reapplyInsetsFromWindowRoot();
+        if (nativeFullscreenWindow != null) {
+            nativeFullscreenWindow.enter();
+        } else {
+            reapplyInsetsFromWindowRoot();
+            if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
+                refreshEdgeToEdgeChrome();
+            }
+        }
 
         unregisterCustomFullscreenBackHandler();
 
@@ -5127,7 +5138,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     return null;
                 }
                 drawable = drawable.mutate();
-                drawable.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
+                DrawableCompat.setTint(drawable, iconColor);
                 drawable.setBounds(0, 0, width, height);
                 return drawable;
             } catch (Exception e) {
