@@ -901,6 +901,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 activity.runOnUiThread(() -> {
                     try {
+                        if (isDismissing) {
+                            // Dismissal already started (e.g. close button or back); do not close twice.
+                            return;
+                        }
                         String currentUrl = getUrl();
                         dismiss();
 
