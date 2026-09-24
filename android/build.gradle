@@ -12,6 +12,10 @@ ext {
                 match.find() ? match.group(1).toInteger() : 0
             }
         }
+        def stripPrerelease = { String version ->
+            def dashIndex = version.indexOf('-')
+            dashIndex > 0 ? version.substring(0, dashIndex) : version
+        }
         def isAtLeast = { String version, String baseline ->
             def versionParts = parseVersionParts(version)
             def baselineParts = parseVersionParts(baseline)
@@ -25,8 +29,14 @@ ext {
             }
             return true
         }
-        if (!isAtLeast(requested, minimum)) {
+        def requestedBase = stripPrerelease(requested)
+        if (!isAtLeast(requestedBase, minimum)) {
             throw new GradleException("androidxBrowserVersion must be >= ${minimum} (required for setUrlBarHidingEnabled), got: ${requested}")
+        }
+        if (requested.contains('-') && isAtLeast(requestedBase, minimum) && isAtLeast(minimum, requestedBase)) {
+            throw new GradleException(
+                "androidxBrowserVersion must be >= ${minimum} stable (prerelease not accepted at the minimum version), got: ${requested}"
+            )
         }
         return requested
     }()

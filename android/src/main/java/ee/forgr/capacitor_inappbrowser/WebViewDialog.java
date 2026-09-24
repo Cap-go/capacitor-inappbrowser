@@ -6583,6 +6583,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView == null) {
                         return;
                     }
+                    applyTrustedBundledFileCrossOriginSettings(url);
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }
