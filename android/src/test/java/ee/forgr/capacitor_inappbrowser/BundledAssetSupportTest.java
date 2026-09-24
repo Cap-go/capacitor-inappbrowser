@@ -78,7 +78,9 @@ public class BundledAssetSupportTest {
     public void rejectsUntrustedFileUrls() {
         assertNull(BundledAssetSupport.resolve("file:///tmp/index.html", (Bridge) null));
         assertNull(BundledAssetSupport.resolve("file:///data/data/com.example/files/secret.html", (Bridge) null));
+        assertNull(BundledAssetSupport.resolve("file:///sdcard/a b.html", (Bridge) null));
         assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///tmp/index.html"));
+        assertTrue(BundledAssetSupport.isFileUrl("file:///sdcard/a b.html"));
     }
 
     @Test

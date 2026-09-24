@@ -2450,11 +2450,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
-        if (_options != null && BundledAssetSupport.isTrustedBundledFileUrl(_options.getUrl())) {
-            // Legacy bundled asset loading via file:///android_asset/ still needs these settings.
-            _webView.getSettings().setAllowFileAccessFromFileURLs(true);
-            _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
-        }
+        applyTrustedBundledFileCrossOriginSettings(_options != null ? _options.getUrl() : null);
         if (!_options.getPersistWebViewData()) {
             _webView.getSettings().setDatabaseEnabled(false);
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
@@ -4968,6 +4964,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private void applyTrustedBundledFileCrossOriginSettings(String url) {
+        if (_webView == null || !BundledAssetSupport.isTrustedBundledFileUrl(url)) {
+            return;
+        }
+
+        // Legacy bundled asset loading via file:///android_asset/ still needs these settings.
+        _webView.getSettings().setAllowFileAccessFromFileURLs(true);
+        _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+    }
+
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {
         final WebViewAssetLoader loader;
         synchronized (bundledAssetLoaderLock) {
@@ -5000,6 +5006,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             Log.e("InAppBrowser", "Rejected untrusted file URL");
             return;
         }
+
+        applyTrustedBundledFileCrossOriginSettings(url);
 
         try {
             if (loadHtmlDataUrlIfNeeded(url)) {

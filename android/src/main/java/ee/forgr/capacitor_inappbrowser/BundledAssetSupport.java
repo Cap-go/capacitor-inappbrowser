@@ -89,7 +89,7 @@ final class BundledAssetSupport {
         try {
             return "file".equalsIgnoreCase(URI.create(url.trim()).getScheme());
         } catch (IllegalArgumentException error) {
-            return false;
+            return url.trim().regionMatches(true, 0, "file:", 0, "file:".length());
         }
     }
 
