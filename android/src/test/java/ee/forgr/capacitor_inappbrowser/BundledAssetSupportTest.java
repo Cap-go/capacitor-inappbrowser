@@ -87,11 +87,20 @@ public class BundledAssetSupportTest {
     public void allowsTrustedBundledFileUrls() {
         assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/index.html"));
         assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/"));
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/my page.html"));
 
         BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("file:///android_asset/public/index.html", (Bridge) null);
 
         assertEquals("file:///android_asset/public/index.html", resolution.url);
         assertFalse(resolution.needsAssetLoader);
+
+        BundledAssetSupport.Resolution spacedResolution = BundledAssetSupport.resolve(
+            "file:///android_asset/public/my page.html",
+            (Bridge) null
+        );
+
+        assertEquals("file:///android_asset/public/my page.html", spacedResolution.url);
+        assertFalse(spacedResolution.needsAssetLoader);
     }
 
     @Test

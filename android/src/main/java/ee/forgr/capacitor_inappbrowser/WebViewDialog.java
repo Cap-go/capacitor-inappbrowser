@@ -4965,13 +4965,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void applyTrustedBundledFileCrossOriginSettings(String url) {
-        if (_webView == null || !BundledAssetSupport.isTrustedBundledFileUrl(url)) {
+        if (_webView == null) {
             return;
         }
 
-        // Legacy bundled asset loading via file:///android_asset/ still needs these settings.
-        _webView.getSettings().setAllowFileAccessFromFileURLs(true);
-        _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        boolean trustedBundledFile = BundledAssetSupport.isTrustedBundledFileUrl(url);
+        _webView.getSettings().setAllowFileAccessFromFileURLs(trustedBundledFile);
+        _webView.getSettings().setAllowUniversalAccessFromFileURLs(trustedBundledFile);
     }
 
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {

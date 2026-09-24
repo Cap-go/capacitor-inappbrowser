@@ -98,14 +98,32 @@ final class BundledAssetSupport {
             return false;
         }
 
-        try {
-            String path = URI.create(url.trim()).getPath();
-            if (path == null || path.isEmpty()) {
-                return false;
-            }
-            return path.startsWith("/android_asset/") || "/android_asset".equals(path);
-        } catch (IllegalArgumentException error) {
+        String path = fileUrlPath(url.trim());
+        if (path == null || path.isEmpty()) {
             return false;
+        }
+        return path.startsWith("/android_asset/") || "/android_asset".equals(path);
+    }
+
+    private static String fileUrlPath(String url) {
+        try {
+            return URI.create(url).getPath();
+        } catch (IllegalArgumentException error) {
+            if (!url.regionMatches(true, 0, "file:", 0, "file:".length())) {
+                return null;
+            }
+
+            String remainder = url.substring("file:".length());
+            if (remainder.startsWith("//")) {
+                remainder = remainder.substring(2);
+                if (remainder.startsWith("/")) {
+                    return remainder;
+                }
+                int slash = remainder.indexOf('/');
+                return slash >= 0 ? remainder.substring(slash) : "/" + remainder;
+            }
+
+            return remainder.startsWith("/") ? remainder : "/" + remainder;
         }
     }
 

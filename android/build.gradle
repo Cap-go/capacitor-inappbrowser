@@ -6,7 +6,26 @@ ext {
     androidxBrowserVersion = {
         def requested = project.hasProperty('androidxBrowserVersion') ? rootProject.ext.androidxBrowserVersion : '1.9.0'
         def minimum = '1.3.0'
-        if (VersionNumber.parse(requested).compareTo(VersionNumber.parse(minimum)) < 0) {
+        def parseVersionParts = { String version ->
+            version.tokenize('.').collect { part ->
+                def match = (part =~ /^(\d+)/)
+                match.find() ? match.group(1).toInteger() : 0
+            }
+        }
+        def isAtLeast = { String version, String baseline ->
+            def versionParts = parseVersionParts(version)
+            def baselineParts = parseVersionParts(baseline)
+            def length = Math.max(versionParts.size(), baselineParts.size())
+            for (int index = 0; index < length; index++) {
+                int versionPart = index < versionParts.size() ? versionParts[index] : 0
+                int baselinePart = index < baselineParts.size() ? baselineParts[index] : 0
+                if (versionPart != baselinePart) {
+                    return versionPart >= baselinePart
+                }
+            }
+            return true
+        }
+        if (!isAtLeast(requested, minimum)) {
             throw new GradleException("androidxBrowserVersion must be >= ${minimum} (required for setUrlBarHidingEnabled), got: ${requested}")
         }
         return requested
