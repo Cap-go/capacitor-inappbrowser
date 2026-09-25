@@ -3357,7 +3357,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         } else {
             reapplyInsetsFromWindowRoot();
             if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
-                refreshEdgeToEdgeChrome();
+                boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
+                if (isBlankToolbar) {
+                    configureBlankToolbarLayout();
+                } else {
+                    refreshEdgeToEdgeChrome();
+                }
             }
         }
 
