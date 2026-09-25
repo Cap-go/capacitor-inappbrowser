@@ -9,6 +9,8 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -120,36 +122,17 @@ final class BundledAssetSupport {
     private static String percentDecodePath(String path) {
         String decoded = path;
         for (int iteration = 0; iteration < 3; iteration++) {
-            String next = percentDecodeOnce(decoded);
-            if (next == null || next.equals(decoded)) {
-                break;
+            try {
+                String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8);
+                if (next.equals(decoded)) {
+                    break;
+                }
+                decoded = next;
+            } catch (IllegalArgumentException error) {
+                return null;
             }
-            decoded = next;
         }
         return decoded;
-    }
-
-    private static String percentDecodeOnce(String path) {
-        if (path == null || path.indexOf('%') < 0) {
-            return path;
-        }
-
-        StringBuilder builder = new StringBuilder(path.length());
-        for (int index = 0; index < path.length(); index++) {
-            char character = path.charAt(index);
-            if (character == '%' && index + 2 < path.length()) {
-                try {
-                    int value = Integer.parseInt(path.substring(index + 1, index + 3), 16);
-                    builder.append((char) value);
-                    index += 2;
-                    continue;
-                } catch (NumberFormatException error) {
-                    return null;
-                }
-            }
-            builder.append(character);
-        }
-        return builder.toString();
     }
 
     private static String canonicalizeAbsolutePath(String path) {
