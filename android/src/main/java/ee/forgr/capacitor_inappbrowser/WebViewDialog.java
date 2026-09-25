@@ -81,6 +81,7 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.FileProvider;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.core.graphics.Insets;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -539,7 +540,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         @Override
-        public void onLowMemory() {}
+        @SuppressWarnings("deprecation")
+        public void onLowMemory() {
+            onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE);
+        }
 
         @Override
         public void onTrimMemory(int level) {}
@@ -2446,11 +2450,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
-        _webView.getSettings().setAllowFileAccessFromFileURLs(true);
-        _webView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        applyTrustedBundledFileCrossOriginSettings(_options != null ? _options.getUrl() : null);
         if (!_options.getPersistWebViewData()) {
-            _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.getSettings().setDatabaseEnabled(false);
+            _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.clearCache(true);
             _webView.clearHistory();
             _webView.clearFormData();
@@ -3349,8 +3352,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             mediaFullscreenWindow.restore();
             mediaFullscreenWindow = null;
         }
-        if (nativeFullscreenWindow != null) nativeFullscreenWindow.enter();
-        else reapplyInsetsFromWindowRoot();
+        if (nativeFullscreenWindow != null) {
+            nativeFullscreenWindow.enter();
+        } else {
+            reapplyInsetsFromWindowRoot();
+            if (SystemUiChromeSupport.requiresEdgeToEdgeChrome(Build.VERSION.SDK_INT)) {
+                boolean isBlankToolbar = _options != null && TextUtils.equals(_options.getToolbarType(), "blank");
+                if (isBlankToolbar) {
+                    configureBlankToolbarLayout();
+                } else {
+                    refreshEdgeToEdgeChrome();
+                }
+            }
+        }
 
         unregisterCustomFullscreenBackHandler();
 
@@ -4955,6 +4969,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private void applyTrustedBundledFileCrossOriginSettings(String url) {
+        if (_webView == null) {
+            return;
+        }
+
+        boolean trustedBundledFile = BundledAssetSupport.isTrustedBundledFileUrl(url);
+        _webView.getSettings().setAllowFileAccessFromFileURLs(trustedBundledFile);
+        _webView.getSettings().setAllowUniversalAccessFromFileURLs(trustedBundledFile);
+    }
+
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {
         final WebViewAssetLoader loader;
         synchronized (bundledAssetLoaderLock) {
@@ -4982,6 +5006,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             Log.w("InAppBrowser", "Cannot set empty URL");
             return;
         }
+
+        if (BundledAssetSupport.isFileUrl(url) && !BundledAssetSupport.isTrustedBundledFileUrl(url)) {
+            Log.e("InAppBrowser", "Rejected untrusted file URL");
+            return;
+        }
+
+        applyTrustedBundledFileCrossOriginSettings(url);
 
         try {
             if (loadHtmlDataUrlIfNeeded(url)) {
@@ -5127,7 +5158,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     return null;
                 }
                 drawable = drawable.mutate();
-                drawable.setColorFilter(iconColor, PorterDuff.Mode.SRC_IN);
+                DrawableCompat.setTint(drawable, iconColor);
                 drawable.setBounds(0, 0, width, height);
                 return drawable;
             } catch (Exception e) {
@@ -6557,6 +6588,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView == null) {
                         return;
                     }
+                    applyTrustedBundledFileCrossOriginSettings(url);
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }

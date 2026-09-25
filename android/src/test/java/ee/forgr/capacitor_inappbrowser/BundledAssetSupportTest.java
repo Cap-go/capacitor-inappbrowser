@@ -75,6 +75,44 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void rejectsUntrustedFileUrls() {
+        assertNull(BundledAssetSupport.resolve("file:///tmp/index.html", (Bridge) null));
+        assertNull(BundledAssetSupport.resolve("file:///data/data/com.example/files/secret.html", (Bridge) null));
+        assertNull(BundledAssetSupport.resolve("file:///sdcard/a b.html", (Bridge) null));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///tmp/index.html"));
+        assertTrue(BundledAssetSupport.isFileUrl("file:///sdcard/a b.html"));
+    }
+
+    @Test
+    public void rejectsFileUrlTraversalUnderAndroidAsset() {
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/../../sdcard/evil.html"));
+        assertNull(BundledAssetSupport.resolve("file:///android_asset/../../sdcard/evil.html", (Bridge) null));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/%2e%2e/%2e%2e/sdcard/evil.html"));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/%2E%2E/sdcard/evil.html"));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/./../sdcard/evil.html"));
+    }
+
+    @Test
+    public void allowsTrustedBundledFileUrls() {
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/index.html"));
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/"));
+        assertTrue(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/public/my page.html"));
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("file:///android_asset/public/index.html", (Bridge) null);
+
+        assertEquals("file:///android_asset/public/index.html", resolution.url);
+        assertFalse(resolution.needsAssetLoader);
+
+        BundledAssetSupport.Resolution spacedResolution = BundledAssetSupport.resolve(
+            "file:///android_asset/public/my page.html",
+            (Bridge) null
+        );
+
+        assertEquals("file:///android_asset/public/my page.html", spacedResolution.url);
+        assertFalse(spacedResolution.needsAssetLoader);
+    }
+
+    @Test
     public void distinguishesBundledPathsFromBareHostnames() {
         assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("/index.html"));
         assertTrue(BundledAssetSupport.isLikelyBundledRelativePath("assets/page.html"));

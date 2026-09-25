@@ -9,6 +9,9 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -81,9 +84,119 @@ final class BundledAssetSupport {
         return resolve(url, localConfig);
     }
 
+    static boolean isFileUrl(String url) {
+        if (isBlank(url)) {
+            return false;
+        }
+
+        try {
+            return "file".equalsIgnoreCase(URI.create(url.trim()).getScheme());
+        } catch (IllegalArgumentException error) {
+            return url.trim().regionMatches(true, 0, "file:", 0, "file:".length());
+        }
+    }
+
+    static boolean isTrustedBundledFileUrl(String url) {
+        if (!isFileUrl(url)) {
+            return false;
+        }
+
+        String path = fileUrlPath(url.trim());
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+
+        String decoded = percentDecodePath(path);
+        if (decoded == null) {
+            return false;
+        }
+
+        String canonical = canonicalizeAbsolutePath(decoded);
+        if (canonical == null) {
+            return false;
+        }
+
+        return "/android_asset".equals(canonical) || canonical.startsWith("/android_asset/");
+    }
+
+    private static String percentDecodePath(String path) {
+        String decoded = path;
+        for (int iteration = 0; iteration < 3; iteration++) {
+            try {
+                String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8);
+                if (next.equals(decoded)) {
+                    break;
+                }
+                decoded = next;
+            } catch (IllegalArgumentException error) {
+                return null;
+            }
+        }
+        return decoded;
+    }
+
+    private static String canonicalizeAbsolutePath(String path) {
+        if (path == null || path.isEmpty()) {
+            return null;
+        }
+
+        String normalized = path.startsWith("/") ? path : "/" + path;
+        String[] rawSegments = normalized.split("/", -1);
+        ArrayList<String> segments = new ArrayList<>();
+        for (String segment : rawSegments) {
+            if (segment.isEmpty() || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment)) {
+                if (segments.isEmpty()) {
+                    return null;
+                }
+                segments.remove(segments.size() - 1);
+                continue;
+            }
+            segments.add(segment);
+        }
+
+        if (segments.isEmpty()) {
+            return "/";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (String segment : segments) {
+            builder.append('/').append(segment);
+        }
+        return builder.toString();
+    }
+
+    private static String fileUrlPath(String url) {
+        try {
+            return URI.create(url).getPath();
+        } catch (IllegalArgumentException error) {
+            if (!url.regionMatches(true, 0, "file:", 0, "file:".length())) {
+                return null;
+            }
+
+            String remainder = url.substring("file:".length());
+            if (remainder.startsWith("//")) {
+                remainder = remainder.substring(2);
+                if (remainder.startsWith("/")) {
+                    return remainder;
+                }
+                int slash = remainder.indexOf('/');
+                return slash >= 0 ? remainder.substring(slash) : "/" + remainder;
+            }
+
+            return remainder.startsWith("/") ? remainder : "/" + remainder;
+        }
+    }
+
     static Resolution resolve(String url, LocalConfig localConfig) {
         String trimmed = url == null ? "" : url.trim();
         String navigationScheme = assetLoaderScheme(localConfig);
+
+        if (isFileUrl(trimmed) && !isTrustedBundledFileUrl(trimmed)) {
+            return null;
+        }
 
         if (isRelativeBundledPath(trimmed)) {
             String path = normalizeBundledPath(trimmed);
