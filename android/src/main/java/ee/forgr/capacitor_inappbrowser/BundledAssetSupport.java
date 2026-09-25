@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.webkit.MimeTypeMap;
 import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
@@ -9,8 +10,6 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -122,15 +121,11 @@ final class BundledAssetSupport {
     private static String percentDecodePath(String path) {
         String decoded = path;
         for (int iteration = 0; iteration < 3; iteration++) {
-            try {
-                String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8.name());
-                if (next.equals(decoded)) {
-                    break;
-                }
-                decoded = next;
-            } catch (IllegalArgumentException error) {
-                return null;
+            String next = Uri.decode(decoded);
+            if (next.equals(decoded)) {
+                break;
             }
+            decoded = next;
         }
         return decoded;
     }
