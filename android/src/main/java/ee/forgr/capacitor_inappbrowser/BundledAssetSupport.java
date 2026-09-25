@@ -2,7 +2,6 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.net.Uri;
 import android.webkit.MimeTypeMap;
 import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
@@ -121,13 +120,36 @@ final class BundledAssetSupport {
     private static String percentDecodePath(String path) {
         String decoded = path;
         for (int iteration = 0; iteration < 3; iteration++) {
-            String next = Uri.decode(decoded);
-            if (next.equals(decoded)) {
+            String next = percentDecodeOnce(decoded);
+            if (next == null || next.equals(decoded)) {
                 break;
             }
             decoded = next;
         }
         return decoded;
+    }
+
+    private static String percentDecodeOnce(String path) {
+        if (path == null || path.indexOf('%') < 0) {
+            return path;
+        }
+
+        StringBuilder builder = new StringBuilder(path.length());
+        for (int index = 0; index < path.length(); index++) {
+            char character = path.charAt(index);
+            if (character == '%' && index + 2 < path.length()) {
+                try {
+                    int value = Integer.parseInt(path.substring(index + 1, index + 3), 16);
+                    builder.append((char) value);
+                    index += 2;
+                    continue;
+                } catch (NumberFormatException error) {
+                    return null;
+                }
+            }
+            builder.append(character);
+        }
+        return builder.toString();
     }
 
     private static String canonicalizeAbsolutePath(String path) {
