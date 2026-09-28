@@ -2979,6 +2979,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 public void onCloseWindow(WebView window) {
                     Log.d("InAppBrowser", "onCloseWindow called");
                     if (window == _webView) {
+                        if (isDismissing) {
+                            // Dismissal already started (e.g. close button or back); do not close twice.
+                            return;
+                        }
                         String currentUrl = getUrl();
                         dismiss();
                         if (_options != null && _options.getCallbacks() != null) {
