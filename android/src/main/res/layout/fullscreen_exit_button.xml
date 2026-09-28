@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The native exit control stays physically top-right in every layout direction. -->
+<com.google.android.material.button.MaterialButton
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="RtlHardcoded"
+    style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+    android:layout_width="48dp"
+    android:layout_height="48dp"
+    android:layout_gravity="top|right"
+    android:layout_marginTop="@dimen/fullscreen_exit_margin"
+    android:layout_marginRight="@dimen/fullscreen_exit_margin"
+    android:contentDescription="@string/exit_fullscreen"
+    android:insetLeft="4dp"
+    android:insetTop="4dp"
+    android:insetRight="4dp"
+    android:insetBottom="4dp"
+    android:padding="12dp"
+    app:icon="@drawable/ic_fullscreen_exit"
+    app:iconGravity="textStart"
+    app:iconSize="24dp"
+    app:iconPadding="0dp"
+    app:shapeAppearance="@xml/fullscreen_exit_shape" />

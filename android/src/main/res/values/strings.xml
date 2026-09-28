@@ -3,6 +3,7 @@
     <string name="my_string">Just a simple string</string>
     <string name="title_activity_browser">BrowserActivity</string>
     <string name="title_activity_basic">BasicActivity</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
     <string name="close_button">Close Button</string>
     <string name="button_near_done">Button near "done"</string>
     <string name="reload_button">Reload Button</string>

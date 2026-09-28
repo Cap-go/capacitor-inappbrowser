@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- With the button's 4dp visual inset, this leaves an 8dp gap inside the safe area. -->
+    <dimen name="fullscreen_exit_margin">4dp</dimen>
+    <style name="FullscreenExitShape" parent="ShapeAppearance.Material3.Corner.Full" />
+    <style name="FullscreenExitPressedShape" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+</resources>
