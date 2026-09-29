@@ -1395,6 +1395,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let screenshotOnHide = call.getBool("screenshotOnHide", false)
         let captureConsoleLogs = call.getBool("captureConsoleLogs", false)
         let handleDownloads = call.getBool("handleDownloads", false)
+        let openWalletPasses = call.getBool("openWalletPasses", false)
         if let rawDownloadPreview = call.getString("downloadPreview"),
            DownloadPreviewSupport.normalizedMode(rawDownloadPreview) == nil {
             call.reject("downloadPreview must be 'inAppBrowser' or 'systemPreview'")
@@ -1617,6 +1618,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.handleDownloads = handleDownloads
+            webViewController.openWalletPasses = openWalletPasses
             webViewController.downloadPreview = downloadPreview
 
             // Set native navigation gestures before view loads
