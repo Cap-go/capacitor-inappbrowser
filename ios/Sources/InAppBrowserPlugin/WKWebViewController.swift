@@ -948,6 +948,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        var reservedDestinationURL: URL?
         do {
             guard let jsonPayload = parseBlobBridgePayload(payload) else {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download start payload is missing"])
@@ -964,6 +965,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             let fileName = blobDownloadFileName(from: jsonPayload)
             let destinationURL = try uniqueDownloadDestination(for: fileName)
+            reservedDestinationURL = destinationURL
             let fileHandle = try BlobDownloadSupport.openWriteHandle(at: destinationURL)
             let expectedSize = (jsonPayload["size"] as? NSNumber)?.int64Value
             blobDownloadSessions[sessionId] = BlobDownloadSession(
@@ -974,6 +976,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 expectedSize: expectedSize
             )
         } catch {
+            if let reservedDestinationURL {
+                try? FileManager.default.removeItem(at: reservedDestinationURL)
+                releaseDownloadDestination(reservedDestinationURL)
+            }
             emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(error.localizedDescription)")
         }
     }
@@ -1039,6 +1045,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        releaseDownloadDestination(session.destinationURL)
         previewDownloadedFile(session.destinationURL, mimeType: session.mimeType, sourceURL: session.sourceURL)
     }
 
