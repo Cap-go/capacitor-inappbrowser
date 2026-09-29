@@ -42,9 +42,19 @@ private enum DownloadReservationStore {
     static let lock = NSLock()
 }
 
-private enum BlobDownloadSupport {
+enum BlobDownloadSupport {
     static let maxLegacyBytes = 512 * 1024
     static let chunkBytes = 64 * 1024
+
+    /// Creates the empty destination file, then opens it for writing.
+    /// `FileHandle(forWritingTo:)` throws when the file does not exist yet, and
+    /// `uniqueDownloadDestination(for:)` only reserves the path without creating it.
+    static func openWriteHandle(at url: URL) throws -> FileHandle {
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+            throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create blob download file"])
+        }
+        return try FileHandle(forWritingTo: url)
+    }
 }
 
 /// Script message handlers registered on every in-app browser WKWebView.
@@ -903,7 +913,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             let fileName = blobDownloadFileName(from: jsonPayload)
             let destinationURL = try uniqueDownloadDestination(for: fileName)
-            let fileHandle = try FileHandle(forWritingTo: destinationURL)
+            let fileHandle = try BlobDownloadSupport.openWriteHandle(at: destinationURL)
             let expectedSize = (jsonPayload["size"] as? NSNumber)?.int64Value
             blobDownloadSessions[sessionId] = BlobDownloadSession(
                 destinationURL: destinationURL,
