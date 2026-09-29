@@ -45,6 +45,12 @@ private enum DownloadReservationStore {
 enum BlobDownloadSupport {
     static let maxLegacyBytes = 512 * 1024
     static let chunkBytes = 64 * 1024
+    /// Each active chunked session keeps a file handle open until finish, abort or teardown.
+    static let maxActiveSessions = 4
+
+    static func canStartSession(activeSessionCount: Int) -> Bool {
+        activeSessionCount < maxActiveSessions
+    }
 
     /// Creates the empty destination file, then opens it for writing.
     /// `FileHandle(forWritingTo:)` throws when the file does not exist yet, and
@@ -834,6 +840,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     @discardableResult
+    private func abortAllBlobDownloadSessions() {
+        for session in blobDownloadSessions.values {
+            cleanupBlobDownloadSession(session, deleteFile: true)
+        }
+        blobDownloadSessions.removeAll()
+    }
+
     private func abortBlobDownloadSession(sessionId: String, deleteFile: Bool) -> BlobDownloadSession? {
         guard let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
             return nil
@@ -910,6 +923,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             if blobDownloadSessions[sessionId] != nil {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download session already exists"])
+            }
+
+            guard BlobDownloadSupport.canStartSession(activeSessionCount: blobDownloadSessions.count) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Too many active blob downloads"])
             }
 
             let fileName = blobDownloadFileName(from: jsonPayload)
@@ -2632,6 +2649,7 @@ public extension WKWebViewController {
 
     func cleanupWebView() {
         setBrowserFullscreen(false)
+        abortAllBlobDownloadSessions()
         guard let webView = self.webView else { return }
         webView.stopLoading()
         previewItemURL = nil

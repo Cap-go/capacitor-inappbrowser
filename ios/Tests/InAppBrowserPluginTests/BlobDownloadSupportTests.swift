@@ -46,6 +46,14 @@ final class BlobDownloadSupportTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: fileURL), Data("first-second".utf8))
     }
 
+    /// Starts are rejected once the active session limit is reached, before any file is created.
+    func testCanStartSessionOnlyBelowLimit() {
+        XCTAssertTrue(BlobDownloadSupport.canStartSession(activeSessionCount: 0))
+        XCTAssertTrue(BlobDownloadSupport.canStartSession(activeSessionCount: BlobDownloadSupport.maxActiveSessions - 1))
+        XCTAssertFalse(BlobDownloadSupport.canStartSession(activeSessionCount: BlobDownloadSupport.maxActiveSessions))
+        XCTAssertFalse(BlobDownloadSupport.canStartSession(activeSessionCount: BlobDownloadSupport.maxActiveSessions + 1))
+    }
+
     /// Failing to create the file surfaces as an error instead of a handle.
     func testOpenWriteHandleThrowsWhenDirectoryIsMissing() {
         let fileURL = directoryURL
