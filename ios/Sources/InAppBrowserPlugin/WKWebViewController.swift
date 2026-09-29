@@ -52,6 +52,14 @@ enum BlobDownloadSupport {
         activeSessionCount < maxActiveSessions
     }
 
+    /// The declared blob size caps how many bytes a session may write, so a start without one is rejected.
+    static func expectedSize(from value: Any?) -> Int64? {
+        guard let size = (value as? NSNumber)?.int64Value, size >= 0 else {
+            return nil
+        }
+        return size
+    }
+
     /// Creates the empty destination file, then opens it for writing.
     /// `FileHandle(forWritingTo:)` throws when the file does not exist yet, and
     /// `uniqueDownloadDestination(for:)` only reserves the path without creating it.
@@ -929,11 +937,14 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Too many active blob downloads"])
             }
 
+            guard let expectedSize = BlobDownloadSupport.expectedSize(from: jsonPayload["size"]) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download size is missing"])
+            }
+
             let fileName = blobDownloadFileName(from: jsonPayload)
             let destinationURL = try uniqueDownloadDestination(for: fileName)
             reservedDestinationURL = destinationURL
             let fileHandle = try BlobDownloadSupport.openWriteHandle(at: destinationURL)
-            let expectedSize = (jsonPayload["size"] as? NSNumber)?.int64Value
             blobDownloadSessions[sessionId] = BlobDownloadSession(
                 destinationURL: destinationURL,
                 sourceURL: jsonPayload["sourceUrl"] as? String,

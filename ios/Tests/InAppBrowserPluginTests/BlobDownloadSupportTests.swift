@@ -54,6 +54,15 @@ final class BlobDownloadSupportTests: XCTestCase {
         XCTAssertFalse(BlobDownloadSupport.canStartSession(activeSessionCount: BlobDownloadSupport.maxActiveSessions + 1))
     }
 
+    /// Only a present, non-negative size is accepted as the session's write cap.
+    func testExpectedSizeRequiresNonNegativeNumber() {
+        XCTAssertEqual(BlobDownloadSupport.expectedSize(from: NSNumber(value: 1_024)), 1_024)
+        XCTAssertEqual(BlobDownloadSupport.expectedSize(from: NSNumber(value: 0)), 0)
+        XCTAssertNil(BlobDownloadSupport.expectedSize(from: nil))
+        XCTAssertNil(BlobDownloadSupport.expectedSize(from: NSNumber(value: -1)))
+        XCTAssertNil(BlobDownloadSupport.expectedSize(from: "1024"))
+    }
+
     /// Failing to create the file surfaces as an error instead of a handle.
     func testOpenWriteHandleThrowsWhenDirectoryIsMissing() {
         let fileURL = directoryURL
