@@ -15,6 +15,19 @@ import type {
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
+  private readonly webViews = new Map<string, { window: Window; url: string; timer: number }>();
+  private webViewCounter = 0;
+
+  private watchClosed(id: string): void {
+    const entry = this.webViews.get(id);
+    if (!entry?.window.closed) {
+      return;
+    }
+    window.clearInterval(entry.timer);
+    this.webViews.delete(id);
+    this.notifyListeners('closeEvent', { id, url: entry.url });
+  }
+
   clearAllCookies(): Promise<any> {
     console.log('clearAllCookies');
     return Promise.resolve();
@@ -27,121 +40,154 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     console.log('clearAllBrowsingData');
     return Promise.resolve();
   }
-  async open(options: OpenOptions): Promise<any> {
-    console.log('open', options);
-    return options;
-  }
-
-  async clearCookies(options: ClearCookieOptions): Promise<any> {
-    console.log('cleanCookies', options);
-    return;
-  }
-
-  async getCookies(options: GetCookieOptions): Promise<any> {
-    // Web implementation to get cookies
-    return options;
-  }
-
-  async openWebView(options: OpenWebViewOptions): Promise<any> {
-    if (options.fullscreen) {
-      throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+  open(options: OpenOptions): Promise<any> {
+    // open() never tracks or closes the window, so the opener can be dropped before navigating.
+    const opened = window.open('', '_blank');
+    if (!opened) {
+      return Promise.reject(new Error('Popup blocked'));
     }
-    console.log('openWebView', options);
-    return options;
+    opened.opener = null;
+    opened.location.href = options.url;
+    return Promise.resolve();
   }
 
-  async executeScript({ code }: { code: string }): Promise<any> {
+  clearCookies(options: ClearCookieOptions): Promise<any> {
+    console.log('cleanCookies', options);
+    return Promise.resolve();
+  }
+
+  getCookies(options: GetCookieOptions): Promise<any> {
+    // Web implementation to get cookies
+    return Promise.resolve(options);
+  }
+
+  openWebView(options: OpenWebViewOptions): Promise<any> {
+    if (options.fullscreen) {
+      return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
+    }
+    const { popup = false, width, height } = options.web ?? {};
+    const features = popup
+      ? ['popup=yes', width ? `width=${width}` : '', height ? `height=${height}` : ''].filter(Boolean).join(',')
+      : '';
+    // Open a blank window first, then navigate. The opener is kept on purpose:
+    // Chrome ignores close() on a window whose opener was cleared, which would break close() and closeEvent.
+    const opened = window.open('', '_blank', features);
+    if (!opened) {
+      return Promise.reject(new Error('Popup blocked'));
+    }
+    opened.location.href = options.url;
+
+    const id = `web-${++this.webViewCounter}`;
+    const timer = window.setInterval(() => this.watchClosed(id), 500);
+    this.webViews.set(id, { window: opened, url: options.url, timer });
+    return Promise.resolve({ id });
+  }
+
+  executeScript({ code }: { code: string }): Promise<any> {
     console.log('code', code);
-    return code;
+    return Promise.resolve(code);
   }
 
-  async close(options?: { id?: string }): Promise<any> {
-    console.log('close', options);
-    return;
+  close(options?: { id?: string }): Promise<any> {
+    const id =
+      options?.id ??
+      Array.from(this.webViews.entries())
+        .reverse()
+        .find(([, entry]) => !entry.window.closed)?.[0];
+    if (!id) {
+      return Promise.resolve();
+    }
+    const entry = this.webViews.get(id);
+    if (!entry) {
+      return Promise.resolve();
+    }
+    entry.window.close();
+    this.watchClosed(id);
+    return Promise.resolve();
   }
 
-  async hide(options?: { id?: string }): Promise<void> {
+  hide(options?: { id?: string }): Promise<void> {
     console.log('hide', options);
-    return;
+    return Promise.resolve();
   }
 
-  async show(options?: { id?: string }): Promise<void> {
+  show(options?: { id?: string }): Promise<void> {
     console.log('show', options);
-    return;
+    return Promise.resolve();
   }
 
-  async sendToBack(options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
+  sendToBack(options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
     console.log('sendToBack not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async bringToFront(options?: BringToFrontOptions): Promise<void> {
+  bringToFront(options?: BringToFrontOptions): Promise<void> {
     console.log('bringToFront not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async dispatchInputEvent(options: DispatchInputEventOptions): Promise<void> {
+  dispatchInputEvent(options: DispatchInputEventOptions): Promise<void> {
     console.log('dispatchInputEvent not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async setUrl(options: { url: string }): Promise<any> {
+  setUrl(options: { url: string }): Promise<any> {
     console.log('setUrl', options.url);
-    return;
+    return Promise.resolve();
   }
 
-  async reload(options?: { id?: string }): Promise<any> {
+  reload(options?: { id?: string }): Promise<any> {
     console.log('reload', options);
-    return;
+    return Promise.resolve();
   }
-  async postMessage(options: Record<string, any>): Promise<any> {
+  postMessage(options: Record<string, any>): Promise<any> {
     console.log('postMessage', options);
-    return options;
+    return Promise.resolve(options);
   }
 
-  async takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
+  takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
     console.log('takeScreenshot not supported on web', options);
-    throw this.unimplemented('Screenshots are not supported on web.');
+    return Promise.reject(this.unimplemented('Screenshots are not supported on web.'));
   }
 
-  async goBack(): Promise<any> {
+  goBack(): Promise<any> {
     console.log('goBack');
-    return;
+    return Promise.resolve();
   }
 
-  async getPluginVersion(): Promise<{ version: string }> {
-    return { version: 'web' };
+  getPluginVersion(): Promise<{ version: string }> {
+    return Promise.resolve({ version: 'web' });
   }
 
-  async updateDimensions(options: DimensionOptions): Promise<void> {
+  updateDimensions(options: DimensionOptions): Promise<void> {
     console.log('updateDimensions', options);
     // Web platform doesn't support dimension control
-    return;
+    return Promise.resolve();
   }
 
-  async handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+  handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
     console.log('handleProxyRequest not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
+  setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setEnabledSafeTopMargin not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async setFullscreen(options: { enabled: boolean; id?: string }): Promise<void> {
+  setFullscreen(options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setFullscreen not supported on web', options);
-    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+    return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  async getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }> {
+  getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }> {
     console.log('getFullscreen not supported on web', options);
-    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+    return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  async setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
+  setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setEnabledSafeBottomMargin not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
   async openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse> {
