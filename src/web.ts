@@ -70,7 +70,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       ? ['popup=yes', width ? `width=${width}` : '', height ? `height=${height}` : ''].filter(Boolean).join(',')
       : '';
     // Open a blank window first, then navigate. The opener is kept on purpose:
-    // browsers only let script close() windows that still reference their opener.
+    // Chrome ignores close() on a window whose opener was cleared, which would break close() and closeEvent.
     const opened = window.open('', '_blank', features);
     if (!opened) {
       return Promise.reject(new Error('Popup blocked'));
