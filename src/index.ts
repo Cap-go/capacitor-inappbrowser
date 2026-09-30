@@ -16,6 +16,7 @@ import type {
   ProxyRequestOverride,
   ProxyResponse,
 } from './definitions';
+import { InAppBrowserWeb } from './web';
 
 const CAPGO_PLUGIN_NAME = 'CapgoInAppBrowser';
 const PREVIOUS_PLUGIN_NAME = 'InAppBrowser';
@@ -41,7 +42,9 @@ function resolvePluginName(): string {
 }
 
 const inAppBrowserImplementations = {
-  web: () => import('./web').then((m) => new m.InAppBrowserWeb()),
+  // Imported statically so the first openWebView() reaches window.open without awaiting a chunk load,
+  // which can outlast the browser's user-activation window and get the popup blocked.
+  web: () => new InAppBrowserWeb(),
 };
 
 function assertValidBundledAssetPath(url: string): void {
