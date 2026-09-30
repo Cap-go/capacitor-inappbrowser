@@ -41,10 +41,13 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
   open(options: OpenOptions): Promise<any> {
-    const opened = window.open(options.url, '_blank');
+    // open() never tracks or closes the window, so the opener can be dropped before navigating.
+    const opened = window.open('', '_blank');
     if (!opened) {
       return Promise.reject(new Error('Popup blocked'));
     }
+    opened.opener = null;
+    opened.location.href = options.url;
     return Promise.resolve();
   }
 
