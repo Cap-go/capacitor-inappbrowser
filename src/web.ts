@@ -86,7 +86,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async close(options?: { id?: string }): Promise<any> {
-    const id = options?.id ?? Array.from(this.webViews.keys()).pop();
+    const id =
+      options?.id ??
+      Array.from(this.webViews.entries())
+        .reverse()
+        .find(([, entry]) => !entry.window.closed)?.[0];
     if (!id) {
       return;
     }
