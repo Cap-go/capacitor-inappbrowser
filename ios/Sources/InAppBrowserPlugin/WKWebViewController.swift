@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import PassKit
 import QuickLook
 import WebKit
 
@@ -436,6 +437,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var clearCookiesOnOpen = false
     open var clearCacheOnOpen = false
     open var handleDownloads = false
+    open var openWalletPasses = false
     open var preferredContentMode: String?
     open var delegate: WKWebViewControllerDelegate?
     open var bypassedSSLHosts: [String]?
@@ -775,6 +777,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
         DispatchQueue.main.async {
+            if self.openWalletPasses &&
+                WalletPassSupport.isWalletPass(mimeType: mimeType, fileURL: fileURL) &&
+                self.presentWalletPass(fileURL, sourceURL: sourceURL) {
+                return
+            }
+
             if DownloadPreviewSupport.usesInAppBrowserPreview(self.downloadPreview) &&
                 self.shouldPreviewDownloadedFile(fileURL, mimeType: mimeType) {
                 let accessURL = fileURL.deletingLastPathComponent()
@@ -791,6 +799,49 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             self.present(previewController, animated: true)
             self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "systemPreview")
         }
+    }
+
+    /// Returns false when the device can't add passes or nothing can present the sheet,
+    /// so the caller falls back to the regular download preview.
+    private func presentWalletPass(_ fileURL: URL, sourceURL: String?) -> Bool {
+        guard PKAddPassesViewController.canAddPasses(), let presenter = walletPassPresenter() else {
+            return false
+        }
+        let pass: PKPass
+        do {
+            pass = try PKPass(data: Data(contentsOf: fileURL))
+        } catch {
+            emitDownloadFailed(
+                sourceURL: sourceURL,
+                fileName: fileURL.lastPathComponent,
+                mimeType: WalletPassSupport.mimeType,
+                error: "Invalid Wallet pass: \(error.localizedDescription)"
+            )
+            return true
+        }
+        guard let addPassesViewController = PKAddPassesViewController(pass: pass) else {
+            return false
+        }
+        presenter.present(addPassesViewController, animated: true) { [weak self] in
+            self?.emitDownloadCompleted(fileURL, mimeType: WalletPassSupport.mimeType, sourceURL: sourceURL, handledBy: "wallet")
+        }
+        return true
+    }
+
+    /// The topmost view controller that can present right now, or nil when the browser
+    /// isn't in a window (e.g. opened hidden) or a modal is mid-transition.
+    private func walletPassPresenter() -> UIViewController? {
+        guard viewIfLoaded?.window != nil else {
+            return nil
+        }
+        var presenter: UIViewController = self
+        while let presented = presenter.presentedViewController {
+            presenter = presented
+        }
+        if presenter.isBeingPresented || presenter.isBeingDismissed {
+            return nil
+        }
+        return presenter
     }
 
     private func parseBlobBridgePayload(_ payload: Any) -> [String: Any]? {
@@ -2355,6 +2406,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.allowScreenshotsFromWebPage = parent.allowScreenshotsFromWebPage
         self.preferredContentMode = parent.preferredContentMode
         self.handleDownloads = parent.handleDownloads
+        self.openWalletPasses = parent.openWalletPasses
         self.downloadPreview = parent.downloadPreview
         self.websiteTitleInNavigationBar = parent.websiteTitleInNavigationBar
         self.doneBarButtonItemPosition = parent.doneBarButtonItemPosition

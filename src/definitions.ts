@@ -364,7 +364,7 @@ export interface ConsoleMessageEvent {
  *
  * @since 8.6.0
  */
-export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external';
+export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external' | 'wallet';
 
 /**
  * Where managed downloads are previewed after saving.
@@ -914,6 +914,19 @@ export interface OpenWebViewOptions {
    * @since 8.6.0
    */
   handleDownloads?: boolean;
+  /**
+   * Opens managed Apple Wallet pass downloads (`.pkpass`) in the Wallet add-pass sheet
+   * instead of the download preview.
+   *
+   * Falls back to the regular download preview when the device can't add passes. An invalid pass
+   * emits `downloadFailed`. A shown sheet emits `downloadCompleted` with `handledBy: 'wallet'`.
+   *
+   * Requires `handleDownloads: true`. iOS only; ignored on Android.
+   *
+   * @default false
+   * @since 8.21.0
+   */
+  openWalletPasses?: boolean;
   /**
    * Controls where managed downloads are previewed after saving.
    *
