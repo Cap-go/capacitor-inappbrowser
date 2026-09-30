@@ -2152,7 +2152,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         openSecureWindowRedirectUri = redirectUri;
 
         CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-        builder.enableUrlBarHiding();
+        builder.setUrlBarHidingEnabled(true);
         builder.setShareState(CustomTabsIntent.SHARE_STATE_OFF);
         builder.setEphemeralBrowsingEnabled(Boolean.TRUE.equals(call.getBoolean("prefersEphemeralWebBrowserSession", false)));
         CustomTabsIntent customTabsIntent = builder.build();
