@@ -41,10 +41,13 @@ function resolvePluginName(): string {
   return CAPGO_PLUGIN_NAME;
 }
 
+let webImplementation: InAppBrowserWeb | undefined;
+
 const inAppBrowserImplementations = {
   // Imported statically so the first openWebView() reaches window.open without awaiting a chunk load,
   // which can outlast the browser's user-activation window and get the popup blocked.
-  web: () => new InAppBrowserWeb(),
+  // Memoized so concurrent first calls share one instance (one id counter and window map).
+  web: () => (webImplementation ??= new InAppBrowserWeb()),
 };
 
 function assertValidBundledAssetPath(url: string): void {
