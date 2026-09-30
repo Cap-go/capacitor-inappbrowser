@@ -801,9 +801,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    /// Returns false when the device can't add passes, so the caller falls back to the regular download preview.
+    /// Returns false when the device can't add passes or nothing can present the sheet,
+    /// so the caller falls back to the regular download preview.
     private func presentWalletPass(_ fileURL: URL, sourceURL: String?) -> Bool {
-        guard PKAddPassesViewController.canAddPasses() else {
+        guard PKAddPassesViewController.canAddPasses(), let presenter = walletPassPresenter() else {
             return false
         }
         let pass: PKPass
@@ -821,9 +822,26 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         guard let addPassesViewController = PKAddPassesViewController(pass: pass) else {
             return false
         }
-        present(addPassesViewController, animated: true)
-        emitDownloadCompleted(fileURL, mimeType: WalletPassSupport.mimeType, sourceURL: sourceURL, handledBy: "wallet")
+        presenter.present(addPassesViewController, animated: true) { [weak self] in
+            self?.emitDownloadCompleted(fileURL, mimeType: WalletPassSupport.mimeType, sourceURL: sourceURL, handledBy: "wallet")
+        }
         return true
+    }
+
+    /// The topmost view controller that can present right now, or nil when the browser
+    /// isn't in a window (e.g. opened hidden) or a modal is mid-transition.
+    private func walletPassPresenter() -> UIViewController? {
+        guard viewIfLoaded?.window != nil else {
+            return nil
+        }
+        var presenter: UIViewController = self
+        while let presented = presenter.presentedViewController {
+            presenter = presented
+        }
+        if presenter.isBeingPresented || presenter.isBeingDismissed {
+            return nil
+        }
+        return presenter
     }
 
     private func parseBlobBridgePayload(_ payload: Any) -> [String: Any]? {
