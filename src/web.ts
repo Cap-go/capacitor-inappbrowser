@@ -15,6 +15,19 @@ import type {
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
+  private webViews = new Map<string, { window: Window; url: string; timer: number }>();
+  private webViewCounter = 0;
+
+  private watchClosed(id: string): void {
+    const entry = this.webViews.get(id);
+    if (!entry || !entry.window.closed) {
+      return;
+    }
+    window.clearInterval(entry.timer);
+    this.webViews.delete(id);
+    this.notifyListeners('closeEvent', { id, url: entry.url });
+  }
+
   clearAllCookies(): Promise<any> {
     console.log('clearAllCookies');
     return Promise.resolve();
@@ -28,8 +41,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
   async open(options: OpenOptions): Promise<any> {
-    console.log('open', options);
-    return options;
+    const opened = window.open(options.url, '_blank');
+    if (!opened) {
+      throw new Error('Popup blocked');
+    }
+    return;
   }
 
   async clearCookies(options: ClearCookieOptions): Promise<any> {
@@ -46,8 +62,22 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     if (options.fullscreen) {
       throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
     }
-    console.log('openWebView', options);
-    return options;
+    const { popup = false, width, height } = options.web ?? {};
+    const features = popup
+      ? ['popup=yes', width ? `width=${width}` : '', height ? `height=${height}` : ''].filter(Boolean).join(',')
+      : '';
+    // Open a blank window first, then navigate. The opener is kept on purpose:
+    // browsers only let script close() windows that still reference their opener.
+    const opened = window.open('', '_blank', features);
+    if (!opened) {
+      throw new Error('Popup blocked');
+    }
+    opened.location.href = options.url;
+
+    const id = `web-${++this.webViewCounter}`;
+    const timer = window.setInterval(() => this.watchClosed(id), 500);
+    this.webViews.set(id, { window: opened, url: options.url, timer });
+    return { id };
   }
 
   async executeScript({ code }: { code: string }): Promise<any> {
@@ -56,7 +86,16 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   async close(options?: { id?: string }): Promise<any> {
-    console.log('close', options);
+    const id = options?.id ?? Array.from(this.webViews.keys()).pop();
+    if (!id) {
+      return;
+    }
+    const entry = this.webViews.get(id);
+    if (!entry) {
+      return;
+    }
+    entry.window.close();
+    this.watchClosed(id);
     return;
   }
 
