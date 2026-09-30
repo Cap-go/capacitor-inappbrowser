@@ -15,12 +15,12 @@ import type {
 } from './definitions';
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
-  private webViews = new Map<string, { window: Window; url: string; timer: number }>();
+  private readonly webViews = new Map<string, { window: Window; url: string; timer: number }>();
   private webViewCounter = 0;
 
   private watchClosed(id: string): void {
     const entry = this.webViews.get(id);
-    if (!entry || !entry.window.closed) {
+    if (!entry?.window.closed) {
       return;
     }
     window.clearInterval(entry.timer);
@@ -45,7 +45,6 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     if (!opened) {
       throw new Error('Popup blocked');
     }
-    return;
   }
 
   async clearCookies(options: ClearCookieOptions): Promise<any> {
