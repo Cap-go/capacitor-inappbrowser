@@ -141,6 +141,9 @@ final class BundledAssetSupport {
         }
 
         String normalized = path.startsWith("/") ? path : "/" + path;
+        if (normalized.indexOf('\\') >= 0) {
+            return null;
+        }
         String[] rawSegments = normalized.split("/", -1);
         ArrayList<String> segments = new ArrayList<>();
         for (String segment : rawSegments) {

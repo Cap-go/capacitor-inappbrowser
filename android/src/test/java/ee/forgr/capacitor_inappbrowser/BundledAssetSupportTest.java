@@ -90,6 +90,8 @@ public class BundledAssetSupportTest {
         assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/%2e%2e/%2e%2e/sdcard/evil.html"));
         assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/%2E%2E/sdcard/evil.html"));
         assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/./../sdcard/evil.html"));
+        assertFalse(BundledAssetSupport.isTrustedBundledFileUrl("file:///android_asset/..\\..\\sdcard/evil.html"));
+        assertNull(BundledAssetSupport.resolve("file:///android_asset/..\\..\\sdcard/evil.html", (Bridge) null));
     }
 
     @Test
