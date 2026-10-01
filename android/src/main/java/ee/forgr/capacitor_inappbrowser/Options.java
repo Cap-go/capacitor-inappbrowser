@@ -164,6 +164,7 @@ public class Options {
     private boolean disableGoBackOnNativeApplication;
     private boolean activeNativeNavigationForWebview;
     private boolean enableReloadGesture = false;
+    private boolean allowWebViewFullscreen = true;
     private boolean isPresentAfterPageLoad;
     private WebViewCallbacks callbacks;
     private PluginCall pluginCall;
@@ -649,6 +650,14 @@ public class Options {
         this.enableReloadGesture = enableReloadGesture;
     }
 
+    public boolean getAllowWebViewFullscreen() {
+        return allowWebViewFullscreen;
+    }
+
+    public void setAllowWebViewFullscreen(boolean allowWebViewFullscreen) {
+        this.allowWebViewFullscreen = allowWebViewFullscreen;
+    }
+
     public boolean getDisableGoBackOnNativeApplication() {
         return disableGoBackOnNativeApplication;
     }
@@ -879,6 +888,7 @@ public class Options {
         copy.setDisableGoBackOnNativeApplication(disableGoBackOnNativeApplication);
         copy.setActiveNativeNavigationForWebview(activeNativeNavigationForWebview);
         copy.setEnableReloadGesture(enableReloadGesture);
+        copy.setAllowWebViewFullscreen(allowWebViewFullscreen);
         copy.setPresentAfterPageLoad(false);
         copy.setVisibleTitle(VisibleTitle);
         copy.setToolbarColor(ToolbarColor);
