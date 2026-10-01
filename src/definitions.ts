@@ -1049,6 +1049,19 @@ export interface OpenWebViewOptions {
    * enableReloadGesture: true
    */
   enableReloadGesture?: boolean;
+
+  /**
+   * Allow pages to enter HTML5 fullscreen (e.g. `requestFullscreen()` or a video player's fullscreen button).
+   * When `false`, fullscreen requests are rejected and the toolbar stays visible, so the user can always close the browser.
+   *
+   * Android only. On iOS, element fullscreen is not enabled by the plugin, so this option has no effect.
+   *
+   * @since 8.22.0
+   * @default true
+   * @example
+   * allowWebViewFullscreen: false
+   */
+  allowWebViewFullscreen?: boolean;
   /**
    * Disable the possibility to go back on native application,
    * useful to force user to stay on the webview, Android only
