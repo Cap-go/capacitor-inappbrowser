@@ -3571,6 +3571,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             configureBlankToolbarLayout();
         }
 
+        if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
+            removeAppBarShadow(appBarLayout);
+        }
+
         // Special handling for Android 15+
         if (isAndroid15Plus && !isBlankToolbar) {
             refreshEdgeToEdgeChrome();
@@ -3828,6 +3832,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         statusBarColorView.requestLayout();
     }
 
+    // AppBarLayout re-applies its elevation through the StateListAnimator, so clearing the elevation alone is not enough.
+    private static void removeAppBarShadow(com.google.android.material.appbar.AppBarLayout appBarLayout) {
+        appBarLayout.setElevation(0);
+        appBarLayout.setStateListAnimator(null);
+        appBarLayout.setOutlineProvider(null);
+    }
+
     private void refreshEdgeToEdgeChrome() {
         if (_webView == null || _options == null) {
             return;
@@ -3840,9 +3851,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
-        appBarLayout.setElevation(0);
-        appBarLayout.setStateListAnimator(null);
-        appBarLayout.setOutlineProvider(null);
+        removeAppBarShadow(appBarLayout);
 
         final int finalBgColor = resolveWindowBackgroundColor();
         _webView.post(() -> {
