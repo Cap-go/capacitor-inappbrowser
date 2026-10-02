@@ -43,9 +43,33 @@ private enum DownloadReservationStore {
     static let lock = NSLock()
 }
 
-private enum BlobDownloadSupport {
+enum BlobDownloadSupport {
     static let maxLegacyBytes = 512 * 1024
     static let chunkBytes = 64 * 1024
+    /// Each active chunked session keeps a file handle open until finish, abort or teardown.
+    static let maxActiveSessions = 4
+
+    static func canStartSession(activeSessionCount: Int) -> Bool {
+        activeSessionCount < maxActiveSessions
+    }
+
+    /// The declared blob size caps how many bytes a session may write, so a start without one is rejected.
+    static func expectedSize(from value: Any?) -> Int64? {
+        guard let size = (value as? NSNumber)?.int64Value, size >= 0 else {
+            return nil
+        }
+        return size
+    }
+
+    /// Creates the empty destination file, then opens it for writing.
+    /// `FileHandle(forWritingTo:)` throws when the file does not exist yet, and
+    /// `uniqueDownloadDestination(for:)` only reserves the path without creating it.
+    static func openWriteHandle(at url: URL) throws -> FileHandle {
+        guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
+            throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create blob download file"])
+        }
+        return try FileHandle(forWritingTo: url)
+    }
 }
 
 /// Script message handlers registered on every in-app browser WKWebView.
@@ -875,6 +899,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     @discardableResult
+    private func abortAllBlobDownloadSessions() {
+        for session in blobDownloadSessions.values {
+            cleanupBlobDownloadSession(session, deleteFile: true)
+        }
+        blobDownloadSessions.removeAll()
+    }
+
     private func abortBlobDownloadSession(sessionId: String, deleteFile: Bool) -> BlobDownloadSession? {
         guard let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
             return nil
@@ -938,6 +969,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        var reservedDestinationURL: URL?
         do {
             guard let jsonPayload = parseBlobBridgePayload(payload) else {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download start payload is missing"])
@@ -952,10 +984,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download session already exists"])
             }
 
+            guard BlobDownloadSupport.canStartSession(activeSessionCount: blobDownloadSessions.count) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Too many active blob downloads"])
+            }
+
+            guard let expectedSize = BlobDownloadSupport.expectedSize(from: jsonPayload["size"]) else {
+                throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download size is missing"])
+            }
+
             let fileName = blobDownloadFileName(from: jsonPayload)
             let destinationURL = try uniqueDownloadDestination(for: fileName)
-            let fileHandle = try FileHandle(forWritingTo: destinationURL)
-            let expectedSize = (jsonPayload["size"] as? NSNumber)?.int64Value
+            reservedDestinationURL = destinationURL
+            let fileHandle = try BlobDownloadSupport.openWriteHandle(at: destinationURL)
             blobDownloadSessions[sessionId] = BlobDownloadSession(
                 destinationURL: destinationURL,
                 sourceURL: jsonPayload["sourceUrl"] as? String,
@@ -964,6 +1004,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 expectedSize: expectedSize
             )
         } catch {
+            if let reservedDestinationURL {
+                try? FileManager.default.removeItem(at: reservedDestinationURL)
+                releaseDownloadDestination(reservedDestinationURL)
+            }
             emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(error.localizedDescription)")
         }
     }
@@ -1029,6 +1073,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        releaseDownloadDestination(session.destinationURL)
         previewDownloadedFile(session.destinationURL, mimeType: session.mimeType, sourceURL: session.sourceURL)
     }
 
@@ -2667,6 +2712,7 @@ public extension WKWebViewController {
 
     func cleanupWebView() {
         setBrowserFullscreen(false)
+        abortAllBlobDownloadSessions()
         guard let webView = self.webView else { return }
         webView.stopLoading()
         previewItemURL = nil
