@@ -1575,6 +1575,43 @@ export interface OpenWebViewOptions {
    * invisibilityMode: InvisibilityMode.FAKE_VISIBLE
    */
   invisibilityMode?: InvisibilityMode;
+
+  /**
+   * Web-only options, ignored on iOS and Android.
+   *
+   * On web, `openWebView()` opens the URL with `window.open` in a new tab (default) or a popup window.
+   * - Call it from a user gesture (e.g. a click handler), otherwise the browser popup blocker may block it;
+   *   a blocked popup rejects with `Popup blocked`.
+   * - Mobile browsers ignore the window features and always open a tab.
+   * - `userAgent` and all presentation/styling options are ignored on web.
+   * - When `headers` is set, the initial document is loaded with `fetch(url, { headers })` and written into the
+   *   blank window. That requires CORS on the target (`Access-Control-Allow-Origin` and allowed request headers).
+   *   It applies to the first document only; later navigations are plain GET requests without those headers.
+   *   Relative subresource URLs resolve against the opener origin unless the injected HTML includes a matching `<base href>`.
+   * - Only `close()` and the `closeEvent` listener are wired on web; other webview APIs keep their web stubs.
+   * - Pages that send `Cross-Origin-Opener-Policy` (common on login/OAuth pages) are cut off from the app: `closeEvent` fires right after opening and `close()` has no effect.
+   * - The opened page keeps a `window.opener` reference to the app (required so `close()` works), so only open URLs you trust.
+   * - `closeEvent` reports the originally opened `url`; the current page URL is not readable cross-origin.
+   *
+   * @since 8.21.0
+   * @example
+   * web: { popup: true, width: 390, height: 844 }
+   */
+  web?: {
+    /**
+     * Open a separate popup window instead of a tab.
+     * @default false
+     */
+    popup?: boolean;
+    /**
+     * Popup width in CSS pixels. Only used when `popup` is true.
+     */
+    width?: number;
+    /**
+     * Popup height in CSS pixels. Only used when `popup` is true.
+     */
+    height?: number;
+  };
 }
 
 export interface DimensionOptions {
@@ -1607,6 +1644,7 @@ export interface InAppBrowserPlugin {
 
   /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
+   * On web, opens the URL in a new tab via `window.open` and rejects with `Popup blocked` when the browser blocks it.
    *
    * @since 0.1.0
    */
