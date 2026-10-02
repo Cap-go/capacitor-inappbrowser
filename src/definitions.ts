@@ -1583,8 +1583,11 @@ export interface OpenWebViewOptions {
    * - Call it from a user gesture (e.g. a click handler), otherwise the browser popup blocker may block it;
    *   a blocked popup rejects with `Popup blocked`.
    * - Mobile browsers ignore the window features and always open a tab.
-   * - `headers`, `userAgent` and all presentation/styling options are ignored on web: a top-level navigation
-   *   cannot carry custom request headers.
+   * - `userAgent` and all presentation/styling options are ignored on web.
+   * - When `headers` is set, the initial document is loaded with `fetch(url, { headers })` and written into the
+   *   blank window. That requires CORS on the target (`Access-Control-Allow-Origin` and allowed request headers).
+   *   It applies to the first document only; later navigations are plain GET requests without those headers.
+   *   Relative subresource URLs resolve against the opener origin unless the injected HTML includes a matching `<base href>`.
    * - Only `close()` and the `closeEvent` listener are wired on web; other webview APIs keep their web stubs.
    * - Pages that send `Cross-Origin-Opener-Policy` (common on login/OAuth pages) are cut off from the app: `closeEvent` fires right after opening and `close()` has no effect.
    * - The opened page keeps a `window.opener` reference to the app (required so `close()` works), so only open URLs you trust.

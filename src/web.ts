@@ -1,4 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 
 import type {
   InAppBrowserPlugin,
@@ -14,35 +15,122 @@ import type {
   ScreenshotResult,
 } from './definitions';
 
+type TrackedWebView = { window: Window; url: string; timer: number };
+
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
-  private readonly webViews = new Map<string, { window: Window; url: string; timer: number }>();
+  private readonly webViews = new Map<string, TrackedWebView>();
   private webViewCounter = 0;
+
+  constructor() {
+    super();
+    if (typeof globalThis.window !== 'undefined') {
+      globalThis.window.addEventListener('message', this.handleWindowMessage);
+    }
+  }
+
+  addListener(
+    eventName: string,
+    listenerFunc: Parameters<WebPlugin['addListener']>[1],
+  ): Promise<PluginListenerHandle> {
+    if (eventName === 'urlChangeEvent') {
+      return Promise.reject(this.unimplemented('URL change events are not supported on web.'));
+    }
+    return super.addListener(eventName, listenerFunc);
+  }
+
+  private readonly handleWindowMessage = (event: MessageEvent): void => {
+    const match = Array.from(this.webViews.entries()).find(([, entry]) => entry.window === event.source);
+    if (!match) {
+      return;
+    }
+    const [id] = match;
+    let data: unknown = event.data;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        this.notifyListeners('messageFromWebview', { id, rawMessage: event.data });
+        return;
+      }
+    }
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      this.notifyListeners('messageFromWebview', { ...(data as Record<string, unknown>), id });
+    } else if (typeof event.data === 'string') {
+      this.notifyListeners('messageFromWebview', { id, rawMessage: event.data });
+    }
+  };
 
   private watchClosed(id: string): void {
     const entry = this.webViews.get(id);
     if (!entry?.window.closed) {
       return;
     }
-    window.clearInterval(entry.timer);
+    globalThis.clearInterval(entry.timer);
     this.webViews.delete(id);
     this.notifyListeners('closeEvent', { id, url: entry.url });
   }
 
-  clearAllCookies(): Promise<any> {
-    console.log('clearAllCookies');
-    return Promise.resolve();
+  private resolveWebViewEntry(id?: string): { id: string; entry: TrackedWebView } | undefined {
+    if (id) {
+      const entry = this.webViews.get(id);
+      if (entry && !entry.window.closed) {
+        return { id, entry };
+      }
+      return undefined;
+    }
+    const match = Array.from(this.webViews.entries())
+      .reverse()
+      .find(([, entry]) => !entry.window.closed);
+    if (!match) {
+      return undefined;
+    }
+    return { id: match[0], entry: match[1] };
   }
+
+  private navigateOpenedWindow(win: Window, url: string, headers?: Record<string, string>): void {
+    const hasHeaders = headers != null && Object.keys(headers).length > 0;
+    if (!hasHeaders) {
+      win.location.href = url;
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const html = await response.text();
+        const parsed = new URL(url, globalThis.location?.href ?? 'https://localhost/');
+        const baseHref = `${parsed.origin}${parsed.pathname}${parsed.search}`;
+        const documentHtml = html.includes('<head')
+          ? html.replace('<head>', `<head><base href="${baseHref}">`)
+          : `<base href="${baseHref}">${html}`;
+        win.document.open();
+        win.document.write(documentHtml);
+        win.document.close();
+      } catch (error) {
+        console.error('[InAppBrowser] Failed to load web view with headers', error);
+        win.close();
+      }
+    })();
+  }
+
+  clearAllCookies(): Promise<any> {
+    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
+  }
+
   clearCache(): Promise<any> {
     console.log('clearCache');
     return Promise.resolve();
   }
+
   clearAllBrowsingData(): Promise<any> {
-    console.log('clearAllBrowsingData');
-    return Promise.resolve();
+    return Promise.reject(this.unimplemented('Browsing data operations are not supported on web.'));
   }
+
   open(options: OpenOptions): Promise<any> {
-    // open() never tracks or closes the window, so the opener can be dropped before navigating.
-    const opened = window.open('', '_blank');
+    const opened = globalThis.open('', '_blank');
     if (!opened) {
       return Promise.reject(new Error('Popup blocked'));
     }
@@ -51,14 +139,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
 
-  clearCookies(options: ClearCookieOptions): Promise<any> {
-    console.log('cleanCookies', options);
-    return Promise.resolve();
+  clearCookies(_options: ClearCookieOptions): Promise<any> {
+    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
   }
 
-  getCookies(options: GetCookieOptions): Promise<any> {
-    // Web implementation to get cookies
-    return Promise.resolve(options);
+  getCookies(_options: GetCookieOptions): Promise<any> {
+    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
   }
 
   openWebView(options: OpenWebViewOptions): Promise<any> {
@@ -69,109 +155,97 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     const features = popup
       ? ['popup=yes', width ? `width=${width}` : '', height ? `height=${height}` : ''].filter(Boolean).join(',')
       : '';
-    // Open a blank window first, then navigate. The opener is kept on purpose:
-    // Chrome ignores close() on a window whose opener was cleared, which would break close() and closeEvent.
-    const opened = window.open('', '_blank', features);
+    const opened = globalThis.open('', '_blank', features);
     if (!opened) {
       return Promise.reject(new Error('Popup blocked'));
     }
-    opened.location.href = options.url;
 
     const id = `web-${++this.webViewCounter}`;
-    const timer = window.setInterval(() => this.watchClosed(id), 500);
+    const timer = globalThis.setInterval(() => this.watchClosed(id), 500);
     this.webViews.set(id, { window: opened, url: options.url, timer });
+    this.navigateOpenedWindow(opened, options.url, options.headers);
     return Promise.resolve({ id });
   }
 
-  executeScript({ code }: { code: string }): Promise<any> {
-    console.log('code', code);
-    return Promise.resolve(code);
+  executeScript(_options: { code: string }): Promise<any> {
+    return Promise.reject(this.unimplemented('Script execution is not supported on web.'));
   }
 
   close(options?: { id?: string }): Promise<any> {
-    const id =
-      options?.id ??
-      Array.from(this.webViews.entries())
-        .reverse()
-        .find(([, entry]) => !entry.window.closed)?.[0];
-    if (!id) {
+    const resolved = this.resolveWebViewEntry(options?.id);
+    if (!resolved) {
       return Promise.resolve();
     }
-    const entry = this.webViews.get(id);
-    if (!entry) {
-      return Promise.resolve();
+    resolved.entry.window.close();
+    this.watchClosed(resolved.id);
+    return Promise.resolve();
+  }
+
+  hide(_options?: { id?: string }): Promise<void> {
+    console.log('hide', _options);
+    return Promise.resolve();
+  }
+
+  show(_options?: { id?: string }): Promise<void> {
+    console.log('show', _options);
+    return Promise.resolve();
+  }
+
+  sendToBack(_options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
+    console.log('sendToBack not supported on web', _options);
+    return Promise.resolve();
+  }
+
+  bringToFront(_options?: BringToFrontOptions): Promise<void> {
+    console.log('bringToFront not supported on web', _options);
+    return Promise.resolve();
+  }
+
+  dispatchInputEvent(_options: DispatchInputEventOptions): Promise<void> {
+    console.log('dispatchInputEvent not supported on web', _options);
+    return Promise.resolve();
+  }
+
+  setUrl(_options: { url: string }): Promise<any> {
+    return Promise.reject(this.unimplemented('setUrl is not supported on web.'));
+  }
+
+  reload(_options?: { id?: string }): Promise<any> {
+    return Promise.reject(this.unimplemented('reload is not supported on web.'));
+  }
+
+  postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void> {
+    const resolved = this.resolveWebViewEntry(options.id);
+    if (resolved) {
+      resolved.entry.window.postMessage(options.detail, '*');
     }
-    entry.window.close();
-    this.watchClosed(id);
     return Promise.resolve();
   }
 
-  hide(options?: { id?: string }): Promise<void> {
-    console.log('hide', options);
-    return Promise.resolve();
-  }
-
-  show(options?: { id?: string }): Promise<void> {
-    console.log('show', options);
-    return Promise.resolve();
-  }
-
-  sendToBack(options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
-    console.log('sendToBack not supported on web', options);
-    return Promise.resolve();
-  }
-
-  bringToFront(options?: BringToFrontOptions): Promise<void> {
-    console.log('bringToFront not supported on web', options);
-    return Promise.resolve();
-  }
-
-  dispatchInputEvent(options: DispatchInputEventOptions): Promise<void> {
-    console.log('dispatchInputEvent not supported on web', options);
-    return Promise.resolve();
-  }
-
-  setUrl(options: { url: string }): Promise<any> {
-    console.log('setUrl', options.url);
-    return Promise.resolve();
-  }
-
-  reload(options?: { id?: string }): Promise<any> {
-    console.log('reload', options);
-    return Promise.resolve();
-  }
-  postMessage(options: Record<string, any>): Promise<any> {
-    console.log('postMessage', options);
-    return Promise.resolve(options);
-  }
-
-  takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
-    console.log('takeScreenshot not supported on web', options);
+  takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
+    console.log('takeScreenshot not supported on web', _options);
     return Promise.reject(this.unimplemented('Screenshots are not supported on web.'));
   }
 
   goBack(): Promise<any> {
-    console.log('goBack');
-    return Promise.resolve();
+    return Promise.reject(this.unimplemented('goBack is not supported on web.'));
   }
 
   getPluginVersion(): Promise<{ version: string }> {
     return Promise.resolve({ version: 'web' });
   }
 
-  updateDimensions(options: DimensionOptions): Promise<void> {
-    console.log('updateDimensions', options);
-    // Web platform doesn't support dimension control
+  updateDimensions(_options: DimensionOptions): Promise<void> {
+    console.log('updateDimensions', _options);
     return Promise.resolve();
   }
 
-  handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
-    console.log('handleProxyRequest not supported on web', options);
-    return Promise.resolve();
+  handleProxyRequest(_options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+    return Promise.reject(this.unimplemented('Proxy requests are not supported on web.'));
   }
 
-  setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeTopMargin not supported on web', options);
+  setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeTopMargin not supported on web', _options);
     return Promise.resolve();
   }
 
@@ -180,13 +254,13 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }> {
-    console.log('getFullscreen not supported on web', options);
+  getFullscreen(_options?: { id?: string }): Promise<{ enabled: boolean }> {
+    console.log('getFullscreen not supported on web', _options);
     return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeBottomMargin not supported on web', options);
+  setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeBottomMargin not supported on web', _options);
     return Promise.resolve();
   }
 
@@ -202,7 +276,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       .map((x) => x.join('='))
       .join(',');
 
-    const popup = window.open(options.authEndpoint, 'Authorization', settings);
+    const popup = globalThis.open(options.authEndpoint, 'Authorization', settings);
     if (!popup) {
       throw new Error('Failed to open secure window');
     }
