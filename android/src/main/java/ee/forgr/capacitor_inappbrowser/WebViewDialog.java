@@ -2562,76 +2562,26 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     beginFileChooserRequest(filePathCallback, acceptTypes, isMultiple);
                     final FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
 
-                    // Direct check for capture attribute in URL (fallback method)
-                    boolean isCaptureInUrl;
-                    String captureMode;
-                    String currentUrl = getUrl();
-
-                    // Look for capture in URL parameters - sometimes the attribute shows up in URL
-                    if (currentUrl != null && currentUrl.contains("capture=")) {
-                        isCaptureInUrl = true;
-                        captureMode = currentUrl.contains("capture=user") ? "user" : "environment";
-                        Log.d("InAppBrowser", "Found capture in URL: " + captureMode);
-                    } else {
-                        captureMode = null;
-                        isCaptureInUrl = false;
-                    }
-
-                    // For image-only inputs, try to detect capture attribute using JavaScript.
-                    // Mixed accept lists (e.g. "image/*,application/pdf") must skip the camera
-                    // path entirely — the camera can only produce images.
+                    // For image-only inputs, launch the camera only when capture is enabled on the
+                    // file input (WebView sets FileChooserParams.isCaptureEnabled). Otherwise use
+                    // the normal photo picker (gallery, files, camera as an option).
+                    // Mixed accept lists (e.g. "image/*,application/pdf") must skip the camera path.
                     if (FileChooserAcceptSupport.isImageOnlyAcceptTypes(acceptTypes)) {
-                        // Check if HTML content contains capture attribute on file inputs (synchronous check)
-                        webView.evaluateJavascript(
-                            "document.querySelector('input[type=\"file\"][capture]') !== null",
-                            (hasCaptureValue) -> {
-                                Log.d("InAppBrowser", "Quick capture check: " + hasCaptureValue);
-                                if (Boolean.parseBoolean(hasCaptureValue.replace("\"", ""))) {
-                                    Log.d("InAppBrowser", "Found capture attribute in quick check");
-                                }
-                            }
-                        );
+                        if (!fileChooserParams.isCaptureEnabled()) {
+                            openFileChooser(request);
+                            return true;
+                        }
 
-                        // Fixed JavaScript with proper error handling
                         String js = """
                             (function() {
                               try {
-                                var captureAttr = null;
-                                // Check active element first
-                                if (document.activeElement &&
-                                    document.activeElement.tagName === 'INPUT' &&
-                                    document.activeElement.type === 'file') {
-                                  if (document.activeElement.hasAttribute('capture')) {
-                                    captureAttr = document.activeElement.getAttribute('capture') || 'environment';
-                                    return captureAttr;
-                                  }
+                                var el = document.activeElement;
+                                if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
+                                  return el.getAttribute('capture') || 'environment';
                                 }
-                                // Try to find any input with capture attribute
-                                var inputs = document.querySelectorAll('input[type="file"][capture]');
-                                if (inputs && inputs.length > 0) {
-                                  captureAttr = inputs[0].getAttribute('capture') || 'environment';
-                                  return captureAttr;
-                                }
-                                // Try to extract from HTML attributes
-                                var allInputs = document.getElementsByTagName('input');
-                                for (var i = 0; i < allInputs.length; i++) {
-                                  var input = allInputs[i];
-                                  if (input.type === 'file') {
-                                    if (input.hasAttribute('capture')) {
-                                      captureAttr = input.getAttribute('capture') || 'environment';
-                                      return captureAttr;
-                                    }
-                                    // Look for the accept attribute containing image/* as this might be a camera input
-                                    var acceptAttr = input.getAttribute('accept');
-                                    if (acceptAttr && acceptAttr.indexOf('image/*') >= 0) {
-                                      console.log('Found input with image/* accept');
-                                    }
-                                  }
-                                }
-                                return '';
-                              } catch(e) {
-                                console.error('Capture detection error:', e);
-                                return '';
+                                return 'environment';
+                              } catch (e) {
+                                return 'environment';
                               }
                             })();
                             """;
@@ -2640,56 +2590,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
                                 return;
                             }
-
-                            Log.d("InAppBrowser", "Capture attribute JS result: " + value);
-
-                            // If we already found capture in URL, use that directly
-                            if (isCaptureInUrl) {
-                                Log.d("InAppBrowser", "Using capture from URL: " + captureMode);
-                                launchCamera(captureMode.equals("user"), request);
-                                return;
-                            }
-
-                            // Process JavaScript result
-                            if (value != null && value.length() > 2) {
-                                // Clean up the value (remove quotes)
-                                String captureValue = value.replace("\"", "");
-                                Log.d("InAppBrowser", "Found capture attribute: " + captureValue);
-
-                                if (!captureValue.isEmpty()) {
-                                    activity.runOnUiThread(() -> launchCamera(captureValue.equals("user"), request));
-                                    return;
-                                }
-                            }
-
-                            // Look for hints in the web page source
-                            Log.d("InAppBrowser", "Looking for camera hints in page content");
-                            webView.evaluateJavascript("(function() { return document.documentElement.innerHTML; })()", (htmlSource) -> {
-                                if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                    return;
-                                }
-
-                                if (htmlSource != null && htmlSource.length() > 10) {
-                                    boolean hasCameraOrSelfieKeyword =
-                                        htmlSource.contains("capture=") || htmlSource.contains("camera") || htmlSource.contains("selfie");
-
-                                    Log.d("InAppBrowser", "Page contains camera keywords: " + hasCameraOrSelfieKeyword);
-
-                                    if (
-                                        hasCameraOrSelfieKeyword &&
-                                        currentUrl != null &&
-                                        (currentUrl.contains("selfie") || currentUrl.contains("camera") || currentUrl.contains("photo"))
-                                    ) {
-                                        Log.d("InAppBrowser", "URL suggests camera usage, launching camera");
-                                        activity.runOnUiThread(() -> launchCamera(currentUrl.contains("selfie"), request));
-                                        return;
-                                    }
-                                }
-
-                                // If all detection methods fail, fall back to regular file picker
-                                Log.d("InAppBrowser", "No capture attribute detected, using file picker");
-                                openFileChooser(request);
-                            });
+                            boolean useFrontCamera = value != null && value.replace("\"", "").equals("user");
+                            activity.runOnUiThread(() -> launchCamera(useFrontCamera, request));
                         });
                         return true;
                     }
