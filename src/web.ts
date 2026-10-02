@@ -28,10 +28,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     }
   }
 
-  addListener(
-    eventName: string,
-    listenerFunc: Parameters<WebPlugin['addListener']>[1],
-  ): Promise<PluginListenerHandle> {
+  addListener(eventName: string, listenerFunc: Parameters<WebPlugin['addListener']>[1]): Promise<PluginListenerHandle> {
     if (eventName === 'urlChangeEvent') {
       return Promise.reject(this.unimplemented('URL change events are not supported on web.'));
     }

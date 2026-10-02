@@ -36,7 +36,9 @@ describe('fullscreen on Web', () => {
 
   it('opens a tracked web view when fullscreen is omitted or disabled', async () => {
     await expect(browser.openWebView({ url: 'https://example.com' })).resolves.toEqual({ id: 'web-1' });
-    await expect(browser.openWebView({ url: 'https://example.com', fullscreen: false })).resolves.toEqual({ id: 'web-2' });
+    await expect(browser.openWebView({ url: 'https://example.com', fullscreen: false })).resolves.toEqual({
+      id: 'web-2',
+    });
   });
 
   it('rejects runtime entry and exit rather than silently changing no state', async () => {

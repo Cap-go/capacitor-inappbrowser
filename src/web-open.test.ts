@@ -11,7 +11,7 @@ describe('openWebView on web', () => {
     close: () => void;
     postMessage: ReturnType<typeof mock>;
   };
-  let openedWindows: typeof mockWindow[];
+  let openedWindows: (typeof mockWindow)[];
 
   beforeEach(() => {
     const openMockHolder: { fn?: typeof window.open } = {};
