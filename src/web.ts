@@ -23,7 +23,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
 
   constructor() {
     super();
-    if (typeof globalThis.window !== 'undefined') {
+    if (globalThis.window !== undefined) {
       globalThis.window.addEventListener('message', this.handleWindowMessage);
     }
   }
@@ -84,6 +84,14 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return { id: match[0], entry: match[1] };
   }
 
+  private resolveTargetOrigin(url: string): string {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return globalThis.location?.origin ?? 'null';
+    }
+  }
+
   private navigateOpenedWindow(win: Window, url: string, headers?: Record<string, string>): void {
     const hasHeaders = headers != null && Object.keys(headers).length > 0;
     if (!hasHeaders) {
@@ -103,9 +111,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         const documentHtml = html.includes('<head')
           ? html.replace('<head>', `<head><base href="${baseHref}">`)
           : `<base href="${baseHref}">${html}`;
-        win.document.open();
-        win.document.write(documentHtml);
-        win.document.close();
+        const blob = new Blob([documentHtml], { type: 'text/html;charset=utf-8' });
+        win.location.href = URL.createObjectURL(blob);
       } catch (error) {
         console.error('[InAppBrowser] Failed to load web view with headers', error);
         win.close();
@@ -214,7 +221,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void> {
     const resolved = this.resolveWebViewEntry(options.id);
     if (resolved) {
-      resolved.entry.window.postMessage(options.detail, '*');
+      resolved.entry.window.postMessage(options.detail, this.resolveTargetOrigin(resolved.entry.url));
     }
     return Promise.resolve();
   }

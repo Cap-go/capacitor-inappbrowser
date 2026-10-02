@@ -88,6 +88,6 @@ describe('openWebView on web', () => {
   it('forwards postMessage to the tracked window', async () => {
     await browser.openWebView({ url: 'https://example.com' });
     await browser.postMessage({ detail: { hello: 'world' } });
-    expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'world' }, '*');
+    expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'world' }, 'https://example.com');
   });
 });
