@@ -2570,61 +2570,57 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     beginFileChooserRequest(filePathCallback, acceptTypes, isMultiple);
                     final FileChooserRequestSupport.FileChooserRequest request = activeFileChooserRequest;
 
-                    // For image-only inputs, launch the camera only when capture is enabled on the
-                    // file input (WebView sets FileChooserParams.isCaptureEnabled). Otherwise use
-                    // the normal photo picker (gallery, files, camera as an option).
-                    // Mixed accept lists (e.g. "image/*,application/pdf") must skip the camera path.
-                    if (FileChooserAcceptSupport.isImageOnlyAcceptTypes(acceptTypes)) {
-                        if (!fileChooserParams.isCaptureEnabled()) {
-                            openFileChooser(request);
-                            return true;
-                        }
+                    final boolean imageOnlyAcceptTypes = FileChooserAcceptSupport.isImageOnlyAcceptTypes(acceptTypes);
+                    final boolean captureEnabled = fileChooserParams.isCaptureEnabled();
+                    final String nativeCaptureForRequest = consumeLastFileInputCaptureValue();
 
-                        String nativeCapture = consumeLastFileInputCaptureValue();
-                        if (nativeCapture != null && !nativeCapture.isEmpty()) {
-                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                return true;
-                            }
-                            boolean useFrontCameraFromNative = nativeCapture.equalsIgnoreCase("user");
-                            activity.runOnUiThread(() -> launchCamera(useFrontCameraFromNative, request));
-                            return true;
-                        }
-
-                        String js = """
-                            (function() {
-                              try {
-                                var cached = window.__capgoLastFileCapture;
-                                window.__capgoLastFileCapture = null;
-                                if (cached) {
-                                  return cached;
-                                }
-                                var el = document.activeElement;
-                                if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
-                                  return el.getAttribute('capture') || 'environment';
-                                }
-                                var inputs = document.querySelectorAll('input[type="file"][capture]');
-                                if (inputs && inputs.length === 1) {
-                                  return inputs[0].getAttribute('capture') || 'environment';
-                                }
-                                return 'environment';
-                              } catch (e) {
-                                return 'environment';
-                              }
-                            })();
-                            """;
-
-                        webView.evaluateJavascript(js, (value) -> {
-                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
-                                return;
-                            }
-                            boolean useFrontCamera = value != null && value.replace("\"", "").equalsIgnoreCase("user");
-                            activity.runOnUiThread(() -> launchCamera(useFrontCamera, request));
-                        });
+                    if (!FileInputCaptureChooserSupport.usesCameraCapturePath(imageOnlyAcceptTypes, captureEnabled)) {
+                        clearFileInputCapturePageState(webView);
+                        openFileChooser(request);
                         return true;
                     }
 
-                    // For non-image types, use regular file picker
-                    openFileChooser(request);
+                    // For image-only inputs with capture enabled, launch the camera when possible.
+                    // Mixed accept lists (e.g. "image/*,application/pdf") use the regular picker above.
+                    if (nativeCaptureForRequest != null && !nativeCaptureForRequest.isEmpty()) {
+                        if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                            return true;
+                        }
+                        boolean useFrontCameraFromNative = nativeCaptureForRequest.equalsIgnoreCase("user");
+                        activity.runOnUiThread(() -> launchCamera(useFrontCameraFromNative, request));
+                        return true;
+                    }
+
+                    String js = """
+                        (function() {
+                          try {
+                            var cached = window.__capgoLastFileCapture;
+                            window.__capgoLastFileCapture = null;
+                            if (cached) {
+                              return cached;
+                            }
+                            var el = document.activeElement;
+                            if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
+                              return el.getAttribute('capture') || 'environment';
+                            }
+                            var inputs = document.querySelectorAll('input[type="file"][capture]');
+                            if (inputs && inputs.length === 1) {
+                              return inputs[0].getAttribute('capture') || 'environment';
+                            }
+                            return 'environment';
+                          } catch (e) {
+                            return 'environment';
+                          }
+                        })();
+                        """;
+
+                    webView.evaluateJavascript(js, (value) -> {
+                        if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                            return;
+                        }
+                        boolean useFrontCamera = value != null && value.replace("\"", "").equalsIgnoreCase("user");
+                        activity.runOnUiThread(() -> launchCamera(useFrontCamera, request));
+                    });
                     return true;
                 }
 
@@ -4329,6 +4325,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         String value = lastFileInputCaptureValue;
         lastFileInputCaptureValue = null;
         return value;
+    }
+
+    private void clearFileInputCapturePageState(WebView webView) {
+        if (webView == null) {
+            return;
+        }
+        webView.evaluateJavascript("(function(){ window.__capgoLastFileCapture = null; })();", null);
     }
 
     private void injectJavaScriptInterface() {
