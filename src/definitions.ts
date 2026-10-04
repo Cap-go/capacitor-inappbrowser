@@ -1596,8 +1596,9 @@ export interface OpenWebViewOptions {
    *   The page sends messages with `window.opener.postMessage(data, appOrigin)` (header loads: `window.top.opener.postMessage`).
    *   `postMessage()` reaches direct URL opens as a standard `message` event (`event.data` is the `detail` object).
    *   Header-loaded pages inside the sandbox iframe also receive a `messageFromNative` custom event (`event.detail` is
-   *   the `detail` object). Messages target the opened URL's origin until the top-level page sends a message, then the
-   *   origin of that message when it stays on the same site (hostname or subdomain of the opened URL).
+   *   the `detail` object). `postMessage()` targets the opened URL's origin until the popup sends a message; the target
+   *   may switch to that message's full origin only when its scheme and port match the opened URL and its hostname is
+   *   the same as, or a subdomain of, the opened URL hostname (parent hostnames are not accepted).
    * - Pages that send `Cross-Origin-Opener-Policy` (common on login/OAuth pages) are cut off from the app: `closeEvent` fires right after opening and `close()` has no effect.
    * - The opened page keeps a `window.opener` reference to the app (required so `close()` works), so only open URLs you trust.
    * - `closeEvent` reports the originally opened `url`; the current page URL is not readable cross-origin.

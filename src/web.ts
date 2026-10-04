@@ -33,18 +33,56 @@ const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
 const NATIVE_BRIDGE_SCRIPT =
   "(function(){window.addEventListener('message',function(e){if(e.source===window.parent){window.dispatchEvent(new CustomEvent('messageFromNative',{detail:e.data}));}});})();";
 
-const injectNativeBridge = (html: string): string => {
+export const formatDoctype = (doctype: DocumentType | null): string => {
+  if (!doctype) {
+    return '';
+  }
+  if (doctype.publicId) {
+    const system = doctype.systemId ? ` "${doctype.systemId}"` : '';
+    return `<!DOCTYPE ${doctype.name} PUBLIC "${doctype.publicId}"${system}>`;
+  }
+  if (doctype.systemId) {
+    return `<!DOCTYPE ${doctype.name} SYSTEM "${doctype.systemId}">`;
+  }
+  return `<!DOCTYPE ${doctype.name}>`;
+};
+
+const serializeParsedHtml = (doc: Document): string => formatDoctype(doc.doctype) + doc.documentElement.outerHTML;
+
+export const injectNativeBridge = (html: string): string => {
   if (typeof DOMParser !== 'undefined') {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const script = doc.createElement('script');
     script.textContent = NATIVE_BRIDGE_SCRIPT;
     if (doc.body) {
       doc.body.appendChild(script);
-      return doc.documentElement.outerHTML;
+      return serializeParsedHtml(doc);
     }
   }
   return `${html}<script>${NATIVE_BRIDGE_SCRIPT}</script>`;
 };
+
+/** Whether a webview message origin may replace the postMessage target (full origin string). */
+export function mayAdoptPostMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
+  try {
+    const opened = new URL(openedUrl);
+    const incoming = new URL(messageOrigin);
+    if (opened.protocol !== incoming.protocol) {
+      return false;
+    }
+    if (opened.port !== incoming.port) {
+      return false;
+    }
+    if (opened.origin === incoming.origin) {
+      return true;
+    }
+    const openedHost = opened.hostname;
+    const incomingHost = incoming.hostname;
+    return incomingHost === openedHost || incomingHost.endsWith(`.${openedHost}`);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Wraps fetched HTML in a sandboxed iframe (opaque origin, no allow-same-origin) so the remote page
@@ -92,7 +130,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       entry.window === event.source &&
       event.origin &&
       event.origin !== 'null' &&
-      this.mayAdoptMessageOrigin(entry.url, event.origin)
+      mayAdoptPostMessageOrigin(entry.url, event.origin)
     ) {
       entry.origin = event.origin;
     }
@@ -158,25 +196,6 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       return undefined;
     }
     return { id: match[0], entry: match[1] };
-  }
-
-  private mayAdoptMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
-    try {
-      const opened = new URL(openedUrl);
-      const incoming = new URL(messageOrigin);
-      if (opened.origin === incoming.origin) {
-        return true;
-      }
-      const openedHost = opened.hostname;
-      const incomingHost = incoming.hostname;
-      return (
-        incomingHost === openedHost ||
-        incomingHost.endsWith(`.${openedHost}`) ||
-        openedHost.endsWith(`.${incomingHost}`)
-      );
-    } catch {
-      return false;
-    }
   }
 
   private resolveTargetOrigin(url: string): string {

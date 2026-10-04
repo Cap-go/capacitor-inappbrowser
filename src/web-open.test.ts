@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import { InAppBrowserWeb } from './web';
+import { InAppBrowserWeb, injectNativeBridge, mayAdoptPostMessageOrigin } from './web';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
@@ -164,6 +164,24 @@ describe('openWebView on web', () => {
     } as unknown as MessageEvent);
     await browser.postMessage({ detail: { hello: 'again' } });
     expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'again' }, 'https://login.app.example.com');
+  });
+
+  it('preserves doctype when injecting the native bridge', () => {
+    const html = '<!DOCTYPE html><html><head></head><body><p>x</p></body></html>';
+    expect(injectNativeBridge(html).startsWith('<!DOCTYPE html>')).toBe(true);
+  });
+
+  it('rejects parent hostnames for postMessage target adoption', () => {
+    expect(mayAdoptPostMessageOrigin('https://login.app.example.com', 'https://app.example.com')).toBe(false);
+  });
+
+  it('rejects scheme downgrades for postMessage target adoption', () => {
+    expect(mayAdoptPostMessageOrigin('https://app.example.com', 'http://login.app.example.com')).toBe(false);
+  });
+
+  it('rejects a different port for postMessage target adoption', () => {
+    expect(mayAdoptPostMessageOrigin('https://app.example.com', 'https://login.app.example.com:8443')).toBe(false);
+    expect(mayAdoptPostMessageOrigin('https://app.example.com:8443', 'https://login.app.example.com:8443')).toBe(true);
   });
 
   it('ignores message origins outside the opened site', async () => {
