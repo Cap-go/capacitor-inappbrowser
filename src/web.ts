@@ -30,6 +30,22 @@ const escapeHtmlAttribute = (value: string): string => value.replace(/[&"<>]/g, 
 
 const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
 
+const NATIVE_BRIDGE_SCRIPT =
+  "(function(){window.addEventListener('message',function(e){if(e.source===window.parent){window.dispatchEvent(new CustomEvent('messageFromNative',{detail:e.data}));}});})();";
+
+const injectNativeBridge = (html: string): string => {
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const script = doc.createElement('script');
+    script.textContent = NATIVE_BRIDGE_SCRIPT;
+    if (doc.body) {
+      doc.body.appendChild(script);
+      return doc.documentElement.outerHTML;
+    }
+  }
+  return `${html}<script>${NATIVE_BRIDGE_SCRIPT}</script>`;
+};
+
 /**
  * Wraps fetched HTML in a sandboxed iframe (opaque origin, no allow-same-origin) so the remote page
  * cannot read the app's storage or DOM even though the wrapper is a Blob created by the app origin.
@@ -38,12 +54,10 @@ const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
  */
 export const buildIsolatedDocument = (html: string, baseHref: string): string => {
   const baseTag = `<base href="${escapeHtmlAttribute(baseHref)}">`;
-  const nativeBridge =
-    "<script>(function(){window.addEventListener('message',function(e){if(e.source===window.parent){window.dispatchEvent(new CustomEvent('messageFromNative',{detail:e.data}));}});})();</script>";
   let inner = OPENING_HEAD_TAG.test(html)
     ? html.replace(OPENING_HEAD_TAG, (tag) => `${tag}${baseTag}`)
     : `${baseTag}${html}`;
-  inner = /<\/body>/i.test(inner) ? inner.replace(/<\/body>/i, `${nativeBridge}</body>`) : `${inner}${nativeBridge}`;
+  inner = injectNativeBridge(inner);
   const sandbox =
     'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
   const relay =
@@ -74,7 +88,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       return;
     }
     const [id, entry] = match;
-    if (entry.window === event.source && event.origin && event.origin !== 'null') {
+    if (
+      entry.window === event.source &&
+      event.origin &&
+      event.origin !== 'null' &&
+      this.mayAdoptMessageOrigin(entry.url, event.origin)
+    ) {
       entry.origin = event.origin;
     }
     let data: unknown = event.data;
@@ -139,6 +158,21 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       return undefined;
     }
     return { id: match[0], entry: match[1] };
+  }
+
+  private mayAdoptMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
+    try {
+      const opened = new URL(openedUrl);
+      const incoming = new URL(messageOrigin);
+      if (opened.origin === incoming.origin) {
+        return true;
+      }
+      const openedHost = opened.hostname;
+      const incomingHost = incoming.hostname;
+      return incomingHost === openedHost || incomingHost.endsWith(`.${openedHost}`) || openedHost.endsWith(`.${incomingHost}`);
+    } catch {
+      return false;
+    }
   }
 
   private resolveTargetOrigin(url: string): string {

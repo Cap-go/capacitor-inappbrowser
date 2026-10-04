@@ -154,15 +154,27 @@ describe('openWebView on web', () => {
     expect(mockWindow.closed).toBe(true);
   });
 
-  it('targets the origin of the last message received after a redirect', async () => {
-    await browser.openWebView({ url: 'https://example.com' });
+  it('targets the origin of the last message received after a same-site redirect', async () => {
+    await browser.openWebView({ url: 'https://app.example.com' });
     const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
     handler({
       source: mockWindow,
-      origin: 'https://login.example.org',
+      origin: 'https://login.app.example.com',
       data: { ready: true },
     } as unknown as MessageEvent);
     await browser.postMessage({ detail: { hello: 'again' } });
-    expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'again' }, 'https://login.example.org');
+    expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'again' }, 'https://login.app.example.com');
+  });
+
+  it('ignores message origins outside the opened site', async () => {
+    await browser.openWebView({ url: 'https://app.example.com' });
+    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
+    handler({
+      source: mockWindow,
+      origin: 'https://evil.example.org',
+      data: { forged: true },
+    } as unknown as MessageEvent);
+    await browser.postMessage({ detail: { hello: 'safe' } });
+    expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'safe' }, 'https://app.example.com');
   });
 });
