@@ -899,7 +899,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
-    @discardableResult
     private func abortAllBlobDownloadSessions() {
         for session in blobDownloadSessions.values {
             cleanupBlobDownloadSession(session, deleteFile: true)
@@ -1094,8 +1093,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         guard let jsonPayload = parseBlobBridgePayload(payload),
               let sessionId = jsonPayload["sessionId"] as? String,
-              !sessionId.isEmpty,
-              let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
+              !sessionId.isEmpty else {
+            emitDownloadFailed(sourceURL: nil, error: "Blob download session was not initialized")
+            return
+        }
+
+        guard let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
             if rejectedBlobDownloadSessionIds.remove(sessionId) != nil {
                 return
             }
