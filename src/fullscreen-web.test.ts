@@ -6,7 +6,14 @@ describe('fullscreen on Web', () => {
   let browser: InAppBrowserWeb;
   let mockWindow: { closed: boolean; location: { href: string }; close: () => void };
 
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  const realOpen = globalThis.open;
+
   beforeEach(() => {
+    // No real 500 ms polling timers leak out of these tests.
+    globalThis.setInterval = mock(() => 1) as unknown as typeof setInterval;
+    globalThis.clearInterval = mock(() => undefined) as unknown as typeof clearInterval;
     mockWindow = {
       closed: false,
       location: { href: '' },
@@ -25,7 +32,11 @@ describe('fullscreen on Web', () => {
   });
 
   afterEach(() => {
+    mockWindow.close();
     delete (globalThis as { window?: Window }).window;
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+    globalThis.open = realOpen;
   });
 
   it('rejects fullscreen opening instead of reporting a successful native presentation', async () => {

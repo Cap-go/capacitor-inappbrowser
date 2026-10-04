@@ -15,7 +15,45 @@ import type {
   ScreenshotResult,
 } from './definitions';
 
-type TrackedWebView = { window: Window; url: string; timer: number };
+type TrackedWebView = {
+  window: Window;
+  url: string;
+  timer: number;
+  /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
+  origin: string;
+  /** Object URL of the isolating wrapper document for header loads, revoked on close. */
+  objectUrl?: string;
+};
+
+const HTML_ATTRIBUTE_ESCAPES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' };
+
+const escapeHtmlAttribute = (value: string): string => value.replace(/[&"<>]/g, (c) => HTML_ATTRIBUTE_ESCAPES[c]);
+
+const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
+
+/**
+ * Wraps fetched HTML in a sandboxed iframe (opaque origin, no allow-same-origin) so the remote page
+ * cannot read the app's storage or DOM even though the wrapper is a Blob created by the app origin.
+ * A <base href> pointing at the final response URL keeps relative URLs resolving against the target.
+ * The wrapper relays messages from the app (its opener) into the sandboxed frame.
+ */
+export const buildIsolatedDocument = (html: string, baseHref: string): string => {
+  const baseTag = `<base href="${escapeHtmlAttribute(baseHref)}">`;
+  const inner = OPENING_HEAD_TAG.test(html)
+    ? html.replace(OPENING_HEAD_TAG, (tag) => `${tag}${baseTag}`)
+    : `${baseTag}${html}`;
+  const sandbox =
+    'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
+  const relay =
+    "(function(){var f=document.getElementById('capgo-iab-frame');" +
+    "window.addEventListener('message',function(e){if(e.source===window.opener&&f&&f.contentWindow){f.contentWindow.postMessage(e.data,'*');}});})();";
+  return (
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    '<style>html,body,iframe{margin:0;padding:0;border:0;width:100%;height:100%;display:block}</style></head>' +
+    `<body><iframe id="capgo-iab-frame" sandbox="${sandbox}" referrerpolicy="no-referrer" srcdoc="${escapeHtmlAttribute(inner)}"></iframe>` +
+    `<script>${relay}</script></body></html>`
+  );
+};
 
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   private readonly webViews = new Map<string, TrackedWebView>();
@@ -36,11 +74,14 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   private readonly handleWindowMessage = (event: MessageEvent): void => {
-    const match = Array.from(this.webViews.entries()).find(([, entry]) => entry.window === event.source);
+    const match = Array.from(this.webViews.entries()).find(([, entry]) => this.isFromWebView(entry, event.source));
     if (!match) {
       return;
     }
-    const [id] = match;
+    const [id, entry] = match;
+    if (!entry.objectUrl && event.origin && event.origin !== 'null') {
+      entry.origin = event.origin;
+    }
     let data: unknown = event.data;
     if (typeof data === 'string') {
       try {
@@ -57,12 +98,30 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     }
   };
 
+  private isFromWebView(entry: TrackedWebView, source: MessageEventSource | null): boolean {
+    if (!source) {
+      return false;
+    }
+    if (entry.window === source) {
+      return true;
+    }
+    try {
+      // Frames inside the opened window (e.g. the sandboxed frame used for header loads) report their own source.
+      return (source as Window).top === entry.window;
+    } catch {
+      return false;
+    }
+  }
+
   private watchClosed(id: string): void {
     const entry = this.webViews.get(id);
     if (!entry?.window.closed) {
       return;
     }
     globalThis.clearInterval(entry.timer);
+    if (entry.objectUrl) {
+      URL.revokeObjectURL(entry.objectUrl);
+    }
     this.webViews.delete(id);
     this.notifyListeners('closeEvent', { id, url: entry.url });
   }
@@ -92,9 +151,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     }
   }
 
-  private navigateOpenedWindow(win: Window, url: string, headers?: Record<string, string>): void {
-    const hasHeaders = headers != null && Object.keys(headers).length > 0;
-    if (!hasHeaders) {
+  private hasHeaders(headers?: Record<string, string>): headers is Record<string, string> {
+    return headers != null && Object.keys(headers).length > 0;
+  }
+
+  private navigateOpenedWindow(id: string, win: Window, url: string, headers?: Record<string, string>): void {
+    if (!this.hasHeaders(headers)) {
       win.location.href = url;
       return;
     }
@@ -106,16 +168,21 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
           throw new Error(`Request failed with status ${response.status}`);
         }
         const html = await response.text();
-        const parsed = new URL(url, globalThis.location?.href ?? 'https://localhost/');
+        const parsed = new URL(response.url || url, globalThis.location?.href ?? 'https://localhost/');
         const baseHref = `${parsed.origin}${parsed.pathname}${parsed.search}`;
-        const documentHtml = html.includes('<head')
-          ? html.replace('<head>', `<head><base href="${baseHref}">`)
-          : `<base href="${baseHref}">${html}`;
-        const blob = new Blob([documentHtml], { type: 'text/html;charset=utf-8' });
-        win.location.href = URL.createObjectURL(blob);
+        const blob = new Blob([buildIsolatedDocument(html, baseHref)], { type: 'text/html;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const entry = this.webViews.get(id);
+        if (!entry || win.closed) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        entry.objectUrl = objectUrl;
+        win.location.href = objectUrl;
       } catch (error) {
         console.error('[InAppBrowser] Failed to load web view with headers', error);
         win.close();
+        this.watchClosed(id);
       }
     })();
   }
@@ -166,8 +233,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
 
     const id = `web-${++this.webViewCounter}`;
     const timer = globalThis.setInterval(() => this.watchClosed(id), 500);
-    this.webViews.set(id, { window: opened, url: options.url, timer });
-    this.navigateOpenedWindow(opened, options.url, options.headers);
+    // Header loads render inside an app-origin wrapper document, so messages target the app origin there.
+    const origin = this.hasHeaders(options.headers)
+      ? (globalThis.location?.origin ?? 'null')
+      : this.resolveTargetOrigin(options.url);
+    this.webViews.set(id, { window: opened, url: options.url, timer, origin });
+    this.navigateOpenedWindow(id, opened, options.url, options.headers);
     return Promise.resolve({ id });
   }
 
@@ -221,7 +292,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void> {
     const resolved = this.resolveWebViewEntry(options.id);
     if (resolved) {
-      resolved.entry.window.postMessage(options.detail, this.resolveTargetOrigin(resolved.entry.url));
+      resolved.entry.window.postMessage(options.detail, resolved.entry.origin);
     }
     return Promise.resolve();
   }
