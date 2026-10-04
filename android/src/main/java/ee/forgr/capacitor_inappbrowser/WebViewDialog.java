@@ -2575,9 +2575,26 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         String js = """
                             (function() {
                               try {
+                                if (!window.__capgoFileInputCaptureHook) {
+                                  window.__capgoFileInputCaptureHook = true;
+                                  window.__capgoLastFileCapture = null;
+                                  document.addEventListener('click', function(e) {
+                                    var t = e.target;
+                                    if (t && t.tagName === 'INPUT' && t.type === 'file' && t.hasAttribute('capture')) {
+                                      window.__capgoLastFileCapture = t.getAttribute('capture') || 'environment';
+                                    }
+                                  }, true);
+                                }
+                                if (window.__capgoLastFileCapture) {
+                                  return window.__capgoLastFileCapture;
+                                }
                                 var el = document.activeElement;
                                 if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
                                   return el.getAttribute('capture') || 'environment';
+                                }
+                                var inputs = document.querySelectorAll('input[type="file"][capture]');
+                                if (inputs && inputs.length === 1) {
+                                  return inputs[0].getAttribute('capture') || 'environment';
                                 }
                                 return 'environment';
                               } catch (e) {
