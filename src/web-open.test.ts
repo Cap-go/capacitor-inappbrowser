@@ -93,18 +93,6 @@ describe('openWebView on web', () => {
     expect(mockWindow.closed).toBe(true);
   });
 
-  it('rejects cookie reads on web', async () => {
-    await expect(browser.getCookies({ url: 'https://example.com' })).rejects.toMatchObject({
-      code: 'UNIMPLEMENTED',
-    });
-  });
-
-  it('rejects urlChangeEvent listeners on web', async () => {
-    await expect(browser.addListener('urlChangeEvent', () => undefined)).rejects.toMatchObject({
-      code: 'UNIMPLEMENTED',
-    });
-  });
-
   it('forwards postMessage to the tracked window', async () => {
     await browser.openWebView({ url: 'https://example.com' });
     await browser.postMessage({ detail: { hello: 'world' } });

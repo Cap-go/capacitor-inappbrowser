@@ -1583,18 +1583,21 @@ export interface OpenWebViewOptions {
    * - Call it from a user gesture (e.g. a click handler), otherwise the browser popup blocker may block it;
    *   a blocked popup rejects with `Popup blocked`.
    * - Mobile browsers ignore the window features and always open a tab.
-   * - `userAgent` and all presentation/styling options are ignored on web.
+   * - `customUserAgent` and all presentation/styling options are ignored on web.
    * - When `headers` is set, the initial document is loaded with `fetch(url, { headers })` and rendered in the
    *   blank window inside a sandboxed iframe with an opaque origin, so the fetched page cannot read the app's
    *   storage or DOM. That requires CORS on the target (`Access-Control-Allow-Origin` and allowed request headers),
    *   and the app's Content-Security-Policy also applies to that document. A `<base href>` built from the final
    *   response URL is injected so relative URLs resolve against the target. It applies to the first document only;
    *   later navigations are plain GET requests without those headers.
-   * - On web, `close()`, `closeEvent`, `postMessage()` and `messageFromWebview` are wired; other webview APIs keep their web stubs.
+   * - On web, `close()`, `closeEvent`, `postMessage()` and `messageFromWebview` are wired. `executeScript`, `setUrl`,
+   *   `reload`, `goBack`, cookie and browsing-data methods, and `urlChangeEvent` listeners keep their prior fulfilled
+   *   web stubs; `hide`, `show`, `updateDimensions` and the safe-margin setters resolve as no-ops.
    *   The page sends messages with `window.opener.postMessage(data, appOrigin)` (header loads: `window.top.opener.postMessage`).
-   *   `postMessage()` reaches the page as a standard `message` event (`event.data` is the `detail` object), not as
-   *   `messageFromNative`. Messages target the opened URL's origin until the page sends a message, then the origin of
-   *   the last message received, so redirected pages keep receiving them.
+   *   `postMessage()` reaches direct URL opens as a standard `message` event (`event.data` is the `detail` object).
+   *   Header-loaded pages inside the sandbox iframe also receive a `messageFromNative` custom event (`event.detail` is
+   *   the `detail` object). Messages target the opened URL's origin until the top-level page sends a message, then the
+   *   origin of that message, so redirected pages keep receiving them.
    * - Pages that send `Cross-Origin-Opener-Policy` (common on login/OAuth pages) are cut off from the app: `closeEvent` fires right after opening and `close()` has no effect.
    * - The opened page keeps a `window.opener` reference to the app (required so `close()` works), so only open URLs you trust.
    * - `closeEvent` reports the originally opened `url`; the current page URL is not readable cross-origin.

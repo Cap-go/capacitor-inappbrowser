@@ -1,5 +1,4 @@
 import { WebPlugin } from '@capacitor/core';
-import type { PluginListenerHandle } from '@capacitor/core';
 
 import type {
   InAppBrowserPlugin,
@@ -39,9 +38,12 @@ const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
  */
 export const buildIsolatedDocument = (html: string, baseHref: string): string => {
   const baseTag = `<base href="${escapeHtmlAttribute(baseHref)}">`;
-  const inner = OPENING_HEAD_TAG.test(html)
+  const nativeBridge =
+    "<script>(function(){window.addEventListener('message',function(e){if(e.source===window.parent){window.dispatchEvent(new CustomEvent('messageFromNative',{detail:e.data}));}});})();</script>";
+  let inner = OPENING_HEAD_TAG.test(html)
     ? html.replace(OPENING_HEAD_TAG, (tag) => `${tag}${baseTag}`)
     : `${baseTag}${html}`;
+  inner = /<\/body>/i.test(inner) ? inner.replace(/<\/body>/i, `${nativeBridge}</body>`) : `${inner}${nativeBridge}`;
   const sandbox =
     'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
   const relay =
@@ -66,20 +68,13 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     }
   }
 
-  addListener(eventName: string, listenerFunc: Parameters<WebPlugin['addListener']>[1]): Promise<PluginListenerHandle> {
-    if (eventName === 'urlChangeEvent') {
-      return Promise.reject(this.unimplemented('URL change events are not supported on web.'));
-    }
-    return super.addListener(eventName, listenerFunc);
-  }
-
   private readonly handleWindowMessage = (event: MessageEvent): void => {
     const match = Array.from(this.webViews.entries()).find(([, entry]) => this.isFromWebView(entry, event.source));
     if (!match) {
       return;
     }
     const [id, entry] = match;
-    if (!entry.objectUrl && event.origin && event.origin !== 'null') {
+    if (entry.window === event.source && event.origin && event.origin !== 'null') {
       entry.origin = event.origin;
     }
     let data: unknown = event.data;
@@ -105,9 +100,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     if (entry.window === source) {
       return true;
     }
+    if (!entry.objectUrl) {
+      return false;
+    }
     try {
-      // Frames inside the opened window (e.g. the sandboxed frame used for header loads) report their own source.
-      return (source as Window).top === entry.window;
+      const frame = entry.window.document.getElementById('capgo-iab-frame') as HTMLIFrameElement | null;
+      return frame?.contentWindow === source;
     } catch {
       return false;
     }
@@ -188,7 +186,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   clearAllCookies(): Promise<any> {
-    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
+    console.log('clearAllCookies');
+    return Promise.resolve();
   }
 
   clearCache(): Promise<any> {
@@ -197,7 +196,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   clearAllBrowsingData(): Promise<any> {
-    return Promise.reject(this.unimplemented('Browsing data operations are not supported on web.'));
+    console.log('clearAllBrowsingData');
+    return Promise.resolve();
   }
 
   open(options: OpenOptions): Promise<any> {
@@ -210,12 +210,13 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
 
-  clearCookies(_options: ClearCookieOptions): Promise<any> {
-    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
+  clearCookies(options: ClearCookieOptions): Promise<any> {
+    console.log('cleanCookies', options);
+    return Promise.resolve();
   }
 
-  getCookies(_options: GetCookieOptions): Promise<any> {
-    return Promise.reject(this.unimplemented('Cookie operations are not supported on web.'));
+  getCookies(options: GetCookieOptions): Promise<any> {
+    return Promise.resolve(options);
   }
 
   openWebView(options: OpenWebViewOptions): Promise<any> {
@@ -242,8 +243,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve({ id });
   }
 
-  executeScript(_options: { code: string }): Promise<any> {
-    return Promise.reject(this.unimplemented('Script execution is not supported on web.'));
+  executeScript({ code }: { code: string }): Promise<any> {
+    console.log('code', code);
+    return Promise.resolve(code);
   }
 
   close(options?: { id?: string }): Promise<any> {
@@ -281,12 +283,14 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
 
-  setUrl(_options: { url: string }): Promise<any> {
-    return Promise.reject(this.unimplemented('setUrl is not supported on web.'));
+  setUrl(options: { url: string }): Promise<any> {
+    console.log('setUrl', options.url);
+    return Promise.resolve();
   }
 
-  reload(_options?: { id?: string }): Promise<any> {
-    return Promise.reject(this.unimplemented('reload is not supported on web.'));
+  reload(options?: { id?: string }): Promise<any> {
+    console.log('reload', options);
+    return Promise.resolve();
   }
 
   postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void> {
@@ -303,7 +307,8 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   goBack(): Promise<any> {
-    return Promise.reject(this.unimplemented('goBack is not supported on web.'));
+    console.log('goBack');
+    return Promise.resolve();
   }
 
   getPluginVersion(): Promise<{ version: string }> {
@@ -315,8 +320,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
 
-  handleProxyRequest(_options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
-    return Promise.reject(this.unimplemented('Proxy requests are not supported on web.'));
+  handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+    console.log('handleProxyRequest not supported on web', options);
+    return Promise.resolve();
   }
 
   setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
