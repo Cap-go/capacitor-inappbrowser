@@ -88,6 +88,7 @@ enum ScriptMessageHandlerSupport {
         "blobDownloadChunk",
         "blobDownloadFinish",
         "blobDownloadAbort",
+        "blobDownloadRejectAck",
         "takeScreenshot",
         "consoleMessageHandler",
         "magicPrint",
@@ -1142,6 +1143,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         )
     }
 
+    private func acknowledgeBlobDownloadRejectionPayload(_ payload: Any) {
+        guard let jsonPayload = parseBlobBridgePayload(payload),
+              let sessionId = jsonPayload["sessionId"] as? String,
+              !sessionId.isEmpty else {
+            return
+        }
+        rejectedBlobDownloadSessionIds.remove(sessionId)
+    }
+
     private func handleBlobDownloadFromPage(blobUrl: String, mimeType: String?, contentDisposition: String?) {
         guard handleDownloads, let webView else {
             emitDownloadFailed(sourceURL: blobUrl, error: "Blob download requires an active WebView")
@@ -1256,6 +1266,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
           })().catch(function(error) {
             const reason = String((error && error.message) || error || 'Blob download failed');
             if (blobDownloadRejectionReason(sessionId)) {
+              delete window.__capgoBlobDownloadRejections[sessionId];
+              if (bridge && bridge.acknowledgeBlobDownloadRejection) {
+                bridge.acknowledgeBlobDownloadRejection(JSON.stringify({ sessionId: sessionId }));
+              }
               console.error('Failed to capture blob download', error);
               return;
             }
@@ -1975,6 +1989,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             finishBlobDownloadPayload(message.body)
         } else if message.name == "blobDownloadAbort" {
             abortBlobDownloadPayload(message.body)
+        } else if message.name == "blobDownloadRejectAck" {
+            acknowledgeBlobDownloadRejectionPayload(message.body)
         } else if message.name == "consoleMessageHandler" {
             if let messageBody = message.body as? [String: Any] {
                 emit("consoleMessage", data: ConsoleMessageSupport.normalizePayload(from: messageBody))
@@ -2135,6 +2151,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                         },
                         abortBlobDownload: function(payload) {
                                 window.webkit.messageHandlers.blobDownloadAbort.postMessage(payload);
+                        },
+                        acknowledgeBlobDownloadRejection: function(payload) {
+                                window.webkit.messageHandlers.blobDownloadRejectAck.postMessage(payload);
                         }\(extraControls)\(screenshotControls)
                 });
                 if (!window.__capgoInAppBrowserWindowCloseInstalled) {
@@ -2271,6 +2290,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         userContentController.add(weakHandler, name: "blobDownloadChunk")
         userContentController.add(weakHandler, name: "blobDownloadFinish")
         userContentController.add(weakHandler, name: "blobDownloadAbort")
+        userContentController.add(weakHandler, name: "blobDownloadRejectAck")
         if allowScreenshotsFromWebPage {
             userContentController.add(weakHandler, name: "takeScreenshot")
         }
