@@ -2575,18 +2575,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         String js = """
                             (function() {
                               try {
-                                if (!window.__capgoFileInputCaptureHook) {
-                                  window.__capgoFileInputCaptureHook = true;
-                                  window.__capgoLastFileCapture = null;
-                                  document.addEventListener('click', function(e) {
-                                    var t = e.target;
-                                    if (t && t.tagName === 'INPUT' && t.type === 'file' && t.hasAttribute('capture')) {
-                                      window.__capgoLastFileCapture = t.getAttribute('capture') || 'environment';
-                                    }
-                                  }, true);
-                                }
-                                if (window.__capgoLastFileCapture) {
-                                  return window.__capgoLastFileCapture;
+                                var cached = window.__capgoLastFileCapture;
+                                window.__capgoLastFileCapture = null;
+                                if (cached) {
+                                  return cached;
                                 }
                                 var el = document.activeElement;
                                 if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
@@ -2607,7 +2599,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
                                 return;
                             }
-                            boolean useFrontCamera = value != null && value.replace("\"", "").equals("user");
+                            boolean useFrontCamera = value != null && value.replace("\"", "").equalsIgnoreCase("user");
                             activity.runOnUiThread(() -> launchCamera(useFrontCamera, request));
                         });
                         return true;
@@ -4335,6 +4327,39 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private String createFileInputCaptureDocumentStartScript() {
+        return """
+        (function() {
+          if (window.__capgoFileInputCaptureHook) {
+            return;
+          }
+          window.__capgoFileInputCaptureHook = true;
+          window.__capgoLastFileCapture = null;
+          var register = function(doc) {
+            if (!doc || doc.__capgoFileInputCaptureRegistered) {
+              return;
+            }
+            doc.__capgoFileInputCaptureRegistered = true;
+            doc.addEventListener('click', function(e) {
+              var t = e.target;
+              if (t && t.tagName === 'INPUT' && t.type === 'file' && t.hasAttribute('capture')) {
+                window.__capgoLastFileCapture = t.getAttribute('capture') || 'environment';
+              }
+            }, true);
+          };
+          register(document);
+          window.addEventListener('load', function(e) {
+            var el = e.target;
+            try {
+              if (el && el.tagName === 'IFRAME' && el.contentDocument) {
+                register(el.contentDocument);
+              }
+            } catch (err) {}
+          }, true);
+        })();
+        """;
+    }
+
     private void injectDocumentStartJavaScriptInterface() {
         if (_webView == null) {
             Log.w("InAppBrowser", "Cannot inject document-start JavaScript interface - WebView is null");
@@ -4347,6 +4372,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         try {
             injectDocumentStartPostMessageBridge();
+            WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureDocumentStartScript(), Collections.singleton("*"));
             WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
             // Honor preShowScriptInjectionTime: "documentStart" (matches iOS WKUserScript
             // .atDocumentStart). Runs before page scripts and persists across navigations,
