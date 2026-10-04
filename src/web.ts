@@ -169,7 +169,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       }
       const openedHost = opened.hostname;
       const incomingHost = incoming.hostname;
-      return incomingHost === openedHost || incomingHost.endsWith(`.${openedHost}`) || openedHost.endsWith(`.${incomingHost}`);
+      return (
+        incomingHost === openedHost ||
+        incomingHost.endsWith(`.${openedHost}`) ||
+        openedHost.endsWith(`.${incomingHost}`)
+      );
     } catch {
       return false;
     }
