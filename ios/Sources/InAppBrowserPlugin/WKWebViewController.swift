@@ -556,6 +556,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     private var lastInjectedSafeAreaInsets: InjectedSafeAreaInsets?
     private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
     private var blobDownloadSessions: [String: BlobDownloadSession] = [:]
+    private var rejectedBlobDownloadSessionIds: Set<String> = []
     private var previewItemURL: URL?
 
     func setHeaders(headers: [String: String]) {
@@ -904,6 +905,39 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             cleanupBlobDownloadSession(session, deleteFile: true)
         }
         blobDownloadSessions.removeAll()
+        rejectedBlobDownloadSessionIds.removeAll()
+    }
+
+    private func signalBlobDownloadRejected(sessionId: String, reason: String) {
+        guard !sessionId.isEmpty else {
+            return
+        }
+
+        rejectedBlobDownloadSessionIds.insert(sessionId)
+
+        guard let webView else {
+            return
+        }
+
+        let escapedSessionId = sessionId
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+        let escapedReason = reason
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        let script = """
+        (function() {
+          if (!window.__capgoBlobDownloadRejections) {
+            window.__capgoBlobDownloadRejections = {};
+          }
+          window.__capgoBlobDownloadRejections['\(escapedSessionId)'] = '\(escapedReason)';
+        })();
+        """
+
+        DispatchQueue.main.async {
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
     }
 
     private func abortBlobDownloadSession(sessionId: String, deleteFile: Bool) -> BlobDownloadSession? {
@@ -1004,11 +1038,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 expectedSize: expectedSize
             )
         } catch {
+            let sessionId = (parseBlobBridgePayload(payload)?["sessionId"] as? String) ?? ""
             if let reservedDestinationURL {
                 try? FileManager.default.removeItem(at: reservedDestinationURL)
                 releaseDownloadDestination(reservedDestinationURL)
             }
-            emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(error.localizedDescription)")
+            let reason = error.localizedDescription
+            if !sessionId.isEmpty {
+                signalBlobDownloadRejected(sessionId: sessionId, reason: reason)
+            }
+            emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(reason)")
         }
     }
 
@@ -1027,6 +1066,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let base64 = jsonPayload["base64"] as? String ?? ""
         guard !base64.isEmpty, let data = Data(base64Encoded: base64) else {
             abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
+            signalBlobDownloadRejected(sessionId: sessionId, reason: "Failed to save blob download")
             emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download")
             return
         }
@@ -1041,7 +1081,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             blobDownloadSessions[sessionId] = session
         } catch {
             abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
-            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download: \(error.localizedDescription)")
+            let reason = error.localizedDescription
+            signalBlobDownloadRejected(sessionId: sessionId, reason: reason)
+            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download: \(reason)")
         }
     }
 
@@ -1054,6 +1096,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
               let sessionId = jsonPayload["sessionId"] as? String,
               !sessionId.isEmpty,
               let session = blobDownloadSessions.removeValue(forKey: sessionId) else {
+            if rejectedBlobDownloadSessionIds.remove(sessionId) != nil {
+                return
+            }
             emitDownloadFailed(sourceURL: nil, error: "Blob download session was not initialized")
             return
         }
@@ -1137,6 +1182,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
               : null;
           const sessionId = 'blob-download-' + Date.now() + '-' + Math.random().toString(36).slice(2);
           let fileName = fallbackFileName;
+          if (!window.__capgoBlobDownloadRejections) {
+            window.__capgoBlobDownloadRejections = {};
+          }
+          const blobDownloadRejectionReason = function(id) {
+            return window.__capgoBlobDownloadRejections && window.__capgoBlobDownloadRejections[id];
+          };
+          const ensureBlobDownloadNotRejected = function(id) {
+            const reason = blobDownloadRejectionReason(id);
+            if (reason) {
+              throw new Error(String(reason));
+            }
+          };
           const readChunkAsBase64 = function(chunk) {
             return new Promise(function(resolve, reject) {
               const reader = new FileReader();
@@ -1168,10 +1225,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 mimeType: blob.type || fallbackMimeType,
                 size: blob.size
               }));
+              await new Promise(function(resolve) { setTimeout(resolve, 0); });
+              ensureBlobDownloadNotRejected(sessionId);
               for (let offset = 0; offset < blob.size; offset += chunkSize) {
+                ensureBlobDownloadNotRejected(sessionId);
                 const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
+                ensureBlobDownloadNotRejected(sessionId);
                 bridge.appendBlobDownloadChunk(JSON.stringify({ sessionId: sessionId, base64: base64 }));
               }
+              ensureBlobDownloadNotRejected(sessionId);
               bridge.finishBlobDownload(JSON.stringify({ sessionId: sessionId }));
               return;
             }
@@ -1189,13 +1251,18 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
               base64: base64
             }));
           })().catch(function(error) {
+            const reason = String((error && error.message) || error || 'Blob download failed');
+            if (blobDownloadRejectionReason(sessionId)) {
+              console.error('Failed to capture blob download', error);
+              return;
+            }
             if (bridge && bridge.abortBlobDownload) {
               bridge.abortBlobDownload(JSON.stringify({
                 sessionId: sessionId,
                 fileName: fileName,
                 sourceUrl: blobUrl,
                 mimeType: fallbackMimeType,
-                reason: String((error && error.message) || error || 'Blob download failed')
+                reason: reason
               }));
             }
             console.error('Failed to capture blob download', error);
@@ -1485,6 +1552,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     deinit {
+        abortAllBlobDownloadSessions()
         NotificationCenter.default.removeObserver(self)
         webView?.removeObserver(self, forKeyPath: estimatedProgressKeyPath)
         if websiteTitleInNavigationBar {
