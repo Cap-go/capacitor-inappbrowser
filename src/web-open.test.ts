@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import { InAppBrowserWeb, injectNativeBridge, mayAdoptPostMessageOrigin } from './web';
+import { InAppBrowserWeb, injectNativeBridge, mayAdoptPostMessageOrigin, resetTrustedHtmlPolicyCache } from './web';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
@@ -164,6 +164,40 @@ describe('openWebView on web', () => {
     } as unknown as MessageEvent);
     await browser.postMessage({ detail: { hello: 'again' } });
     expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'again' }, 'https://login.app.example.com');
+  });
+
+  it('passes TrustedHTML from a named policy into DOMParser when trustedTypes is available', () => {
+    const realDOMParser = globalThis.DOMParser;
+    const createHTML = mock((value: string) => `trusted:${value}`);
+    const createPolicy = mock(() => ({ createHTML }));
+    const parseFromString = mock(() => {
+      const body = {
+        appendChild: () => undefined,
+      };
+      return {
+        body,
+        documentElement: { outerHTML: '<html><head></head><body></body></html>' },
+        doctype: null,
+        createElement: () => ({ textContent: '' }),
+      } as Document;
+    });
+    resetTrustedHtmlPolicyCache();
+    (globalThis as { window?: Window }).window = {
+      trustedTypes: { createPolicy },
+    } as Window;
+    globalThis.DOMParser = class {
+      parseFromString = parseFromString;
+    } as unknown as typeof DOMParser;
+    try {
+      injectNativeBridge('<html><body></body></html>');
+      expect(createPolicy).toHaveBeenCalledWith('capgo-inappbrowser', { createHTML: expect.any(Function) });
+      expect(createHTML).toHaveBeenCalled();
+      expect(parseFromString).toHaveBeenCalledWith('trusted:<html><body></body></html>', 'text/html');
+    } finally {
+      globalThis.DOMParser = realDOMParser;
+      resetTrustedHtmlPolicyCache();
+      delete (globalThis as { window?: Window }).window;
+    }
   });
 
   it('preserves doctype when injecting the native bridge', () => {

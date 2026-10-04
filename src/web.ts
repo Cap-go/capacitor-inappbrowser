@@ -49,9 +49,52 @@ export const formatDoctype = (doctype: DocumentType | null): string => {
 
 const serializeParsedHtml = (doc: Document): string => formatDoctype(doc.doctype) + doc.documentElement.outerHTML;
 
+const TRUSTED_TYPES_POLICY_NAME = 'capgo-inappbrowser';
+
+type CapgoTrustedHtmlPolicy = {
+  createHTML: (html: string) => unknown;
+};
+
+type CapgoTrustedTypes = {
+  createPolicy: (name: string, rules: { createHTML: (html: string) => string }) => CapgoTrustedHtmlPolicy;
+};
+
+let trustedHtmlPolicy: CapgoTrustedHtmlPolicy | null | undefined;
+
+/** Clears the lazy Trusted Types policy cache (for tests). */
+export const resetTrustedHtmlPolicyCache = (): void => {
+  trustedHtmlPolicy = undefined;
+};
+
+const getTrustedHtmlPolicy = (): CapgoTrustedHtmlPolicy | null => {
+  if (trustedHtmlPolicy !== undefined) {
+    return trustedHtmlPolicy;
+  }
+  trustedHtmlPolicy = null;
+  try {
+    const trustedTypes = (globalThis.window as (Window & { trustedTypes?: CapgoTrustedTypes }) | undefined)
+      ?.trustedTypes;
+    if (trustedTypes) {
+      trustedHtmlPolicy = trustedTypes.createPolicy(TRUSTED_TYPES_POLICY_NAME, {
+        createHTML: (value: string) => value,
+      });
+    }
+  } catch {
+    trustedHtmlPolicy = null;
+  }
+  return trustedHtmlPolicy;
+};
+
+export const createTrustedHtml = (html: string): string | unknown => {
+  const policy = getTrustedHtmlPolicy();
+  return policy ? policy.createHTML(html) : html;
+};
+
+const trustedHtmlToString = (html: string | unknown): string => (typeof html === 'string' ? html : String(html));
+
 export const injectNativeBridge = (html: string): string => {
   if (typeof DOMParser !== 'undefined') {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const doc = new DOMParser().parseFromString(createTrustedHtml(html) as string, 'text/html');
     const script = doc.createElement('script');
     script.textContent = NATIVE_BRIDGE_SCRIPT;
     if (doc.body) {
@@ -96,6 +139,7 @@ export const buildIsolatedDocument = (html: string, baseHref: string): string =>
     ? html.replace(OPENING_HEAD_TAG, (tag) => `${tag}${baseTag}`)
     : `${baseTag}${html}`;
   inner = injectNativeBridge(inner);
+  const srcdoc = trustedHtmlToString(createTrustedHtml(inner));
   const sandbox =
     'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
   const relay =
@@ -104,7 +148,7 @@ export const buildIsolatedDocument = (html: string, baseHref: string): string =>
   return (
     '<!doctype html><html><head><meta charset="utf-8">' +
     '<style>html,body,iframe{margin:0;padding:0;border:0;width:100%;height:100%;display:block}</style></head>' +
-    `<body><iframe id="capgo-iab-frame" sandbox="${sandbox}" referrerpolicy="no-referrer" srcdoc="${escapeHtmlAttribute(inner)}"></iframe>` +
+    `<body><iframe id="capgo-iab-frame" sandbox="${sandbox}" referrerpolicy="no-referrer" srcdoc="${escapeHtmlAttribute(srcdoc)}"></iframe>` +
     `<script>${relay}</script></body></html>`
   );
 };
