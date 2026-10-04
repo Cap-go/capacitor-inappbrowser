@@ -51,6 +51,10 @@ const serializeParsedHtml = (doc: Document): string => formatDoctype(doc.doctype
 
 const TRUSTED_TYPES_POLICY_NAME = 'capgo-inappbrowser';
 
+export const TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE =
+  "InAppBrowser could not create the Trusted Types policy 'capgo-inappbrowser'. " +
+  'Add capgo-inappbrowser to the host app Content-Security-Policy trusted-types directive.';
+
 type CapgoTrustedHtmlPolicy = {
   createHTML: (html: string) => unknown;
 };
@@ -70,19 +74,19 @@ const getTrustedHtmlPolicy = (): CapgoTrustedHtmlPolicy | null => {
   if (trustedHtmlPolicy !== undefined) {
     return trustedHtmlPolicy;
   }
-  trustedHtmlPolicy = null;
-  try {
-    const trustedTypes = (globalThis.window as (Window & { trustedTypes?: CapgoTrustedTypes }) | undefined)
-      ?.trustedTypes;
-    if (trustedTypes) {
-      trustedHtmlPolicy = trustedTypes.createPolicy(TRUSTED_TYPES_POLICY_NAME, {
-        createHTML: (value: string) => value,
-      });
-    }
-  } catch {
+  const trustedTypes = (globalThis.window as (Window & { trustedTypes?: CapgoTrustedTypes }) | undefined)?.trustedTypes;
+  if (!trustedTypes) {
     trustedHtmlPolicy = null;
+    return null;
   }
-  return trustedHtmlPolicy;
+  try {
+    trustedHtmlPolicy = trustedTypes.createPolicy(TRUSTED_TYPES_POLICY_NAME, {
+      createHTML: (value: string) => value,
+    });
+    return trustedHtmlPolicy;
+  } catch {
+    throw new Error(TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE);
+  }
 };
 
 export const createTrustedHtml = (html: string): string | unknown => {

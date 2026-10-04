@@ -1589,7 +1589,9 @@ export interface OpenWebViewOptions {
    *   storage or DOM. That requires CORS on the target (`Access-Control-Allow-Origin` and allowed request headers),
    *   and the app's Content-Security-Policy also applies to that document. A `<base href>` built from the final
    *   response URL is injected so relative URLs resolve against the target. It applies to the first document only;
-   *   later navigations are plain GET requests without those headers.
+   *   later navigations are plain GET requests without those headers. When the host enables Trusted Types
+   *   (`require-trusted-types-for 'script'`), the host CSP `trusted-types` directive must allow the policy name
+   *   `capgo-inappbrowser`; otherwise header loads throw a clear error instead of using unsafe HTML strings.
    * - On web, `close()`, `closeEvent`, `postMessage()` and `messageFromWebview` are wired. `executeScript`, `setUrl`,
    *   `reload`, `goBack`, cookie and browsing-data methods, and `urlChangeEvent` listeners keep their prior fulfilled
    *   web stubs; `hide`, `show`, `updateDimensions` and the safe-margin setters resolve as no-ops.

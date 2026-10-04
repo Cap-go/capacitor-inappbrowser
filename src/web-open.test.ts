@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import { InAppBrowserWeb, injectNativeBridge, mayAdoptPostMessageOrigin, resetTrustedHtmlPolicyCache } from './web';
+import {
+  InAppBrowserWeb,
+  buildIsolatedDocument,
+  createTrustedHtml,
+  injectNativeBridge,
+  mayAdoptPostMessageOrigin,
+  resetTrustedHtmlPolicyCache,
+  TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE,
+} from './web';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
@@ -168,7 +176,8 @@ describe('openWebView on web', () => {
 
   it('passes TrustedHTML from a named policy into DOMParser when trustedTypes is available', () => {
     const realDOMParser = globalThis.DOMParser;
-    const createHTML = mock((value: string) => `trusted:${value}`);
+    const trustedHtmlSentinel = { capgoTrustedHtml: true };
+    const createHTML = mock(() => trustedHtmlSentinel);
     const createPolicy = mock(() => ({ createHTML }));
     const parseFromString = mock(() => {
       const body = {
@@ -192,9 +201,59 @@ describe('openWebView on web', () => {
       injectNativeBridge('<html><body></body></html>');
       expect(createPolicy).toHaveBeenCalledWith('capgo-inappbrowser', { createHTML: expect.any(Function) });
       expect(createHTML).toHaveBeenCalled();
-      expect(parseFromString).toHaveBeenCalledWith('trusted:<html><body></body></html>', 'text/html');
+      expect(parseFromString).toHaveBeenCalledWith(trustedHtmlSentinel, 'text/html');
     } finally {
       globalThis.DOMParser = realDOMParser;
+      resetTrustedHtmlPolicyCache();
+      delete (globalThis as { window?: Window }).window;
+    }
+  });
+
+  it('runs createTrustedHtml for sandbox srcdoc when building an isolated document', () => {
+    const realDOMParser = globalThis.DOMParser;
+    const trustedHtmlSentinel = { capgoTrustedHtml: true };
+    const createHTML = mock(() => trustedHtmlSentinel);
+    const createPolicy = mock(() => ({ createHTML }));
+    const parseFromString = mock(() => {
+      const body = { appendChild: () => undefined };
+      return {
+        body,
+        documentElement: { outerHTML: '<html><body></body></html>' },
+        doctype: null,
+        createElement: () => ({ textContent: '' }),
+      } as Document;
+    });
+    resetTrustedHtmlPolicyCache();
+    (globalThis as { window?: Window }).window = {
+      trustedTypes: { createPolicy },
+    } as Window;
+    globalThis.DOMParser = class {
+      parseFromString = parseFromString;
+    } as unknown as typeof DOMParser;
+    try {
+      const wrapper = buildIsolatedDocument('<html><body>hi</body></html>', 'https://example.com/');
+      expect(parseFromString).toHaveBeenCalledWith(trustedHtmlSentinel, 'text/html');
+      expect(createHTML.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(wrapper).toContain('srcdoc="');
+    } finally {
+      globalThis.DOMParser = realDOMParser;
+      resetTrustedHtmlPolicyCache();
+      delete (globalThis as { window?: Window }).window;
+    }
+  });
+
+  it('throws when trustedTypes is present but createPolicy is blocked', () => {
+    resetTrustedHtmlPolicyCache();
+    (globalThis as { window?: Window }).window = {
+      trustedTypes: {
+        createPolicy: () => {
+          throw new Error('CSP blocked');
+        },
+      },
+    } as Window;
+    try {
+      expect(() => createTrustedHtml('<html><body></body></html>')).toThrow(TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE);
+    } finally {
       resetTrustedHtmlPolicyCache();
       delete (globalThis as { window?: Window }).window;
     }
