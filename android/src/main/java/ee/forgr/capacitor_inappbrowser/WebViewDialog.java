@@ -591,6 +591,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     // Temporary URI for storing camera capture
     public Uri tempCameraUri;
 
+    // Last file input capture attribute reported from any frame (including cross-origin iframes).
+    private volatile String lastFileInputCaptureValue;
+
     public interface PermissionHandler {
         void handleCameraPermissionRequest(PermissionRequest request);
 
@@ -1059,6 +1062,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         @JavascriptInterface
         public void postMessage(String message) {
             handleJavaScriptPostMessage(message);
+        }
+
+        @JavascriptInterface
+        public void setFileInputCapture(String captureValue) {
+            storeLastFileInputCaptureValue(captureValue == null || captureValue.isEmpty() ? "environment" : captureValue);
         }
 
         @JavascriptInterface
@@ -2569,6 +2577,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (FileChooserAcceptSupport.isImageOnlyAcceptTypes(acceptTypes)) {
                         if (!fileChooserParams.isCaptureEnabled()) {
                             openFileChooser(request);
+                            return true;
+                        }
+
+                        String nativeCapture = consumeLastFileInputCaptureValue();
+                        if (nativeCapture != null && !nativeCapture.isEmpty()) {
+                            if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
+                                return true;
+                            }
+                            boolean useFrontCameraFromNative = nativeCapture.equalsIgnoreCase("user");
+                            activity.runOnUiThread(() -> launchCamera(useFrontCameraFromNative, request));
                             return true;
                         }
 
@@ -4303,6 +4321,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         _webView.post(() -> callback.onError(message));
     }
 
+    private synchronized void storeLastFileInputCaptureValue(String captureValue) {
+        lastFileInputCaptureValue = captureValue;
+    }
+
+    private synchronized String consumeLastFileInputCaptureValue() {
+        String value = lastFileInputCaptureValue;
+        lastFileInputCaptureValue = null;
+        return value;
+    }
+
     private void injectJavaScriptInterface() {
         if (_webView == null) {
             Log.w("InAppBrowser", "Cannot inject JavaScript interface - WebView is null");
@@ -4316,6 +4344,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 if (_webView != null) {
                     try {
                         _webView.evaluateJavascript(script, null);
+                        injectFileInputCaptureHookScript();
                         injectBlankTargetInCurrentWebViewScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
@@ -4327,7 +4356,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
-    private String createFileInputCaptureDocumentStartScript() {
+    private void injectFileInputCaptureHookScript() {
+        if (_webView == null) {
+            return;
+        }
+        _webView.evaluateJavascript(createFileInputCaptureHookScript(), null);
+    }
+
+    private String createFileInputCaptureHookScript() {
         return """
         (function() {
           if (window.__capgoFileInputCaptureHook) {
@@ -4335,6 +4371,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
           }
           window.__capgoFileInputCaptureHook = true;
           window.__capgoLastFileCapture = null;
+          var notifyCapture = function(value) {
+            var captureValue = value || 'environment';
+            window.__capgoLastFileCapture = captureValue;
+            try {
+              var bridge = window.AndroidInterface || window.mobileApp;
+              if (bridge && bridge.setFileInputCapture) {
+                bridge.setFileInputCapture(captureValue);
+              }
+            } catch (err) {}
+          };
           var register = function(doc) {
             if (!doc || doc.__capgoFileInputCaptureRegistered) {
               return;
@@ -4343,7 +4389,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             doc.addEventListener('click', function(e) {
               var t = e.target;
               if (t && t.tagName === 'INPUT' && t.type === 'file' && t.hasAttribute('capture')) {
-                window.__capgoLastFileCapture = t.getAttribute('capture') || 'environment';
+                notifyCapture(t.getAttribute('capture') || 'environment');
               }
             }, true);
           };
@@ -4372,7 +4418,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         try {
             injectDocumentStartPostMessageBridge();
-            WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureDocumentStartScript(), Collections.singleton("*"));
+            WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureHookScript(), Collections.singleton("*"));
             WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
             // Honor preShowScriptInjectionTime: "documentStart" (matches iOS WKUserScript
             // .atDocumentStart). Runs before page scripts and persists across navigations,
