@@ -1004,6 +1004,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         var reservedDestinationURL: URL?
+        var shouldSignalRejection = true
         do {
             guard let jsonPayload = parseBlobBridgePayload(payload) else {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download start payload is missing"])
@@ -1015,6 +1016,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
 
             if blobDownloadSessions[sessionId] != nil {
+                shouldSignalRejection = false
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download session already exists"])
             }
 
@@ -1044,7 +1046,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 releaseDownloadDestination(reservedDestinationURL)
             }
             let reason = error.localizedDescription
-            if !sessionId.isEmpty {
+            if !sessionId.isEmpty && shouldSignalRejection {
                 signalBlobDownloadRejected(sessionId: sessionId, reason: reason)
             }
             emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(reason)")
