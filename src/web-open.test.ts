@@ -211,8 +211,13 @@ describe('openWebView on web', () => {
 
   it('runs createTrustedHtml for sandbox srcdoc when building an isolated document', () => {
     const realDOMParser = globalThis.DOMParser;
-    const trustedHtmlSentinel = { capgoTrustedHtml: true };
-    const createHTML = mock(() => trustedHtmlSentinel);
+    const parseTrustedSentinel = { capgoTrustedHtml: 'parse' };
+    const srcdocTrustedSentinel = {
+      toString: () => 'capgo-srcdoc-trusted-marker',
+    };
+    const createHTML = mock()
+      .mockImplementationOnce(() => parseTrustedSentinel)
+      .mockImplementationOnce(() => srcdocTrustedSentinel);
     const createPolicy = mock(() => ({ createHTML }));
     const parseFromString = mock(() => {
       const body = { appendChild: () => undefined };
@@ -232,9 +237,11 @@ describe('openWebView on web', () => {
     } as unknown as typeof DOMParser;
     try {
       const wrapper = buildIsolatedDocument('<html><body>hi</body></html>', 'https://example.com/');
-      expect(parseFromString).toHaveBeenCalledWith(trustedHtmlSentinel, 'text/html');
-      expect(createHTML.mock.calls.length).toBeGreaterThanOrEqual(2);
-      expect(wrapper).toContain('srcdoc="');
+      expect(parseFromString).toHaveBeenCalledWith(parseTrustedSentinel, 'text/html');
+      expect(createHTML).toHaveBeenCalledTimes(2);
+      const srcdocMatch = wrapper.match(/srcdoc="([^"]*)"/);
+      expect(srcdocMatch).not.toBeNull();
+      expect(srcdocMatch![1]).toContain('capgo-srcdoc-trusted-marker');
     } finally {
       globalThis.DOMParser = realDOMParser;
       resetTrustedHtmlPolicyCache();
