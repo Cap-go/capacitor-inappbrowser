@@ -1,20 +1,29 @@
 # @capgo/capacitor-inappbrowser
 
-<a href="https://capgo.app/"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-inappbrowser" alt="Capgo - Instant updates for Capacitor" /></a>
+Open web content inside your Capacitor app with a full-featured in-app browser: custom toolbars, two-way messaging, JavaScript injection, navigation events and native layering behind your UI.
+
+<a href="https://capgo.app/?ref=plugin_inappbrowser"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-inappbrowser" alt="Capgo - Instant updates for Capacitor" /></a>
 
 <div align="center">
-  <h2>
-    <a href="https://capgo.app/?ref=plugin_inappbrowser"> ➡️ Get Instant updates for your App with Capgo</a>
-  </h2>
-  <h2>
-    <a href="https://capgo.app/consulting/?ref=plugin_inappbrowser">
-      {' '}
-      Missing a feature? We’ll build the plugin for you 💪
-    </a>
-  </h2>
+  <p><b>Capgo</b>: open-source live updates for Ionic and Capacitor apps. Ship OTA fixes and features instantly, without waiting for app store review.</p>
+  <h2><a href="https://capgo.app/register/?ref=plugin_inappbrowser">➡️ Get started for free</a></h2>
+  <p>14-day unlimited free trial. No credit card required</p>
+  <p><a href="https://capgo.app/consulting/?ref=plugin_inappbrowser">Missing a feature? We'll build the plugin for you 💪</a></p>
 </div>
 
-Capacitor plugin in app browser with urlChangeEvent, two way communication, camera and microphone usage, etc.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Cap-go/capacitor-inappbrowser/main/assets/iab-layer-controls-demo.webp" alt="iOS example app showing a web page in the native browser with an Ionic overlay rendered above it" width="300" />
+</p>
+
+## Key features
+
+- **Two browser modes**: `open()` uses SFSafariViewController on iOS and Chrome Custom Tabs on Android, `openWebView()` opens a WebView with your own toolbar, title, colors and buttons.
+- **Two-way messaging**: `postMessage()` and the `messageFromWebview` event, plus `executeScript()` to run code in the page.
+- **Navigation events**: `urlChangeEvent`, `browserPageLoaded`, `pageLoadError`, `closeEvent`, downloads and popups.
+- **Layout control**: `updateDimensions()`, fullscreen, safe-area margins, `hide()`, `show()` and `sendToBack()` to place the browser behind your Ionic UI.
+- **Session data**: `getCookies()`, `clearCookies()`, `clearCache()` and `clearAllBrowsingData()`.
+- **OAuth**: `openSecureWindow()` runs an auth flow with ASWebAuthenticationSession on iOS and Custom Tabs on Android, and a popup on web.
+- **Platforms**: iOS and Android. On web only `openSecureWindow()` and a few helpers do real work.
 
 ## Why InAppBrowser?
 
@@ -146,7 +155,7 @@ const { id } = await InAppBrowser.openWebView({
 });
 ```
 
-Android already shares cookies process-wide, so this flag is a no-op there. Do not enable it unless you need host session sharing — clearing cookies/cache for that webview can affect the host WebView on iOS.
+Android already shares cookies process-wide, so this flag is a no-op there. Do not enable it unless you need host session sharing, clearing cookies/cache for that webview can affect the host WebView on iOS.
 
 #### Keep multiple browser instances ready
 
