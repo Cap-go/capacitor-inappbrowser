@@ -2591,28 +2591,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return true;
                     }
 
-                    String js = """
-                        (function() {
-                          try {
-                            var cached = window.__capgoLastFileCapture;
-                            window.__capgoLastFileCapture = null;
-                            if (cached) {
-                              return cached;
-                            }
-                            var el = document.activeElement;
-                            if (el && el.tagName === 'INPUT' && el.type === 'file' && el.hasAttribute('capture')) {
-                              return el.getAttribute('capture') || 'environment';
-                            }
-                            var inputs = document.querySelectorAll('input[type="file"][capture]');
-                            if (inputs && inputs.length === 1) {
-                              return inputs[0].getAttribute('capture') || 'environment';
-                            }
-                            return 'environment';
-                          } catch (e) {
-                            return 'environment';
-                          }
-                        })();
-                        """;
+                    String js = FileInputCaptureChooserSupport.createChooserFallbackCaptureResolutionScript();
 
                     webView.evaluateJavascript(js, (value) -> {
                         if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
@@ -4367,46 +4346,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private String createFileInputCaptureHookScript() {
-        return """
-        (function() {
-          if (window.__capgoFileInputCaptureHook) {
-            return;
-          }
-          window.__capgoFileInputCaptureHook = true;
-          window.__capgoLastFileCapture = null;
-          var notifyCapture = function(value) {
-            var captureValue = value || 'environment';
-            window.__capgoLastFileCapture = captureValue;
-            try {
-              var bridge = window.AndroidInterface || window.mobileApp;
-              if (bridge && bridge.setFileInputCapture) {
-                bridge.setFileInputCapture(captureValue);
-              }
-            } catch (err) {}
-          };
-          var register = function(doc) {
-            if (!doc || doc.__capgoFileInputCaptureRegistered) {
-              return;
-            }
-            doc.__capgoFileInputCaptureRegistered = true;
-            doc.addEventListener('click', function(e) {
-              var t = e.target;
-              if (t && t.tagName === 'INPUT' && t.type === 'file' && t.hasAttribute('capture')) {
-                notifyCapture(t.getAttribute('capture') || 'environment');
-              }
-            }, true);
-          };
-          register(document);
-          window.addEventListener('load', function(e) {
-            var el = e.target;
-            try {
-              if (el && el.tagName === 'IFRAME' && el.contentDocument) {
-                register(el.contentDocument);
-              }
-            } catch (err) {}
-          }, true);
-        })();
-        """;
+        return FileInputCaptureChooserSupport.createFileInputCaptureHookScript();
     }
 
     private void injectDocumentStartJavaScriptInterface() {
