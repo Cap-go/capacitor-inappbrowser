@@ -16,76 +16,84 @@ final class FileInputCaptureChooserSupport {
      * Document-level click hook installed at document start (and on navigation fallback).
      */
     static String createFileInputCaptureHookScript() {
-        return """
-        (function() {
-          if (window.__capgoFileInputCaptureHook) {
-            return;
-          }
-          window.__capgoFileInputCaptureHook = true;
-          window.__capgoLastFileCapture = null;
-          """ + captureDetectionHelpersJs() + """
-          var notifyCapture = function(value) {
-            var captureValue = value || 'environment';
-            window.__capgoLastFileCapture = captureValue;
-            try {
-              var bridge = window.AndroidInterface || window.mobileApp;
-              if (bridge && bridge.setFileInputCapture) {
-                bridge.setFileInputCapture(captureValue);
+        return (
+            """
+            (function() {
+              if (window.__capgoFileInputCaptureHook) {
+                return;
               }
-            } catch (err) {}
-          };
-          var register = function(doc) {
-            if (!doc || doc.__capgoFileInputCaptureRegistered) {
-              return;
-            }
-            doc.__capgoFileInputCaptureRegistered = true;
-            doc.addEventListener('click', function(e) {
-              var captureValue = capgoFindCaptureFromClickEvent(e);
-              if (captureValue) {
-                notifyCapture(captureValue);
-              }
-            }, true);
-          };
-          register(document);
-          window.addEventListener('load', function(e) {
-            var el = e.target;
-            try {
-              if (el && el.tagName === 'IFRAME' && el.contentDocument) {
-                register(el.contentDocument);
-              }
-            } catch (err) {}
-          }, true);
-        })();
-        """;
+              window.__capgoFileInputCaptureHook = true;
+              window.__capgoLastFileCapture = null;
+              """ +
+            captureDetectionHelpersJs() +
+            """
+              var notifyCapture = function(value) {
+                var captureValue = value || 'environment';
+                window.__capgoLastFileCapture = captureValue;
+                try {
+                  var bridge = window.AndroidInterface || window.mobileApp;
+                  if (bridge && bridge.setFileInputCapture) {
+                    bridge.setFileInputCapture(captureValue);
+                  }
+                } catch (err) {}
+              };
+              var register = function(doc) {
+                if (!doc || doc.__capgoFileInputCaptureRegistered) {
+                  return;
+                }
+                doc.__capgoFileInputCaptureRegistered = true;
+                doc.addEventListener('click', function(e) {
+                  var captureValue = capgoFindCaptureFromClickEvent(e);
+                  if (captureValue) {
+                    notifyCapture(captureValue);
+                  }
+                }, true);
+              };
+              register(document);
+              window.addEventListener('load', function(e) {
+                var el = e.target;
+                try {
+                  if (el && el.tagName === 'IFRAME' && el.contentDocument) {
+                    register(el.contentDocument);
+                  }
+                } catch (err) {}
+              }, true);
+            })();
+            """
+        );
     }
 
     /**
      * Runs when the native chooser opens, after {@code consumeLastFileInputCaptureValue()}.
      */
     static String createChooserFallbackCaptureResolutionScript() {
-        return """
-        (function() {
-          try {
-            """ + captureDetectionHelpersJs() + """
-            var cached = window.__capgoLastFileCapture;
-            window.__capgoLastFileCapture = null;
-            if (cached) {
-              return cached;
-            }
-            var fromActive = capgoFindCaptureFromActiveElementChain();
-            if (fromActive) {
-              return fromActive;
-            }
-            var inputs = document.querySelectorAll('input[type="file"][capture]');
-            if (inputs && inputs.length === 1) {
-              return inputs[0].getAttribute('capture') || 'environment';
-            }
-            return 'environment';
-          } catch (e) {
-            return 'environment';
-          }
-        })();
-        """;
+        return (
+            """
+            (function() {
+              try {
+                """ +
+            captureDetectionHelpersJs() +
+            """
+                var cached = window.__capgoLastFileCapture;
+                window.__capgoLastFileCapture = null;
+                if (cached) {
+                  return cached;
+                }
+                var fromActive = capgoFindCaptureFromActiveElementChain();
+                if (fromActive) {
+                  return fromActive;
+                }
+                var inputs = document.querySelectorAll('input[type="file"][capture]');
+                if (inputs && inputs.length === 1) {
+                  return inputs[0].getAttribute('capture') || 'environment';
+                }
+                return 'environment';
+              } catch (e) {
+                return 'environment';
+              }
+            })();
+            """
+        );
     }
 
     private static String captureDetectionHelpersJs() {
