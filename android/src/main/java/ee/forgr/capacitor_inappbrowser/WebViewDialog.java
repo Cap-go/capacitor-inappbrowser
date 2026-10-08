@@ -465,6 +465,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void syncDialogSystemBarsFromHost() {
+        if (isFullscreen()) {
+            return;
+        }
+
         if (activity == null) {
             return;
         }

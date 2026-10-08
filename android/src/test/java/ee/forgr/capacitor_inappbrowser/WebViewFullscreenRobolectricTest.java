@@ -102,11 +102,17 @@ public class WebViewFullscreenRobolectricTest {
             f.dialog.getWindow().getDecorView()
         );
         assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+        SystemBarsControllerState afterOpen = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(afterOpen.isStatusVisible());
+        assertFalse(afterOpen.isNavigationVisible());
 
         f.dialog.setFullscreen(true);
         f.dialog.setFullscreen(false);
 
         assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+        SystemBarsControllerState afterToggle = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(afterToggle.isStatusVisible());
+        assertFalse(afterToggle.isNavigationVisible());
     }
 
     @Test

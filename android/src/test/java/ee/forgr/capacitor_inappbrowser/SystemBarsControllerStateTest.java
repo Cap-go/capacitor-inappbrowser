@@ -3,6 +3,7 @@ package ee.forgr.capacitor_inappbrowser;
 import static org.junit.Assert.*;
 
 import android.app.Dialog;
+import android.view.View;
 import android.view.Window;
 import androidx.activity.ComponentActivity;
 import androidx.core.graphics.Insets;
@@ -64,6 +65,16 @@ public class SystemBarsControllerStateTest {
         );
 
         assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+    }
+
+    @Test
+    public void captureTreatsSystemUiFullscreenFlagAsHiddenStatusBarWhenInsetsMissing() {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        Window window = activity.getWindow();
+        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN);
+
+        SystemBarsControllerState captured = SystemBarsControllerState.capture(window);
+        assertFalse(captured.isStatusVisible());
     }
 
     @Test

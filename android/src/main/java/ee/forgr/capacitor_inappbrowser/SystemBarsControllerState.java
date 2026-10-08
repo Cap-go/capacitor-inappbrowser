@@ -34,7 +34,8 @@ final class SystemBarsControllerState {
         boolean statusVisible =
             insets != null
                 ? insets.isVisible(WindowInsetsCompat.Type.statusBars())
-                : (attributes.flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0;
+                : (attributes.flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0 &&
+                    (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
         boolean navigationVisible =
             insets != null
                 ? insets.isVisible(WindowInsetsCompat.Type.navigationBars())
