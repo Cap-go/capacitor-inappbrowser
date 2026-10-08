@@ -26,6 +26,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowLooper;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34)
@@ -97,6 +98,7 @@ public class WebViewFullscreenRobolectricTest {
     @Test
     public void dialogFollowsHostImmersiveBarsAcrossFullscreenToggle() throws Exception {
         Fixture f = new Fixture(false, false, true);
+        ShadowLooper.idleMainLooper();
         WindowInsetsControllerCompat dialogController = WindowCompat.getInsetsController(
             f.dialog.getWindow(),
             f.dialog.getWindow().getDecorView()
@@ -108,6 +110,7 @@ public class WebViewFullscreenRobolectricTest {
 
         f.dialog.setFullscreen(true);
         f.dialog.setFullscreen(false);
+        ShadowLooper.idleMainLooper();
 
         assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
         SystemBarsControllerState afterToggle = SystemBarsControllerState.capture(f.dialog.getWindow());

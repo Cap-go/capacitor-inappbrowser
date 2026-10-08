@@ -33,12 +33,14 @@ final class SystemBarsControllerState {
         int visibility = decor.getSystemUiVisibility();
         boolean statusVisible =
             insets != null
-                ? insets.isVisible(WindowInsetsCompat.Type.statusBars())
+                ? insets.isVisible(WindowInsetsCompat.Type.statusBars()) &&
+                    (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0
                 : (attributes.flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0 &&
                     (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0;
         boolean navigationVisible =
             insets != null
-                ? insets.isVisible(WindowInsetsCompat.Type.navigationBars())
+                ? insets.isVisible(WindowInsetsCompat.Type.navigationBars()) &&
+                    (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0
                 : (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0;
         return new SystemBarsControllerState(behavior, statusVisible, navigationVisible);
     }
