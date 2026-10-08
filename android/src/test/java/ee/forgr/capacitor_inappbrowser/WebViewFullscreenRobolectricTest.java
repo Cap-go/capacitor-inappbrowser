@@ -242,6 +242,50 @@ public class WebViewFullscreenRobolectricTest {
     }
 
     @Test
+    public void disallowedWebViewFullscreenRejectsCustomViewAndKeepsToolbar() throws Exception {
+        Fixture f = new Fixture(false, false);
+        f.options.setAllowWebViewFullscreen(false);
+        Method show = WebViewDialog.class.getDeclaredMethod(
+            "showCustomFullscreenView",
+            View.class,
+            WebChromeClient.CustomViewCallback.class
+        );
+        show.setAccessible(true);
+        List<Boolean> hidden = new ArrayList<>();
+        View video = new View(f.activity);
+        show.invoke(f.dialog, video, (WebChromeClient.CustomViewCallback) () -> hidden.add(true));
+
+        assertEquals(List.of(true), hidden);
+        assertNull(video.getParent());
+        assertEquals(View.VISIBLE, f.webView.getVisibility());
+        assertEquals(View.VISIBLE, f.toolbar.getVisibility());
+        assertTrue(f.dialog.isShowing());
+    }
+
+    @Test
+    @Config(sdk = { 34, 35 })
+    public void backExitsMediaFullscreenWithoutDismissing() throws Exception {
+        Fixture f = new Fixture(false, false);
+        f.dialog.applyBackNavigationPolicy();
+        Method show = WebViewDialog.class.getDeclaredMethod(
+            "showCustomFullscreenView",
+            View.class,
+            WebChromeClient.CustomViewCallback.class
+        );
+        show.setAccessible(true);
+        List<Boolean> hidden = new ArrayList<>();
+        View video = new View(f.activity);
+        show.invoke(f.dialog, video, (WebChromeClient.CustomViewCallback) () -> hidden.add(true));
+
+        f.dialog.getOnBackPressedDispatcher().onBackPressed();
+
+        assertNull(video.getParent());
+        assertEquals(View.VISIBLE, f.webView.getVisibility());
+        assertEquals(List.of(true), hidden);
+        assertTrue(f.dialog.isShowing());
+    }
+
+    @Test
     public void backExitsNestedMediaBeforeBrowserFullscreen() throws Exception {
         Fixture f = new Fixture(false, false);
         f.dialog.applyBackNavigationPolicy();

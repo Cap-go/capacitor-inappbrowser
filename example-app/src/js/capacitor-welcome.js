@@ -14,6 +14,7 @@ import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
+import { openQaToolsPanel } from './qa-tools.js';
 
 // Default URL configuration
 let testWebappUrl = 'http://localhost:8000/index.php';
@@ -35,263 +36,372 @@ window.customElements.define(
       root.innerHTML = `
     <style>
       :host {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+        color-scheme: light dark;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --surface: #f8fafc;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --brand: #1b8f5a;
+        --brand-strong: #146b44;
+        --radius: 14px;
+        --shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         display: block;
         width: 100%;
-        height: 100%;
+        min-height: 100%;
+        background: var(--surface);
+        color: var(--ink);
       }
-      h1, h2, h3, h4, h5 {
-        text-transform: uppercase;
+      @media (prefers-color-scheme: dark) {
+        :host {
+          --ink: #e2e8f0;
+          --muted: #94a3b8;
+          --surface: #0b1220;
+          --card: #111827;
+          --border: #1f2937;
+          --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+        }
       }
-      .button {
-        display: inline-block;
-        padding: 10px;
-        background-color: #73B5F6;
+      * { box-sizing: border-box; }
+      .app-header {
+        padding: 20px 16px 12px;
+        background: linear-gradient(160deg, var(--brand) 0%, var(--brand-strong) 100%);
         color: #fff;
-        font-size: 0.9em;
-        border: 0;
-        border-radius: 3px;
-        text-decoration: none;
-        cursor: pointer;
+      }
+      .app-header h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .app-header p {
+        margin: 8px 0 0;
+        font-size: 0.9rem;
+        opacity: 0.92;
+        line-height: 1.45;
+      }
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .chip {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.25);
       }
       main {
-        padding: 15px;
+        padding: 12px 12px 24px;
+        display: grid;
+        gap: 12px;
+        max-width: 720px;
+        margin: 0 auto;
       }
-      main hr { height: 1px; background-color: #eee; border: 0; }
-      main h1 {
-        font-size: 1.4em;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 16px;
       }
-      main h2 {
-        font-size: 1.1em;
+      .card h2 {
+        margin: 0 0 6px;
+        font-size: 1.05rem;
+        font-weight: 700;
       }
-      main h3 {
-        font-size: 0.9em;
+      .card .lede {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.45;
       }
-      main p {
-        color: #333;
+      .field-grid {
+        display: grid;
+        gap: 10px;
       }
-      main pre {
-        white-space: pre-line;
+      .field-row {
+        display: flex;
+        gap: 8px;
+        align-items: stretch;
+      }
+      input[type="text"],
+      input[type="email"],
+      input[type="password"],
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font-size: 0.9rem;
+        background: var(--surface);
+        color: var(--ink);
+      }
+      label.check {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 0.88rem;
+        line-height: 1.35;
+        cursor: pointer;
+      }
+      label.check input {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+      .button-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        background: var(--brand);
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 600;
+        border: 0;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .button.secondary { background: #334155; }
+      .button.danger { background: #dc2626; }
+      .button.info { background: #0284c7; }
+      .button.warn { background: #ca8a04; color: #1f2937; }
+      .button.purple { background: #6d28d9; }
+      .button.teal { background: #0f766e; }
+      .status-pane {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: var(--muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .status-pane strong { color: var(--ink); }
+      .log-pane {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 16px;
+      }
+      .log-pane h2 {
+        margin: 0 0 8px;
+        font-size: 0.95rem;
+      }
+      #app-activity-log {
+        margin: 0;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        color: var(--muted);
+        max-height: 140px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 0;
       }
     </style>
     <div>
-      <capacitor-welcome-titlebar>
+      <header class="app-header">
         <h1>InAppBrowser Test App</h1>
-      </capacitor-welcome-titlebar>
+        <p>Try common plugin flows on device or web. Maestro regression controls live in QA tools at the bottom of the page.</p>
+        <div class="chip-row">
+          <span class="chip">openWebView</span>
+          <span class="chip">toolbar options</span>
+          <span class="chip">downloads</span>
+          <span class="chip">messaging</span>
+        </div>
+      </header>
       <main>
-        <p>
-          This app is designed to test the Capacitor InAppBrowser plugin, specifically to reproduce and debug back button navigation issues.
-        </p>
-        <h2>Download Handling</h2>
-        <p>
-          Open a page that immediately downloads a blob text file. With native download handling enabled, the downloaded file should reopen inside the webview.
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="handle-downloads-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Handle downloads natively</span>
-          </label>
-        </p>
-        <p>
-          <button class="button" id="open-download-demo" style="background-color: #198754;">Open Auto Download Demo</button>
-        </p>
-        <p>
-          <button class="button" id="open-download-demo-listener" style="background-color: #0ea5e9;">Open Auto Download Demo + Close On Event</button>
-        </p>
-        <p id="download-event-status" style="margin-top: 8px; padding: 10px 12px; border-radius: 8px; background-color: #f8f9fa; color: #495057; font-size: 0.85em;">
-          Download listener idle.
-        </p>
-        <hr />
-        <h2>Custom URL</h2>
-        <p>
-          Enter a URL to open in the in-app browser.
-        </p>
-        <p style="display: flex; gap: 8px; align-items: center;">
-          <input type="text" id="custom-url-input" value="https://google.com" placeholder="https://example.com" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; box-sizing: border-box;" />
-          <button id="clear-url-button" style="background-color: #dc3545; color: white; border: none; border-radius: 3px; padding: 8px 12px; cursor: pointer; font-size: 0.9em; margin-bottom: 10px;">🗑️</button>
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="prevent-deeplink-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Prevent Deeplinks (block external app opening)</span>
-          </label>
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="spoof-firebase-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Spoof Firebase (inject Service Worker polyfill)</span>
-          </label>
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="spoof-useragent-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Use Spoofed User Agent (Android Chrome)</span>
-          </label>
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="enable-google-pay-toggle" style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Enable Google Pay Support</span>
-          <label style="display: block; font-size: 0.9em; margin-bottom: 5px;">
-            <span>Toolbar Type:</span>
-          </label>
-          <select id="toolbar-type-select" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.9em; box-sizing: border-box;">
-            <option value="navigation">Navigation (back/forward/reload)</option>
-            <option value="activity">Activity (close/share)</option>
-            <option value="compact">Compact (close only)</option>
-            <option value="blank">Blank (no toolbar)</option>
-          </select>
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="native-navigation-gestures-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Native Navigation Gestures (swipe left/right)</span>
-          </label>
-        </p>
-        <p>
-          <button class="button" id="open-custom-url" style="background-color: #007bff;">Open Custom URL</button>
-        </p>
-        <h2>Fullscreen</h2>
-        <p>
-          <label><input type="checkbox" id="fullscreen-start" checked /> Start fullscreen</label>
-          <label><input type="checkbox" id="fullscreen-hidden" /> Open hidden</label>
-          <label><input type="checkbox" id="fullscreen-deferred" /> Wait for page load</label>
-        </p>
-        <p>
-          <button class="button" id="fullscreen-open">Open fullscreen demo</button>
-          <button class="button" id="fullscreen-show" disabled>Show demo</button>
-        </p>
-        <p id="fullscreen-status">Open the demo to check native fullscreen and retained page state.</p>
-        <h2>Proxy Regression</h2>
-        <p>
-          Run a self-contained proxy flow that serves the page, script, fetch, and XHR through <code>addProxyHandler()</code>.
-        </p>
-        <p>
-          <button class="button" id="run-proxy-regression" style="background-color: #5b39f7;">Run Proxy Regression Test</button>
-        </p>
-        <div id="proxy-regression-status" style="margin-top: 10px; padding: 10px; background-color: #eef1ff; border-radius: 5px; font-size: 0.8em; color: #1b1f3b;">
-          <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
-          <div id="proxy-regression-details" style="margin-top: 6px;"></div>
-        </div>
-        <hr />
-        <h2>Proxy Demo Scenarios</h2>
-        <p>
-          Open real websites and exercise the proxy paths directly from this example app.
-        </p>
-        <p style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button class="button" id="proxy-demo-grailed-stub" style="background-color: #1f7a8c;">Grailed SDK Stub Proxy</button>
-          <button class="button" id="proxy-demo-grailed-google-login" style="background-color: #126b4c;">Grailed Google Login Proxy</button>
-          <button class="button" id="proxy-demo-grailed-background-login" style="background-color: #0b8f68;">Grailed Background Login</button>
-          <button class="button" id="proxy-demo-facebook-login" style="background-color: #1877f2;">Facebook Login</button>
-          <button class="button" id="proxy-demo-facebook-script" style="background-color: #0f5dcf;">Facebook Script Proxy</button>
-        </p>
-        <div style="display: grid; gap: 8px; max-width: 440px; margin-bottom: 12px;">
-          <input id="proxy-demo-google-email" type="email" placeholder="Google email" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
-          <input id="proxy-demo-google-password" type="password" placeholder="Google password" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
-          <input id="proxy-demo-google-otp" type="text" placeholder="Google 2FA code (optional)" style="padding: 10px; border: 1px solid #c9d7d1; border-radius: 6px;" />
-        </div>
-        <p style="font-size: 0.75em; color: #3f5f53; margin-top: -4px;">
-          The background Grailed demo keeps both the Grailed page and the Google popup hidden, drives them with injected JavaScript, and reports each step here.
-        </p>
-        <p style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-          <button class="button" id="proxy-demo-show-primary" style="background-color: #5b7c6f;" disabled>Show hidden Grailed window</button>
-          <button class="button" id="proxy-demo-show-popup" style="background-color: #466d8f;" disabled>Show hidden popup</button>
-        </p>
-        <div id="proxy-demo-status" style="margin-top: 10px; padding: 10px; background-color: #eefaf7; border-radius: 5px; font-size: 0.8em; color: #12372a;">
-          <strong>Status:</strong> <span id="proxy-demo-status-text">Not started</span>
-          <div id="proxy-demo-details" style="margin-top: 6px; white-space: pre-wrap; word-break: break-word;"></div>
-          <div style="margin-top: 10px;">
-            <strong>Steps:</strong>
-            <pre id="proxy-demo-history" style="margin-top: 6px; padding: 8px; background: rgba(18,55,42,0.06); border-radius: 4px; white-space: pre-wrap; word-break: break-word; max-height: 180px; overflow-y: auto;">No events yet.</pre>
+        <section class="log-pane" aria-live="polite">
+          <h2>Activity</h2>
+          <pre id="app-activity-log">Tap an action to see results here.</pre>
+        </section>
+
+        <section class="card">
+          <h2>Open a URL</h2>
+          <p class="lede">Load any HTTPS page with toolbar, deeplink, and user agent options.</p>
+          <div class="field-grid">
+            <div class="field-row">
+              <input type="text" id="custom-url-input" value="https://example.com" placeholder="https://example.com" />
+              <button type="button" id="clear-url-button" class="button danger" title="Clear URL">Clear</button>
+            </div>
+            <label class="check"><input type="checkbox" id="prevent-deeplink-toggle" /><span>Prevent deeplinks (block external app opening)</span></label>
+            <label class="check"><input type="checkbox" id="spoof-firebase-toggle" /><span>Spoof Firebase (inject Service Worker polyfill)</span></label>
+            <label class="check"><input type="checkbox" id="spoof-useragent-toggle" /><span>Use spoofed user agent (Android Chrome)</span></label>
+            <label class="check"><input type="checkbox" id="enable-google-pay-toggle" /><span>Enable Google Pay support</span></label>
+            <label class="check"><span>Toolbar type</span></label>
+            <select id="toolbar-type-select">
+              <option value="navigation">Navigation (back, forward, reload)</option>
+              <option value="activity">Activity (close, share)</option>
+              <option value="compact">Compact (close only)</option>
+              <option value="blank">Blank (no toolbar)</option>
+            </select>
+            <label class="check"><input type="checkbox" id="native-navigation-gestures-toggle" checked /><span>Native navigation gestures (swipe)</span></label>
+            <div class="button-row">
+              <button type="button" class="button" id="open-custom-url">Open custom URL</button>
+            </div>
           </div>
-        </div>
-        <hr />
-        <h2>Target Blank Test</h2>
-        <p>
-          Open a deterministic target="_blank" HTTPS test page inside the plugin and verify that the linked page stays inside the current webview.
-        </p>
-        <p>
-          <button class="button" id="open-blank-target-test" style="background-color: #0f766e;">Open Blank Target HTTPS Test</button>
-        </p>
-        <div id="blank-target-test-status" style="margin-top: 10px; padding: 10px; background-color: #ecfeff; border-radius: 5px; font-size: 0.8em; color: #134e4a;">
-          <div><strong>Blank target test status:</strong> <span id="blank-target-status-text">Idle</span></div>
-          <div><strong>Blank target test result:</strong> <span id="blank-target-result-text">not run</span></div>
-          <div><strong>Blank target last URL:</strong> <span id="blank-target-last-url-text">none</span></div>
-        </div>
-        <hr />
-        <h2>In-App Browser Demo</h2>
-        <p>
-          Open the Capacitor InAppBrowser plugin documentation in an in-app browser.
-        </p>
-        <p>
-          <button class="button" id="open-browser">Open In-App Browser</button>
-        </p>
-        <p>
-          <button class="button" id="open-browser-with-blocked-host">Open In-App Browser in blocked host</button>
-        </p>
-        <hr />
-        <h2>System Bars</h2>
-        <p>
-          Use the SystemBars API to show the system UI after changing visibility.
-        </p>
-        <p>
-          <button class="button" id="system-bars-show-all">Show All System Bars</button>
-          <button class="button" id="system-bars-show-status">Show Status Bar</button>
-          <button class="button" id="system-bars-show-navigation">Show Navigation Bar</button>
-          <button class="button" id="system-bars-hide-navigation">Hide Navigation Bar</button>
-        </p>
-        <h2>WebView Visibility</h2>
-        <p>
-          Hide or show the current InAppBrowser webview. Use the toolbar button near Done to hide it too.
-        </p>
-        <p>
-          <button class="button" id="webview-hide">Hide WebView</button>
-          <button class="button" id="webview-show">Show WebView</button>
-        </p>
-        <h2>Back Button Test</h2>
-        <p>
-          Test the back button issue with our custom test webapp. This opens a PHP webapp designed to reproduce navigation issues.
-        </p>
-        <p>
-          <button class="button" id="open-test-webapp" style="background-color: #28a745;">🧪 Open Test Webapp (Navigation Mode)</button>
-        </p>
-        <p>
-          <button class="button" id="open-test-webapp-activity" style="background-color: #ffc107; color: #212529;">🧪 Open Test Webapp (Activity Mode)</button>
-        </p>
-        <div id="webapp-status" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.8em; color: #666;">
-          <strong>Setup:</strong> Make sure to copy url.js.example to url.js and configure your local server URL.
-        </div>
-        <hr />
-        <h2>Hidden WebView Test</h2>
-        <p>
-          Test the hidden webview feature. Opens example.com invisibly, extracts DOM content via JavaScript, and displays it here.
-        </p>
-        <p style="margin-bottom: 10px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9em;">
-            <input type="checkbox" id="hidden-fake-visible-toggle" checked style="width: 18px; height: 18px; cursor: pointer;" />
-            <span>Fake visible (fullscreen metrics)</span>
-          </label>
-        </p>
-        <p>
-          <button class="button" id="test-hidden-webview" style="background-color: #6f42c1;">👻 Load Hidden WebView</button>
-          <button class="button" id="close-hidden-webview" style="background-color: #dc3545; margin-left: 8px;">✖ Close Hidden</button>
-          <button class="button" id="check-hidden-visibility" style="background-color: #17a2b8; margin-left: 8px;">👁️ Check visibility</button>
-          <button class="button" id="check-hidden-dimensions" style="background-color: #20c997; margin-left: 8px;">📏 Check dimensions</button>
-          <button class="button" id="refresh-hidden-dom" style="background-color: #6c757d; margin-left: 8px;">🔄 Refresh DOM</button>
-        </p>
-        <div id="hidden-webview-status" style="margin-top: 10px; padding: 10px; background-color: #e7e3f1; border-radius: 5px; font-size: 0.8em; color: #333;">
-          <strong>Status:</strong> <span id="hidden-status-text">Not started</span>
-        </div>
-        <div id="hidden-webview-result" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.75em; color: #333; max-height: 300px; overflow-y: auto; display: none;">
-          <strong>DOM Content:</strong>
-          <pre id="dom-content-output" style="white-space: pre-wrap; word-break: break-word; margin-top: 8px;"></pre>
-        </div>
-        <div id="hidden-webview-metrics" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; font-size: 0.75em; color: #333; max-height: 300px; overflow-y: auto; display: none;">
-          <strong>Dimensions:</strong>
-          <pre id="metrics-output" style="white-space: pre-wrap; word-break: break-word; margin-top: 8px;"></pre>
-        </div>
+        </section>
+
+        <section class="card">
+          <h2>Documentation browser</h2>
+          <p class="lede">Open the plugin repo in a styled in-app webview.</p>
+          <div class="button-row">
+            <button type="button" class="button secondary" id="open-browser">Open in-app browser</button>
+            <button type="button" class="button secondary" id="open-browser-with-blocked-host">Open with blocked host</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Download handling</h2>
+          <p class="lede">Trigger a blob download and observe native handling or listener events.</p>
+          <label class="check"><input type="checkbox" id="handle-downloads-toggle" checked /><span>Handle downloads natively</span></label>
+          <div class="button-row">
+            <button type="button" class="button" id="open-download-demo">Open auto download demo</button>
+            <button type="button" class="button info" id="open-download-demo-listener">Open auto download + close on event</button>
+          </div>
+          <p id="download-event-status" class="status-pane">Download listener idle.</p>
+        </section>
+
+        <section class="card">
+          <h2>Fullscreen demo</h2>
+          <p class="lede">Exercise fullscreen, hidden open, and deferred show flows.</p>
+          <label class="check"><input type="checkbox" id="fullscreen-start" checked /><span>Start fullscreen</span></label>
+          <label class="check"><input type="checkbox" id="fullscreen-hidden" /><span>Open hidden</span></label>
+          <label class="check"><input type="checkbox" id="fullscreen-deferred" /><span>Wait for page load</span></label>
+          <div class="button-row">
+            <button type="button" class="button" id="fullscreen-open">Open fullscreen demo</button>
+            <button type="button" class="button secondary" id="fullscreen-show" disabled>Show demo</button>
+          </div>
+          <p id="fullscreen-status" class="status-pane">Open the demo to check native fullscreen and retained page state.</p>
+        </section>
+
+        <section class="card">
+          <h2>WebView visibility</h2>
+          <p class="lede">Hide or show the active webview. The toolbar near Done can hide it too.</p>
+          <div class="button-row">
+            <button type="button" class="button secondary" id="webview-hide">Hide WebView</button>
+            <button type="button" class="button" id="webview-show">Show WebView</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Hidden WebView</h2>
+          <p class="lede">Load a page invisibly, then read DOM, visibility, and dimensions here.</p>
+          <label class="check"><input type="checkbox" id="hidden-fake-visible-toggle" checked /><span>Fake visible (fullscreen metrics)</span></label>
+          <div class="button-row">
+            <button type="button" class="button purple" id="test-hidden-webview">Load hidden WebView</button>
+            <button type="button" class="button danger" id="close-hidden-webview">Close hidden</button>
+            <button type="button" class="button info" id="check-hidden-visibility">Check visibility</button>
+            <button type="button" class="button teal" id="check-hidden-dimensions">Check dimensions</button>
+            <button type="button" class="button secondary" id="refresh-hidden-dom">Refresh DOM</button>
+          </div>
+          <div id="hidden-webview-status" class="status-pane"><strong>Status:</strong> <span id="hidden-status-text">Not started</span></div>
+          <div id="hidden-webview-result" class="status-pane" style="display: none; max-height: 220px; overflow-y: auto;">
+            <strong>DOM content</strong>
+            <pre id="dom-content-output"></pre>
+          </div>
+          <div id="hidden-webview-metrics" class="status-pane" style="display: none; max-height: 220px; overflow-y: auto;">
+            <strong>Dimensions</strong>
+            <pre id="metrics-output"></pre>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Navigation test webapp</h2>
+          <p class="lede">Open the PHP harness to debug back button behavior. Configure url.js first.</p>
+          <div class="button-row">
+            <button type="button" class="button" id="open-test-webapp">Open test webapp (navigation)</button>
+            <button type="button" class="button warn" id="open-test-webapp-activity">Open test webapp (activity)</button>
+          </div>
+          <div id="webapp-status" class="status-pane"><strong>Setup:</strong> Copy url.js.example to url.js and set your local server URL.</div>
+        </section>
+
+        <section class="card">
+          <h2>Target blank link</h2>
+          <p class="lede">Verify target="_blank" HTTPS links stay inside the current webview.</p>
+          <div class="button-row">
+            <button type="button" class="button teal" id="open-blank-target-test">Open blank target HTTPS test</button>
+          </div>
+          <div id="blank-target-test-status" class="status-pane">
+            <div><strong>Status:</strong> <span id="blank-target-status-text">Idle</span></div>
+            <div><strong>Result:</strong> <span id="blank-target-result-text">not run</span></div>
+            <div><strong>Last URL:</strong> <span id="blank-target-last-url-text">none</span></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>System bars</h2>
+          <p class="lede">Toggle status and navigation bars through the SystemBars API.</p>
+          <div class="button-row">
+            <button type="button" class="button secondary" id="system-bars-show-all">Show all system bars</button>
+            <button type="button" class="button secondary" id="system-bars-show-status">Show status bar</button>
+            <button type="button" class="button secondary" id="system-bars-show-navigation">Show navigation bar</button>
+            <button type="button" class="button danger" id="system-bars-hide-navigation">Hide navigation bar</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Proxy regression (manual)</h2>
+          <p class="lede">Self-contained proxy flow through <code>addProxyHandler()</code>.</p>
+          <div class="button-row">
+            <button type="button" class="button" id="run-proxy-regression" style="background: #5b39f7;">Run proxy regression test</button>
+          </div>
+          <div id="proxy-regression-status" class="status-pane">
+            <strong>Status:</strong> <span id="proxy-regression-status-text">Not started</span>
+            <div id="proxy-regression-details"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Proxy demo scenarios</h2>
+          <p class="lede">Exercise real sites and proxy paths from the example app.</p>
+          <div class="button-row">
+            <button type="button" class="button teal" id="proxy-demo-grailed-stub">Grailed SDK stub proxy</button>
+            <button type="button" class="button" id="proxy-demo-grailed-google-login">Grailed Google login proxy</button>
+            <button type="button" class="button" id="proxy-demo-grailed-background-login">Grailed background login</button>
+            <button type="button" class="button info" id="proxy-demo-facebook-login">Facebook login</button>
+            <button type="button" class="button secondary" id="proxy-demo-facebook-script">Facebook script proxy</button>
+          </div>
+          <div class="field-grid" style="margin-top: 10px;">
+            <input id="proxy-demo-google-email" type="email" placeholder="Google email" />
+            <input id="proxy-demo-google-password" type="password" placeholder="Google password" />
+            <input id="proxy-demo-google-otp" type="text" placeholder="Google 2FA code (optional)" />
+          </div>
+          <p class="lede" style="margin-top: 8px;">Background Grailed demo keeps pages hidden and reports steps below.</p>
+          <div class="button-row">
+            <button type="button" class="button secondary" id="proxy-demo-show-primary" disabled>Show hidden Grailed window</button>
+            <button type="button" class="button secondary" id="proxy-demo-show-popup" disabled>Show hidden popup</button>
+          </div>
+          <div id="proxy-demo-status" class="status-pane">
+            <strong>Status:</strong> <span id="proxy-demo-status-text">Not started</span>
+            <div id="proxy-demo-details"></div>
+            <div style="margin-top: 8px;"><strong>Steps</strong></div>
+            <pre id="proxy-demo-history">No events yet.</pre>
+          </div>
+        </section>
       </main>
     </div>
     `;
@@ -799,6 +909,7 @@ window.customElements.define(
         if (maestroReadyBanner) {
           maestroReadyBanner.textContent = 'Maestro Ready';
         }
+        openQaToolsPanel();
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
         maestroReadyBanner.textContent = 'Maestro Unavailable';

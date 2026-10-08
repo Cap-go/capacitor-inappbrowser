@@ -2,26 +2,26 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    
     <meta
       name="viewport"
       content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
-<title>InAppBrowser Test App</title>
+    <title>InAppBrowser Test App</title>
 
-
-<script>
+    <script>
       if (window.location.protocol === "http:" || window.location.protocol === "https:") {
         const moduleScript = document.createElement("script");
         moduleScript.type = "module";
-        moduleScript.src = "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js";
+        moduleScript.src =
+          "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js";
         document.head.appendChild(moduleScript);
 
         const legacyScript = document.createElement("script");
         legacyScript.setAttribute("nomodule", "");
-        legacyScript.src = "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js";
+        legacyScript.src =
+          "https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js";
         document.head.appendChild(legacyScript);
       }
     </script>
@@ -29,63 +29,63 @@
     <link rel="icon" type="image/x-icon" href="./assets/icon/favicon.ico" />
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="./css/style.css" />
-    <meta name="theme-color" content="#31d53d" />
+    <meta name="theme-color" content="#1b8f5a" />
   </head>
-  <body>
-    <div
-      id="maestro-controls"
-      style="position: sticky; top: 0; z-index: 20; padding: 12px; border-bottom: 1px solid #d8e1ff; background: #f4f7ff; color: #1b1f3b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"
-    >
-      <div id="maestro-ready-banner" style="font-weight: 700;">Maestro Booting</div>
-      <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <button
-          id="maestro-run-proxy"
-          disabled
-          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #5b39f7; color: #fff; font-size: 14px;"
-        >
-          Run Proxy Regression (Maestro)
-        </button>
-        <button
-          id="maestro-run-keyboard"
-          disabled
-          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #1d3557; color: #fff; font-size: 14px;"
-        >
-          Run Keyboard Regression (Maestro)
-        </button>
-        <button
-          id="maestro-run-blank-target"
-          disabled
-          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #0f766e; color: #fff; font-size: 14px;"
-        >
-          Run Blank Target Regression (Maestro)
-        </button>
-        <button
-          id="maestro-run-feature-smoke"
-          disabled
-          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #854d0e; color: #fff; font-size: 14px;"
-        >
-          Run Feature Smoke (Maestro)
-        </button>
-        <button
-          id="maestro-run-download"
-          disabled
-          style="padding: 10px 12px; border: 0; border-radius: 6px; background: #0ea5e9; color: #fff; font-size: 14px;"
-        >
-          Run Download Event (Maestro)
-        </button>
-      </div>
-      <div id="maestro-proxy-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
-      <div id="maestro-proxy-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
-      <div id="maestro-keyboard-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
-      <div id="maestro-keyboard-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
-      <div id="maestro-blank-target-status" style="margin-top: 8px; font-size: 14px;">Not started</div>
-      <div id="maestro-blank-target-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
-      <div id="maestro-feature-smoke-status" style="margin-top: 8px; font-size: 14px;">Feature smoke booting</div>
-      <div id="maestro-feature-smoke-details" style="margin-top: 4px; font-size: 13px; white-space: pre-wrap;"></div>
-      <div id="maestro-download-status" style="margin-top: 8px; font-size: 14px;">Download not started</div>
-    </div>
+  <body class="example-app-body">
     <capacitor-welcome></capacitor-welcome>
 
+    <details id="qa-tools-panel" class="qa-tools-panel">
+      <summary class="qa-tools-summary">QA tools (Maestro regression)</summary>
+      <div
+        id="maestro-controls"
+        class="maestro-controls"
+        aria-label="Maestro regression controls"
+      >
+        <div id="maestro-ready-banner" class="maestro-ready-banner">Maestro Booting</div>
+        <div class="maestro-button-row">
+          <button id="maestro-run-proxy" class="maestro-btn maestro-btn-proxy" disabled>
+            Run Proxy Regression (Maestro)
+          </button>
+          <button id="maestro-run-keyboard" class="maestro-btn maestro-btn-keyboard" disabled>
+            Run Keyboard Regression (Maestro)
+          </button>
+          <button id="maestro-run-blank-target" class="maestro-btn maestro-btn-blank" disabled>
+            Run Blank Target Regression (Maestro)
+          </button>
+          <button id="maestro-run-feature-smoke" class="maestro-btn maestro-btn-smoke" disabled>
+            Run Feature Smoke (Maestro)
+          </button>
+          <button id="maestro-run-download" class="maestro-btn maestro-btn-download" disabled>
+            Run Download Event (Maestro)
+          </button>
+        </div>
+        <div id="maestro-proxy-status" class="maestro-status-line">Not started</div>
+        <div id="maestro-proxy-details" class="maestro-status-details"></div>
+        <div id="maestro-keyboard-status" class="maestro-status-line">Not started</div>
+        <div id="maestro-keyboard-details" class="maestro-status-details"></div>
+        <div id="maestro-blank-target-status" class="maestro-status-line">Not started</div>
+        <div id="maestro-blank-target-details" class="maestro-status-details"></div>
+        <div id="maestro-feature-smoke-status" class="maestro-status-line">Feature smoke booting</div>
+        <div id="maestro-feature-smoke-details" class="maestro-status-details"></div>
+        <div id="maestro-download-status" class="maestro-status-line">Download not started</div>
+      </div>
+    </details>
+
     <script src="./js/capacitor-welcome.js" type="module"></script>
+    <script>
+      (function ensureQaToolsVisibleForAutomation() {
+        const panel = document.getElementById("qa-tools-panel");
+        if (!panel) {
+          return;
+        }
+        const openForHarness = () => {
+          if (window.MaestroNativeHarness !== undefined) {
+            panel.setAttribute("open", "");
+          }
+        };
+        openForHarness();
+        window.addEventListener("load", openForHarness);
+      })();
+    </script>
   </body>
 </html>

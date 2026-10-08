@@ -26,6 +26,18 @@ public class WebViewCustomFullscreenSupportTest {
     }
 
     @Test
+    public void showRejectedWhenFullscreenDisallowed() {
+        assertTrue(WebViewCustomFullscreenSupport.shouldRejectShow(false, false));
+        assertTrue(WebViewCustomFullscreenSupport.shouldRejectShow(false, true));
+    }
+
+    @Test
+    public void showAllowedWhenFullscreenAllowedAndInactive() {
+        assertFalse(WebViewCustomFullscreenSupport.shouldRejectShow(true, false));
+        assertTrue(WebViewCustomFullscreenSupport.shouldRejectShow(true, true));
+    }
+
+    @Test
     public void backPressConsumedWhileFullscreenActive() {
         assertTrue(WebViewCustomFullscreenSupport.shouldConsumeBackPress(true));
         assertFalse(WebViewCustomFullscreenSupport.shouldConsumeBackPress(false));
