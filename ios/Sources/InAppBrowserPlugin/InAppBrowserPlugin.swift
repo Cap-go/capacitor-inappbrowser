@@ -1779,9 +1779,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             self.navigationWebViewController?.toolbar.isTranslucent = false
 
             // Ensure no lines or borders appear by default
-            self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
-            self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
-            self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
+            if let navigationBar = self.navigationWebViewController?.navigationBar {
+                NavigationBarShadowSupport.hideShadow(on: navigationBar)
+            }
             self.navigationWebViewController?.toolbar.setShadowImage(UIImage(), forToolbarPosition: .any)
 
             // Handle web view background color
