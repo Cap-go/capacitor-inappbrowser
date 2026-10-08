@@ -8,7 +8,7 @@
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
-    <title>InAppBrowser Example</title>
+    <title>InAppBrowser Test App</title>
 
     <script>
       if (window.location.protocol === "http:" || window.location.protocol === "https:") {
@@ -79,7 +79,7 @@
           return;
         }
         const openForHarness = () => {
-          if (typeof window.MaestroNativeHarness !== "undefined") {
+          if (window.MaestroNativeHarness !== undefined) {
             panel.setAttribute("open", "");
           }
         };

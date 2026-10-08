@@ -224,7 +224,7 @@ window.customElements.define(
     </style>
     <div>
       <header class="app-header">
-        <h1>InAppBrowser Example</h1>
+        <h1>InAppBrowser Test App</h1>
         <p>Try common plugin flows on device or web. Maestro regression controls live in QA tools at the bottom of the page.</p>
         <div class="chip-row">
           <span class="chip">openWebView</span>
