@@ -2513,6 +2513,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         _webView.setWebChromeClient(
             new WebChromeClient() {
+                private Bitmap transparentVideoPoster;
+
                 @Override
                 public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
                     if (consoleMessage != null && _options != null && _options.getCaptureConsoleLogs() && _options.getCallbacks() != null) {
@@ -2527,6 +2529,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             );
                     }
                     return super.onConsoleMessage(consoleMessage);
+                }
+
+                // Android WebView otherwise paints a stretched grey play icon on <video> without poster or frames; Chrome paints nothing.
+                @Override
+                public Bitmap getDefaultVideoPoster() {
+                    if (transparentVideoPoster == null) {
+                        transparentVideoPoster = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+                    }
+                    return transparentVideoPoster;
                 }
 
                 // Enable HTML5/iframe fullscreen (e.g. embedded YouTube player fullscreen button).
