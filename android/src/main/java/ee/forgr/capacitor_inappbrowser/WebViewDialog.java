@@ -2594,6 +2594,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     // For image-only inputs with capture enabled, launch the camera when possible.
                     // Mixed accept lists (e.g. "image/*,application/pdf") use the regular picker above.
                     if (nativeCaptureForRequest != null && !nativeCaptureForRequest.isEmpty()) {
+                        clearFileInputCapturePageState(webView);
                         if (!FileChooserRequestSupport.isActive(request, activeFileChooserRequest)) {
                             return true;
                         }
