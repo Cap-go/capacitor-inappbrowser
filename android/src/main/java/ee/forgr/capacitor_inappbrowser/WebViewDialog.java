@@ -3199,7 +3199,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     // Shows a native fullscreen view requested via the HTML5 Fullscreen API (e.g. embedded YouTube).
     private void showCustomFullscreenView(View view, WebChromeClient.CustomViewCallback callback) {
-        if (WebViewCustomFullscreenSupport.shouldRejectDuplicateShow(customFullscreenView != null)) {
+        boolean allowWebViewFullscreen = _options == null || _options.getAllowWebViewFullscreen();
+        if (WebViewCustomFullscreenSupport.shouldRejectShow(allowWebViewFullscreen, customFullscreenView != null)) {
             callback.onCustomViewHidden();
             return;
         }
