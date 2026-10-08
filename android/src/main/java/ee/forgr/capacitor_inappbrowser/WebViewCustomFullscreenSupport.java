@@ -22,6 +22,10 @@ final class WebViewCustomFullscreenSupport {
         return isActive;
     }
 
+    static boolean shouldRejectShow(boolean allowWebViewFullscreen, boolean isActive) {
+        return !allowWebViewFullscreen || shouldRejectDuplicateShow(isActive);
+    }
+
     static boolean shouldConsumeBackPress(boolean isActive) {
         return isActive;
     }

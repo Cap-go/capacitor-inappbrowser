@@ -1,5 +1,5 @@
 import XCTest
-@testable import InAppBrowserPlugin
+@testable import InappbrowserPlugin
 
 final class HtmlDataUrlSupportTests: XCTestCase {
     func testParsesHtmlBase64DataUrl() {
