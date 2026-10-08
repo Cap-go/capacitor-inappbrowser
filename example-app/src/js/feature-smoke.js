@@ -5,6 +5,7 @@ import {
   InvisibilityMode,
   addProxyHandler,
 } from "@capgo/capacitor-inappbrowser";
+import { openQaToolsPanel } from "./qa-tools.js";
 
 const SMOKE_ORIGIN = "https://feature-smoke.capgo.test";
 const ENTRY_URL = `${SMOKE_ORIGIN}/entry`;
@@ -625,5 +626,6 @@ export function attachFeatureSmokeHarness() {
   });
 
   runButton.disabled = false;
+  openQaToolsPanel();
   setStatus("Feature smoke ready");
 }
