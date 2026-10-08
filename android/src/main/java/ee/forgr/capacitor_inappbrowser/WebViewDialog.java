@@ -458,9 +458,24 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
             fullscreenContentBehavior = null;
             baseline.restore();
+            syncDialogSystemBarsFromHost();
             reapplyInsetsFromWindowRoot();
         }
         if (fullscreenChangeListener != null) fullscreenChangeListener.accept(enabled);
+    }
+
+    private void syncDialogSystemBarsFromHost() {
+        if (activity == null) {
+            return;
+        }
+
+        Window hostWindow = activity.getWindow();
+        Window dialogWindow = getWindow();
+        if (hostWindow == null || dialogWindow == null) {
+            return;
+        }
+
+        SystemBarsControllerState.capture(hostWindow).applyTo(dialogWindow);
     }
 
     private void updateFullscreenExitInsets(WindowInsetsCompat insets) {
@@ -630,6 +645,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     @Override
     protected void onStart() {
         super.onStart();
+        syncDialogSystemBarsFromHost();
         applyStartupFullscreen();
         // ComponentDialog registers its own back callback in onCreate; re-add ours last so
         // handleBrowserBackNavigation runs before the built-in cancel callback (LIFO order).
@@ -3554,6 +3570,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 statusBarColor,
                 lightStatusBars
             );
+            decorView.post(this::syncDialogSystemBarsFromHost);
         }
 
         requestSafeAreaInsets();

@@ -11,7 +11,10 @@ import androidx.activity.ComponentActivity;
 import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.button.MaterialButton;
 import java.lang.reflect.Field;
@@ -40,10 +43,28 @@ public class WebViewFullscreenRobolectricTest {
         List<Boolean> events = new ArrayList<>();
 
         Fixture(boolean startup, boolean hidden) throws Exception {
+            this(startup, hidden, false);
+        }
+
+        Fixture(boolean startup, boolean hidden, boolean hostImmersive) throws Exception {
             options.setUrl("https://example.com/start");
             options.setTitle("Browser");
             options.setFullscreen(startup);
             options.setHidden(hidden);
+            if (hostImmersive) {
+                android.view.Window hostWindow = activity.getWindow();
+                WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
+                WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+                hostController.hide(WindowInsetsCompat.Type.systemBars());
+                hostController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                ViewCompat.dispatchApplyWindowInsets(
+                    hostWindow.getDecorView(),
+                    new WindowInsetsCompat.Builder()
+                        .setVisible(WindowInsetsCompat.Type.statusBars(), false)
+                        .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
+                        .build()
+                );
+            }
             dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
             dialog.activity = activity;
             root = new CoordinatorLayout(activity);
@@ -71,6 +92,21 @@ public class WebViewFullscreenRobolectricTest {
             dialog.setFullscreenChangeListener(events::add);
             dialog.show();
         }
+    }
+
+    @Test
+    public void dialogFollowsHostImmersiveBarsAcrossFullscreenToggle() throws Exception {
+        Fixture f = new Fixture(false, false, true);
+        WindowInsetsControllerCompat dialogController = WindowCompat.getInsetsController(
+            f.dialog.getWindow(),
+            f.dialog.getWindow().getDecorView()
+        );
+        assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+
+        f.dialog.setFullscreen(true);
+        f.dialog.setFullscreen(false);
+
+        assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
     }
 
     @Test
