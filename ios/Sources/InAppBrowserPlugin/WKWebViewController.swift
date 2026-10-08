@@ -1359,30 +1359,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         navigationBar.backgroundColor = color
         navigationBar.barTintColor = color
         navigationBar.isTranslucent = false
-        navigationBar.setBackgroundImage(UIImage(), for: .default)
-        navigationBar.shadowImage = UIImage()
-        navigationBar.setValue(true, forKey: "hidesShadow")
-
-        if #available(iOS 13.0, *) {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = color
-            appearance.backgroundEffect = nil
-            appearance.shadowColor = .clear
-            appearance.shadowImage = UIImage()
-
-            if let titleTextAttributes = navigationBar.titleTextAttributes {
-                appearance.titleTextAttributes = titleTextAttributes
-            }
-            if let largeTitleTextAttributes = navigationBar.largeTitleTextAttributes {
-                appearance.largeTitleTextAttributes = largeTitleTextAttributes
-            }
-
-            navigationBar.standardAppearance = appearance
-            navigationBar.compactAppearance = appearance
-            navigationBar.scrollEdgeAppearance = appearance
-            navigationBar.compactScrollEdgeAppearance = appearance
-        }
+        NavigationBarShadowSupport.hideShadow(on: navigationBar, backgroundColor: color)
     }
 
     // Make status bar background with colored view underneath
@@ -2393,11 +2370,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         let webView = WKWebView(frame: .zero, configuration: webConfiguration)
 
-        //        if webView.responds(to: Selector(("setInspectable:"))) {
-        //            // Fix: https://stackoverflow.com/questions/76216183/how-to-debug-wkwebview-in-ios-16-4-1-using-xcode-14-2/76603043#76603043
-        //            webView.perform(Selector(("setInspectable:")), with: isInspectable)
-        //        }
-
         if #available(iOS 16.4, *) {
             webView.isInspectable = isInspectable
         }
@@ -3366,8 +3338,9 @@ fileprivate extension WKWebViewController {
 
     // Separated the actual sharing functionality
     private func showShareSheet(items: [Any], sender: AnyObject) {
-        let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        activityViewController.setValue(self.shareSubject ?? self.title, forKey: "subject")
+        let subject = self.shareSubject ?? self.title
+        let activityItems = items.map { ShareActivityItemSource(item: $0, subject: subject) }
+        let activityViewController = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
         if let barButtonItem = sender as? UIBarButtonItem {
             activityViewController.popoverPresentationController?.barButtonItem = barButtonItem
         }
