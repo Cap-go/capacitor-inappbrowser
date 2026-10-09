@@ -98,6 +98,15 @@ public class WebViewFullscreenRobolectricTest {
     }
 
     private static WebViewDialog browserLayoutDialog(ComponentActivity activity, Options options, boolean hostImmersive) throws Exception {
+        return browserLayoutDialog(activity, options, hostImmersive, true);
+    }
+
+    private static WebViewDialog browserLayoutDialog(
+        ComponentActivity activity,
+        Options options,
+        boolean hostImmersive,
+        boolean idleMainLooper
+    ) throws Exception {
         if (hostImmersive) {
             Window hostWindow = activity.getWindow();
             WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
@@ -121,7 +130,9 @@ public class WebViewFullscreenRobolectricTest {
         dialog.activity = activity;
         dialog.presentWebView();
         dialog.show();
-        ShadowLooper.idleMainLooper();
+        if (idleMainLooper) {
+            ShadowLooper.idleMainLooper();
+        }
         return dialog;
     }
 
@@ -216,7 +227,8 @@ public class WebViewFullscreenRobolectricTest {
         Options options = new Options();
         options.setUrl("https://example.com");
         options.setBackgroundColor("white");
-        WebViewDialog dialog = browserLayoutDialog(activity, options, false);
+        // idleMainLooper=false: media fullscreen must be active before the posted host sync runs.
+        WebViewDialog dialog = browserLayoutDialog(activity, options, false, false);
 
         Method show = WebViewDialog.class.getDeclaredMethod(
             "showCustomFullscreenView",
@@ -225,32 +237,17 @@ public class WebViewFullscreenRobolectricTest {
         );
         show.setAccessible(true);
         show.invoke(dialog, new View(activity), (WebChromeClient.CustomViewCallback) () -> {});
-        ShadowLooper.idleMainLooper();
 
         Field customViewField = WebViewDialog.class.getDeclaredField("customFullscreenView");
         customViewField.setAccessible(true);
         assertNotNull(customViewField.get(dialog));
 
+        ShadowLooper.idleMainLooper();
+
         Window dialogWindow = dialog.getWindow();
-        ViewCompat.dispatchApplyWindowInsets(
-            dialogWindow.getDecorView(),
-            new WindowInsetsCompat.Builder()
-                .setVisible(WindowInsetsCompat.Type.statusBars(), false)
-                .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
-                .build()
-        );
-
-        SystemBarsControllerState duringMedia = SystemBarsControllerState.capture(dialogWindow);
-        assertFalse(duringMedia.isStatusVisible());
-        assertFalse(duringMedia.isNavigationVisible());
-
-        Method sync = WebViewDialog.class.getDeclaredMethod("syncDialogSystemBarsFromHost");
-        sync.setAccessible(true);
-        sync.invoke(dialog);
-
-        SystemBarsControllerState afterSync = SystemBarsControllerState.capture(dialogWindow);
-        assertFalse(afterSync.isStatusVisible());
-        assertFalse(afterSync.isNavigationVisible());
+        SystemBarsControllerState afterPostedSync = SystemBarsControllerState.capture(dialogWindow);
+        assertFalse(afterPostedSync.isStatusVisible());
+        assertFalse(afterPostedSync.isNavigationVisible());
     }
 
     @Test
