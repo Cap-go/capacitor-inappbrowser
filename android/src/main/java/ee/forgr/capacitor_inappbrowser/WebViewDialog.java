@@ -479,7 +479,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
-        if (mediaFullscreenWindow != null && customFullscreenWindow == dialogWindow) {
+        if (customFullscreenView != null && customFullscreenWindow == dialogWindow) {
             return;
         }
 
