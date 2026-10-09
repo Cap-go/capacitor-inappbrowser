@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
@@ -95,32 +96,42 @@ public class WebViewFullscreenRobolectricTest {
         }
     }
 
+    private static WebViewDialog browserLayoutDialog(ComponentActivity activity, Options options, boolean hostImmersive) throws Exception {
+        if (hostImmersive) {
+            Window hostWindow = activity.getWindow();
+            WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
+            WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+            hostController.hide(WindowInsetsCompat.Type.systemBars());
+            hostController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            ViewCompat.dispatchApplyWindowInsets(
+                hostWindow.getDecorView(),
+                new WindowInsetsCompat.Builder()
+                    .setVisible(WindowInsetsCompat.Type.statusBars(), false)
+                    .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
+                    .build()
+            );
+        }
+
+        WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
+        dialog.activity = activity;
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.activity_browser);
+        Field webViewField = WebViewDialog.class.getDeclaredField("_webView");
+        webViewField.setAccessible(true);
+        webViewField.set(dialog, dialog.findViewById(R.id.browser_view));
+        dialog.show();
+        ShadowLooper.idleMainLooper();
+        return dialog;
+    }
+
     @Test
     @Config(sdk = 35)
     public void hiddenHostStatusBarHidesStatusBarColorViewAfterChromeRefresh() throws Exception {
         ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
-        android.view.Window hostWindow = activity.getWindow();
-        WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
-        WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
-        hostController.hide(WindowInsetsCompat.Type.systemBars());
-        hostController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-        ViewCompat.dispatchApplyWindowInsets(
-            hostWindow.getDecorView(),
-            new WindowInsetsCompat.Builder()
-                .setVisible(WindowInsetsCompat.Type.statusBars(), false)
-                .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
-                .build()
-        );
-
         Options options = new Options();
         options.setUrl("https://example.com");
-        options.setTitle("Browser");
-        options.setMaterialPicker(true);
-        WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
-        dialog.activity = activity;
-        dialog.presentWebView();
-        dialog.show();
-        ShadowLooper.idleMainLooper();
+        options.setBackgroundColor("white");
+        WebViewDialog dialog = browserLayoutDialog(activity, options, true);
 
         View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
         assertNotNull(statusBarColorView);
@@ -142,13 +153,8 @@ public class WebViewFullscreenRobolectricTest {
         ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
         Options options = new Options();
         options.setUrl("https://example.com");
-        options.setTitle("Browser");
-        options.setMaterialPicker(true);
-        WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
-        dialog.activity = activity;
-        dialog.presentWebView();
-        dialog.show();
-        ShadowLooper.idleMainLooper();
+        options.setBackgroundColor("white");
+        WebViewDialog dialog = browserLayoutDialog(activity, options, false);
 
         View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
         assertNotNull(statusBarColorView);
