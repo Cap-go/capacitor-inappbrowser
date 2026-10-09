@@ -112,13 +112,13 @@ public class WebViewFullscreenRobolectricTest {
             );
         }
 
+        options.setMaterialPicker(true);
+        if (options.getBackgroundColor() == null) {
+            options.setBackgroundColor("white");
+        }
         WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
         dialog.activity = activity;
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.activity_browser);
-        Field webViewField = WebViewDialog.class.getDeclaredField("_webView");
-        webViewField.setAccessible(true);
-        webViewField.set(dialog, dialog.findViewById(R.id.browser_view));
+        dialog.presentWebView();
         dialog.show();
         ShadowLooper.idleMainLooper();
         return dialog;
