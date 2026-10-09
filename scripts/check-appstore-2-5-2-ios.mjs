@@ -33,7 +33,9 @@ const FORBIDDEN_PATTERNS = [
   { id: "NSClassFromString", pattern: /\bNSClassFromString\s*\(/ },
   { id: "dlopen", pattern: /\bdlopen\s*\(/ },
   { id: "dlsym", pattern: /\bdlsym\s*\(/ },
-  { id: "Selector(stringLiteral:)", pattern: /\bSelector\s*\(\s*[^#"]/ },
+  { id: "Selector(non-literal)", pattern: /\bSelector\s*\(\s*[^#"\s]/ },
+  { id: "Selector(concat)", pattern: /\bSelector\s*\([^)]*\+/ },
+  { id: "Selector(interpolation)", pattern: /\bSelector\s*\([^)]*\\\(/ },
 ];
 
 /** Allowed only with appstore-2.5.2-allow on the same or previous non-empty line. */
@@ -58,7 +60,11 @@ function walk(dir, files = []) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       walk(fullPath, files);
-    } else if (entry.name.endsWith(".swift") || entry.name.endsWith(".m")) {
+    } else if (
+      entry.name.endsWith(".swift") ||
+      entry.name.endsWith(".m") ||
+      entry.name.endsWith(".mm")
+    ) {
       files.push(fullPath);
     }
   }
@@ -105,26 +111,39 @@ function scanForbiddenAcrossFile(text, filePath) {
   return violations;
 }
 
+function scanAnnotatedAcrossFile(text, filePath, lines) {
+  const violations = [];
+
+  for (const rule of ALLOW_ANNOTATED_PATTERNS) {
+    const pattern = new RegExp(
+      rule.pattern.source,
+      rule.pattern.flags.includes("g") ? rule.pattern.flags : `${rule.pattern.flags}g`,
+    );
+    for (const match of text.matchAll(pattern)) {
+      const lineNumber = lineNumberAtIndex(text, match.index ?? 0);
+      const lineIndex = lineNumber - 1;
+      if (lineHasAllow(lines, lineIndex)) {
+        continue;
+      }
+      const line = (lines[lineIndex] ?? "").trim();
+      violations.push({
+        filePath,
+        lineNumber,
+        rule: rule.id,
+        message: `${rule.id} requires // appstore-2.5.2-allow: <reason> on this or the previous line`,
+        line,
+      });
+    }
+  }
+
+  return violations;
+}
+
 function scanFile(filePath) {
   const text = fs.readFileSync(filePath, "utf8");
   const lines = text.split(/\r?\n/);
   const violations = scanForbiddenAcrossFile(text, filePath);
-
-  lines.forEach((line, index) => {
-    const lineNumber = index + 1;
-
-    for (const rule of ALLOW_ANNOTATED_PATTERNS) {
-      if (rule.pattern.test(line) && !lineHasAllow(lines, index)) {
-        violations.push({
-          filePath,
-          lineNumber,
-          rule: rule.id,
-          message: `${rule.id} requires // appstore-2.5.2-allow: <reason> on this or the previous line`,
-          line,
-        });
-      }
-    }
-  });
+  violations.push(...scanAnnotatedAcrossFile(text, filePath, lines));
 
   return violations;
 }
