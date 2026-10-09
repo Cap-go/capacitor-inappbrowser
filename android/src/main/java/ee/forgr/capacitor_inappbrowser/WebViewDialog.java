@@ -4051,12 +4051,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             isEdgeToEdge,
             layoutBehindNavigationBar
         );
+        boolean hostStatusBarVisible = isHostStatusBarVisible();
         int statusBarTop = SafeAreaInsetsSupport.resolveStatusBarTop(
             bars.top,
             bars.bottom,
             bars.left,
             bars.right,
-            getSystemStatusBarHeight()
+            hostStatusBarVisible ? getSystemStatusBarHeight() : 0
         );
         int fallbackBottomInset = applyBottomInset ? getSystemNavigationBarHeight() : 0;
         int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
@@ -4092,7 +4093,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             // instead of the status_bar_height resource used for the initial layout.
             View toolbarView = findBrowserContentDescendant(R.id.tool_bar);
             if (toolbarView != null && toolbarView.getParent() instanceof com.google.android.material.appbar.AppBarLayout appBarLayout) {
-                applyAppBarTopInset(appBarLayout, statusBarTop);
+                int appBarTopInset = hostStatusBarVisible ? statusBarTop : 0;
+                applyAppBarTopInset(appBarLayout, appBarTopInset);
             }
         }
 

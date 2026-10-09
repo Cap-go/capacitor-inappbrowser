@@ -83,6 +83,13 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void statusBarTopSkipsFallbackWhenHostStatusBarIsHidden() {
+        // WebViewDialog passes a zero fallback when the host status bar is hidden so a later
+        // applySafeAreaInsets() cannot re-apply a status-bar-sized app-bar inset.
+        assertEquals(0, SafeAreaInsetsSupport.resolveStatusBarTop(0, 0, 0, 0, 0));
+    }
+
+    @Test
     public void statusBarTopStaysZeroWhenOtherInsetsAreReported() {
         // Multi-window secondary window or hidden status bar: no status bar to avoid, so no padding.
         assertEquals(0, SafeAreaInsetsSupport.resolveStatusBarTop(0, 126, 0, 0, 63));
