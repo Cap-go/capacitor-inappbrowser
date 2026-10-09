@@ -4,7 +4,6 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
@@ -14,26 +13,14 @@ final class FullscreenWindowState {
     private final Window window;
     private final WindowManager.LayoutParams attributes = new WindowManager.LayoutParams();
     private final int visibility;
-    private final int behavior;
-    private final boolean statusVisible;
-    private final boolean navigationVisible;
+    private final SystemBarsControllerState systemBars;
 
     FullscreenWindowState(Window window) {
         this.window = window;
         attributes.copyFrom(window.getAttributes());
         View decor = window.getDecorView();
         visibility = decor.getSystemUiVisibility();
-        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, decor);
-        behavior = controller.getSystemBarsBehavior();
-        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(decor);
-        statusVisible =
-            insets != null
-                ? insets.isVisible(WindowInsetsCompat.Type.statusBars())
-                : (attributes.flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0;
-        navigationVisible =
-            insets != null
-                ? insets.isVisible(WindowInsetsCompat.Type.navigationBars())
-                : (visibility & View.SYSTEM_UI_FLAG_HIDE_NAVIGATION) == 0;
+        systemBars = SystemBarsControllerState.capture(window);
     }
 
     void enter() {
@@ -60,12 +47,7 @@ final class FullscreenWindowState {
     }
 
     void restore() {
-        WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, window.getDecorView());
-        if (statusVisible) controller.show(WindowInsetsCompat.Type.statusBars());
-        else controller.hide(WindowInsetsCompat.Type.statusBars());
-        if (navigationVisible) controller.show(WindowInsetsCompat.Type.navigationBars());
-        else controller.hide(WindowInsetsCompat.Type.navigationBars());
-        controller.setSystemBarsBehavior(behavior);
+        systemBars.applyTo(window);
         window.setAttributes(attributes);
         window.getDecorView().setSystemUiVisibility(visibility);
     }
