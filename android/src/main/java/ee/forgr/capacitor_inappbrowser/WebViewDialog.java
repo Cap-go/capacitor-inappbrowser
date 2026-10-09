@@ -479,6 +479,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
+        if (mediaFullscreenWindow != null && customFullscreenWindow == dialogWindow) {
+            return;
+        }
+
         SystemBarsControllerState hostState = SystemBarsControllerState.capture(hostWindow);
         hostState.applyTo(dialogWindow);
         applyStatusBarColorViewForHostVisibility(hostState.isStatusVisible());

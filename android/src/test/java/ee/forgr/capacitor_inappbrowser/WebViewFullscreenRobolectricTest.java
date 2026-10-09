@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.*;
 
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -146,6 +147,92 @@ public class WebViewFullscreenRobolectricTest {
 
         assertEquals(View.GONE, statusBarColorView.getVisibility());
         assertEquals(0, statusBarColorView.getLayoutParams().height);
+    }
+
+    @Test
+    @Config(sdk = 35)
+    public void hiddenHostStatusBarKeepsAppBarTopInsetZeroAfterSafeAreaInsets() throws Exception {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        Options options = new Options();
+        options.setUrl("https://example.com");
+        options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
+        options.setEnabledSafeTopMargin(true);
+        WebViewDialog dialog = browserLayoutDialog(activity, options, true);
+
+        com.google.android.material.appbar.AppBarLayout appBarLayout = dialog.findViewById(R.id.app_bar_layout);
+        assertNotNull(appBarLayout);
+        assertEquals(0, appBarLayout.getPaddingTop());
+
+        Method applySafeAreaInsets = WebViewDialog.class.getDeclaredMethod(
+            "applySafeAreaInsets",
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            boolean.class,
+            boolean.class,
+            boolean.class
+        );
+        applySafeAreaInsets.setAccessible(true);
+        View toolbarView = dialog.findViewById(R.id.tool_bar);
+        boolean appBarHandlesTopInset =
+            Build.VERSION.SDK_INT >= 35 && toolbarView != null && toolbarView.getParent() == appBarLayout;
+        assertTrue(appBarHandlesTopInset);
+
+        applySafeAreaInsets.invoke(
+            dialog,
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            false,
+            appBarHandlesTopInset,
+            true
+        );
+        ShadowLooper.idleMainLooper();
+
+        assertEquals(0, appBarLayout.getPaddingTop());
+    }
+
+    @Test
+    public void hostBarSyncSkippedDuringDialogMediaFullscreen() throws Exception {
+        Fixture f = new Fixture(false, false, false);
+        Window hostWindow = f.activity.getWindow();
+        WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+        hostController.show(WindowInsetsCompat.Type.statusBars());
+        hostController.show(WindowInsetsCompat.Type.navigationBars());
+        ViewCompat.dispatchApplyWindowInsets(
+            hostWindow.getDecorView(),
+            new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+                .setVisible(WindowInsetsCompat.Type.statusBars(), true)
+                .setVisible(WindowInsetsCompat.Type.navigationBars(), true)
+                .build()
+        );
+
+        Method show = WebViewDialog.class.getDeclaredMethod(
+            "showCustomFullscreenView",
+            View.class,
+            WebChromeClient.CustomViewCallback.class
+        );
+        show.setAccessible(true);
+        show.invoke(f.dialog, new View(f.activity), (WebChromeClient.CustomViewCallback) () -> {});
+
+        SystemBarsControllerState duringMedia = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(duringMedia.isStatusVisible());
+        assertFalse(duringMedia.isNavigationVisible());
+
+        Method sync = WebViewDialog.class.getDeclaredMethod("syncDialogSystemBarsFromHost");
+        sync.setAccessible(true);
+        sync.invoke(f.dialog);
+
+        SystemBarsControllerState afterSync = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(afterSync.isStatusVisible());
+        assertFalse(afterSync.isNavigationVisible());
     }
 
     @Test
