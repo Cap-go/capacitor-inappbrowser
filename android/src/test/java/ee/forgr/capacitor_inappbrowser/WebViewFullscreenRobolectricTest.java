@@ -177,8 +177,7 @@ public class WebViewFullscreenRobolectricTest {
         );
         applySafeAreaInsets.setAccessible(true);
         View toolbarView = dialog.findViewById(R.id.tool_bar);
-        boolean appBarHandlesTopInset =
-            Build.VERSION.SDK_INT >= 35 && toolbarView != null && toolbarView.getParent() == appBarLayout;
+        boolean appBarHandlesTopInset = Build.VERSION.SDK_INT >= 35 && toolbarView != null && toolbarView.getParent() == appBarLayout;
         assertTrue(appBarHandlesTopInset);
 
         applySafeAreaInsets.invoke(
@@ -222,7 +221,16 @@ public class WebViewFullscreenRobolectricTest {
         show.setAccessible(true);
         show.invoke(f.dialog, new View(f.activity), (WebChromeClient.CustomViewCallback) () -> {});
 
-        SystemBarsControllerState duringMedia = SystemBarsControllerState.capture(f.dialog.getWindow());
+        Window dialogWindow = f.dialog.getWindow();
+        ViewCompat.dispatchApplyWindowInsets(
+            dialogWindow.getDecorView(),
+            new WindowInsetsCompat.Builder()
+                .setVisible(WindowInsetsCompat.Type.statusBars(), false)
+                .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
+                .build()
+        );
+
+        SystemBarsControllerState duringMedia = SystemBarsControllerState.capture(dialogWindow);
         assertFalse(duringMedia.isStatusVisible());
         assertFalse(duringMedia.isNavigationVisible());
 
@@ -230,7 +238,7 @@ public class WebViewFullscreenRobolectricTest {
         sync.setAccessible(true);
         sync.invoke(f.dialog);
 
-        SystemBarsControllerState afterSync = SystemBarsControllerState.capture(f.dialog.getWindow());
+        SystemBarsControllerState afterSync = SystemBarsControllerState.capture(dialogWindow);
         assertFalse(afterSync.isStatusVisible());
         assertFalse(afterSync.isNavigationVisible());
     }
