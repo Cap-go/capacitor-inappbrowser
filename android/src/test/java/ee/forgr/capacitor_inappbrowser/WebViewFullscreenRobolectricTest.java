@@ -131,6 +131,7 @@ public class WebViewFullscreenRobolectricTest {
         Options options = new Options();
         options.setUrl("https://example.com");
         options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
         WebViewDialog dialog = browserLayoutDialog(activity, options, true);
 
         View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
@@ -165,6 +166,7 @@ public class WebViewFullscreenRobolectricTest {
         Options options = new Options();
         options.setUrl("https://example.com");
         options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
         WebViewDialog dialog = browserLayoutDialog(activity, options, false);
 
         View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
