@@ -151,6 +151,17 @@ public class WebViewFullscreenRobolectricTest {
     @Config(sdk = 35)
     public void visibleHostStatusBarKeepsStatusBarColorViewAfterChromeRefresh() throws Exception {
         ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        android.view.Window hostWindow = activity.getWindow();
+        WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+        hostController.show(WindowInsetsCompat.Type.statusBars());
+        ViewCompat.dispatchApplyWindowInsets(
+            hostWindow.getDecorView(),
+            new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
+                .setVisible(WindowInsetsCompat.Type.statusBars(), true)
+                .build()
+        );
+
         Options options = new Options();
         options.setUrl("https://example.com");
         options.setBackgroundColor("white");

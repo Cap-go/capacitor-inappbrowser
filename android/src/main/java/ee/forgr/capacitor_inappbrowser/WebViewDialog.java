@@ -2567,7 +2567,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         // Set web view background color
-        int backgroundColor = _options.getBackgroundColor().equals("white") ? Color.WHITE : Color.BLACK;
+        int backgroundColor = TextUtils.equals(_options.getBackgroundColor(), "white") ? Color.WHITE : Color.BLACK;
         _webView.setBackgroundColor(backgroundColor);
 
         // Set text zoom if specified in options
