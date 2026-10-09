@@ -479,7 +479,48 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
-        SystemBarsControllerState.capture(hostWindow).applyTo(dialogWindow);
+        SystemBarsControllerState hostState = SystemBarsControllerState.capture(hostWindow);
+        hostState.applyTo(dialogWindow);
+        applyStatusBarColorViewForHostVisibility(hostState.isStatusVisible());
+    }
+
+    private void applyStatusBarColorViewForHostVisibility(boolean statusBarVisible) {
+        if (_options != null && TextUtils.equals(_options.getToolbarType(), "blank")) {
+            return;
+        }
+
+        View statusBarColorView = findViewById(R.id.status_bar_color_view);
+        if (statusBarColorView == null) {
+            return;
+        }
+
+        ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+        if (!statusBarVisible) {
+            statusBarColorView.setVisibility(View.GONE);
+            if (params != null) {
+                params.height = 0;
+                statusBarColorView.setLayoutParams(params);
+            }
+            return;
+        }
+
+        statusBarColorView.setVisibility(View.VISIBLE);
+        if (params != null) {
+            params.height = getSystemStatusBarHeight();
+            statusBarColorView.setLayoutParams(params);
+            statusBarColorView.requestLayout();
+        }
+    }
+
+    private boolean isHostStatusBarVisible() {
+        if (activity == null) {
+            return true;
+        }
+        Window hostWindow = activity.getWindow();
+        if (hostWindow == null) {
+            return true;
+        }
+        return SystemBarsControllerState.capture(hostWindow).isStatusVisible();
     }
 
     private void updateFullscreenExitInsets(WindowInsetsCompat insets) {
@@ -2418,6 +2459,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                     // Set the height of the status bar color view
                     if (statusBarColorView != null) {
+                        if (!isHostStatusBarVisible()) {
+                            applyStatusBarColorViewForHostVisibility(false);
+                            return;
+                        }
+
                         statusBarColorView.getLayoutParams().height = statusBarHeight;
                         statusBarColorView.requestLayout();
 
@@ -3764,6 +3810,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
 
+        if (!isHostStatusBarVisible()) {
+            applyStatusBarColorViewForHostVisibility(false);
+            return;
+        }
+
         params.height = statusBarHeight;
         statusBarColorView.setLayoutParams(params);
         statusBarColorView.requestLayout();
@@ -3797,18 +3848,24 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
 
             int statusBarHeight = getSystemStatusBarHeight();
+            boolean hostStatusBarVisible = isHostStatusBarVisible();
 
             if (statusBarColorView != null) {
-                ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
-                if (params != null) {
-                    params.height = statusBarHeight;
-                    statusBarColorView.setLayoutParams(params);
+                if (!hostStatusBarVisible) {
+                    applyStatusBarColorViewForHostVisibility(false);
+                } else {
+                    ViewGroup.LayoutParams params = statusBarColorView.getLayoutParams();
+                    if (params != null) {
+                        params.height = statusBarHeight;
+                        statusBarColorView.setLayoutParams(params);
+                    }
+                    statusBarColorView.setBackgroundColor(finalBgColor);
+                    statusBarColorView.setVisibility(View.VISIBLE);
                 }
-                statusBarColorView.setBackgroundColor(finalBgColor);
-                statusBarColorView.setVisibility(View.VISIBLE);
             }
 
-            applyAppBarTopInset(appBarLayout, appBarHandlesTopInset(toolbarView) ? statusBarHeight : 0);
+            int appBarTopInset = appBarHandlesTopInset(toolbarView) && hostStatusBarVisible ? statusBarHeight : 0;
+            applyAppBarTopInset(appBarLayout, appBarTopInset);
             appBarLayout.setBackgroundColor(finalBgColor);
 
             Window window = getWindow();
