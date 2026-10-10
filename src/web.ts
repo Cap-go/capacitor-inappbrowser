@@ -14,134 +14,440 @@ import type {
   ScreenshotResult,
 } from './definitions';
 
+type TrackedWebView = {
+  window: Window;
+  url: string;
+  timer: number;
+  /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
+  origin: string;
+  /** Object URL of the isolating wrapper document for header loads, revoked on close. */
+  objectUrl?: string;
+};
+
+const HTML_ATTRIBUTE_ESCAPES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' };
+
+const escapeHtmlAttribute = (value: string): string => value.replace(/[&"<>]/g, (c) => HTML_ATTRIBUTE_ESCAPES[c]);
+
+const OPENING_HEAD_TAG = /<head(?:\s[^>]*)?>/i;
+
+const NATIVE_BRIDGE_SCRIPT =
+  "(function(){window.addEventListener('message',function(e){if(e.source===window.parent){window.dispatchEvent(new CustomEvent('messageFromNative',{detail:e.data}));}});})();";
+
+export const formatDoctype = (doctype: DocumentType | null): string => {
+  if (!doctype) {
+    return '';
+  }
+  if (doctype.publicId) {
+    const system = doctype.systemId ? ` "${doctype.systemId}"` : '';
+    return `<!DOCTYPE ${doctype.name} PUBLIC "${doctype.publicId}"${system}>`;
+  }
+  if (doctype.systemId) {
+    return `<!DOCTYPE ${doctype.name} SYSTEM "${doctype.systemId}">`;
+  }
+  return `<!DOCTYPE ${doctype.name}>`;
+};
+
+const serializeParsedHtml = (doc: Document): string => formatDoctype(doc.doctype) + doc.documentElement.outerHTML;
+
+const TRUSTED_TYPES_POLICY_NAME = 'capgo-inappbrowser';
+
+export const TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE =
+  "InAppBrowser could not create the Trusted Types policy 'capgo-inappbrowser'. " +
+  'Add capgo-inappbrowser to the host app Content-Security-Policy trusted-types directive.';
+
+type CapgoTrustedHtmlPolicy = {
+  createHTML: (html: string) => unknown;
+};
+
+type CapgoTrustedTypes = {
+  createPolicy: (name: string, rules: { createHTML: (html: string) => string }) => CapgoTrustedHtmlPolicy;
+};
+
+let trustedHtmlPolicy: CapgoTrustedHtmlPolicy | null | undefined;
+
+/** Clears the lazy Trusted Types policy cache (for tests). */
+export const resetTrustedHtmlPolicyCache = (): void => {
+  trustedHtmlPolicy = undefined;
+};
+
+const getTrustedHtmlPolicy = (): CapgoTrustedHtmlPolicy | null => {
+  if (trustedHtmlPolicy !== undefined) {
+    return trustedHtmlPolicy;
+  }
+  const trustedTypes = (globalThis.window as (Window & { trustedTypes?: CapgoTrustedTypes }) | undefined)?.trustedTypes;
+  if (!trustedTypes) {
+    trustedHtmlPolicy = null;
+    return null;
+  }
+  try {
+    trustedHtmlPolicy = trustedTypes.createPolicy(TRUSTED_TYPES_POLICY_NAME, {
+      createHTML: (value: string) => value,
+    });
+    return trustedHtmlPolicy;
+  } catch {
+    throw new Error(TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE);
+  }
+};
+
+export const createTrustedHtml = (html: string): string | unknown => {
+  const policy = getTrustedHtmlPolicy();
+  return policy ? policy.createHTML(html) : html;
+};
+
+const trustedHtmlToString = (html: string | unknown): string => (typeof html === 'string' ? html : String(html));
+
+export const injectNativeBridge = (html: string): string => {
+  if (typeof DOMParser !== 'undefined') {
+    const doc = new DOMParser().parseFromString(createTrustedHtml(html) as string, 'text/html');
+    const script = doc.createElement('script');
+    script.textContent = NATIVE_BRIDGE_SCRIPT;
+    if (doc.body) {
+      doc.body.appendChild(script);
+      return serializeParsedHtml(doc);
+    }
+  }
+  return `${html}<script>${NATIVE_BRIDGE_SCRIPT}</script>`;
+};
+
+/** Whether a webview message origin may replace the postMessage target (full origin string). */
+export function mayAdoptPostMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
+  try {
+    const opened = new URL(openedUrl);
+    const incoming = new URL(messageOrigin);
+    if (opened.protocol !== incoming.protocol) {
+      return false;
+    }
+    if (opened.port !== incoming.port) {
+      return false;
+    }
+    if (opened.origin === incoming.origin) {
+      return true;
+    }
+    const openedHost = opened.hostname;
+    const incomingHost = incoming.hostname;
+    return incomingHost === openedHost || incomingHost.endsWith(`.${openedHost}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wraps fetched HTML in a sandboxed iframe (opaque origin, no allow-same-origin) so the remote page
+ * cannot read the app's storage or DOM even though the wrapper is a Blob created by the app origin.
+ * A <base href> pointing at the final response URL keeps relative URLs resolving against the target.
+ * The wrapper relays messages from the app (its opener) into the sandboxed frame.
+ */
+export const buildIsolatedDocument = (html: string, baseHref: string): string => {
+  const baseTag = `<base href="${escapeHtmlAttribute(baseHref)}">`;
+  let inner = OPENING_HEAD_TAG.test(html)
+    ? html.replace(OPENING_HEAD_TAG, (tag) => `${tag}${baseTag}`)
+    : `${baseTag}${html}`;
+  inner = injectNativeBridge(inner);
+  const srcdoc = trustedHtmlToString(createTrustedHtml(inner));
+  const sandbox =
+    'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation';
+  const relay =
+    "(function(){var f=document.getElementById('capgo-iab-frame');" +
+    "window.addEventListener('message',function(e){if(e.source===window.opener&&f&&f.contentWindow){f.contentWindow.postMessage(e.data,'*');}});})();";
+  return (
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    '<style>html,body,iframe{margin:0;padding:0;border:0;width:100%;height:100%;display:block}</style></head>' +
+    `<body><iframe id="capgo-iab-frame" sandbox="${sandbox}" referrerpolicy="no-referrer" srcdoc="${escapeHtmlAttribute(srcdoc)}"></iframe>` +
+    `<script>${relay}</script></body></html>`
+  );
+};
+
 export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
+  private readonly webViews = new Map<string, TrackedWebView>();
+  private webViewCounter = 0;
+
+  constructor() {
+    super();
+    if (globalThis.window !== undefined) {
+      globalThis.window.addEventListener('message', this.handleWindowMessage);
+    }
+  }
+
+  private readonly handleWindowMessage = (event: MessageEvent): void => {
+    const match = Array.from(this.webViews.entries()).find(([, entry]) => this.isFromWebView(entry, event.source));
+    if (!match) {
+      return;
+    }
+    const [id, entry] = match;
+    if (
+      entry.window === event.source &&
+      event.origin &&
+      event.origin !== 'null' &&
+      mayAdoptPostMessageOrigin(entry.url, event.origin)
+    ) {
+      entry.origin = event.origin;
+    }
+    let data: unknown = event.data;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        this.notifyListeners('messageFromWebview', { id, rawMessage: event.data });
+        return;
+      }
+    }
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      this.notifyListeners('messageFromWebview', { ...(data as Record<string, unknown>), id });
+    } else if (typeof event.data === 'string') {
+      this.notifyListeners('messageFromWebview', { id, rawMessage: event.data });
+    }
+  };
+
+  private isFromWebView(entry: TrackedWebView, source: MessageEventSource | null): boolean {
+    if (!source) {
+      return false;
+    }
+    if (entry.window === source) {
+      return true;
+    }
+    if (!entry.objectUrl) {
+      return false;
+    }
+    try {
+      const frame = entry.window.document.getElementById('capgo-iab-frame') as HTMLIFrameElement | null;
+      return frame?.contentWindow === source;
+    } catch {
+      return false;
+    }
+  }
+
+  private watchClosed(id: string): void {
+    const entry = this.webViews.get(id);
+    if (!entry?.window.closed) {
+      return;
+    }
+    globalThis.clearInterval(entry.timer);
+    if (entry.objectUrl) {
+      URL.revokeObjectURL(entry.objectUrl);
+    }
+    this.webViews.delete(id);
+    this.notifyListeners('closeEvent', { id, url: entry.url });
+  }
+
+  private resolveWebViewEntry(id?: string): { id: string; entry: TrackedWebView } | undefined {
+    if (id) {
+      const entry = this.webViews.get(id);
+      if (entry && !entry.window.closed) {
+        return { id, entry };
+      }
+      return undefined;
+    }
+    const match = Array.from(this.webViews.entries())
+      .reverse()
+      .find(([, entry]) => !entry.window.closed);
+    if (!match) {
+      return undefined;
+    }
+    return { id: match[0], entry: match[1] };
+  }
+
+  private resolveTargetOrigin(url: string): string {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return globalThis.location?.origin ?? 'null';
+    }
+  }
+
+  private hasHeaders(headers?: Record<string, string>): headers is Record<string, string> {
+    return headers != null && Object.keys(headers).length > 0;
+  }
+
+  private navigateOpenedWindow(id: string, win: Window, url: string, headers?: Record<string, string>): void {
+    if (!this.hasHeaders(headers)) {
+      win.location.href = url;
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        const html = await response.text();
+        const parsed = new URL(response.url || url, globalThis.location?.href ?? 'https://localhost/');
+        const baseHref = `${parsed.origin}${parsed.pathname}${parsed.search}`;
+        const blob = new Blob([buildIsolatedDocument(html, baseHref)], { type: 'text/html;charset=utf-8' });
+        const objectUrl = URL.createObjectURL(blob);
+        const entry = this.webViews.get(id);
+        if (!entry || win.closed) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        entry.objectUrl = objectUrl;
+        win.location.href = objectUrl;
+      } catch (error) {
+        console.error('[InAppBrowser] Failed to load web view with headers', error);
+        win.close();
+        this.watchClosed(id);
+      }
+    })();
+  }
+
   clearAllCookies(): Promise<any> {
     console.log('clearAllCookies');
     return Promise.resolve();
   }
+
   clearCache(): Promise<any> {
     console.log('clearCache');
     return Promise.resolve();
   }
+
   clearAllBrowsingData(): Promise<any> {
     console.log('clearAllBrowsingData');
     return Promise.resolve();
   }
-  async open(options: OpenOptions): Promise<any> {
-    console.log('open', options);
-    return options;
-  }
 
-  async clearCookies(options: ClearCookieOptions): Promise<any> {
-    console.log('cleanCookies', options);
-    return;
-  }
-
-  async getCookies(options: GetCookieOptions): Promise<any> {
-    // Web implementation to get cookies
-    return options;
-  }
-
-  async openWebView(options: OpenWebViewOptions): Promise<any> {
-    if (options.fullscreen) {
-      throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+  open(options: OpenOptions): Promise<any> {
+    const opened = globalThis.open('', '_blank');
+    if (!opened) {
+      return Promise.reject(new Error('Popup blocked'));
     }
-    console.log('openWebView', options);
-    return options;
+    opened.opener = null;
+    opened.location.href = options.url;
+    return Promise.resolve();
   }
 
-  async executeScript({ code }: { code: string }): Promise<any> {
+  clearCookies(options: ClearCookieOptions): Promise<any> {
+    console.log('cleanCookies', options);
+    return Promise.resolve();
+  }
+
+  getCookies(options: GetCookieOptions): Promise<any> {
+    return Promise.resolve(options);
+  }
+
+  openWebView(options: OpenWebViewOptions): Promise<any> {
+    if (options.fullscreen) {
+      return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
+    }
+    const { popup = false, width, height } = options.web ?? {};
+    const features = popup
+      ? ['popup=yes', width ? `width=${width}` : '', height ? `height=${height}` : ''].filter(Boolean).join(',')
+      : '';
+    const opened = globalThis.open('', '_blank', features);
+    if (!opened) {
+      return Promise.reject(new Error('Popup blocked'));
+    }
+
+    const id = `web-${++this.webViewCounter}`;
+    const timer = globalThis.setInterval(() => this.watchClosed(id), 500);
+    // Header loads render inside an app-origin wrapper document, so messages target the app origin there.
+    const origin = this.hasHeaders(options.headers)
+      ? (globalThis.location?.origin ?? 'null')
+      : this.resolveTargetOrigin(options.url);
+    this.webViews.set(id, { window: opened, url: options.url, timer, origin });
+    this.navigateOpenedWindow(id, opened, options.url, options.headers);
+    return Promise.resolve({ id });
+  }
+
+  executeScript({ code }: { code: string }): Promise<any> {
     console.log('code', code);
-    return code;
+    return Promise.resolve(code);
   }
 
-  async close(options?: { id?: string }): Promise<any> {
-    console.log('close', options);
-    return;
+  close(options?: { id?: string }): Promise<any> {
+    const resolved = this.resolveWebViewEntry(options?.id);
+    if (!resolved) {
+      return Promise.resolve();
+    }
+    resolved.entry.window.close();
+    this.watchClosed(resolved.id);
+    return Promise.resolve();
   }
 
-  async hide(options?: { id?: string }): Promise<void> {
-    console.log('hide', options);
-    return;
+  hide(_options?: { id?: string }): Promise<void> {
+    console.log('hide', _options);
+    return Promise.resolve();
   }
 
-  async show(options?: { id?: string }): Promise<void> {
-    console.log('show', options);
-    return;
+  show(_options?: { id?: string }): Promise<void> {
+    console.log('show', _options);
+    return Promise.resolve();
   }
 
-  async sendToBack(options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
-    console.log('sendToBack not supported on web', options);
-    return;
+  sendToBack(_options?: { id?: string; transparentBackground?: boolean }): Promise<void> {
+    console.log('sendToBack not supported on web', _options);
+    return Promise.resolve();
   }
 
-  async bringToFront(options?: BringToFrontOptions): Promise<void> {
-    console.log('bringToFront not supported on web', options);
-    return;
+  bringToFront(_options?: BringToFrontOptions): Promise<void> {
+    console.log('bringToFront not supported on web', _options);
+    return Promise.resolve();
   }
 
-  async dispatchInputEvent(options: DispatchInputEventOptions): Promise<void> {
-    console.log('dispatchInputEvent not supported on web', options);
-    return;
+  dispatchInputEvent(_options: DispatchInputEventOptions): Promise<void> {
+    console.log('dispatchInputEvent not supported on web', _options);
+    return Promise.resolve();
   }
 
-  async setUrl(options: { url: string }): Promise<any> {
+  setUrl(options: { url: string }): Promise<any> {
     console.log('setUrl', options.url);
-    return;
+    return Promise.resolve();
   }
 
-  async reload(options?: { id?: string }): Promise<any> {
+  reload(options?: { id?: string }): Promise<any> {
     console.log('reload', options);
-    return;
-  }
-  async postMessage(options: Record<string, any>): Promise<any> {
-    console.log('postMessage', options);
-    return options;
+    return Promise.resolve();
   }
 
-  async takeScreenshot(options?: { id?: string }): Promise<ScreenshotResult> {
-    console.log('takeScreenshot not supported on web', options);
-    throw this.unimplemented('Screenshots are not supported on web.');
+  postMessage(options: { detail: Record<string, any>; id?: string }): Promise<void> {
+    const resolved = this.resolveWebViewEntry(options.id);
+    if (resolved) {
+      resolved.entry.window.postMessage(options.detail, resolved.entry.origin);
+    }
+    return Promise.resolve();
   }
 
-  async goBack(): Promise<any> {
+  takeScreenshot(_options?: { id?: string }): Promise<ScreenshotResult> {
+    console.log('takeScreenshot not supported on web', _options);
+    return Promise.reject(this.unimplemented('Screenshots are not supported on web.'));
+  }
+
+  goBack(): Promise<any> {
     console.log('goBack');
-    return;
+    return Promise.resolve();
   }
 
-  async getPluginVersion(): Promise<{ version: string }> {
-    return { version: 'web' };
+  getPluginVersion(): Promise<{ version: string }> {
+    return Promise.resolve({ version: 'web' });
   }
 
-  async updateDimensions(options: DimensionOptions): Promise<void> {
-    console.log('updateDimensions', options);
-    // Web platform doesn't support dimension control
-    return;
+  updateDimensions(_options: DimensionOptions): Promise<void> {
+    console.log('updateDimensions', _options);
+    return Promise.resolve();
   }
 
-  async handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
+  handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
     console.log('handleProxyRequest not supported on web', options);
-    return;
+    return Promise.resolve();
   }
 
-  async setEnabledSafeTopMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeTopMargin not supported on web', options);
-    return;
+  setEnabledSafeTopMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeTopMargin not supported on web', _options);
+    return Promise.resolve();
   }
 
-  async setFullscreen(options: { enabled: boolean; id?: string }): Promise<void> {
+  setFullscreen(options: { enabled: boolean; id?: string }): Promise<void> {
     console.log('setFullscreen not supported on web', options);
-    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+    return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  async getFullscreen(options?: { id?: string }): Promise<{ enabled: boolean }> {
-    console.log('getFullscreen not supported on web', options);
-    throw this.unimplemented('Fullscreen is only supported by native openWebView presentations.');
+  getFullscreen(_options?: { id?: string }): Promise<{ enabled: boolean }> {
+    console.log('getFullscreen not supported on web', _options);
+    return Promise.reject(this.unimplemented('Fullscreen is only supported by native openWebView presentations.'));
   }
 
-  async setEnabledSafeBottomMargin(options: { enabled: boolean; id?: string }): Promise<void> {
-    console.log('setEnabledSafeBottomMargin not supported on web', options);
-    return;
+  setEnabledSafeBottomMargin(_options: { enabled: boolean; id?: string }): Promise<void> {
+    console.log('setEnabledSafeBottomMargin not supported on web', _options);
+    return Promise.resolve();
   }
 
   async openSecureWindow(options: OpenSecureWindowOptions): Promise<OpenSecureWindowResponse> {
@@ -156,7 +462,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       .map((x) => x.join('='))
       .join(',');
 
-    const popup = window.open(options.authEndpoint, 'Authorization', settings);
+    const popup = globalThis.open(options.authEndpoint, 'Authorization', settings);
     if (!popup) {
       throw new Error('Failed to open secure window');
     }

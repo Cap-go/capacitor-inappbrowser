@@ -1,9 +1,43 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { InAppBrowserWeb } from './web';
 
 describe('fullscreen on Web', () => {
-  const browser = new InAppBrowserWeb();
+  let browser: InAppBrowserWeb;
+  let mockWindow: { closed: boolean; location: { href: string }; close: () => void };
+
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  const realOpen = globalThis.open;
+
+  beforeEach(() => {
+    // No real 500 ms polling timers leak out of these tests.
+    globalThis.setInterval = mock(() => 1) as unknown as typeof setInterval;
+    globalThis.clearInterval = mock(() => undefined) as unknown as typeof clearInterval;
+    mockWindow = {
+      closed: false,
+      location: { href: '' },
+      close: () => {
+        mockWindow.closed = true;
+      },
+    };
+    const openMock = mock(() => mockWindow as unknown as Window) as typeof window.open;
+    (globalThis as { window?: Window }).window = {
+      addEventListener: () => undefined,
+      location: { href: 'https://app.test/' },
+      open: openMock,
+    } as Window;
+    globalThis.open = openMock;
+    browser = new InAppBrowserWeb();
+  });
+
+  afterEach(() => {
+    mockWindow.close();
+    delete (globalThis as { window?: Window }).window;
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+    globalThis.open = realOpen;
+  });
 
   it('rejects fullscreen opening instead of reporting a successful native presentation', async () => {
     await expect(browser.openWebView({ url: 'https://example.com', fullscreen: true })).rejects.toMatchObject({
@@ -11,11 +45,11 @@ describe('fullscreen on Web', () => {
     });
   });
 
-  it('preserves ordinary Web opening when fullscreen is omitted or disabled', async () => {
-    for (const fullscreen of [undefined, false]) {
-      const options = { url: 'https://example.com', fullscreen };
-      await expect(browser.openWebView(options)).resolves.toEqual(options);
-    }
+  it('opens a tracked web view when fullscreen is omitted or disabled', async () => {
+    await expect(browser.openWebView({ url: 'https://example.com' })).resolves.toEqual({ id: 'web-1' });
+    await expect(browser.openWebView({ url: 'https://example.com', fullscreen: false })).resolves.toEqual({
+      id: 'web-2',
+    });
   });
 
   it('rejects runtime entry and exit rather than silently changing no state', async () => {
