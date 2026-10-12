@@ -2,7 +2,7 @@
 
 Open web content inside your Capacitor app with a full-featured in-app browser: custom toolbars, two-way messaging, JavaScript injection, navigation events and native layering behind your UI.
 
-<a href="https://capgo.app/?ref=plugin_inappbrowser"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-inappbrowser" alt="Capgo - Instant updates for Capacitor" /></a>
+<a href="https://capgo.app/?ref=plugin_inappbrowser"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-inappbrowser" alt="Capgo - Build Capacitor apps with AI, ship updates instantly" /></a>
 
 <div align="center">
   <p><b>Capgo</b>: push fixes to your Capacitor users in minutes, build signed iOS and Android apps without a Mac, and roll back in one click.</p>
@@ -10,6 +10,8 @@ Open web content inside your Capacitor app with a full-featured in-app browser: 
   <p>14-day unlimited free trial. No credit card required</p>
   <p><a href="https://capgo.app/consulting/?ref=plugin_inappbrowser">Missing a feature? We'll build the plugin for you 💪</a></p>
 </div>
+
+> 🤖 **Building with an AI coding agent?** Install [Capgo skills](https://capgo.app/skills/?ref=plugin_inappbrowser) so Claude Code, Codex, Cursor, Copilot, or Gemini CLI know how to install and use `@capgo/capacitor-inappbrowser` in your Capacitor app: `npx skills add Cap-go/capgo-skills`. Then ask your agent: *"Add @capgo/capacitor-inappbrowser to my Capacitor app and wire it up."* [Agent setup guides](https://capgo.app/agents/?ref=plugin_inappbrowser) · [Hosted MCP](https://capgo.app/docs/ai/mcp/?ref=plugin_inappbrowser)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/Cap-go/capacitor-inappbrowser/main/assets/iab-layer-controls-demo.webp" alt="iOS example app showing a web page in the native browser with an Ionic overlay rendered above it" width="300" />
