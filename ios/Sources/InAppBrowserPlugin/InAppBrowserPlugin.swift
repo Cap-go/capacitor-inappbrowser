@@ -1479,6 +1479,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let activeNativeNavigationForWebview = call.getBool("activeNativeNavigationForWebview", true)
 
         self.isPresentAfterPageLoad = call.getBool("isPresentAfterPageLoad", false)
+        let disablePrivacyScreen = call.getBool("disablePrivacyScreen", false)
         let showReloadButton = call.getBool("showReloadButton", false)
 
         let blockedHostsRaw = call.getArray("blockedHosts", [])
@@ -1620,6 +1621,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.handleDownloads = handleDownloads
             webViewController.openWalletPasses = openWalletPasses
             webViewController.downloadPreview = downloadPreview
+            webViewController.disablePrivacyScreen = disablePrivacyScreen
 
             // Set native navigation gestures before view loads
             webViewController.activeNativeNavigationForWebview = activeNativeNavigationForWebview
@@ -2657,6 +2659,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func showPrivacyScreen() {
+        guard webViewController?.disablePrivacyScreen != true else { return }
         if privacyScreen == nil {
             let newPrivacyScreen = UIImageView()
             self.privacyScreen = newPrivacyScreen
