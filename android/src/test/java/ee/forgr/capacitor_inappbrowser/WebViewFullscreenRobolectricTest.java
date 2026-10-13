@@ -2,8 +2,10 @@ package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.*;
 
+import android.os.Build;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
@@ -11,7 +13,10 @@ import androidx.activity.ComponentActivity;
 import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.button.MaterialButton;
 import java.lang.reflect.Field;
@@ -23,6 +28,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowLooper;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34)
@@ -40,10 +46,28 @@ public class WebViewFullscreenRobolectricTest {
         List<Boolean> events = new ArrayList<>();
 
         Fixture(boolean startup, boolean hidden) throws Exception {
+            this(startup, hidden, false);
+        }
+
+        Fixture(boolean startup, boolean hidden, boolean hostImmersive) throws Exception {
             options.setUrl("https://example.com/start");
             options.setTitle("Browser");
             options.setFullscreen(startup);
             options.setHidden(hidden);
+            if (hostImmersive) {
+                android.view.Window hostWindow = activity.getWindow();
+                WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
+                WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+                hostController.hide(WindowInsetsCompat.Type.systemBars());
+                hostController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                ViewCompat.dispatchApplyWindowInsets(
+                    hostWindow.getDecorView(),
+                    new WindowInsetsCompat.Builder()
+                        .setVisible(WindowInsetsCompat.Type.statusBars(), false)
+                        .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
+                        .build()
+                );
+            }
             dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
             dialog.activity = activity;
             root = new CoordinatorLayout(activity);
@@ -71,6 +95,215 @@ public class WebViewFullscreenRobolectricTest {
             dialog.setFullscreenChangeListener(events::add);
             dialog.show();
         }
+    }
+
+    private static WebViewDialog browserLayoutDialog(ComponentActivity activity, Options options, boolean hostImmersive) throws Exception {
+        return browserLayoutDialog(activity, options, hostImmersive, true);
+    }
+
+    private static WebViewDialog browserLayoutDialog(
+        ComponentActivity activity,
+        Options options,
+        boolean hostImmersive,
+        boolean idleMainLooper
+    ) throws Exception {
+        if (hostImmersive) {
+            Window hostWindow = activity.getWindow();
+            WindowCompat.setDecorFitsSystemWindows(hostWindow, false);
+            WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+            hostController.hide(WindowInsetsCompat.Type.systemBars());
+            hostController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            ViewCompat.dispatchApplyWindowInsets(
+                hostWindow.getDecorView(),
+                new WindowInsetsCompat.Builder()
+                    .setVisible(WindowInsetsCompat.Type.statusBars(), false)
+                    .setVisible(WindowInsetsCompat.Type.navigationBars(), false)
+                    .build()
+            );
+        }
+
+        options.setMaterialPicker(true);
+        if (options.getBackgroundColor() == null) {
+            options.setBackgroundColor("white");
+        }
+        WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
+        dialog.activity = activity;
+        dialog.presentWebView();
+        dialog.show();
+        if (idleMainLooper) {
+            ShadowLooper.idleMainLooper();
+        }
+        return dialog;
+    }
+
+    @Test
+    @Config(sdk = 35)
+    public void hiddenHostStatusBarHidesStatusBarColorViewAfterChromeRefresh() throws Exception {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        Options options = new Options();
+        options.setUrl("https://example.com");
+        options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
+        WebViewDialog dialog = browserLayoutDialog(activity, options, true);
+
+        View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
+        assertNotNull(statusBarColorView);
+        assertEquals(View.GONE, statusBarColorView.getVisibility());
+        assertEquals(0, statusBarColorView.getLayoutParams().height);
+
+        Method refresh = WebViewDialog.class.getDeclaredMethod("refreshEdgeToEdgeChrome");
+        refresh.setAccessible(true);
+        refresh.invoke(dialog);
+        ShadowLooper.idleMainLooper();
+
+        assertEquals(View.GONE, statusBarColorView.getVisibility());
+        assertEquals(0, statusBarColorView.getLayoutParams().height);
+    }
+
+    @Test
+    @Config(sdk = 35)
+    public void hiddenHostStatusBarKeepsAppBarTopInsetZeroAfterSafeAreaInsets() throws Exception {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        Options options = new Options();
+        options.setUrl("https://example.com");
+        options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
+        options.setEnabledSafeTopMargin(true);
+        WebViewDialog dialog = browserLayoutDialog(activity, options, true);
+
+        com.google.android.material.appbar.AppBarLayout appBarLayout = dialog.findViewById(R.id.app_bar_layout);
+        assertNotNull(appBarLayout);
+        assertEquals(0, appBarLayout.getPaddingTop());
+
+        Method applySafeAreaInsets = WebViewDialog.class.getDeclaredMethod(
+            "applySafeAreaInsets",
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            Insets.class,
+            boolean.class,
+            boolean.class,
+            boolean.class
+        );
+        applySafeAreaInsets.setAccessible(true);
+        View toolbarView = dialog.findViewById(R.id.tool_bar);
+        boolean appBarHandlesTopInset = Build.VERSION.SDK_INT >= 35 && toolbarView != null && toolbarView.getParent() == appBarLayout;
+        assertTrue(appBarHandlesTopInset);
+
+        applySafeAreaInsets.invoke(
+            dialog,
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            Insets.of(0, 0, 0, 0),
+            false,
+            appBarHandlesTopInset,
+            true
+        );
+        ShadowLooper.idleMainLooper();
+
+        assertEquals(0, appBarLayout.getPaddingTop());
+    }
+
+    @Test
+    public void hostBarSyncSkippedDuringDialogMediaFullscreen() throws Exception {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        Window hostWindow = activity.getWindow();
+        WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+        hostController.show(WindowInsetsCompat.Type.statusBars());
+        hostController.show(WindowInsetsCompat.Type.navigationBars());
+        ViewCompat.dispatchApplyWindowInsets(
+            hostWindow.getDecorView(),
+            new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
+                .setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, 48))
+                .setVisible(WindowInsetsCompat.Type.statusBars(), true)
+                .setVisible(WindowInsetsCompat.Type.navigationBars(), true)
+                .build()
+        );
+
+        Options options = new Options();
+        options.setUrl("https://example.com");
+        options.setBackgroundColor("white");
+        // idleMainLooper=false: media fullscreen must be active before the posted host sync runs.
+        WebViewDialog dialog = browserLayoutDialog(activity, options, false, false);
+
+        Method show = WebViewDialog.class.getDeclaredMethod(
+            "showCustomFullscreenView",
+            View.class,
+            WebChromeClient.CustomViewCallback.class
+        );
+        show.setAccessible(true);
+        show.invoke(dialog, new View(activity), (WebChromeClient.CustomViewCallback) () -> {});
+
+        Field customViewField = WebViewDialog.class.getDeclaredField("customFullscreenView");
+        customViewField.setAccessible(true);
+        assertNotNull(customViewField.get(dialog));
+
+        ShadowLooper.idleMainLooper();
+
+        Window dialogWindow = dialog.getWindow();
+        SystemBarsControllerState afterPostedSync = SystemBarsControllerState.capture(dialogWindow);
+        assertFalse(afterPostedSync.isStatusVisible());
+        assertFalse(afterPostedSync.isNavigationVisible());
+    }
+
+    @Test
+    @Config(sdk = 35)
+    public void visibleHostStatusBarKeepsStatusBarColorViewAfterChromeRefresh() throws Exception {
+        ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
+        android.view.Window hostWindow = activity.getWindow();
+        WindowInsetsControllerCompat hostController = WindowCompat.getInsetsController(hostWindow, hostWindow.getDecorView());
+        hostController.show(WindowInsetsCompat.Type.statusBars());
+        ViewCompat.dispatchApplyWindowInsets(
+            hostWindow.getDecorView(),
+            new WindowInsetsCompat.Builder()
+                .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
+                .setVisible(WindowInsetsCompat.Type.statusBars(), true)
+                .build()
+        );
+
+        Options options = new Options();
+        options.setUrl("https://example.com");
+        options.setBackgroundColor("white");
+        options.setMaterialPicker(true);
+        WebViewDialog dialog = browserLayoutDialog(activity, options, false);
+
+        View statusBarColorView = dialog.findViewById(R.id.status_bar_color_view);
+        assertNotNull(statusBarColorView);
+        assertEquals(View.VISIBLE, statusBarColorView.getVisibility());
+
+        Method refresh = WebViewDialog.class.getDeclaredMethod("refreshEdgeToEdgeChrome");
+        refresh.setAccessible(true);
+        refresh.invoke(dialog);
+        ShadowLooper.idleMainLooper();
+
+        assertEquals(View.VISIBLE, statusBarColorView.getVisibility());
+    }
+
+    @Test
+    public void dialogFollowsHostImmersiveBarsAcrossFullscreenToggle() throws Exception {
+        Fixture f = new Fixture(false, false, true);
+        ShadowLooper.idleMainLooper();
+        WindowInsetsControllerCompat dialogController = WindowCompat.getInsetsController(
+            f.dialog.getWindow(),
+            f.dialog.getWindow().getDecorView()
+        );
+        assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+        SystemBarsControllerState afterOpen = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(afterOpen.isStatusVisible());
+        assertFalse(afterOpen.isNavigationVisible());
+
+        f.dialog.setFullscreen(true);
+        f.dialog.setFullscreen(false);
+        ShadowLooper.idleMainLooper();
+
+        assertEquals(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE, dialogController.getSystemBarsBehavior());
+        SystemBarsControllerState afterToggle = SystemBarsControllerState.capture(f.dialog.getWindow());
+        assertFalse(afterToggle.isStatusVisible());
+        assertFalse(afterToggle.isNavigationVisible());
     }
 
     @Test

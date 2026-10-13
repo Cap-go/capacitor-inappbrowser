@@ -179,9 +179,11 @@ private var bundledAssetStoppedKey: UInt8 = 0
 private extension WKURLSchemeTask {
     var stopped: Bool {
         get {
+            // appstore-2.5.2-allow: track WKURLSchemeTask stopped state across async completions
             objc_getAssociatedObject(self, &bundledAssetStoppedKey) as? Bool ?? false
         }
         set {
+            // appstore-2.5.2-allow: track WKURLSchemeTask stopped state across async completions
             objc_setAssociatedObject(self, &bundledAssetStoppedKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
     }
