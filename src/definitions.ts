@@ -1107,6 +1107,20 @@ export interface OpenWebViewOptions {
    */
   preferredContentMode?: PreferredContentMode;
   /**
+   * If true, the app is not covered with a privacy screen when it resigns active.
+   * By default the webview is covered with the `LaunchImage` (or `Splash`) asset, so the
+   * app switcher shows that image instead of the page. Set this to show the page content,
+   * like the main Capacitor WebView.
+   *
+   * **iOS only** — ignored on Android and Web.
+   *
+   * @since 8.23.0
+   * @default false
+   * @example
+   * disablePrivacyScreen: true
+   */
+  disablePrivacyScreen?: boolean;
+  /**
    * Whether the website in the webview is inspectable or not, ios only
    * @default false
    */
