@@ -1633,7 +1633,7 @@ export interface OpenWebViewOptions {
    * - The opened page keeps a `window.opener` reference to the app (required so `close()` works), so only open URLs you trust.
    * - `closeEvent` reports the originally opened `url`; the current page URL is not readable cross-origin.
    *
-   * @since 8.22.0
+   * @since 8.23.0
    * @example
    * web: { popup: true, width: 390, height: 844 }
    */
