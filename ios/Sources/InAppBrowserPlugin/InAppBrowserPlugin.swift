@@ -118,9 +118,9 @@ enum CustomSchemeHandoffSupport {
         url: URL,
         shouldEmitInterceptEvent: Bool,
         open: @escaping OpenHandler = defaultOpen,
-        onNavigationCancelled: () -> Void,
-        onIntercepted: (_ url: String, _ opened: Bool) -> Void,
-        onPageLoadError: () -> Void
+        onNavigationCancelled: @escaping () -> Void,
+        onIntercepted: @escaping (_ url: String, _ opened: Bool) -> Void,
+        onPageLoadError: @escaping () -> Void
     ) {
         guard CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme) else {
             onNavigationCancelled()
