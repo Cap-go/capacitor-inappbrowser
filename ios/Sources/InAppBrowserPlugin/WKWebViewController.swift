@@ -502,6 +502,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var openBlankTargetInWebView: Bool = false
+    var openCustomSchemesWithoutQuery: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
@@ -2487,6 +2488,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.titleFontFamily = parent.titleFontFamily
         self.titleIcon = parent.titleIcon
         self.openBlankTargetInWebView = parent.openBlankTargetInWebView
+        self.openCustomSchemesWithoutQuery = parent.openCustomSchemesWithoutQuery
         self.blankNavigationTab = false
         self.enabledSafeBottomMargin = parent.enabledSafeBottomMargin
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
@@ -3045,17 +3047,37 @@ fileprivate extension WKWebViewController {
     private func tryOpenCustomScheme(_ url: URL, completion: @escaping (Bool) -> Void) {
         let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
 
-        CustomSchemeHandoffSupport.handoff(
-            url: url,
-            shouldEmitInterceptEvent: shouldEmitCustomSchemeEvent,
-            onNavigationCancelled: { completion(true) },
-            onIntercepted: { [weak self] urlString, opened in
-                self?.emit("customSchemeIntercepted", data: ["url": urlString, "opened": opened])
-            },
-            onPageLoadError: { [weak self] in
-                self?.emit("pageLoadError")
+        if openCustomSchemesWithoutQuery {
+            CustomSchemeHandoffSupport.handoff(
+                url: url,
+                shouldEmitInterceptEvent: shouldEmitCustomSchemeEvent,
+                shouldAttemptOpen: CustomSchemeOpenSupport.shouldAttemptOpenWithoutQuery(scheme: url.scheme),
+                onNavigationCancelled: { completion(true) },
+                onIntercepted: { [weak self] urlString, opened in
+                    self?.emit("customSchemeIntercepted", data: ["url": urlString, "opened": opened])
+                },
+                onPageLoadError: { [weak self] in
+                    self?.emit("pageLoadError")
+                }
+            )
+            return
+        }
+
+        let canOpen = UIApplication.shared.canOpenURL(url)
+        if CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme, canOpenURL: canOpen) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            if shouldEmitCustomSchemeEvent {
+                emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": true])
             }
-        )
+            completion(true)
+            return
+        }
+
+        if shouldEmitCustomSchemeEvent {
+            emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
+        }
+        emit("pageLoadError")
+        completion(true)
     }
 
     /// Prefer Universal Links into the native app; if that fails, hand off to the system

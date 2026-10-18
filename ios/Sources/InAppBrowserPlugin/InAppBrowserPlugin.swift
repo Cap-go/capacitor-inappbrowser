@@ -96,9 +96,22 @@ enum AuthorizedAppLinkOpenSupport {
 }
 
 enum CustomSchemeOpenSupport {
-    /// `canOpenURL` needs LSApplicationQueriesSchemes; `open` does not.
-    /// Always attempt `UIApplication.open` for non-empty custom schemes.
-    static func shouldAttemptOpen(scheme: String?) -> Bool {
+    static let alwaysAttemptOpenSchemes = ["tel", "mailto", "sms"]
+
+    /// Default path: `canOpenURL` needs LSApplicationQueriesSchemes; `open` does not.
+    /// Always attempt open for Mail/Phone/Messages even when the query fails.
+    static func shouldAttemptOpen(scheme: String?, canOpenURL: Bool) -> Bool {
+        if canOpenURL {
+            return true
+        }
+        guard let scheme = scheme?.lowercased(), !scheme.isEmpty else {
+            return false
+        }
+        return alwaysAttemptOpenSchemes.contains(scheme)
+    }
+
+    /// Opt-in path (`openCustomSchemesWithoutQuery`): attempt `UIApplication.open` for any non-empty scheme.
+    static func shouldAttemptOpenWithoutQuery(scheme: String?) -> Bool {
         guard let scheme = scheme?.lowercased(), !scheme.isEmpty else {
             return false
         }
@@ -118,12 +131,13 @@ enum CustomSchemeHandoffSupport {
     static func handoff(
         url: URL,
         shouldEmitInterceptEvent: Bool,
+        shouldAttemptOpen: Bool,
         open: @escaping OpenHandler = defaultOpen,
         onNavigationCancelled: @escaping () -> Void,
         onIntercepted: @escaping (_ url: String, _ opened: Bool) -> Void,
         onPageLoadError: @escaping () -> Void
     ) {
-        guard CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme) else {
+        guard shouldAttemptOpen else {
             onNavigationCancelled()
             if shouldEmitInterceptEvent {
                 onIntercepted(url.absoluteString, false)
@@ -1405,6 +1419,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let titleFontFamily = call.getString("titleFontFamily")
         let isInspectable = call.getBool("isInspectable", self.bridge?.config.isWebDebuggable ?? false)
         let preventDeeplink = call.getBool("preventDeeplink", false)
+        let openCustomSchemesWithoutQuery = call.getBool("openCustomSchemesWithoutQuery", false)
         let openBlankTargetInWebView = call.getBool("openBlankTargetInWebView", false)
         let isAnimated = call.getBool("isAnimated", true)
         let enabledSafeBottomMargin = call.getBool("enabledSafeBottomMargin", false)
@@ -1606,6 +1621,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.proxyBridgeAccessToken = proxyBridgeAccessToken
             webViewController.legacyProxyRequestURLRegexPattern = legacyProxyRequests.urlRegex?.pattern
             webViewController.openBlankTargetInWebView = openBlankTargetInWebView
+            webViewController.openCustomSchemesWithoutQuery = openCustomSchemesWithoutQuery
             webViewController.persistWebViewData = persistWebViewData
             webViewController.useSharedDataStore = useSharedDataStore
             webViewController.clearCookiesOnOpen = clearCookiesOnOpen

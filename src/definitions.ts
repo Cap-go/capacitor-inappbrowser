@@ -1384,9 +1384,9 @@ export interface OpenWebViewOptions {
   /**
    * If true, deeplinks and external app hand-off are blocked and stay in the webview.
    * If false (default), custom schemes such as `tel:`, `mailto:`, and `sms:` open natively.
-   * On iOS, custom scheme URLs are handed off with `UIApplication.open` and do not require
-   * `LSApplicationQueriesSchemes` registration. HTTPS `authorizedAppLinks` use Universal Links
-   * and system open separately.
+   * On iOS, listing a custom scheme under `LSApplicationQueriesSchemes` is only required when
+   * you rely on `canOpenURL` for that scheme (for example `instagram://`). It is not required
+   * for HTTPS `authorizedAppLinks`, and `mailto`/`tel`/`sms` open without that Info.plist entry.
    * @since 0.1.0
    * @default false
    * @example
@@ -1394,6 +1394,21 @@ export interface OpenWebViewOptions {
    * Test URL: https://aasa-tester.capgo.app/
    */
   preventDeeplink?: boolean;
+
+  /**
+   * **iOS only** — ignored on Android, which already attempts to open any custom scheme.
+   * When true, non-http(s) custom scheme URLs are handed off with `UIApplication.open` without
+   * calling `canOpenURL` first, so undeclared schemes in `LSApplicationQueriesSchemes` can still
+   * open when a handler app is installed. `customSchemeIntercepted.opened` reflects the open
+   * completion handler and may arrive shortly after navigation is cancelled in the webview.
+   * When false (default), iOS keeps the legacy `canOpenURL` gate before opening.
+   *
+   * @since 8.25.0
+   * @default false
+   * @example
+   * openCustomSchemesWithoutQuery: true
+   */
+  openCustomSchemesWithoutQuery?: boolean;
 
   /**
    * When true, HTTP and HTTPS links opened from `target="_blank"` anchors stay in the current webview instead of spawning a popup or opening in the system browser.
