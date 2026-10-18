@@ -3046,26 +3046,24 @@ fileprivate extension WKWebViewController {
         let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
 
         guard CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme) else {
+            completion(true)
             if shouldEmitCustomSchemeEvent {
                 emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
             }
             emit("pageLoadError")
-            completion(true)
             return
         }
 
+        completion(true)
+
         UIApplication.shared.open(url, options: [:]) { [weak self] success in
-            guard let self else {
-                completion(true)
-                return
-            }
+            guard let self else { return }
             if shouldEmitCustomSchemeEvent {
                 self.emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": success])
             }
             if !success {
                 self.emit("pageLoadError")
             }
-            completion(true)
         }
     }
 
