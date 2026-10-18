@@ -1,10 +1,32 @@
 import XCTest
 @testable import InappbrowserPlugin
 
-private enum CustomSchemeTestURLs {
-    static let handoffSuccess = URL(string: "myapp://callback/success")
-    static let handoffFailure = URL(string: "myapp://callback/fail")
-    static let schemelessRelative = URL(string: "relative/path")
+private enum CustomSchemeTestURLParts {
+    static let scheme = "myapp"
+    static let callbackHost = "callback"
+    static let successPath = "/success"
+    static let failurePath = "/fail"
+    static let schemelessRelativePath = "relative/path"
+
+    static func handoffSuccess() -> URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = callbackHost
+        components.path = successPath
+        return components.url
+    }
+
+    static func handoffFailure() -> URL? {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = callbackHost
+        components.path = failurePath
+        return components.url
+    }
+
+    static func schemelessRelative() -> URL? {
+        URL(string: schemelessRelativePath)
+    }
 }
 
 final class AuthorizedAppLinkOpenSupportTests: XCTestCase {
@@ -32,7 +54,7 @@ final class AuthorizedAppLinkOpenSupportTests: XCTestCase {
 
 final class CustomSchemeHandoffSupportTests: XCTestCase {
     func testCancelsNavigationBeforeOpenInvoked() throws {
-        let url = try XCTUnwrap(CustomSchemeTestURLs.handoffSuccess)
+        let url = try XCTUnwrap(CustomSchemeTestURLParts.handoffSuccess())
         var navigationCancelled = false
         var openInvoked = false
         var interceptCalls = 0
@@ -57,7 +79,7 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
     }
 
     func testSuccessfulOpenEmitsInterceptedWithoutPageLoadError() throws {
-        let url = try XCTUnwrap(CustomSchemeTestURLs.handoffSuccess)
+        let url = try XCTUnwrap(CustomSchemeTestURLParts.handoffSuccess())
         var intercepted: (String, Bool)?
         var pageLoadErrors = 0
         var navigationCancelled = false
@@ -81,7 +103,7 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
     }
 
     func testFailedOpenEmitsInterceptedAndPageLoadError() throws {
-        let url = try XCTUnwrap(CustomSchemeTestURLs.handoffFailure)
+        let url = try XCTUnwrap(CustomSchemeTestURLParts.handoffFailure())
         var intercepted: (String, Bool)?
         var pageLoadErrors = 0
         var navigationCancelled = false
@@ -108,7 +130,7 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
         var openCalled = false
         var pageLoadErrors = 0
         var navigationCancelled = false
-        let url = try XCTUnwrap(CustomSchemeTestURLs.schemelessRelative)
+        let url = try XCTUnwrap(CustomSchemeTestURLParts.schemelessRelative())
 
         CustomSchemeHandoffSupport.handoff(
             url: url,
