@@ -16,6 +16,7 @@ private enum CustomSchemeTestURLParts {
         pathWithLeadingDelimiter(for: failureSegment)
     }
 
+    /// URLComponents requires an absolute path when `host` is set.
     private static func pathWithLeadingDelimiter(for segment: String) -> String {
         segment.hasPrefix(pathDelimiter) ? segment : pathDelimiter + segment
     }
