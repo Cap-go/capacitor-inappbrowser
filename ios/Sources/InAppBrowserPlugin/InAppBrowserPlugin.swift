@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import WebKit
 import AuthenticationServices
@@ -102,6 +103,44 @@ enum CustomSchemeOpenSupport {
             return false
         }
         return true
+    }
+}
+
+enum CustomSchemeHandoffSupport {
+    typealias OpenHandler = (_ url: URL, _ completion: @escaping (Bool) -> Void) -> Void
+
+    static func defaultOpen(_ url: URL, completion: @escaping (Bool) -> Void) {
+        UIApplication.shared.open(url, options: [:], completionHandler: completion)
+    }
+
+    /// Complete navigation cancellation synchronously, then hand off to the OS via `open`.
+    static func handoff(
+        url: URL,
+        shouldEmitInterceptEvent: Bool,
+        open: @escaping OpenHandler = defaultOpen,
+        onNavigationCancelled: () -> Void,
+        onIntercepted: (_ url: String, _ opened: Bool) -> Void,
+        onPageLoadError: () -> Void
+    ) {
+        guard CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme) else {
+            onNavigationCancelled()
+            if shouldEmitInterceptEvent {
+                onIntercepted(url.absoluteString, false)
+            }
+            onPageLoadError()
+            return
+        }
+
+        onNavigationCancelled()
+
+        open(url) { success in
+            if shouldEmitInterceptEvent {
+                onIntercepted(url.absoluteString, success)
+            }
+            if !success {
+                onPageLoadError()
+            }
+        }
     }
 }
 
