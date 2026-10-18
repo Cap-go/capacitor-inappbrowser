@@ -25,21 +25,17 @@ final class AuthorizedAppLinkOpenSupportTests: XCTestCase {
 }
 
 final class CustomSchemeOpenSupportTests: XCTestCase {
-    func testOpensWhenCanOpenURLIsTrue() {
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "instagram", canOpenURL: true))
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "mailto", canOpenURL: true))
+    func testAttemptsOpenForCustomSchemes() {
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "instagram"))
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "myapp"))
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "mailto"))
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "tel"))
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "sms"))
+        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "MAILTO"))
     }
 
-    func testForcesOpenForMailtoTelSmsWithoutQueriesScheme() {
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "mailto", canOpenURL: false))
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "tel", canOpenURL: false))
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "sms", canOpenURL: false))
-        XCTAssertTrue(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "MAILTO", canOpenURL: false))
-    }
-
-    func testDoesNotForceOpenUnknownCustomSchemesWithoutQueriesScheme() {
-        XCTAssertFalse(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "instagram", canOpenURL: false))
-        XCTAssertFalse(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: "myapp", canOpenURL: false))
-        XCTAssertFalse(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: nil, canOpenURL: false))
+    func testDoesNotAttemptOpenWithoutScheme() {
+        XCTAssertFalse(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: nil))
+        XCTAssertFalse(CustomSchemeOpenSupport.shouldAttemptOpen(scheme: ""))
     }
 }

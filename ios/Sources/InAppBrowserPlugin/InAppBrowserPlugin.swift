@@ -95,18 +95,13 @@ enum AuthorizedAppLinkOpenSupport {
 }
 
 enum CustomSchemeOpenSupport {
-    static let alwaysAttemptOpenSchemes = ["tel", "mailto", "sms"]
-
     /// `canOpenURL` needs LSApplicationQueriesSchemes; `open` does not.
-    /// Always attempt open for Mail/Phone/Messages even when the query fails.
-    static func shouldAttemptOpen(scheme: String?, canOpenURL: Bool) -> Bool {
-        if canOpenURL {
-            return true
-        }
+    /// Always attempt `UIApplication.open` for non-empty custom schemes.
+    static func shouldAttemptOpen(scheme: String?) -> Bool {
         guard let scheme = scheme?.lowercased(), !scheme.isEmpty else {
             return false
         }
-        return alwaysAttemptOpenSchemes.contains(scheme)
+        return true
     }
 }
 

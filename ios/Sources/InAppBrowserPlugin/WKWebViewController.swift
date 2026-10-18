@@ -3042,25 +3042,31 @@ fileprivate extension WKWebViewController {
         return valid
     }
 
-    private func tryOpenCustomScheme(_ url: URL) -> Bool {
-        let app = UIApplication.shared
+    private func tryOpenCustomScheme(_ url: URL, completion: @escaping (Bool) -> Void) {
         let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
-        let canOpen = app.canOpenURL(url)
 
-        if CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme, canOpenURL: canOpen) {
-            app.open(url, options: [:], completionHandler: nil)
+        guard CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme) else {
             if shouldEmitCustomSchemeEvent {
-                emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": true])
+                emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
             }
-            return true // external app opened -> cancel WebView load
+            emit("pageLoadError")
+            completion(true)
+            return
         }
 
-        // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
-        if shouldEmitCustomSchemeEvent {
-            emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
+        UIApplication.shared.open(url, options: [:]) { [weak self] success in
+            guard let self else {
+                completion(true)
+                return
+            }
+            if shouldEmitCustomSchemeEvent {
+                self.emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": success])
+            }
+            if !success {
+                self.emit("pageLoadError")
+            }
+            completion(true)
         }
-        emit("pageLoadError")
-        return true
     }
 
     /// Prefer Universal Links into the native app; if that fails, hand off to the system
@@ -3173,7 +3179,7 @@ fileprivate extension WKWebViewController {
         // Handle all non-http(s) schemes by default
         if scheme != "http" && scheme != "https" && scheme != "file" {
             print("[InAppBrowser] not http(s) scheme, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
 
@@ -3183,12 +3189,12 @@ fileprivate extension WKWebViewController {
 
         if hosts.contains(host) {
             print("[InAppBrowser] host \(host) matches one in UrlsHandledByApp, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
         if schemes.contains(scheme) {
             print("[InAppBrowser] scheme \(scheme) matches one in UrlsHandledByApp, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
 

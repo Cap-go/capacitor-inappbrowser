@@ -40,6 +40,8 @@ export interface CustomSchemeInterceptedEvent {
   url: string;
   /**
    * Whether the operating system accepted the URL handoff.
+   * On iOS this reflects the `UIApplication.open` completion handler and may arrive
+   * shortly after navigation is cancelled in the webview.
    */
   opened: boolean;
 }
@@ -1382,9 +1384,9 @@ export interface OpenWebViewOptions {
   /**
    * If true, deeplinks and external app hand-off are blocked and stay in the webview.
    * If false (default), custom schemes such as `tel:`, `mailto:`, and `sms:` open natively.
-   * On iOS, listing a custom scheme under `LSApplicationQueriesSchemes` is only required when
-   * you rely on `canOpenURL` for that scheme (for example `instagram://`). It is not required
-   * for HTTPS `authorizedAppLinks`, and `mailto`/`tel`/`sms` open without that Info.plist entry.
+   * On iOS, custom scheme URLs are handed off with `UIApplication.open` and do not require
+   * `LSApplicationQueriesSchemes` registration. HTTPS `authorizedAppLinks` use Universal Links
+   * and system open separately.
    * @since 0.1.0
    * @default false
    * @example
@@ -1921,6 +1923,7 @@ export interface InAppBrowserPlugin {
    * and hands it to the operating system.
    *
    * Standard OS-handled schemes such as `tel:`, `mailto:`, and `sms:` are excluded.
+   * On iOS, `opened` is reported asynchronously after `UIApplication.open` completes.
    *
    * @since 8.6.7
    */
