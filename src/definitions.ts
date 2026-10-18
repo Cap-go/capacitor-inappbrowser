@@ -40,6 +40,8 @@ export interface CustomSchemeInterceptedEvent {
   url: string;
   /**
    * Whether the operating system accepted the URL handoff.
+   * On iOS this reflects the `UIApplication.open` completion handler and may arrive
+   * shortly after navigation is cancelled in the webview.
    */
   opened: boolean;
 }
@@ -1394,6 +1396,21 @@ export interface OpenWebViewOptions {
   preventDeeplink?: boolean;
 
   /**
+   * **iOS only** — ignored on Android, which already attempts to open any custom scheme.
+   * When true, non-http(s) custom scheme URLs are handed off with `UIApplication.open` without
+   * calling `canOpenURL` first, so undeclared schemes in `LSApplicationQueriesSchemes` can still
+   * open when a handler app is installed. `customSchemeIntercepted.opened` reflects the open
+   * completion handler and may arrive shortly after navigation is cancelled in the webview.
+   * When false (default), iOS keeps the legacy `canOpenURL` gate before opening.
+   *
+   * @since 8.25.0
+   * @default false
+   * @example
+   * openCustomSchemesWithoutQuery: true
+   */
+  openCustomSchemesWithoutQuery?: boolean;
+
+  /**
    * When true, HTTP and HTTPS links opened from `target="_blank"` anchors stay in the current webview instead of spawning a popup or opening in the system browser.
    * By default, blank-target HTTP(S) links stay inside the plugin as managed popups that share cookies with the opener; enabling this option keeps everything in the same tab.
    * Custom schemes such as `tel:` and `mailto:` and authorized app links still prefer their native handlers unless `preventDeeplink` is enabled.
@@ -1921,6 +1938,7 @@ export interface InAppBrowserPlugin {
    * and hands it to the operating system.
    *
    * Standard OS-handled schemes such as `tel:`, `mailto:`, and `sms:` are excluded.
+   * On iOS, `opened` is reported asynchronously after `UIApplication.open` completes.
    *
    * @since 8.6.7
    */

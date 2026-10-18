@@ -502,6 +502,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     var viewWasPresented = false
     var preventDeeplink: Bool = false
     var openBlankTargetInWebView: Bool = false
+    var openCustomSchemesWithoutQuery: Bool = false
     var blankNavigationTab: Bool = false
     var capacitorStatusBar: UIView?
     var enabledSafeBottomMargin: Bool = false
@@ -2487,6 +2488,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.titleFontFamily = parent.titleFontFamily
         self.titleIcon = parent.titleIcon
         self.openBlankTargetInWebView = parent.openBlankTargetInWebView
+        self.openCustomSchemesWithoutQuery = parent.openCustomSchemesWithoutQuery
         self.blankNavigationTab = false
         self.enabledSafeBottomMargin = parent.enabledSafeBottomMargin
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
@@ -3042,25 +3044,40 @@ fileprivate extension WKWebViewController {
         return valid
     }
 
-    private func tryOpenCustomScheme(_ url: URL) -> Bool {
-        let app = UIApplication.shared
+    private func tryOpenCustomScheme(_ url: URL, completion: @escaping (Bool) -> Void) {
         let shouldEmitCustomSchemeEvent = CustomSchemeInterceptSupport.shouldEmitInterceptEvent(for: url)
-        let canOpen = app.canOpenURL(url)
 
+        if openCustomSchemesWithoutQuery {
+            CustomSchemeHandoffSupport.handoff(
+                url: url,
+                shouldEmitInterceptEvent: shouldEmitCustomSchemeEvent,
+                shouldAttemptOpen: CustomSchemeOpenSupport.shouldAttemptOpenWithoutQuery(scheme: url.scheme),
+                onNavigationCancelled: { completion(true) },
+                onIntercepted: { [weak self] urlString, opened in
+                    self?.emit("customSchemeIntercepted", data: ["url": urlString, "opened": opened])
+                },
+                onPageLoadError: { [weak self] in
+                    self?.emit("pageLoadError")
+                }
+            )
+            return
+        }
+
+        let canOpen = UIApplication.shared.canOpenURL(url)
         if CustomSchemeOpenSupport.shouldAttemptOpen(scheme: url.scheme, canOpenURL: canOpen) {
-            app.open(url, options: [:], completionHandler: nil)
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
             if shouldEmitCustomSchemeEvent {
                 emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": true])
             }
-            return true // external app opened -> cancel WebView load
+            completion(true)
+            return
         }
 
-        // Cannot open scheme: notify and still block WebView (avoid rendering garbage / errors)
         if shouldEmitCustomSchemeEvent {
             emit("customSchemeIntercepted", data: ["url": url.absoluteString, "opened": false])
         }
         emit("pageLoadError")
-        return true
+        completion(true)
     }
 
     /// Prefer Universal Links into the native app; if that fails, hand off to the system
@@ -3173,7 +3190,7 @@ fileprivate extension WKWebViewController {
         // Handle all non-http(s) schemes by default
         if scheme != "http" && scheme != "https" && scheme != "file" {
             print("[InAppBrowser] not http(s) scheme, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
 
@@ -3183,12 +3200,12 @@ fileprivate extension WKWebViewController {
 
         if hosts.contains(host) {
             print("[InAppBrowser] host \(host) matches one in UrlsHandledByApp, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
         if schemes.contains(scheme) {
             print("[InAppBrowser] scheme \(scheme) matches one in UrlsHandledByApp, try to open URLs in external apps")
-            completion(tryOpenCustomScheme(url))
+            tryOpenCustomScheme(url, completion: completion)
             return
         }
 
