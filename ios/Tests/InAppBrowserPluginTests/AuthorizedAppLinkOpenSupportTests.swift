@@ -7,14 +7,21 @@ private enum CustomSchemeTestURLParts {
     static let successSegment = "success"
     static let failureSegment = "fail"
     static let schemelessRelativePath = "relative/path"
-    private static let pathLeadingSlash = "/"
 
     static var successPath: String {
-        pathLeadingSlash + successSegment
+        pathWithLeadingDelimiter(for: successSegment)
     }
 
     static var failurePath: String {
-        pathLeadingSlash + failureSegment
+        pathWithLeadingDelimiter(for: failureSegment)
+    }
+
+    private static func pathWithLeadingDelimiter(for segment: String) -> String {
+        segment.hasPrefix(pathDelimiter) ? segment : pathDelimiter + segment
+    }
+
+    private static var pathDelimiter: String {
+        String(UnicodeScalar(47))
     }
 
     static func handoffSuccess() -> URL? {
