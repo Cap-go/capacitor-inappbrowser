@@ -4,8 +4,8 @@ import XCTest
 private enum CustomSchemeTestURLParts {
     static let scheme = "myapp"
     static let callbackHost = "callback"
-    static let successPath = "/success"
-    static let failurePath = "/fail"
+    static let successSegment = "success"
+    static let failureSegment = "fail"
     static let schemelessRelativePath = "relative/path"
 
     static func handoffSuccess() -> URL? {
