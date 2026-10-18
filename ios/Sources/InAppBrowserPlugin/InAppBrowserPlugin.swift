@@ -113,7 +113,8 @@ enum CustomSchemeHandoffSupport {
         UIApplication.shared.open(url, options: [:], completionHandler: completion)
     }
 
-    /// Complete navigation cancellation synchronously, then hand off to the OS via `open`.
+    /// Calls `onNavigationCancelled` synchronously, then hands off to the OS via `open`.
+    /// Intercept and error callbacks run when the open attempt finishes.
     static func handoff(
         url: URL,
         shouldEmitInterceptEvent: Bool,
