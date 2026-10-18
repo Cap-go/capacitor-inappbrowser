@@ -7,6 +7,15 @@ private enum CustomSchemeTestURLParts {
     static let successSegment = "success"
     static let failureSegment = "fail"
     static let schemelessRelativePath = "relative/path"
+    private static let pathLeadingSlash = "/"
+
+    static var successPath: String {
+        pathLeadingSlash + successSegment
+    }
+
+    static var failurePath: String {
+        pathLeadingSlash + failureSegment
+    }
 
     static func handoffSuccess() -> URL? {
         var components = URLComponents()
@@ -53,6 +62,19 @@ final class AuthorizedAppLinkOpenSupportTests: XCTestCase {
 }
 
 final class CustomSchemeHandoffSupportTests: XCTestCase {
+    func testHandoffFixtureURLsUseLeadingSlashPaths() throws {
+        let success = try XCTUnwrap(CustomSchemeTestURLParts.handoffSuccess())
+        let failure = try XCTUnwrap(CustomSchemeTestURLParts.handoffFailure())
+
+        XCTAssertEqual(success.scheme, CustomSchemeTestURLParts.scheme)
+        XCTAssertEqual(success.host, CustomSchemeTestURLParts.callbackHost)
+        XCTAssertEqual(success.path, CustomSchemeTestURLParts.successPath)
+
+        XCTAssertEqual(failure.scheme, CustomSchemeTestURLParts.scheme)
+        XCTAssertEqual(failure.host, CustomSchemeTestURLParts.callbackHost)
+        XCTAssertEqual(failure.path, CustomSchemeTestURLParts.failurePath)
+    }
+
     func testCancelsNavigationBeforeOpenInvoked() throws {
         let url = try XCTUnwrap(CustomSchemeTestURLParts.handoffSuccess())
         var navigationCancelled = false
@@ -130,6 +152,7 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
         var openCalled = false
         var pageLoadErrors = 0
         var navigationCancelled = false
+        var interceptCalls = 0
         let url = try XCTUnwrap(CustomSchemeTestURLParts.schemelessRelative())
 
         CustomSchemeHandoffSupport.handoff(
@@ -138,12 +161,13 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
             shouldAttemptOpen: false,
             open: { _, _ in openCalled = true },
             onNavigationCancelled: { navigationCancelled = true },
-            onIntercepted: { _, _ in XCTFail("Intercept event should not fire") },
+            onIntercepted: { _, _ in interceptCalls += 1 },
             onPageLoadError: { pageLoadErrors += 1 }
         )
 
         XCTAssertTrue(navigationCancelled)
         XCTAssertFalse(openCalled)
+        XCTAssertEqual(interceptCalls, 0)
         XCTAssertEqual(pageLoadErrors, 1)
     }
 }
