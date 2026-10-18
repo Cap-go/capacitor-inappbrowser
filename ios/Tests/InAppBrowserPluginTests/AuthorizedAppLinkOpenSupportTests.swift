@@ -86,9 +86,7 @@ final class CustomSchemeHandoffSupportTests: XCTestCase {
     func testInvalidSchemeEmitsFailureWithoutCallingOpen() throws {
         var openCalled = false
         var pageLoadErrors = 0
-        var components = URLComponents()
-        components.scheme = ""
-        let url = try XCTUnwrap(components.url)
+        let url = try XCTUnwrap(URL(string: "relative/path"))
 
         CustomSchemeHandoffSupport.handoff(
             url: url,
