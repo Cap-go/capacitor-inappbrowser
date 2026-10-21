@@ -36,6 +36,11 @@ describe('openWebView on web', () => {
       text: '',
       remove: mock(() => undefined),
     });
+    const markConsoleCaptureInstalled = (win: Record<string, unknown>, element: { text?: string }) => {
+      if (element.text?.includes('__capgoInAppBrowserConsoleCaptureInstalled')) {
+        win.__capgoInAppBrowserConsoleCaptureInstalled = true;
+      }
+    };
     mockWindow = {
       closed: false,
       location: { href: 'https://example.com/page', origin: 'https://example.com' },
@@ -43,7 +48,11 @@ describe('openWebView on web', () => {
         open: () => undefined,
         write: () => undefined,
         close: () => undefined,
-        head: { appendChild: mock(() => undefined) },
+        head: {
+          appendChild: mock((element: { text?: string }) => {
+            markConsoleCaptureInstalled(mockWindow, element);
+          }),
+        },
         createElement: mock(() => createScriptElement()),
       },
       close: () => {
@@ -59,7 +68,11 @@ describe('openWebView on web', () => {
           open: () => undefined,
           write: () => undefined,
           close: () => undefined,
-          head: { appendChild: mock(() => undefined) },
+          head: {
+            appendChild: mock((element: { text?: string }) => {
+              markConsoleCaptureInstalled(win, element);
+            }),
+          },
           createElement: mock(() => createScriptElement()),
         },
         close: () => {

@@ -15,6 +15,8 @@ import type {
 } from './definitions';
 import { buildConsoleCaptureScript, parseCapgoConsolePostMessage } from './web-console-capture';
 
+type ConsoleCaptureWindow = Window & { __capgoInAppBrowserConsoleCaptureInstalled?: boolean };
+
 type TrackedWebView = {
   window: Window;
   url: string;
@@ -22,8 +24,8 @@ type TrackedWebView = {
   /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
   origin: string;
   captureConsoleLogs: boolean;
-  /** Href of the child document where console capture was last injected. */
-  consoleCaptureInstalledHref?: string;
+  /** Child document where console capture hooks were last confirmed active. */
+  consoleCaptureInstalledDocument?: Document;
   consoleCaptureTimer?: number;
 };
 
@@ -148,40 +150,48 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         }
         return;
       }
-      const href = this.childDocumentHref(current);
-      if (!href || current.consoleCaptureInstalledHref === href) {
+      if (!this.childDocumentHref(current)) {
         return;
       }
-      if (this.tryInstallConsoleCapture(current)) {
-        current.consoleCaptureInstalledHref = href;
+      const child = current.window as ConsoleCaptureWindow;
+      const doc = child.document;
+      if (this.isConsoleCaptureActive(child) && current.consoleCaptureInstalledDocument === doc) {
+        return;
+      }
+      this.tryInstallConsoleCapture(current);
+      if (this.isConsoleCaptureActive(child)) {
+        current.consoleCaptureInstalledDocument = doc;
       }
     };
     tryInstall();
     entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
   }
 
-  private tryInstallConsoleCapture(entry: TrackedWebView): boolean {
+  private isConsoleCaptureActive(child: ConsoleCaptureWindow): boolean {
+    return child.__capgoInAppBrowserConsoleCaptureInstalled === true;
+  }
+
+  private tryInstallConsoleCapture(entry: TrackedWebView): void {
     const child = entry.window;
     if (child.closed || !this.childDocumentHref(entry)) {
-      return false;
+      return;
     }
     try {
       const script = buildConsoleCaptureScript();
       const doc = child.document;
       if (!doc) {
-        return false;
+        return;
       }
       const target = doc.head ?? doc.documentElement;
       if (!target) {
-        return false;
+        return;
       }
       const element = doc.createElement('script');
       element.text = script;
       target.appendChild(element);
       element.remove();
-      return true;
     } catch {
-      return false;
+      return;
     }
   }
 
