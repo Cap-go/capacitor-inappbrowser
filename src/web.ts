@@ -13,9 +13,12 @@ import type {
   OpenSecureWindowResponse,
   ScreenshotResult,
 } from './definitions';
-import { buildConsoleCaptureScript, parseCapgoConsolePostMessage } from './web-console-capture';
-
-type ConsoleCaptureWindow = Window & { __capgoInAppBrowserConsoleCaptureInstalled?: boolean };
+import { parseCapgoConsolePostMessage } from './web-console-capture';
+import {
+  type ConsoleCaptureWindow,
+  ensureConsoleCaptureInstalled,
+  isConsoleCaptureActive,
+} from './web-console-capture-host';
 
 type TrackedWebView = {
   window: Window;
@@ -92,7 +95,7 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     if (entry.captureConsoleLogs && event.source === entry.window) {
       const childWindow = entry.window as ConsoleCaptureWindow;
       if (
-        this.isConsoleCaptureActive(childWindow) &&
+        isConsoleCaptureActive(childWindow) &&
         event.origin &&
         event.origin !== 'null' &&
         mayAdoptPostMessageOrigin(entry.url, event.origin)
@@ -128,18 +131,6 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     this.notifyListeners('closeEvent', { id, url: entry.url });
   }
 
-  private childDocumentHref(entry: TrackedWebView): string | undefined {
-    try {
-      const href = entry.window.location.href;
-      if (!href || href === 'about:blank') {
-        return undefined;
-      }
-      return href;
-    } catch {
-      return undefined;
-    }
-  }
-
   private scheduleConsoleCapture(id: string): void {
     const entry = this.webViews.get(id);
     if (!entry?.captureConsoleLogs || entry.consoleCaptureTimer !== undefined) {
@@ -154,53 +145,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         }
         return;
       }
-      if (!this.childDocumentHref(current)) {
-        return;
-      }
-      const child = current.window as ConsoleCaptureWindow;
-      const doc = child.document;
-      if (this.isConsoleCaptureActive(child) && current.consoleCaptureInstalledDocument === doc) {
-        return;
-      }
-      this.tryInstallConsoleCapture(current);
-      if (this.isConsoleCaptureActive(child)) {
-        current.consoleCaptureInstalledDocument = doc;
-      }
+      ensureConsoleCaptureInstalled(current);
     };
     tryInstall();
     entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
-  }
-
-  private isConsoleCaptureActive(child: ConsoleCaptureWindow): boolean {
-    try {
-      return child.__capgoInAppBrowserConsoleCaptureInstalled === true;
-    } catch {
-      return false;
-    }
-  }
-
-  private tryInstallConsoleCapture(entry: TrackedWebView): void {
-    const child = entry.window;
-    if (child.closed || !this.childDocumentHref(entry)) {
-      return;
-    }
-    try {
-      const script = buildConsoleCaptureScript();
-      const doc = child.document;
-      if (!doc) {
-        return;
-      }
-      const target = doc.head ?? doc.documentElement;
-      if (!target) {
-        return;
-      }
-      const element = doc.createElement('script');
-      element.text = script;
-      target.appendChild(element);
-      element.remove();
-    } catch {
-      return;
-    }
   }
 
   private resolveWebViewEntry(id?: string): { id: string; entry: TrackedWebView } | undefined {

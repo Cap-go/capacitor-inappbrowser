@@ -173,27 +173,23 @@ await InAppBrowser.show({ id: second.id });
 
 #### Listen to console output from the managed page
 
-Use `captureConsoleLogs: true` when you need `consoleMessage` events from JavaScript running inside the in-app browser (for example while the WebView stays hidden during a smoke test). The option is off by default and adds no overhead when omitted.
+See [`consoleMessage`](#addlistenerconsolemessage-) and [`captureConsoleLogs`](#openwebview).
 
 ```js
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 
 const listener = await InAppBrowser.addListener('consoleMessage', (event) => {
-  console.log(`[${event.level}]`, event.message, event.source, event.line);
+  console.log(event.level, event.message);
 });
 
 const { id } = await InAppBrowser.openWebView({
   url: 'https://example.com/checkout',
   captureConsoleLogs: true,
-  hidden: true,
 });
 
-// Later:
 await listener.remove();
 await InAppBrowser.close({ id });
 ```
-
-On web, console capture works only for same-origin pages opened with `openWebView`. Cross-origin popups ignore the option without error.
 
 #### Hide from the native close button and brand the toolbar title
 

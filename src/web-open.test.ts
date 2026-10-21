@@ -1,25 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { InAppBrowserWeb, mayAdoptPostMessageOrigin } from './web';
-import { CAPGO_CONSOLE_POST_TYPE } from './web-console-capture';
+import {
+  createMockPopoutWindow,
+  dispatchConsolePostMessage,
+  getWindowMessageHandler,
+  type MockPopoutWindow,
+} from './web-open-test-helpers';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
-  let mockWindow: {
-    closed: boolean;
-    location: { href: string; origin?: string };
-    document: {
-      open: () => void;
-      write: (html: string) => void;
-      close: () => void;
-      head: { appendChild: ReturnType<typeof mock> };
-      createElement: ReturnType<typeof mock>;
-    };
-    close: () => void;
-    postMessage: ReturnType<typeof mock>;
-  };
+  let mockWindow: MockPopoutWindow;
   let consoleEvents: unknown[];
-  let openedWindows: (typeof mockWindow)[];
+  let openedWindows: MockPopoutWindow[];
   const realSetInterval = globalThis.setInterval;
   const realClearInterval = globalThis.clearInterval;
   const realOpen = globalThis.open;
@@ -36,50 +29,14 @@ describe('openWebView on web', () => {
       text: '',
       remove: mock(() => undefined),
     });
-    const markConsoleCaptureInstalled = (win: Record<string, unknown>, element: { text?: string }) => {
+    const markConsoleCaptureInstalled = (win: MockPopoutWindow, element: { text?: string }) => {
       if (element.text?.includes('__capgoInAppBrowserConsoleCaptureInstalled')) {
         win.__capgoInAppBrowserConsoleCaptureInstalled = true;
       }
     };
-    mockWindow = {
-      closed: false,
-      location: { href: 'https://example.com/page', origin: 'https://example.com' },
-      document: {
-        open: () => undefined,
-        write: () => undefined,
-        close: () => undefined,
-        head: {
-          appendChild: mock((element: { text?: string }) => {
-            markConsoleCaptureInstalled(mockWindow, element);
-          }),
-        },
-        createElement: mock(() => createScriptElement()),
-      },
-      close: () => {
-        mockWindow.closed = true;
-      },
-      postMessage: mock(() => undefined),
-    };
+    mockWindow = createMockPopoutWindow(createScriptElement, markConsoleCaptureInstalled);
     openMockHolder.fn = mock(() => {
-      const win = {
-        closed: false,
-        location: { href: 'https://example.com/page', origin: 'https://example.com' },
-        document: {
-          open: () => undefined,
-          write: () => undefined,
-          close: () => undefined,
-          head: {
-            appendChild: mock((element: { text?: string }) => {
-              markConsoleCaptureInstalled(win, element);
-            }),
-          },
-          createElement: mock(() => createScriptElement()),
-        },
-        close: () => {
-          win.closed = true;
-        },
-        postMessage: mock(() => undefined),
-      };
+      const win = createMockPopoutWindow(createScriptElement, markConsoleCaptureInstalled);
       openedWindows.push(win);
       mockWindow = win;
       return win as unknown as Window;
@@ -169,8 +126,7 @@ describe('openWebView on web', () => {
 
   it('targets the origin of the last message received after a same-site redirect', async () => {
     await browser.openWebView({ url: 'https://app.example.com' });
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
+    getWindowMessageHandler(browser)({
       source: mockWindow,
       origin: 'https://login.app.example.com',
       data: { ready: true },
@@ -204,76 +160,37 @@ describe('openWebView on web', () => {
 
   it('emits consoleMessage from child postMessage payloads', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    (
-      mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }
-    ).__capgoInAppBrowserConsoleCaptureInstalled = true;
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
-      source: mockWindow,
+    mockWindow.__capgoInAppBrowserConsoleCaptureInstalled = true;
+    dispatchConsolePostMessage(browser, mockWindow, {
       origin: 'https://example.com',
-      data: {
-        type: CAPGO_CONSOLE_POST_TYPE,
-        level: 'log',
-        message: 'feature-smoke-console-ok',
-      },
-    } as unknown as MessageEvent);
+      message: 'feature-smoke-console-ok',
+    });
     expect(consoleEvents).toEqual([{ id: 'web-1', level: 'log', message: 'feature-smoke-console-ok' }]);
   });
 
   it('ignores console postMessage payloads when captureConsoleLogs is false', async () => {
     await browser.openWebView({ url: 'https://example.com/page' });
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
-      source: mockWindow,
-      origin: 'https://example.com',
-      data: {
-        type: CAPGO_CONSOLE_POST_TYPE,
-        level: 'log',
-        message: 'should-not-emit',
-      },
-    } as unknown as MessageEvent);
+    dispatchConsolePostMessage(browser, mockWindow, { origin: 'https://example.com', message: 'should-not-emit' });
     expect(consoleEvents).toEqual([]);
   });
 
   it('ignores console postMessage payloads from disallowed origins', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    (
-      mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }
-    ).__capgoInAppBrowserConsoleCaptureInstalled = true;
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
-      source: mockWindow,
-      origin: 'https://evil.example.org',
-      data: {
-        type: CAPGO_CONSOLE_POST_TYPE,
-        level: 'log',
-        message: 'forged',
-      },
-    } as unknown as MessageEvent);
+    mockWindow.__capgoInAppBrowserConsoleCaptureInstalled = true;
+    dispatchConsolePostMessage(browser, mockWindow, { origin: 'https://evil.example.org', message: 'forged' });
     expect(consoleEvents).toEqual([]);
   });
 
   it('ignores forged console payloads when capture hooks are not active', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    delete (mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean })
-      .__capgoInAppBrowserConsoleCaptureInstalled;
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
-      source: mockWindow,
-      origin: 'https://example.com',
-      data: {
-        type: CAPGO_CONSOLE_POST_TYPE,
-        level: 'log',
-        message: 'forged-without-hooks',
-      },
-    } as unknown as MessageEvent);
+    delete mockWindow.__capgoInAppBrowserConsoleCaptureInstalled;
+    dispatchConsolePostMessage(browser, mockWindow, { origin: 'https://example.com', message: 'forged-without-hooks' });
     expect(consoleEvents).toEqual([]);
   });
 
   it('ignores message origins outside the opened site', async () => {
     await browser.openWebView({ url: 'https://app.example.com' });
-    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
-    handler({
+    getWindowMessageHandler(browser)({
       source: mockWindow,
       origin: 'https://evil.example.org',
       data: { forged: true },
