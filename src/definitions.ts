@@ -833,6 +833,9 @@ export interface OpenWebViewOptions {
    * Emits `consoleMessage` events for JavaScript `console.*` output coming from the managed page.
    * Useful when the webview stays hidden and you still need page-level diagnostics.
    *
+   * On web, capture works only when the opened window stays same-origin with the host page so the
+   * opener can inject the console wrapper. Cross-origin pages ignore this option without error.
+   *
    * @default false
    * @since 8.6.0
    */

@@ -1,16 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 import { InAppBrowserWeb, mayAdoptPostMessageOrigin } from './web';
+import { CAPGO_CONSOLE_POST_TYPE } from './web-console-capture';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
   let mockWindow: {
     closed: boolean;
-    location: { href: string };
-    document: { open: () => void; write: (html: string) => void; close: () => void };
+    location: { href: string; origin?: string };
+    document: {
+      open: () => void;
+      write: (html: string) => void;
+      close: () => void;
+      head: { appendChild: ReturnType<typeof mock> };
+      createElement: ReturnType<typeof mock>;
+    };
     close: () => void;
     postMessage: ReturnType<typeof mock>;
   };
+  let consoleEvents: unknown[];
   let openedWindows: (typeof mockWindow)[];
   const realSetInterval = globalThis.setInterval;
   const realClearInterval = globalThis.clearInterval;
@@ -23,13 +31,20 @@ describe('openWebView on web', () => {
     globalThis.clearInterval = mock(() => undefined) as unknown as typeof clearInterval;
     const openMockHolder: { fn?: typeof window.open } = {};
     openedWindows = [];
+    consoleEvents = [];
+    const createScriptElement = () => ({
+      text: '',
+      remove: mock(() => undefined),
+    });
     mockWindow = {
       closed: false,
-      location: { href: '' },
+      location: { href: '', origin: 'https://example.com' },
       document: {
         open: () => undefined,
         write: () => undefined,
         close: () => undefined,
+        head: { appendChild: mock(() => undefined) },
+        createElement: mock(() => createScriptElement()),
       },
       close: () => {
         mockWindow.closed = true;
@@ -39,11 +54,13 @@ describe('openWebView on web', () => {
     openMockHolder.fn = mock(() => {
       const win = {
         closed: false,
-        location: { href: '' },
+        location: { href: '', origin: 'https://example.com' },
         document: {
           open: () => undefined,
           write: () => undefined,
           close: () => undefined,
+          head: { appendChild: mock(() => undefined) },
+          createElement: mock(() => createScriptElement()),
         },
         close: () => {
           win.closed = true;
@@ -61,6 +78,9 @@ describe('openWebView on web', () => {
     } as Window;
     globalThis.open = openMockHolder.fn;
     browser = new InAppBrowserWeb();
+    browser.addListener('consoleMessage', (event) => {
+      consoleEvents.push(event);
+    });
   });
 
   afterEach(() => {
@@ -157,6 +177,31 @@ describe('openWebView on web', () => {
   it('rejects a different port for postMessage target adoption', () => {
     expect(mayAdoptPostMessageOrigin('https://app.example.com', 'https://login.app.example.com:8443')).toBe(false);
     expect(mayAdoptPostMessageOrigin('https://app.example.com:8443', 'https://login.app.example.com:8443')).toBe(true);
+  });
+
+  it('installs console capture when captureConsoleLogs is true', async () => {
+    await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
+    expect(mockWindow.document.createElement).toHaveBeenCalledWith('script');
+  });
+
+  it('does not install console capture by default', async () => {
+    await browser.openWebView({ url: 'https://example.com/page' });
+    expect(mockWindow.document.createElement).not.toHaveBeenCalled();
+  });
+
+  it('emits consoleMessage from child postMessage payloads', async () => {
+    await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
+    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
+    handler({
+      source: mockWindow,
+      origin: 'https://example.com',
+      data: {
+        type: CAPGO_CONSOLE_POST_TYPE,
+        level: 'log',
+        message: 'feature-smoke-console-ok',
+      },
+    } as unknown as MessageEvent);
+    expect(consoleEvents).toEqual([{ id: 'web-1', level: 'log', message: 'feature-smoke-console-ok' }]);
   });
 
   it('ignores message origins outside the opened site', async () => {

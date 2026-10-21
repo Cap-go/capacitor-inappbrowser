@@ -13,6 +13,7 @@ import type {
   OpenSecureWindowResponse,
   ScreenshotResult,
 } from './definitions';
+import { buildConsoleCaptureScript, parseCapgoConsolePostMessage } from './web-console-capture';
 
 type TrackedWebView = {
   window: Window;
@@ -20,6 +21,9 @@ type TrackedWebView = {
   timer: number;
   /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
   origin: string;
+  captureConsoleLogs: boolean;
+  consoleCaptureInstalled: boolean;
+  consoleCaptureTimer?: number;
 };
 
 const WEB_HEADERS_UNSUPPORTED_MESSAGE =
@@ -81,6 +85,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         return;
       }
     }
+    const consolePayload = parseCapgoConsolePostMessage(data);
+    if (consolePayload) {
+      this.notifyListeners('consoleMessage', { id, ...consolePayload });
+      return;
+    }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       this.notifyListeners('messageFromWebview', { ...(data as Record<string, unknown>), id });
     } else if (typeof event.data === 'string') {
@@ -98,8 +107,64 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       return;
     }
     globalThis.clearInterval(entry.timer);
+    if (entry.consoleCaptureTimer !== undefined) {
+      globalThis.clearInterval(entry.consoleCaptureTimer);
+    }
     this.webViews.delete(id);
     this.notifyListeners('closeEvent', { id, url: entry.url });
+  }
+
+  private scheduleConsoleCapture(id: string): void {
+    const entry = this.webViews.get(id);
+    if (!entry?.captureConsoleLogs || entry.consoleCaptureInstalled) {
+      return;
+    }
+    const tryInstall = (): void => {
+      const current = this.webViews.get(id);
+      if (!current || current.consoleCaptureInstalled || current.window.closed) {
+        if (current?.consoleCaptureTimer !== undefined) {
+          globalThis.clearInterval(current.consoleCaptureTimer);
+          current.consoleCaptureTimer = undefined;
+        }
+        return;
+      }
+      if (this.tryInstallConsoleCapture(current)) {
+        current.consoleCaptureInstalled = true;
+        if (current.consoleCaptureTimer !== undefined) {
+          globalThis.clearInterval(current.consoleCaptureTimer);
+          current.consoleCaptureTimer = undefined;
+        }
+      }
+    };
+    tryInstall();
+    if (!entry.consoleCaptureInstalled && entry.consoleCaptureTimer === undefined) {
+      entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
+    }
+  }
+
+  private tryInstallConsoleCapture(entry: TrackedWebView): boolean {
+    const child = entry.window;
+    if (child.closed) {
+      return false;
+    }
+    try {
+      const script = buildConsoleCaptureScript();
+      const doc = child.document;
+      if (!doc) {
+        return false;
+      }
+      const target = doc.head ?? doc.documentElement;
+      if (!target) {
+        return false;
+      }
+      const element = doc.createElement('script');
+      element.text = script;
+      target.appendChild(element);
+      element.remove();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private resolveWebViewEntry(id?: string): { id: string; entry: TrackedWebView } | undefined {
@@ -188,8 +253,19 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     const id = `web-${++this.webViewCounter}`;
     const timer = globalThis.setInterval(() => this.watchClosed(id), 500);
     const origin = this.resolveTargetOrigin(options.url);
-    this.webViews.set(id, { window: opened, url: options.url, timer, origin });
+    const captureConsoleLogs = options.captureConsoleLogs === true;
+    this.webViews.set(id, {
+      window: opened,
+      url: options.url,
+      timer,
+      origin,
+      captureConsoleLogs,
+      consoleCaptureInstalled: false,
+    });
     this.navigateOpenedWindow(opened, options.url, options.headers);
+    if (captureConsoleLogs) {
+      this.scheduleConsoleCapture(id);
+    }
     return Promise.resolve({ id });
   }
 

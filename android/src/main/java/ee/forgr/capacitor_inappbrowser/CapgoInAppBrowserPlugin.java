@@ -2240,7 +2240,10 @@ final class ConsoleMessageEventHelper {
 
         String normalized = level.trim().toLowerCase();
         return switch (normalized) {
-            case "log", "info", "warn", "error", "debug", "assert" -> normalized;
+            case "log", "info", "warn", "error", "debug" -> normalized;
+            case "tip" -> "info";
+            case "warning" -> "warn";
+            case "assert" -> "error";
             default -> "log";
         };
     }
