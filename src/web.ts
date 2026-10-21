@@ -35,7 +35,8 @@ const WEB_HEADERS_UNSUPPORTED_MESSAGE =
 /** Whether a webview message origin may replace the postMessage target (full origin string). */
 export function mayAdoptPostMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
   try {
-    const opened = new URL(openedUrl);
+    const base = globalThis.location?.href;
+    const opened = base ? new URL(openedUrl, base) : new URL(openedUrl);
     const incoming = new URL(messageOrigin);
     if (opened.protocol !== incoming.protocol) {
       return false;
@@ -88,16 +89,19 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         return;
       }
     }
-    if (
-      entry.captureConsoleLogs &&
-      event.origin &&
-      event.origin !== 'null' &&
-      mayAdoptPostMessageOrigin(entry.url, event.origin)
-    ) {
-      const consolePayload = parseCapgoConsolePostMessage(data);
-      if (consolePayload) {
-        this.notifyListeners('consoleMessage', { id, ...consolePayload });
-        return;
+    if (entry.captureConsoleLogs && event.source === entry.window) {
+      const childWindow = entry.window as ConsoleCaptureWindow;
+      if (
+        this.isConsoleCaptureActive(childWindow) &&
+        event.origin &&
+        event.origin !== 'null' &&
+        mayAdoptPostMessageOrigin(entry.url, event.origin)
+      ) {
+        const consolePayload = parseCapgoConsolePostMessage(data);
+        if (consolePayload) {
+          this.notifyListeners('consoleMessage', { id, ...consolePayload });
+          return;
+        }
       }
     }
     if (data && typeof data === 'object' && !Array.isArray(data)) {

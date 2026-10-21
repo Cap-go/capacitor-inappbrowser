@@ -116,7 +116,7 @@ var originalAssert=console.assert?console.assert.bind(console):null;
 console.assert=function(condition){
 if(!condition){
 var args=Array.prototype.slice.call(arguments,1);
-post('error',args.length?args:['console.assert'],null);
+post('error',args.length?['Assertion failed:'].concat(args):['Assertion failed'],null);
 }
 if(originalAssert){return originalAssert.apply(console,arguments);}
 };
