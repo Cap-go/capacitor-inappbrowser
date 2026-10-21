@@ -173,7 +173,7 @@ await InAppBrowser.show({ id: second.id });
 
 #### Listen to console output from the managed page
 
-See [`consoleMessage`](#addlistenerconsolemessage-) and [`captureConsoleLogs`](#openwebview).
+See [`consoleMessage`](#addlistenerconsolemessage-) and [`captureConsoleLogs`](#openwebviewoptions).
 
 ```js
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
