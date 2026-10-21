@@ -3748,8 +3748,8 @@ extension WKWebViewController: WKNavigationDelegate {
                     }
                 } else {
                     // injectPreShowScript will block, don't execute on the main thread
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        self.injectPreShowScript()
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        self?.injectPreShowScript()
                         DispatchQueue.main.async { [weak self] in
                             self?.capBrowserPlugin?.presentView(webViewId: self?.instanceId)
                         }
