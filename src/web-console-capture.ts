@@ -83,11 +83,15 @@ var postType=${JSON.stringify(postType)};
 var opener=window.opener;
 if(!opener||typeof opener.postMessage!=='function'){return;}
 var serialize=function(value){
+if(value===undefined){return 'undefined';}
 if(value instanceof Error){return value.stack||value.message||String(value);}
 if(typeof value==='string'){return value;}
-try{return JSON.stringify(value);}catch(_e){
+try{
+var json=JSON.stringify(value);
+if(json!==undefined){return json;}
+}catch(_e){}
 try{return String(value);}catch(_e2){return '[unserializable]';}
-}};
+};
 var post=function(level,values,metadata){
 try{
 var parts=Array.prototype.slice.call(values||[]).map(serialize);
@@ -108,5 +112,13 @@ post(level,arguments,null);
 if(original){return original.apply(console,arguments);}
 };
 });
+var originalAssert=console.assert?console.assert.bind(console):null;
+console.assert=function(condition){
+if(!condition){
+var args=Array.prototype.slice.call(arguments,1);
+post('error',args.length?args:['console.assert'],null);
+}
+if(originalAssert){return originalAssert.apply(console,arguments);}
+};
 })();`;
 }

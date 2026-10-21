@@ -262,7 +262,9 @@ async function verifyStartup(ctx) {
     throw new Error("preShowScript did not run before entry script");
   }
   await waitUntil("consoleMessage", () =>
-    ctx.consoleMessages.some((event) => String(event.message).includes("feature-smoke-console-ok")),
+    ctx.consoleMessages.some(
+      (event) => event.level === "log" && String(event.message).includes("feature-smoke-console-ok"),
+    ),
   );
   ctx.markStep("page load, proxy, console, preShowScript");
 }

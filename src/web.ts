@@ -22,7 +22,8 @@ type TrackedWebView = {
   /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
   origin: string;
   captureConsoleLogs: boolean;
-  consoleCaptureInstalled: boolean;
+  /** Href of the child document where console capture was last injected. */
+  consoleCaptureInstalledHref?: string;
   consoleCaptureTimer?: number;
 };
 
@@ -85,10 +86,17 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         return;
       }
     }
-    const consolePayload = parseCapgoConsolePostMessage(data);
-    if (consolePayload) {
-      this.notifyListeners('consoleMessage', { id, ...consolePayload });
-      return;
+    if (
+      entry.captureConsoleLogs &&
+      event.origin &&
+      event.origin !== 'null' &&
+      mayAdoptPostMessageOrigin(entry.url, event.origin)
+    ) {
+      const consolePayload = parseCapgoConsolePostMessage(data);
+      if (consolePayload) {
+        this.notifyListeners('consoleMessage', { id, ...consolePayload });
+        return;
+      }
     }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       this.notifyListeners('messageFromWebview', { ...(data as Record<string, unknown>), id });
@@ -114,37 +122,47 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     this.notifyListeners('closeEvent', { id, url: entry.url });
   }
 
+  private childDocumentHref(entry: TrackedWebView): string | undefined {
+    try {
+      const href = entry.window.location.href;
+      if (!href || href === 'about:blank') {
+        return undefined;
+      }
+      return href;
+    } catch {
+      return undefined;
+    }
+  }
+
   private scheduleConsoleCapture(id: string): void {
     const entry = this.webViews.get(id);
-    if (!entry?.captureConsoleLogs || entry.consoleCaptureInstalled) {
+    if (!entry?.captureConsoleLogs || entry.consoleCaptureTimer !== undefined) {
       return;
     }
     const tryInstall = (): void => {
       const current = this.webViews.get(id);
-      if (!current || current.consoleCaptureInstalled || current.window.closed) {
+      if (!current || current.window.closed) {
         if (current?.consoleCaptureTimer !== undefined) {
           globalThis.clearInterval(current.consoleCaptureTimer);
           current.consoleCaptureTimer = undefined;
         }
         return;
       }
+      const href = this.childDocumentHref(current);
+      if (!href || current.consoleCaptureInstalledHref === href) {
+        return;
+      }
       if (this.tryInstallConsoleCapture(current)) {
-        current.consoleCaptureInstalled = true;
-        if (current.consoleCaptureTimer !== undefined) {
-          globalThis.clearInterval(current.consoleCaptureTimer);
-          current.consoleCaptureTimer = undefined;
-        }
+        current.consoleCaptureInstalledHref = href;
       }
     };
     tryInstall();
-    if (!entry.consoleCaptureInstalled && entry.consoleCaptureTimer === undefined) {
-      entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
-    }
+    entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
   }
 
   private tryInstallConsoleCapture(entry: TrackedWebView): boolean {
     const child = entry.window;
-    if (child.closed) {
+    if (child.closed || !this.childDocumentHref(entry)) {
       return false;
     }
     try {
@@ -260,7 +278,6 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       timer,
       origin,
       captureConsoleLogs,
-      consoleCaptureInstalled: false,
     });
     this.navigateOpenedWindow(opened, options.url, options.headers);
     if (captureConsoleLogs) {

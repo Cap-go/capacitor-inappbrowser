@@ -38,7 +38,7 @@ describe('openWebView on web', () => {
     });
     mockWindow = {
       closed: false,
-      location: { href: '', origin: 'https://example.com' },
+      location: { href: 'https://example.com/page', origin: 'https://example.com' },
       document: {
         open: () => undefined,
         write: () => undefined,
@@ -54,7 +54,7 @@ describe('openWebView on web', () => {
     openMockHolder.fn = mock(() => {
       const win = {
         closed: false,
-        location: { href: '', origin: 'https://example.com' },
+        location: { href: 'https://example.com/page', origin: 'https://example.com' },
         document: {
           open: () => undefined,
           write: () => undefined,
@@ -202,6 +202,36 @@ describe('openWebView on web', () => {
       },
     } as unknown as MessageEvent);
     expect(consoleEvents).toEqual([{ id: 'web-1', level: 'log', message: 'feature-smoke-console-ok' }]);
+  });
+
+  it('ignores console postMessage payloads when captureConsoleLogs is false', async () => {
+    await browser.openWebView({ url: 'https://example.com/page' });
+    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
+    handler({
+      source: mockWindow,
+      origin: 'https://example.com',
+      data: {
+        type: CAPGO_CONSOLE_POST_TYPE,
+        level: 'log',
+        message: 'should-not-emit',
+      },
+    } as unknown as MessageEvent);
+    expect(consoleEvents).toEqual([]);
+  });
+
+  it('ignores console postMessage payloads from disallowed origins', async () => {
+    await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
+    const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
+    handler({
+      source: mockWindow,
+      origin: 'https://evil.example.org',
+      data: {
+        type: CAPGO_CONSOLE_POST_TYPE,
+        level: 'log',
+        message: 'forged',
+      },
+    } as unknown as MessageEvent);
+    expect(consoleEvents).toEqual([]);
   });
 
   it('ignores message origins outside the opened site', async () => {
