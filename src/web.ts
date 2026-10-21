@@ -172,7 +172,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   }
 
   private isConsoleCaptureActive(child: ConsoleCaptureWindow): boolean {
-    return child.__capgoInAppBrowserConsoleCaptureInstalled === true;
+    try {
+      return child.__capgoInAppBrowserConsoleCaptureInstalled === true;
+    } catch {
+      return false;
+    }
   }
 
   private tryInstallConsoleCapture(entry: TrackedWebView): void {

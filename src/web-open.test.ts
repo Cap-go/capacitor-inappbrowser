@@ -204,8 +204,9 @@ describe('openWebView on web', () => {
 
   it('emits consoleMessage from child postMessage payloads', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    (mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }).__capgoInAppBrowserConsoleCaptureInstalled =
-      true;
+    (
+      mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }
+    ).__capgoInAppBrowserConsoleCaptureInstalled = true;
     const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
     handler({
       source: mockWindow,
@@ -236,8 +237,9 @@ describe('openWebView on web', () => {
 
   it('ignores console postMessage payloads from disallowed origins', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    (mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }).__capgoInAppBrowserConsoleCaptureInstalled =
-      true;
+    (
+      mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }
+    ).__capgoInAppBrowserConsoleCaptureInstalled = true;
     const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
     handler({
       source: mockWindow,
@@ -253,7 +255,8 @@ describe('openWebView on web', () => {
 
   it('ignores forged console payloads when capture hooks are not active', async () => {
     await browser.openWebView({ url: 'https://example.com/page', captureConsoleLogs: true });
-    delete (mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean }).__capgoInAppBrowserConsoleCaptureInstalled;
+    delete (mockWindow as { __capgoInAppBrowserConsoleCaptureInstalled?: boolean })
+      .__capgoInAppBrowserConsoleCaptureInstalled;
     const handler = (browser as unknown as { handleWindowMessage: (event: MessageEvent) => void }).handleWindowMessage;
     handler({
       source: mockWindow,
