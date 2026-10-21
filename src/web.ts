@@ -13,6 +13,12 @@ import type {
   OpenSecureWindowResponse,
   ScreenshotResult,
 } from './definitions';
+import { parseCapgoConsolePostMessage } from './web-console-capture';
+import {
+  type ConsoleCaptureWindow,
+  ensureConsoleCaptureInstalled,
+  isConsoleCaptureActive,
+} from './web-console-capture-host';
 
 type TrackedWebView = {
   window: Window;
@@ -20,6 +26,10 @@ type TrackedWebView = {
   timer: number;
   /** Origin used as postMessage target. Updated from the last message the page sent (handles redirects). */
   origin: string;
+  captureConsoleLogs: boolean;
+  /** Child document where console capture hooks were last confirmed active. */
+  consoleCaptureInstalledDocument?: Document;
+  consoleCaptureTimer?: number;
 };
 
 const WEB_HEADERS_UNSUPPORTED_MESSAGE =
@@ -28,7 +38,8 @@ const WEB_HEADERS_UNSUPPORTED_MESSAGE =
 /** Whether a webview message origin may replace the postMessage target (full origin string). */
 export function mayAdoptPostMessageOrigin(openedUrl: string, messageOrigin: string): boolean {
   try {
-    const opened = new URL(openedUrl);
+    const base = globalThis.location?.href;
+    const opened = base ? new URL(openedUrl, base) : new URL(openedUrl);
     const incoming = new URL(messageOrigin);
     if (opened.protocol !== incoming.protocol) {
       return false;
@@ -81,6 +92,21 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
         return;
       }
     }
+    if (entry.captureConsoleLogs && event.source === entry.window) {
+      const childWindow = entry.window as ConsoleCaptureWindow;
+      if (
+        isConsoleCaptureActive(childWindow) &&
+        event.origin &&
+        event.origin !== 'null' &&
+        mayAdoptPostMessageOrigin(entry.url, event.origin)
+      ) {
+        const consolePayload = parseCapgoConsolePostMessage(data);
+        if (consolePayload) {
+          this.notifyListeners('consoleMessage', { id, ...consolePayload });
+          return;
+        }
+      }
+    }
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       this.notifyListeners('messageFromWebview', { ...(data as Record<string, unknown>), id });
     } else if (typeof event.data === 'string') {
@@ -98,8 +124,31 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
       return;
     }
     globalThis.clearInterval(entry.timer);
+    if (entry.consoleCaptureTimer !== undefined) {
+      globalThis.clearInterval(entry.consoleCaptureTimer);
+    }
     this.webViews.delete(id);
     this.notifyListeners('closeEvent', { id, url: entry.url });
+  }
+
+  private scheduleConsoleCapture(id: string): void {
+    const entry = this.webViews.get(id);
+    if (!entry?.captureConsoleLogs || entry.consoleCaptureTimer !== undefined) {
+      return;
+    }
+    const tryInstall = (): void => {
+      const current = this.webViews.get(id);
+      if (!current || current.window.closed) {
+        if (current?.consoleCaptureTimer !== undefined) {
+          globalThis.clearInterval(current.consoleCaptureTimer);
+          current.consoleCaptureTimer = undefined;
+        }
+        return;
+      }
+      ensureConsoleCaptureInstalled(current);
+    };
+    tryInstall();
+    entry.consoleCaptureTimer = globalThis.setInterval(tryInstall, 250);
   }
 
   private resolveWebViewEntry(id?: string): { id: string; entry: TrackedWebView } | undefined {
@@ -188,8 +237,18 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     const id = `web-${++this.webViewCounter}`;
     const timer = globalThis.setInterval(() => this.watchClosed(id), 500);
     const origin = this.resolveTargetOrigin(options.url);
-    this.webViews.set(id, { window: opened, url: options.url, timer, origin });
+    const captureConsoleLogs = options.captureConsoleLogs === true;
+    this.webViews.set(id, {
+      window: opened,
+      url: options.url,
+      timer,
+      origin,
+      captureConsoleLogs,
+    });
     this.navigateOpenedWindow(opened, options.url, options.headers);
+    if (captureConsoleLogs) {
+      this.scheduleConsoleCapture(id);
+    }
     return Promise.resolve({ id });
   }
 

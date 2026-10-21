@@ -9,6 +9,13 @@ import org.junit.Test;
 public class ConsoleMessageEventHelperTest {
 
     @Test
+    public void normalizeLevelMapsAndroidMessageLevels() {
+        assertEquals("info", ConsoleMessageEventHelper.normalizeLevel("TIP"));
+        assertEquals("warn", ConsoleMessageEventHelper.normalizeLevel("WARNING"));
+        assertEquals("error", ConsoleMessageEventHelper.normalizeLevel("ASSERT"));
+    }
+
+    @Test
     public void createBuildsConsoleEventPayload() {
         Map<String, Object> payload = ConsoleMessageEventHelper.createData(
             "webview-1",
