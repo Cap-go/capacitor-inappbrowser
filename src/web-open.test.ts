@@ -1,14 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-import {
-  InAppBrowserWeb,
-  buildIsolatedDocument,
-  createTrustedHtml,
-  injectNativeBridge,
-  mayAdoptPostMessageOrigin,
-  resetTrustedHtmlPolicyCache,
-  TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE,
-} from './web';
+import { InAppBrowserWeb, mayAdoptPostMessageOrigin } from './web';
 
 describe('openWebView on web', () => {
   let browser: InAppBrowserWeb;
@@ -24,8 +16,6 @@ describe('openWebView on web', () => {
   const realClearInterval = globalThis.clearInterval;
   const realOpen = globalThis.open;
   const realFetch = globalThis.fetch;
-  const realCreateObjectURL = URL.createObjectURL;
-  const realRevokeObjectURL = URL.revokeObjectURL;
 
   beforeEach(() => {
     // No real 500 ms polling timers leak out of these tests.
@@ -82,11 +72,7 @@ describe('openWebView on web', () => {
     globalThis.clearInterval = realClearInterval;
     globalThis.open = realOpen;
     globalThis.fetch = realFetch;
-    URL.createObjectURL = realCreateObjectURL;
-    URL.revokeObjectURL = realRevokeObjectURL;
   });
-
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it('opens a blank window synchronously then navigates', async () => {
     await expect(browser.openWebView({ url: 'https://example.com/page' })).resolves.toEqual({ id: 'web-1' });
@@ -112,54 +98,40 @@ describe('openWebView on web', () => {
     expect(globalThis.open).toHaveBeenCalledWith('', '_blank', 'popup=yes,width=390,height=844');
   });
 
-  it('loads header requests into an isolated sandboxed document and revokes the object URL on close', async () => {
+  it('warns and navigates to the real URL when headers are provided', async () => {
     const fetchMock = mock(async () => ({
       ok: true,
       status: 200,
-      url: 'https://example.com/final/page?x=1',
-      text: async () => '<html><HEAD lang="en"><title>t</title></HEAD><body>hi</body></html>',
+      url: 'https://example.com/',
+      text: async () => '',
     }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    let blobText = '';
-    URL.createObjectURL = mock((blob: Blob) => {
-      void blob.text().then((t) => (blobText = t));
-      return 'blob:https://app.test/1';
-    }) as typeof URL.createObjectURL;
-    URL.revokeObjectURL = mock(() => undefined) as typeof URL.revokeObjectURL;
-
-    await browser.openWebView({ url: 'https://example.com/start', headers: { Authorization: 'Bearer t' } });
-    await flush();
-    await flush();
-
-    expect(fetchMock).toHaveBeenCalledWith('https://example.com/start', { headers: { Authorization: 'Bearer t' } });
-    expect(mockWindow.location.href).toBe('blob:https://app.test/1');
-    expect(blobText).toContain('sandbox="allow-scripts');
-    expect(blobText).not.toContain('allow-same-origin');
-    expect(blobText).toContain(
-      '&lt;HEAD lang=&quot;en&quot;&gt;&lt;base href=&quot;https://example.com/final/page?x=1&quot;&gt;',
-    );
-
-    await browser.close();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:https://app.test/1');
+    const warnSpy = mock(() => undefined);
+    const realWarn = console.warn;
+    console.warn = warnSpy as typeof console.warn;
+    try {
+      await browser.openWebView({ url: 'https://example.com/start', headers: { Authorization: 'Bearer t' } });
+    } finally {
+      console.warn = realWarn;
+    }
+    expect(warnSpy).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockWindow.location.href).toBe('https://example.com/start');
+    await browser.postMessage({ detail: { ping: true } });
+    expect(mockWindow.postMessage).toHaveBeenCalledWith({ ping: true }, 'https://example.com');
   });
 
-  it('closes the window when the header request fails', async () => {
-    globalThis.fetch = mock(async () => ({
-      ok: false,
-      status: 401,
-      url: '',
-      text: async () => '',
-    })) as unknown as typeof fetch;
-    const errorSpy = console.error;
-    console.error = () => undefined;
+  it('does not warn when headers is empty', async () => {
+    const warnSpy = mock(() => undefined);
+    const realWarn = console.warn;
+    console.warn = warnSpy as typeof console.warn;
     try {
-      await browser.openWebView({ url: 'https://example.com', headers: { 'X-Test': '1' } });
-      await flush();
-      await flush();
+      await browser.openWebView({ url: 'https://example.com/', headers: {} });
     } finally {
-      console.error = errorSpy;
+      console.warn = realWarn;
     }
-    expect(mockWindow.closed).toBe(true);
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(mockWindow.location.href).toBe('https://example.com/');
   });
 
   it('targets the origin of the last message received after a same-site redirect', async () => {
@@ -172,103 +144,6 @@ describe('openWebView on web', () => {
     } as unknown as MessageEvent);
     await browser.postMessage({ detail: { hello: 'again' } });
     expect(mockWindow.postMessage).toHaveBeenCalledWith({ hello: 'again' }, 'https://login.app.example.com');
-  });
-
-  it('passes TrustedHTML from a named policy into DOMParser when trustedTypes is available', () => {
-    const realDOMParser = globalThis.DOMParser;
-    const trustedHtmlSentinel = { capgoTrustedHtml: true };
-    const createHTML = mock(() => trustedHtmlSentinel);
-    const createPolicy = mock(() => ({ createHTML }));
-    const parseFromString = mock(() => {
-      const body = {
-        appendChild: () => undefined,
-      };
-      return {
-        body,
-        documentElement: { outerHTML: '<html><head></head><body></body></html>' },
-        doctype: null,
-        createElement: () => ({ textContent: '' }),
-      } as Document;
-    });
-    resetTrustedHtmlPolicyCache();
-    (globalThis as { window?: Window }).window = {
-      trustedTypes: { createPolicy },
-    } as Window;
-    globalThis.DOMParser = class {
-      parseFromString = parseFromString;
-    } as unknown as typeof DOMParser;
-    try {
-      injectNativeBridge('<html><body></body></html>');
-      expect(createPolicy).toHaveBeenCalledWith('capgo-inappbrowser', { createHTML: expect.any(Function) });
-      expect(createHTML).toHaveBeenCalled();
-      expect(parseFromString).toHaveBeenCalledWith(trustedHtmlSentinel, 'text/html');
-    } finally {
-      globalThis.DOMParser = realDOMParser;
-      resetTrustedHtmlPolicyCache();
-      delete (globalThis as { window?: Window }).window;
-    }
-  });
-
-  it('runs createTrustedHtml for sandbox srcdoc when building an isolated document', () => {
-    const realDOMParser = globalThis.DOMParser;
-    const parseTrustedSentinel = { capgoTrustedHtml: 'parse' };
-    const srcdocTrustedSentinel = {
-      toString: () => 'capgo-srcdoc-trusted-marker',
-    };
-    const createHTML = mock()
-      .mockImplementationOnce(() => parseTrustedSentinel)
-      .mockImplementationOnce(() => srcdocTrustedSentinel);
-    const createPolicy = mock(() => ({ createHTML }));
-    const parseFromString = mock(() => {
-      const body = { appendChild: () => undefined };
-      return {
-        body,
-        documentElement: { outerHTML: '<html><body></body></html>' },
-        doctype: null,
-        createElement: () => ({ textContent: '' }),
-      } as Document;
-    });
-    resetTrustedHtmlPolicyCache();
-    (globalThis as { window?: Window }).window = {
-      trustedTypes: { createPolicy },
-    } as Window;
-    globalThis.DOMParser = class {
-      parseFromString = parseFromString;
-    } as unknown as typeof DOMParser;
-    try {
-      const wrapper = buildIsolatedDocument('<html><body>hi</body></html>', 'https://example.com/');
-      expect(parseFromString).toHaveBeenCalledWith(parseTrustedSentinel, 'text/html');
-      expect(createHTML).toHaveBeenCalledTimes(2);
-      const srcdocMatch = wrapper.match(/srcdoc="([^"]*)"/);
-      expect(srcdocMatch).not.toBeNull();
-      expect(srcdocMatch![1]).toContain('capgo-srcdoc-trusted-marker');
-    } finally {
-      globalThis.DOMParser = realDOMParser;
-      resetTrustedHtmlPolicyCache();
-      delete (globalThis as { window?: Window }).window;
-    }
-  });
-
-  it('throws when trustedTypes is present but createPolicy is blocked', () => {
-    resetTrustedHtmlPolicyCache();
-    (globalThis as { window?: Window }).window = {
-      trustedTypes: {
-        createPolicy: () => {
-          throw new Error('CSP blocked');
-        },
-      },
-    } as Window;
-    try {
-      expect(() => createTrustedHtml('<html><body></body></html>')).toThrow(TRUSTED_TYPES_POLICY_BLOCKED_MESSAGE);
-    } finally {
-      resetTrustedHtmlPolicyCache();
-      delete (globalThis as { window?: Window }).window;
-    }
-  });
-
-  it('preserves doctype when injecting the native bridge', () => {
-    const html = '<!DOCTYPE html><html><head></head><body><p>x</p></body></html>';
-    expect(injectNativeBridge(html).startsWith('<!DOCTYPE html>')).toBe(true);
   });
 
   it('rejects parent hostnames for postMessage target adoption', () => {
