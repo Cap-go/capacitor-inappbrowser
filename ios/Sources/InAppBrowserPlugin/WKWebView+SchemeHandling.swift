@@ -1,67 +1,40 @@
-import Foundation
-import ObjectiveC
 import WebKit
 
 extension WKWebView {
-    private enum HandlesURLSchemePrivateAPI {
-        static let originalSelector = #selector(WKWebView.handlesURLScheme(_:))
-        static let swizzledSelector = #selector(WKWebView._capgo_handlesURLScheme(_:))
+    /// True when this build compiled `HttpProxySchemeSwizzle.swift`.
+    /// The default stub reports false and does not swap WebKit scheme handling.
+    static var isHttpProxySwizzleCompiled: Bool {
+        HttpProxySchemeSwizzle.isCompiled
     }
 
-    private static var _overriddenSchemes = Set<String>()
-    private static let _overriddenSchemesLock = NSLock()
-    private static var _originalHandlesURLSchemeIMP: IMP?
-
-    // Original +[WKWebView handlesURLScheme:] IMP (saved before swizzle).
-    private typealias HandlesURLSchemeIMP = @convention(c) (AnyClass, Selector, NSString) -> Bool
-
-    private static let _swizzleOnce: Void = {
-        guard WKWebView.responds(to: HandlesURLSchemePrivateAPI.originalSelector) else {
-            print("[InAppBrowser][Proxy] WARNING: WKWebView does not respond to handlesURLScheme; swizzle skipped")
-            return
+    /// Installs the HTTP/HTTPS scheme override used by native proxy rules.
+    ///
+    /// The default build leaves that override out. App Store guideline 2.5.2 can reject
+    /// the private WebKit scheme swap even when proxy is unused. This function logs that
+    /// once and returns false until `plugins.CapgoInAppBrowser.httpProxySwizzle` is `true`
+    /// and the app runs cap sync.
+    /// Returns true when `http` and `https` can be registered as custom scheme handlers.
+    @discardableResult
+    static func enableCustomSchemeHandling(for schemes: [String]) -> Bool {
+        if !isHttpProxySwizzleCompiled {
+            HttpProxySchemeHandlingNotice.logOmittedOnce()
         }
+        return HttpProxySchemeSwizzle.install(for: schemes)
+    }
+}
 
-        // appstore-2.5.2-allow: resolve WKWebView class methods for proxy scheme registration
-        let original = class_getClassMethod(WKWebView.self, HandlesURLSchemePrivateAPI.originalSelector)
-        // appstore-2.5.2-allow: resolve swizzled class method for proxy scheme registration
-        let swizzled = class_getClassMethod(WKWebView.self, HandlesURLSchemePrivateAPI.swizzledSelector)
-
-        guard let original, let swizzled else {
-            print("[InAppBrowser][Proxy] WARNING: Could not get methods for swizzle")
-            return
-        }
-
-        // appstore-2.5.2-allow: preserve original handlesURLScheme IMP before exchange
-        _originalHandlesURLSchemeIMP = method_getImplementation(original)
-        // appstore-2.5.2-allow: route handlesURLScheme through proxy override for http/https
-        method_exchangeImplementations(original, swizzled)
+private enum HttpProxySchemeHandlingNotice {
+    private static let once: Void = {
+        print(
+            "[InAppBrowser][Proxy] WARNING: HTTP/HTTPS proxy interception is off after this update. " +
+                "This plugin no longer overrides WebKit scheme handling by default because App Store " +
+                "review guideline 2.5.2 can reject that private API usage even when the app never " +
+                "enables proxy. To intercept http and https again, set plugins.CapgoInAppBrowser.httpProxySwizzle " +
+                "to true in capacitor.config.ts and run cap sync. Proxy rules will not intercept requests until then."
+        )
     }()
 
-    @objc(capgo_handlesURLScheme:)
-    private static func _capgo_handlesURLScheme(_ urlScheme: String) -> Bool {
-        _overriddenSchemesLock.lock()
-        let isOverridden = _overriddenSchemes.contains(urlScheme.lowercased())
-        _overriddenSchemesLock.unlock()
-
-        if isOverridden { return false }
-
-        guard let imp = _originalHandlesURLSchemeIMP else {
-            print("[InAppBrowser][Proxy] WARNING: Original handlesURLScheme IMP missing; assuming not handled")
-            return false
-        }
-
-        // appstore-2.5.2-allow: call saved handlesURLScheme IMP without re-entering swizzled Swift entry
-        let original: HandlesURLSchemeIMP = unsafeBitCast(imp, to: HandlesURLSchemeIMP.self)
-        return original(WKWebView.self, HandlesURLSchemePrivateAPI.originalSelector, urlScheme as NSString)
-    }
-
-    static func enableCustomSchemeHandling(for schemes: [String]) {
-        _overriddenSchemesLock.lock()
-        for scheme in schemes {
-            _overriddenSchemes.insert(scheme.lowercased())
-        }
-        _overriddenSchemesLock.unlock()
-
-        _ = _swizzleOnce
+    static func logOmittedOnce() {
+        _ = once
     }
 }

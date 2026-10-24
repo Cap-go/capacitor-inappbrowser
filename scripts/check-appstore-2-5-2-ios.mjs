@@ -5,6 +5,10 @@
  * Blocks dynamic selector/class lookup and runtime-built API names.
  * Allows documented private runtime calls when marked with:
  *   // appstore-2.5.2-allow: <reason>
+ *
+ * `method_exchangeImplementations` is compiled only from HttpProxySchemeSwizzle.swift.
+ * Package.swift and the podspec default to excluding that file. `cap sync`
+ * includes it only when httpProxySwizzle is boolean true.
  */
 
 import fs from "node:fs";
@@ -51,6 +55,9 @@ const ALLOW_ANNOTATED_PATTERNS = [
 ];
 
 const ALLOW_TAG = /appstore-2\.5\.2-allow:\s*\S/;
+const SWIZZLE_SOURCE = "HttpProxySchemeSwizzle.swift";
+const STUB_SOURCE = "HttpProxySchemeSwizzleStub.swift";
+const METHOD_EXCHANGE = /\bmethod_exchangeImplementations\s*\(/;
 
 function walk(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -142,13 +149,111 @@ function scanAnnotatedAcrossFile(text, filePath, lines) {
 function scanFile(filePath) {
   const text = fs.readFileSync(filePath, "utf8");
   const lines = text.split(/\r?\n/);
-  const violations = scanForbiddenAcrossFile(text, filePath);
-  violations.push(...scanAnnotatedAcrossFile(text, filePath, lines));
+  return [
+    ...scanForbiddenAcrossFile(text, filePath),
+    ...scanAnnotatedAcrossFile(text, filePath, lines),
+    ...scanMethodExchangeOptIn(text, filePath),
+  ];
+}
 
+function scanMethodExchangeOptIn(text, filePath) {
+  if (path.basename(filePath) === SWIZZLE_SOURCE || !METHOD_EXCHANGE.test(text)) {
+    return [];
+  }
+
+  return text.split(/\r?\n/).flatMap((line, index) => {
+    if (!METHOD_EXCHANGE.test(line)) {
+      return [];
+    }
+    return [
+      {
+        filePath,
+        lineNumber: index + 1,
+        rule: "method_exchangeImplementations",
+        message: `method_exchangeImplementations is only allowed in ${SWIZZLE_SOURCE}`,
+        line: line.trim(),
+      },
+    ];
+  });
+}
+
+function manifestViolation(filePath, message, line) {
+  return {
+    filePath,
+    lineNumber: 1,
+    rule: "httpProxySwizzle",
+    message,
+    line,
+  };
+}
+
+function scanSwizzleManifest(filePath, content, requiredExclude, forbiddenExclude) {
+  const violations = [];
+  if (!content.includes("http-proxy-swizzle:disabled") || !content.includes(requiredExclude)) {
+    violations.push(
+      manifestViolation(
+        filePath,
+        `default manifest must exclude ${SWIZZLE_SOURCE}`,
+        requiredExclude,
+      ),
+    );
+  }
+  if (content.includes("http-proxy-swizzle:enabled") || content.includes(forbiddenExclude)) {
+    violations.push(
+      manifestViolation(
+        filePath,
+        `committed manifest must not compile ${SWIZZLE_SOURCE}`,
+        forbiddenExclude,
+      ),
+    );
+  }
   return violations;
 }
 
+function scanOptInManifests() {
+  const packageSwiftPath = path.join(ROOT, "Package.swift");
+  const podspecPath = path.join(ROOT, "CapgoCapacitorInappbrowser.podspec");
+  const packageSwift = fs.readFileSync(packageSwiftPath, "utf8");
+  const podspec = fs.readFileSync(podspecPath, "utf8");
+
+  return [
+    ...scanSwizzleManifest(
+      packageSwiftPath,
+      packageSwift,
+      `exclude: ["${SWIZZLE_SOURCE}"]`,
+      `exclude: ["${STUB_SOURCE}"]`,
+    ),
+    ...scanSwizzleManifest(
+      podspecPath,
+      podspec,
+      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${SWIZZLE_SOURCE}'`,
+      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${STUB_SOURCE}'`,
+    ),
+  ];
+}
+
+function selfTestOptInScanner() {
+  const allowed = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    SWIZZLE_SOURCE,
+  );
+  const leaked = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    "leak.swift",
+  );
+  const stub = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    STUB_SOURCE,
+  );
+  if (allowed.length !== 0 || leaked.length !== 1 || stub.length !== 1) {
+    console.error("App Store 2.5.2 opt-in scanner self-test failed.");
+    process.exit(1);
+  }
+}
+
 function main() {
+  selfTestOptInScanner();
+
   if (!fs.existsSync(IOS_SOURCES)) {
     console.log("No ios/Sources directory; skipping App Store 2.5.2 iOS guard.");
     return;
@@ -156,6 +261,7 @@ function main() {
 
   const files = walk(IOS_SOURCES);
   const violations = files.flatMap(scanFile);
+  violations.push(...scanOptInManifests());
 
   if (violations.length === 0) {
     console.log(`App Store 2.5.2 iOS guard passed (${files.length} files scanned).`);

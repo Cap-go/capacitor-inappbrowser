@@ -2240,12 +2240,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         ScriptMessageHandlerSupport.removeAll(from: userContentController)
 
         if proxyRequests || proxySchemeHandler != nil, let handler = proxySchemeHandler {
-            WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
-            if !WKWebView.handlesURLScheme("https") && !WKWebView.handlesURLScheme("http") {
-                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "https")
-                webConfiguration.setURLSchemeHandler(handler, forURLScheme: "http")
-            } else {
-                print("[InAppBrowser][Proxy] WARNING: handlesURLScheme swizzle failed; proxy scheme handler not registered")
+            let registered = WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
+            // Drop the handler when registration does not succeed. Leaving it set still
+            // injects the proxy bridge, which rewrites page requests to a marker URL.
+            if !registered && WKWebView.isHttpProxySwizzleCompiled {
+                print(
+                    "[InAppBrowser][Proxy] WARNING: HTTP/HTTPS scheme registration failed. " +
+                        "Proxy rules will not intercept requests."
+                )
+            }
+            self.proxySchemeHandler = ProxyBridgeSupport.resolvedProxySchemeHandler(
+                handler,
+                registrationSucceeded: registered
+            )
+            if let activeHandler = self.proxySchemeHandler {
+                webConfiguration.setURLSchemeHandler(activeHandler, forURLScheme: "https")
+                webConfiguration.setURLSchemeHandler(activeHandler, forURLScheme: "http")
             }
         }
 

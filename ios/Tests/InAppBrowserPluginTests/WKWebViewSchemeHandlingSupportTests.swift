@@ -3,16 +3,26 @@ import XCTest
 @testable import InappbrowserPlugin
 
 final class WKWebViewSchemeHandlingSupportTests: XCTestCase {
-    func testProxySchemeOverrideReturnsFalseForHttpSchemes() {
-        WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
-
-        XCTAssertFalse(WKWebView.handlesURLScheme("https"))
-        XCTAssertFalse(WKWebView.handlesURLScheme("http"))
-        XCTAssertFalse(WKWebView.handlesURLScheme("HTTPS"))
+    func testHttpProxySchemeHandlingMatchesTheLinkedImplementation() {
+        if WKWebView.isHttpProxySwizzleCompiled {
+            XCTAssertTrue(WKWebView.enableCustomSchemeHandling(for: ["https", "http"]))
+            XCTAssertFalse(WKWebView.handlesURLScheme("https"))
+            XCTAssertFalse(WKWebView.handlesURLScheme("http"))
+            XCTAssertFalse(WKWebView.handlesURLScheme("HTTPS"))
+        } else {
+            XCTAssertFalse(WKWebView.enableCustomSchemeHandling(for: ["https", "http"]))
+            XCTAssertTrue(WKWebView.handlesURLScheme("https"))
+            XCTAssertTrue(WKWebView.handlesURLScheme("http"))
+        }
     }
 
     func testNonOverriddenSchemesCallThroughToOriginalImplementation() {
-        WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
+        guard WKWebView.isHttpProxySwizzleCompiled else {
+            XCTAssertFalse(WKWebView.enableCustomSchemeHandling(for: ["https", "http"]))
+            return
+        }
+
+        XCTAssertTrue(WKWebView.enableCustomSchemeHandling(for: ["https", "http"]))
 
         // Regression for #681: calling a non-overridden scheme must not recurse through the
         // swizzled Swift method (stack overflow / EXC_BAD_ACCESS). These calls should return

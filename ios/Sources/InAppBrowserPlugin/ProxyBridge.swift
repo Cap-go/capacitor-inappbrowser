@@ -117,6 +117,19 @@ enum ProxyBridgeSupport {
         hasProxySchemeHandler
     }
 
+    /// Keeps a proxy scheme handler only after HTTP/HTTPS registration succeeds.
+    /// A handler that was not registered must not stay attached, or the proxy bridge
+    /// rewrites requests that native code can no longer serve.
+    static func resolvedProxySchemeHandler<Handler>(
+        _ handler: Handler?,
+        registrationSucceeded: Bool
+    ) -> Handler? {
+        guard registrationSucceeded else {
+            return nil
+        }
+        return handler
+    }
+
     static func usesLegacyJsProxyMode(
         legacyProxyRequests: Bool,
         legacyProxyRequestURLRegex: NSRegularExpression?,
