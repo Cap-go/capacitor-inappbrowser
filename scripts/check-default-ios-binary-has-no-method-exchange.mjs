@@ -54,7 +54,7 @@ const hits = [];
 for (const objectFile of objects) {
   let output = "";
   try {
-    output = execFileSync("nm", [objectFile], { encoding: "utf8" });
+    output = execFileSync("/usr/bin/nm", [objectFile], { encoding: "utf8" });
   } catch (error) {
     output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
   }
