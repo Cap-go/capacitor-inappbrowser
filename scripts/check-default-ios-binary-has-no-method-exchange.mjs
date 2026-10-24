@@ -54,16 +54,23 @@ if (objects.length === 0) {
   process.exit(1);
 }
 
+// The linked InappbrowserPlugin.o symbol listing is larger than Node's default 1 MiB buffer.
+const NM_MAX_BUFFER = 16 * 1024 * 1024;
+
 function inspectObject(objectFile) {
   try {
-    return execFileSync("/usr/bin/nm", [objectFile], { encoding: "utf8" });
+    return execFileSync("/usr/bin/nm", [objectFile], {
+      encoding: "utf8",
+      maxBuffer: NM_MAX_BUFFER,
+    });
   } catch (error) {
-    const stdout = typeof error.stdout === "string" ? error.stdout : "";
-    if (stdout.trim()) {
-      return stdout;
-    }
     const stderr = typeof error.stderr === "string" ? error.stderr : "";
-    console.error(`nm failed for ${objectFile}: ${stderr || error.message}`);
+    const stdout = typeof error.stdout === "string" ? error.stdout : "";
+    const detail = (stderr || error.message).trim();
+    const partial = stdout.trim()
+      ? " Partial stdout was ignored because the inspection did not finish."
+      : "";
+    console.error(`nm failed for ${objectFile}: ${detail}${partial}`);
     process.exit(1);
   }
 }
