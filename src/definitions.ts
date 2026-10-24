@@ -1301,9 +1301,11 @@ export interface OpenWebViewOptions {
    *
    * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
    *
-   * On iOS, HTTP and HTTPS interception stays in the build unless
-   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `false`. Run cap sync after changing it.
-   * See the proxy setup notes.
+   * On iOS, HTTP and HTTPS interception is left out of the build unless
+   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `true`. App Store guideline 2.5.2
+   * can reject a binary that contains `method_exchangeImplementations`, even when the
+   * app never uses proxy. Set that flag and run cap sync to restore interception.
+   * See "Proxy examples" in the README.
    *
    * @since 6.9.0
    */
@@ -1311,9 +1313,11 @@ export interface OpenWebViewOptions {
   /**
    * Native-first outbound proxy rules.
    *
-   * On iOS, HTTP and HTTPS interception stays in the build unless
-   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `false`. Run cap sync after changing it.
-   * See the proxy setup notes.
+   * On iOS, HTTP and HTTPS interception is left out of the build unless
+   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `true`. App Store guideline 2.5.2
+   * can reject a binary that contains `method_exchangeImplementations`, even when the
+   * app never uses proxy. Set that flag and run cap sync to restore interception.
+   * See "Proxy examples" in the README.
    *
    * @since 8.6.0
    */
@@ -1321,9 +1325,11 @@ export interface OpenWebViewOptions {
   /**
    * Native-first inbound proxy rules.
    *
-   * On iOS, HTTP and HTTPS interception stays in the build unless
-   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `false`. Run cap sync after changing it.
-   * See the proxy setup notes.
+   * On iOS, HTTP and HTTPS interception is left out of the build unless
+   * `plugins.CapgoInAppBrowser.httpProxySwizzle` is `true`. App Store guideline 2.5.2
+   * can reject a binary that contains `method_exchangeImplementations`, even when the
+   * app never uses proxy. Set that flag and run cap sync to restore interception.
+   * See "Proxy examples" in the README.
    *
    * @since 8.6.0
    */

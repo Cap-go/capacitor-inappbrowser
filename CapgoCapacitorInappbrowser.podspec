@@ -15,10 +15,12 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
   s.swift_version = '5.1'
-  # cap sync rewrites this block. Default compiles the swizzle.
-  # plugins.CapgoInAppBrowser.httpProxySwizzle: false compiles the stub instead.
+  # cap sync rewrites this block. Default compiles the stub.
+  # App Store guideline 2.5.2 can reject method_exchangeImplementations even
+  # when the app never enables proxy.
+  # plugins.CapgoInAppBrowser.httpProxySwizzle: true compiles the swizzle instead.
   # http-proxy-swizzle:begin
-  # http-proxy-swizzle:enabled
-  s.exclude_files = 'ios/Sources/InAppBrowserPlugin/HttpProxySchemeSwizzleStub.swift'
+  # http-proxy-swizzle:disabled
+  s.exclude_files = 'ios/Sources/InAppBrowserPlugin/HttpProxySchemeSwizzle.swift'
   # http-proxy-swizzle:end
 end

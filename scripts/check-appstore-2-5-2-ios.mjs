@@ -7,8 +7,8 @@
  *   // appstore-2.5.2-allow: <reason>
  *
  * `method_exchangeImplementations` is compiled only from HttpProxySchemeSwizzle.swift.
- * Package.swift and the podspec default to excluding the stub. `cap sync` can
- * switch that block so apps that set httpProxySwizzle: false compile the stub.
+ * Package.swift and the podspec default to excluding that file. `cap sync`
+ * includes it only when httpProxySwizzle is boolean true.
  */
 
 import fs from "node:fs";
@@ -187,23 +187,23 @@ function manifestViolation(filePath, message, line) {
   };
 }
 
-function scanSwizzleManifest(filePath, content, enabledExclude, disabledExclude) {
+function scanSwizzleManifest(filePath, content, requiredExclude, forbiddenExclude) {
   const violations = [];
-  if (!content.includes("http-proxy-swizzle:enabled") || !content.includes(enabledExclude)) {
+  if (!content.includes("http-proxy-swizzle:disabled") || !content.includes(requiredExclude)) {
     violations.push(
       manifestViolation(
         filePath,
-        `default manifest must exclude ${STUB_SOURCE}`,
-        enabledExclude,
+        `default manifest must exclude ${SWIZZLE_SOURCE}`,
+        requiredExclude,
       ),
     );
   }
-  if (content.includes("http-proxy-swizzle:disabled") || content.includes(disabledExclude)) {
+  if (content.includes("http-proxy-swizzle:enabled") || content.includes(forbiddenExclude)) {
     violations.push(
       manifestViolation(
         filePath,
-        `committed manifest must not exclude ${SWIZZLE_SOURCE}`,
-        disabledExclude,
+        `committed manifest must not compile ${SWIZZLE_SOURCE}`,
+        forbiddenExclude,
       ),
     );
   }
@@ -220,14 +220,14 @@ function scanOptInManifests() {
     ...scanSwizzleManifest(
       packageSwiftPath,
       packageSwift,
-      `exclude: ["${STUB_SOURCE}"]`,
       `exclude: ["${SWIZZLE_SOURCE}"]`,
+      `exclude: ["${STUB_SOURCE}"]`,
     ),
     ...scanSwizzleManifest(
       podspecPath,
       podspec,
-      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${STUB_SOURCE}'`,
       `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${SWIZZLE_SOURCE}'`,
+      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${STUB_SOURCE}'`,
     ),
   ];
 }

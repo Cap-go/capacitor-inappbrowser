@@ -2,8 +2,10 @@
 import PackageDescription
 
 // `cap sync` rewrites the http-proxy-swizzle block below.
-// Default keeps the swizzle so existing proxy apps stay unchanged.
-// plugins.CapgoInAppBrowser.httpProxySwizzle: false compiles the stub instead.
+// The published default excludes HttpProxySchemeSwizzle.swift.
+// App Store guideline 2.5.2 can reject a binary that contains
+// method_exchangeImplementations even when the app never enables proxy.
+// plugins.CapgoInAppBrowser.httpProxySwizzle: true compiles the swizzle instead.
 let package = Package(
     name: "CapgoCapacitorInappbrowser",
     platforms: [.iOS(.v15)],
@@ -24,8 +26,8 @@ let package = Package(
             ],
             path: "ios/Sources/InAppBrowserPlugin",
             // http-proxy-swizzle:begin
-            // http-proxy-swizzle:enabled
-            exclude: ["HttpProxySchemeSwizzleStub.swift"],
+            // http-proxy-swizzle:disabled
+            exclude: ["HttpProxySchemeSwizzle.swift"],
             // http-proxy-swizzle:end
             resources: [.process("Resources")]),
         .testTarget(

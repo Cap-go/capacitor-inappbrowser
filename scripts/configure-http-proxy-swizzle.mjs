@@ -6,9 +6,11 @@
  * read the app's capacitor.config from CAPACITOR_CONFIG and choose which
  * native implementation is compiled.
  *
- * httpProxySwizzle defaults to true so existing proxy apps keep HTTP/HTTPS
- * interception. false excludes HttpProxySchemeSwizzle.swift and compiles
+ * httpProxySwizzle defaults to off. Only boolean true includes
+ * HttpProxySchemeSwizzle.swift. Every other value compiles
  * HttpProxySchemeSwizzleStub.swift, which has no method_exchangeImplementations.
+ * App Store guideline 2.5.2 can reject a binary that contains that call even
+ * when the app never enables proxy.
  *
  * Capacitor runs this with cwd set to the plugin root.
  */
@@ -36,7 +38,7 @@ const PODSPEC_EXCLUDE = {
 
 export function isHttpProxySwizzleEnabled(configJson) {
   if (!configJson) {
-    return true;
+    return false;
   }
 
   let config;
@@ -48,7 +50,7 @@ export function isHttpProxySwizzleEnabled(configJson) {
 
   const plugins = config?.plugins ?? {};
   const pluginConfig = plugins.CapgoInAppBrowser ?? plugins.InAppBrowser ?? {};
-  return pluginConfig.httpProxySwizzle !== false;
+  return pluginConfig.httpProxySwizzle === true;
 }
 
 export function renderSwizzleBlock(content, enabled, innerLine) {
@@ -144,10 +146,15 @@ function selfTest() {
     enabledAgain.length === 2 &&
     packageEnabled.includes(`exclude: ["${STUB_FILE}"]`) &&
     packageEnabled.includes("http-proxy-swizzle:enabled") &&
-    isHttpProxySwizzleEnabled("") === true &&
+    isHttpProxySwizzleEnabled("") === false &&
+    isHttpProxySwizzleEnabled("{}") === false &&
     isHttpProxySwizzleEnabled('{"plugins":{"CapgoInAppBrowser":{"httpProxySwizzle":false}}}') === false &&
-    isHttpProxySwizzleEnabled('{"plugins":{"InAppBrowser":{"httpProxySwizzle":false}}}') === false &&
-    configureHttpProxySwizzle(root, true).length === 0;
+    isHttpProxySwizzleEnabled('{"plugins":{"CapgoInAppBrowser":{"httpProxySwizzle":"true"}}}') === false &&
+    isHttpProxySwizzleEnabled('{"plugins":{"CapgoInAppBrowser":{"httpProxySwizzle":true}}}') === true &&
+    isHttpProxySwizzleEnabled('{"plugins":{"InAppBrowser":{"httpProxySwizzle":true}}}') === true &&
+    configureHttpProxySwizzle(root, true).length === 0 &&
+    configureHttpProxySwizzle(root, false).length === 2 &&
+    configureHttpProxySwizzle(root, false).length === 0;
 
   fs.rmSync(root, { recursive: true, force: true });
   if (!ok) {

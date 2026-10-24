@@ -34,7 +34,7 @@
   "scripts": {
     "verify": "bun run verify:ios && bun run verify:android && bun run verify:web",
     "capacitor:sync:before": "node scripts/configure-http-proxy-swizzle.mjs",
-    "verify:ios": "bun run build:proxy-bridge && xcodebuild -scheme CapgoCapacitorInappbrowser -destination generic/platform=iOS -derivedDataPath build/ios-derived && node scripts/check-default-ios-binary-has-no-method-exchange.mjs build/ios-derived present",
+    "verify:ios": "bun run build:proxy-bridge && xcodebuild -scheme CapgoCapacitorInappbrowser -destination generic/platform=iOS -derivedDataPath build/ios-derived && node scripts/check-default-ios-binary-has-no-method-exchange.mjs build/ios-derived absent",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "bun run build && bun run test:web",
     "test:web": "bun test src/proxy-bridge-support.test.ts src/bundled-asset-support.test.ts src/fullscreen-web.test.ts src/web-console-capture.test.ts src/web-open.test.ts",

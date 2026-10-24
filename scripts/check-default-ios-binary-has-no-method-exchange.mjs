@@ -2,8 +2,8 @@
 /**
  * Confirms whether an iOS plugin build references method_exchangeImplementations.
  * Pass the xcodebuild -derivedDataPath directory and `present` or `absent`.
- * The default package build includes the swizzle, so verify:ios passes `present`.
- * A build made after httpProxySwizzle: false must pass `absent`.
+ * The default package build omits the swizzle, so verify:ios passes `absent`.
+ * A build made after httpProxySwizzle: true must pass `present`.
  */
 
 import { execFileSync } from "node:child_process";
@@ -54,15 +54,23 @@ if (objects.length === 0) {
   process.exit(1);
 }
 
+function inspectObject(objectFile) {
+  try {
+    return execFileSync("/usr/bin/nm", [objectFile], { encoding: "utf8" });
+  } catch (error) {
+    const stdout = typeof error.stdout === "string" ? error.stdout : "";
+    if (stdout.trim()) {
+      return stdout;
+    }
+    const stderr = typeof error.stderr === "string" ? error.stderr : "";
+    console.error(`nm failed for ${objectFile}: ${stderr || error.message}`);
+    process.exit(1);
+  }
+}
+
 const hits = [];
 for (const objectFile of objects) {
-  let output = "";
-  try {
-    output = execFileSync("/usr/bin/nm", [objectFile], { encoding: "utf8" });
-  } catch (error) {
-    output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
-  }
-  if (output.includes("method_exchangeImplementations")) {
+  if (inspectObject(objectFile).includes("method_exchangeImplementations")) {
     hits.push(objectFile);
   }
 }

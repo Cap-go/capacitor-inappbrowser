@@ -2243,6 +2243,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             let registered = WKWebView.enableCustomSchemeHandling(for: ["https", "http"])
             // Drop the handler when registration does not succeed. Leaving it set still
             // injects the proxy bridge, which rewrites page requests to a marker URL.
+            if !registered && WKWebView.isHttpProxySwizzleCompiled {
+                print(
+                    "[InAppBrowser][Proxy] WARNING: HTTP/HTTPS scheme registration failed. " +
+                        "Proxy rules will not intercept requests."
+                )
+            }
             self.proxySchemeHandler = ProxyBridgeSupport.resolvedProxySchemeHandler(
                 handler,
                 registrationSucceeded: registered

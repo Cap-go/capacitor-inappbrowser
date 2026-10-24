@@ -1,27 +1,11 @@
-import Foundation
-
-/// Compiled only when `plugins.CapgoInAppBrowser.httpProxySwizzle` is false.
-/// This file must not reference `method_exchangeImplementations`.
+/// Default iOS implementation. Compiled unless `plugins.CapgoInAppBrowser.httpProxySwizzle` is true.
+/// This file must not call the Objective-C method-exchange API.
+/// `WKWebView.enableCustomSchemeHandling` logs why interception is off and how to turn it back on.
 enum HttpProxySchemeSwizzle {
     static let isCompiled = false
 
     static func install(for schemes: [String]) -> Bool {
         _ = schemes
-        HttpProxySchemeSwizzleNotice.logOnce()
         return false
-    }
-}
-
-private enum HttpProxySchemeSwizzleNotice {
-    private static let once: Void = {
-        print(
-            "[InAppBrowser][Proxy] WARNING: HTTP/HTTPS proxy scheme handling is omitted from this build. " +
-                "Set plugins.CapgoInAppBrowser.httpProxySwizzle to true in capacitor.config.ts and run cap sync " +
-                "to include it. Proxy rules will not intercept requests."
-        )
-    }()
-
-    static func logOnce() {
-        _ = once
     }
 }
