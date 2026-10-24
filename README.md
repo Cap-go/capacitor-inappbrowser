@@ -372,7 +372,9 @@ plugins: {
 },
 ```
 
-Then run `npx cap sync`. The sync hook includes `HttpProxySchemeSwizzle.swift` and excludes the stub. Leaving the key unset, or setting it to `false`, keeps the stub. Android proxy handling does not use this switch. Run `npx cap sync` again after you change the flag. When a build without the swizzle tries to register `http` or `https`, `WKWebView.enableCustomSchemeHandling` logs this same reason once.
+Then run `npx cap sync`. The sync hook includes `HttpProxySchemeSwizzle.swift` and excludes the stub. That build calls `method_exchangeImplementations` so `WKWebView` can hand `http` and `https` to the proxy scheme handler. `proxyRequests`, `outboundProxyRules`, and `inboundProxyRules` intercept those requests again. Leaving the key unset, or setting it to `false`, keeps the stub and leaves the call out of the binary. Android proxy handling does not use this switch. Run `npx cap sync` again after you change the flag. When a build without the swizzle tries to register `http` or `https`, `WKWebView.enableCustomSchemeHandling` logs the reason once.
+
+Enabling the swizzle can make App Review harder. Guideline 2.5.2 scans the shipped binary for `method_exchangeImplementations`. If the app needs HTTP or HTTPS interception, say so in the review notes and explain why. Apple may approve that use case by case. The scanner may also never flag the binary.
 
 #### Block one request natively
 
