@@ -1301,17 +1301,26 @@ export interface OpenWebViewOptions {
    *
    * Prefer `outboundProxyRules` and `inboundProxyRules` for native-first matching.
    *
+   * On iOS, HTTP and HTTPS interception is compiled only when the build sets
+   * `CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE`. See the proxy setup notes.
+   *
    * @since 6.9.0
    */
   proxyRequests?: boolean | string;
   /**
    * Native-first outbound proxy rules.
    *
+   * On iOS, HTTP and HTTPS interception is compiled only when the build sets
+   * `CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE`. See the proxy setup notes.
+   *
    * @since 8.6.0
    */
   outboundProxyRules?: NativeProxyRule[];
   /**
    * Native-first inbound proxy rules.
+   *
+   * On iOS, HTTP and HTTPS interception is compiled only when the build sets
+   * `CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE`. See the proxy setup notes.
    *
    * @since 8.6.0
    */

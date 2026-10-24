@@ -41,4 +41,26 @@ final class ProxyBridgeSupportTests: XCTestCase {
         )
         XCTAssertNil(bridge.getAndRemove(requestId: "rid-1"))
     }
+
+    func testFailedHttpSchemeRegistrationDropsProxyHandler() {
+        XCTAssertNil(
+            ProxyBridgeSupport.resolvedProxySchemeHandler(
+                "handler",
+                registrationSucceeded: false
+            )
+        )
+        XCTAssertEqual(
+            ProxyBridgeSupport.resolvedProxySchemeHandler(
+                "handler",
+                registrationSucceeded: true
+            ),
+            "handler"
+        )
+        XCTAssertNil(
+            ProxyBridgeSupport.resolvedProxySchemeHandler(
+                nil as String?,
+                registrationSucceeded: true
+            )
+        )
+    }
 }

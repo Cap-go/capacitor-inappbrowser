@@ -1,7 +1,52 @@
+import WebKit
+#if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
 import Foundation
 import ObjectiveC
-import WebKit
+#endif
 
+extension WKWebView {
+    /// True only when the app compiled the HTTP/HTTPS scheme override in.
+    /// The override calls `method_exchangeImplementations`, so it stays out of
+    /// binaries that never set `CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE`.
+    static var isHttpProxySwizzleCompiled: Bool {
+        #if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Installs the HTTP/HTTPS scheme override used by native proxy rules.
+    /// Returns true when those schemes can be registered as custom scheme handlers.
+    @discardableResult
+    static func enableCustomSchemeHandling(for schemes: [String]) -> Bool {
+        #if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
+        return installHttpProxySchemeSwizzle(for: schemes)
+        #else
+        _ = schemes
+        HttpProxySchemeSwizzleNotice.logOnce()
+        return false
+        #endif
+    }
+}
+
+#if !CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
+private enum HttpProxySchemeSwizzleNotice {
+    private static let once: Void = {
+        print(
+            "[InAppBrowser][Proxy] WARNING: HTTP/HTTPS proxy scheme handling is omitted from this build. " +
+                "Export CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE=1 before pod install or Swift package " +
+                "resolution to opt in. Proxy rules will not intercept requests."
+        )
+    }()
+
+    static func logOnce() {
+        _ = once
+    }
+}
+#endif
+
+#if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
 extension WKWebView {
     private enum HandlesURLSchemePrivateAPI {
         static let originalSelector = #selector(WKWebView.handlesURLScheme(_:))
@@ -17,7 +62,7 @@ extension WKWebView {
 
     private static let _swizzleOnce: Void = {
         guard WKWebView.responds(to: HandlesURLSchemePrivateAPI.originalSelector) else {
-            print("[InAppBrowser][Proxy] WARNING: WKWebView does not respond to handlesURLScheme; swizzle skipped")
+            print("[InAppBrowser][Proxy] WARNING: WKWebView does not respond to handlesURLScheme; scheme override skipped")
             return
         }
 
@@ -27,7 +72,7 @@ extension WKWebView {
         let swizzled = class_getClassMethod(WKWebView.self, HandlesURLSchemePrivateAPI.swizzledSelector)
 
         guard let original, let swizzled else {
-            print("[InAppBrowser][Proxy] WARNING: Could not get methods for swizzle")
+            print("[InAppBrowser][Proxy] WARNING: Could not get methods for scheme override")
             return
         }
 
@@ -55,7 +100,7 @@ extension WKWebView {
         return original(WKWebView.self, HandlesURLSchemePrivateAPI.originalSelector, urlScheme as NSString)
     }
 
-    static func enableCustomSchemeHandling(for schemes: [String]) {
+    fileprivate static func installHttpProxySchemeSwizzle(for schemes: [String]) -> Bool {
         _overriddenSchemesLock.lock()
         for scheme in schemes {
             _overriddenSchemes.insert(scheme.lowercased())
@@ -63,5 +108,11 @@ extension WKWebView {
         _overriddenSchemesLock.unlock()
 
         _ = _swizzleOnce
+
+        let lowered = Set(schemes.map { $0.lowercased() })
+        let httpReady = !lowered.contains("http") || !WKWebView.handlesURLScheme("http")
+        let httpsReady = !lowered.contains("https") || !WKWebView.handlesURLScheme("https")
+        return httpReady && httpsReady
     }
 }
+#endif
