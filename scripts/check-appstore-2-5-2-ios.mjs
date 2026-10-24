@@ -6,9 +6,9 @@
  * Allows documented private runtime calls when marked with:
  *   // appstore-2.5.2-allow: <reason>
  *
- * `method_exchangeImplementations` is compiled only inside:
- *   #if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE
- * Package.swift and the podspec must keep that flag off unless the app opts in.
+ * `method_exchangeImplementations` is compiled only from HttpProxySchemeSwizzle.swift.
+ * Package.swift and the podspec default to excluding the stub. `cap sync` can
+ * switch that block so apps that set httpProxySwizzle: false compile the stub.
  */
 
 import fs from "node:fs";
@@ -55,10 +55,8 @@ const ALLOW_ANNOTATED_PATTERNS = [
 ];
 
 const ALLOW_TAG = /appstore-2\.5\.2-allow:\s*\S/;
-const HTTP_PROXY_SWIZZLE_FLAG = "CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE";
-const HTTP_PROXY_SWIZZLE_IF = new RegExp(
-  `^\\s*#\\s*if\\s+${HTTP_PROXY_SWIZZLE_FLAG}\\s*(?:\\/\\/.*)?$`,
-);
+const SWIZZLE_SOURCE = "HttpProxySchemeSwizzle.swift";
+const STUB_SOURCE = "HttpProxySchemeSwizzleStub.swift";
 const METHOD_EXCHANGE = /\bmethod_exchangeImplementations\s*\(/;
 
 function walk(dir, files = []) {
@@ -151,154 +149,103 @@ function scanAnnotatedAcrossFile(text, filePath, lines) {
 function scanFile(filePath) {
   const text = fs.readFileSync(filePath, "utf8");
   const lines = text.split(/\r?\n/);
-  const violations = scanForbiddenAcrossFile(text, filePath);
-  violations.push(...scanAnnotatedAcrossFile(text, filePath, lines));
-  violations.push(...scanMethodExchangeOptIn(text, filePath));
-
-  return violations;
+  return [
+    ...scanForbiddenAcrossFile(text, filePath),
+    ...scanAnnotatedAcrossFile(text, filePath, lines),
+    ...scanMethodExchangeOptIn(text, filePath),
+  ];
 }
 
 function scanMethodExchangeOptIn(text, filePath) {
-  const lines = text.split(/\r?\n/);
-  const violations = [];
-  let depth = 0;
-  let optInDepth = null;
+  if (path.basename(filePath) === SWIZZLE_SOURCE || !METHOD_EXCHANGE.test(text)) {
+    return [];
+  }
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (/^\s*#\s*if\b/.test(line)) {
-      depth += 1;
-      if (optInDepth === null && HTTP_PROXY_SWIZZLE_IF.test(line)) {
-        optInDepth = depth;
-      }
+  return text.split(/\r?\n/).flatMap((line, index) => {
+    if (!METHOD_EXCHANGE.test(line)) {
+      return [];
     }
-
-    if (METHOD_EXCHANGE.test(line) && optInDepth === null) {
-      violations.push({
+    return [
+      {
         filePath,
         lineNumber: index + 1,
         rule: "method_exchangeImplementations",
-        message: `${HTTP_PROXY_SWIZZLE_FLAG} must wrap method_exchangeImplementations so default builds omit it`,
+        message: `method_exchangeImplementations is only allowed in ${SWIZZLE_SOURCE}`,
         line: line.trim(),
-      });
-    }
+      },
+    ];
+  });
+}
 
-    if (/^\s*#\s*endif\b/.test(line)) {
-      if (optInDepth === depth) {
-        optInDepth = null;
-      }
-      depth = Math.max(0, depth - 1);
-    }
+function manifestViolation(filePath, message, line) {
+  return {
+    filePath,
+    lineNumber: 1,
+    rule: "httpProxySwizzle",
+    message,
+    line,
+  };
+}
+
+function scanSwizzleManifest(filePath, content, enabledExclude, disabledExclude) {
+  const violations = [];
+  if (!content.includes("http-proxy-swizzle:enabled") || !content.includes(enabledExclude)) {
+    violations.push(
+      manifestViolation(
+        filePath,
+        `default manifest must exclude ${STUB_SOURCE}`,
+        enabledExclude,
+      ),
+    );
   }
-
+  if (content.includes("http-proxy-swizzle:disabled") || content.includes(disabledExclude)) {
+    violations.push(
+      manifestViolation(
+        filePath,
+        `committed manifest must not exclude ${SWIZZLE_SOURCE}`,
+        disabledExclude,
+      ),
+    );
+  }
   return violations;
 }
 
-function isManifestComment(line) {
-  const trimmed = line.trim();
-  return trimmed.startsWith("//") || trimmed.startsWith("#");
-}
-
 function scanOptInManifests() {
-  const violations = [];
   const packageSwiftPath = path.join(ROOT, "Package.swift");
   const podspecPath = path.join(ROOT, "CapgoCapacitorInappbrowser.podspec");
   const packageSwift = fs.readFileSync(packageSwiftPath, "utf8");
   const podspec = fs.readFileSync(podspecPath, "utf8");
 
-  const assignment = packageSwift.match(/let enableHttpProxySwizzle\s*=\s*([^\n]+)/);
-  if (
-    !assignment ||
-    !assignment[1].includes(`environment["${HTTP_PROXY_SWIZZLE_FLAG}"]`) ||
-    !assignment[1].includes('== "1"')
-  ) {
-    violations.push({
-      filePath: packageSwiftPath,
-      lineNumber: 1,
-      rule: HTTP_PROXY_SWIZZLE_FLAG,
-      message: `Package.swift must set enableHttpProxySwizzle from ${HTTP_PROXY_SWIZZLE_FLAG}=1`,
-      line: assignment ? assignment[0] : "missing enableHttpProxySwizzle",
-    });
-  }
-
-  if (/enableHttpProxySwizzle\s*=\s*true/.test(packageSwift)) {
-    violations.push({
-      filePath: packageSwiftPath,
-      lineNumber: 1,
-      rule: HTTP_PROXY_SWIZZLE_FLAG,
-      message: "Package.swift must not force the HTTP proxy swizzle on",
-      line: "enableHttpProxySwizzle = true",
-    });
-  }
-
-  const packageLines = packageSwift.split(/\r?\n/);
-  for (let index = 0; index < packageLines.length; index += 1) {
-    const line = packageLines[index];
-    if (!line.includes(HTTP_PROXY_SWIZZLE_FLAG) || isManifestComment(line)) {
-      continue;
-    }
-    const previous = packageLines[index - 1] ?? "";
-    const isEnvAssignment = line.includes("enableHttpProxySwizzle") && line.includes("environment");
-    const isConditionalDefine =
-      line.includes("enableHttpProxySwizzle ?") ||
-      (previous.includes("enableHttpProxySwizzle") && line.includes(".define("));
-    if (!isEnvAssignment && !isConditionalDefine) {
-      violations.push({
-        filePath: packageSwiftPath,
-        lineNumber: index + 1,
-        rule: HTTP_PROXY_SWIZZLE_FLAG,
-        message: "HTTP proxy swizzle flag must stay behind enableHttpProxySwizzle",
-        line: line.trim(),
-      });
-    }
-  }
-
-  const podLines = podspec.split(/\r?\n/);
-  let envIfDepth = 0;
-  let sawEnvIf = false;
-  for (let index = 0; index < podLines.length; index += 1) {
-    const line = podLines[index];
-    if (line.includes(`ENV['${HTTP_PROXY_SWIZZLE_FLAG}'] == '1'`)) {
-      sawEnvIf = true;
-      envIfDepth += 1;
-    }
-    if (line.includes(HTTP_PROXY_SWIZZLE_FLAG) && envIfDepth === 0 && !isManifestComment(line)) {
-      violations.push({
-        filePath: podspecPath,
-        lineNumber: index + 1,
-        rule: HTTP_PROXY_SWIZZLE_FLAG,
-        message: "podspec must set the HTTP proxy swizzle flag only inside the ENV opt-in",
-        line: line.trim(),
-      });
-    }
-    if (envIfDepth > 0 && /^\s*end\s*$/.test(line)) {
-      envIfDepth -= 1;
-    }
-  }
-  if (!sawEnvIf) {
-    violations.push({
-      filePath: podspecPath,
-      lineNumber: 1,
-      rule: HTTP_PROXY_SWIZZLE_FLAG,
-      message: `podspec must opt in with ENV['${HTTP_PROXY_SWIZZLE_FLAG}'] == '1'`,
-      line: "missing ENV opt-in",
-    });
-  }
-
-  return violations;
+  return [
+    ...scanSwizzleManifest(
+      packageSwiftPath,
+      packageSwift,
+      `exclude: ["${STUB_SOURCE}"]`,
+      `exclude: ["${SWIZZLE_SOURCE}"]`,
+    ),
+    ...scanSwizzleManifest(
+      podspecPath,
+      podspec,
+      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${STUB_SOURCE}'`,
+      `s.exclude_files = 'ios/Sources/InAppBrowserPlugin/${SWIZZLE_SOURCE}'`,
+    ),
+  ];
 }
 
 function selfTestOptInScanner() {
-  const optedIn = scanMethodExchangeOptIn(
-    ["#if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE", "method_exchangeImplementations(original, swizzled)", "#endif"].join("\n"),
-    "opt.swift",
+  const allowed = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    SWIZZLE_SOURCE,
   );
-  const leaked = scanMethodExchangeOptIn("method_exchangeImplementations(original, swizzled)\n", "leak.swift");
-  const alwaysOn = scanMethodExchangeOptIn(
-    ["#if CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE || true", "method_exchangeImplementations(original, swizzled)", "#endif"].join("\n"),
-    "always.swift",
+  const leaked = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    "leak.swift",
   );
-  if (optedIn.length !== 0 || leaked.length !== 1 || alwaysOn.length !== 1) {
+  const stub = scanMethodExchangeOptIn(
+    "method_exchangeImplementations(original, swizzled)\n",
+    STUB_SOURCE,
+  );
+  if (allowed.length !== 0 || leaked.length !== 1 || stub.length !== 1) {
     console.error("App Store 2.5.2 opt-in scanner self-test failed.");
     process.exit(1);
   }

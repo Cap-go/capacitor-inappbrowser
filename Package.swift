@@ -1,12 +1,9 @@
 // swift-tools-version: 5.9
-import Foundation
 import PackageDescription
 
-// Off unless the app opts in. Leaving this unset keeps method_exchangeImplementations
-// out of the compiled plugin, which is what App Store review scans.
-let enableHttpProxySwizzle = ProcessInfo.processInfo.environment["CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE"] == "1"
-let httpProxySwizzleSettings: [SwiftSetting] = enableHttpProxySwizzle ? [.define("CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE")] : []
-
+// `cap sync` rewrites the http-proxy-swizzle block below.
+// Default keeps the swizzle so existing proxy apps stay unchanged.
+// plugins.CapgoInAppBrowser.httpProxySwizzle: false compiles the stub instead.
 let package = Package(
     name: "CapgoCapacitorInappbrowser",
     platforms: [.iOS(.v15)],
@@ -26,12 +23,14 @@ let package = Package(
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
             path: "ios/Sources/InAppBrowserPlugin",
-            resources: [.process("Resources")],
-            swiftSettings: httpProxySwizzleSettings),
+            // http-proxy-swizzle:begin
+            // http-proxy-swizzle:enabled
+            exclude: ["HttpProxySchemeSwizzleStub.swift"],
+            // http-proxy-swizzle:end
+            resources: [.process("Resources")]),
         .testTarget(
             name: "InappbrowserPluginTests",
             dependencies: ["InappbrowserPlugin"],
-            path: "ios/Tests/InAppBrowserPluginTests",
-            swiftSettings: httpProxySwizzleSettings)
+            path: "ios/Tests/InAppBrowserPluginTests")
     ]
 )

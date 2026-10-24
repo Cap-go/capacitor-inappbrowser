@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Confirms the default iOS plugin build does not reference method_exchangeImplementations.
- * Pass the xcodebuild -derivedDataPath directory from a build that did not set
- * CAPGO_INAPPBROWSER_HTTP_PROXY_SWIZZLE.
+ * Confirms whether an iOS plugin build references method_exchangeImplementations.
+ * Pass the xcodebuild -derivedDataPath directory and `present` or `absent`.
+ * The default package build includes the swizzle, so verify:ios passes `present`.
+ * A build made after httpProxySwizzle: false must pass `absent`.
  */
 
 import { execFileSync } from "node:child_process";
@@ -10,9 +11,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const derivedDataPath = process.argv[2];
+const expectation = process.argv[3];
 
-if (!derivedDataPath) {
-  console.error("Usage: check-default-ios-binary-has-no-method-exchange.mjs <derivedDataPath>");
+if (!derivedDataPath || (expectation !== "present" && expectation !== "absent")) {
+  console.error(
+    "Usage: check-default-ios-binary-has-no-method-exchange.mjs <derivedDataPath> <present|absent>",
+  );
   process.exit(1);
 }
 
@@ -63,14 +67,22 @@ for (const objectFile of objects) {
   }
 }
 
-if (hits.length > 0) {
-  console.error("Default iOS build still references method_exchangeImplementations:");
+const found = hits.length > 0;
+if (expectation === "absent" && found) {
+  console.error("iOS build still references method_exchangeImplementations:");
   for (const hit of hits) {
     console.error(`  ${hit}`);
   }
   process.exit(1);
 }
 
+if (expectation === "present" && !found) {
+  console.error(
+    `iOS build is missing method_exchangeImplementations (${objects.length} plugin objects scanned).`,
+  );
+  process.exit(1);
+}
+
 console.log(
-  `Default iOS build has no method_exchangeImplementations reference (${objects.length} plugin objects scanned).`,
+  `iOS build method_exchangeImplementations ${expectation} (${objects.length} plugin objects scanned).`,
 );
