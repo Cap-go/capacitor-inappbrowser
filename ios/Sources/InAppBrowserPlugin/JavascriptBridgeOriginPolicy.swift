@@ -102,7 +102,7 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
 
     static func matchesAllowRule(pageOrigin: String, rule: String) -> Bool {
         let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let normalizedRule = origin(fromUrl: trimmedRule) ?? origin(fromUrl: "https://\(trimmedRule)") else {
+        guard let normalizedRule = Self.origin(fromUrl: trimmedRule) ?? Self.origin(fromUrl: "https://\(trimmedRule)") else {
             return false
         }
         if pageOrigin.caseInsensitiveCompare(normalizedRule) == .orderedSame {

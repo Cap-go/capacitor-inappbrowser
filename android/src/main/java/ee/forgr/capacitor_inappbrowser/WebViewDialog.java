@@ -1503,7 +1503,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private void logBlockedJavascriptBridgeCall(String methodName) {
         Log.w(
             "InAppBrowser",
-            "Blocked JavaScript bridge call " + methodName + " for origin " + JavascriptBridgeOriginPolicy.originFromUrl(getUrl())
+            "Blocked JavaScript bridge call " +
+                methodName +
+                " for origin " +
+                JavascriptBridgeOriginPolicy.originFromUrl(getWebViewUrlOnMainThread(null))
         );
     }
 
