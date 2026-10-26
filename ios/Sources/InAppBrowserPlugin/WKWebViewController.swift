@@ -456,6 +456,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var downloadPreview = DownloadPreviewSupport.defaultMode
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
+    open var javascriptBridgeOriginPolicy: JavascriptBridgeOriginPolicy = .unrestricted
     open var captureConsoleLogs = false
     open var persistWebViewData = true
     open var useSharedDataStore = false
@@ -1950,8 +1951,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
+    private func isJavascriptBridgeScriptMessage(_ name: String) -> Bool {
+        switch name {
+        case "messageHandler", "preShowScriptError", "preShowScriptSuccess", "close", "hide", "show",
+             "blobDownload", "blobDownloadStart", "blobDownloadChunk", "blobDownloadFinish", "blobDownloadAbort",
+             "blobDownloadRejectAck", "takeScreenshot", "magicPrint", "capgoProxyBridge":
+            return true
+        default:
+            return false
+        }
+    }
+
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if isJavascriptBridgeScriptMessage(message.name), !javascriptBridgeOriginPolicy.allows(message: message) {
+            return
+        }
         if message.name == "messageHandler" {
             if let messageBody = message.body as? [String: Any] {
                 print("Received message from JavaScript:", messageBody)
@@ -2270,20 +2285,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         let weakHandler = WeakScriptMessageHandler(self)
-        userContentController.add(weakHandler, name: "messageHandler")
-        userContentController.add(weakHandler, name: "preShowScriptError")
-        userContentController.add(weakHandler, name: "preShowScriptSuccess")
-        userContentController.add(weakHandler, name: "close")
-        userContentController.add(weakHandler, name: "hide")
-        userContentController.add(weakHandler, name: "show")
-        userContentController.add(weakHandler, name: "blobDownload")
-        userContentController.add(weakHandler, name: "blobDownloadStart")
-        userContentController.add(weakHandler, name: "blobDownloadChunk")
-        userContentController.add(weakHandler, name: "blobDownloadFinish")
-        userContentController.add(weakHandler, name: "blobDownloadAbort")
-        userContentController.add(weakHandler, name: "blobDownloadRejectAck")
-        if allowScreenshotsFromWebPage {
-            userContentController.add(weakHandler, name: "takeScreenshot")
+        if !javascriptBridgeOriginPolicy.isDisabled {
+            userContentController.add(weakHandler, name: "messageHandler")
+            userContentController.add(weakHandler, name: "preShowScriptError")
+            userContentController.add(weakHandler, name: "preShowScriptSuccess")
+            userContentController.add(weakHandler, name: "close")
+            userContentController.add(weakHandler, name: "hide")
+            userContentController.add(weakHandler, name: "show")
+            userContentController.add(weakHandler, name: "blobDownload")
+            userContentController.add(weakHandler, name: "blobDownloadStart")
+            userContentController.add(weakHandler, name: "blobDownloadChunk")
+            userContentController.add(weakHandler, name: "blobDownloadFinish")
+            userContentController.add(weakHandler, name: "blobDownloadAbort")
+            userContentController.add(weakHandler, name: "blobDownloadRejectAck")
+            if allowScreenshotsFromWebPage {
+                userContentController.add(weakHandler, name: "takeScreenshot")
+            }
         }
         if captureConsoleLogs {
             userContentController.add(weakHandler, name: "consoleMessageHandler")
@@ -2310,23 +2327,25 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 )
             )
         }
-        if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
-            userContentController.add(weakHandler, name: "capgoProxyBridge")
-        }
-        userContentController.add(weakHandler, name: "magicPrint")
+        if !javascriptBridgeOriginPolicy.isDisabled {
+            if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
+                userContentController.add(weakHandler, name: "capgoProxyBridge")
+            }
+            userContentController.add(weakHandler, name: "magicPrint")
 
-        // Inject JavaScript to override window.print
-        let script = WKUserScript(
-            source: """
-            window.print = function() {
-                window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
-            };
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
-        )
-        userContentController.addUserScript(script)
-        addMobileAppUserScript(to: userContentController)
+            // Inject JavaScript to override window.print
+            let script = WKUserScript(
+                source: """
+                window.print = function() {
+                    window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
+                };
+                """,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: false
+            )
+            userContentController.addUserScript(script)
+            addMobileAppUserScript(to: userContentController)
+        }
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController

@@ -822,6 +822,28 @@ export interface OpenWebViewOptions {
    */
   jsInterface?: never; // This property doesn't exist, it's just for documentation
   /**
+   * Restrict native JavaScript bridges (`window.mobileApp`, print, preShow callbacks, proxy bridge) to trusted document origins.
+   *
+   * - **Omit** (default): bridges remain available on every origin loaded in the webview (backward compatible).
+   * - **Empty array `[]`**: disable native bridges for this webview (no handlers or injection).
+   * - **Non-empty**: allow bridge calls only when the main document URL matches an entry.
+   *
+   * Entries are origin strings such as `https://login.example.com` or `https://localhost`.
+   * Host wildcards are supported (`https://*.example.com`). Scheme and port must match.
+   *
+   * On Android, `postMessage` prefers `WebMessageListener` with matching origin rules when supported.
+   * Subframe-originated bridge calls are rejected when an allowlist is configured.
+   *
+   * @platform android, ios
+   * @default undefined (all origins)
+   * @example
+   * // OIDC login only: no native bridge exposure on the IdP pages
+   * javascriptBridgeOrigins: []
+   * @example
+   * javascriptBridgeOrigins: ['https://app.example.com', 'https://localhost']
+   */
+  javascriptBridgeOrigins?: string[];
+  /**
    * Allows page JavaScript to call `window.mobileApp.takeScreenshot()`.
    * Disabled by default so only the host app can trigger native screenshots through the plugin API.
    *
