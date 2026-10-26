@@ -35,8 +35,7 @@ public class JavascriptBridgeAllowlistRobolectricTest {
         WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
         dialog.activity = activity;
 
-        WebView webView = new WebView(activity);
-        webView.loadUrl("https://login.example.com/oauth");
+        UrlTrackingWebView webView = new UrlTrackingWebView(activity, "https://login.example.com/oauth");
         setWebView(dialog, webView);
         ShadowLooper.idleMainLooper();
 
@@ -74,8 +73,7 @@ public class JavascriptBridgeAllowlistRobolectricTest {
         WebViewDialog dialog = new WebViewDialog(activity, android.R.style.Theme_NoTitleBar, options, null, null);
         dialog.activity = activity;
 
-        WebView webView = new WebView(activity);
-        webView.loadUrl("https://evil.example.com/phish");
+        UrlTrackingWebView webView = new UrlTrackingWebView(activity, "https://evil.example.com/phish");
         setWebView(dialog, webView);
         ShadowLooper.idleMainLooper();
 
@@ -103,5 +101,20 @@ public class JavascriptBridgeAllowlistRobolectricTest {
         Field field = WebViewDialog.class.getDeclaredField("_webView");
         field.setAccessible(true);
         field.set(dialog, webView);
+    }
+
+    private static final class UrlTrackingWebView extends WebView {
+
+        private final String currentUrl;
+
+        UrlTrackingWebView(ComponentActivity activity, String currentUrl) {
+            super(activity);
+            this.currentUrl = currentUrl;
+        }
+
+        @Override
+        public String getUrl() {
+            return currentUrl;
+        }
     }
 }
