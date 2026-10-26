@@ -2302,6 +2302,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         String fallbackMimeType = normalizeMimeType(mimeType, "download");
         String fallbackFileName = URLUtil.guessFileName("download", contentDisposition, fallbackMimeType);
+        if (getJavascriptBridgeOriginPolicy().isDisabled()) {
+            showDownloadError(
+                "Blob download bridge is not available",
+                new IllegalStateException("JavaScript bridges are disabled"),
+                blobUrl,
+                fallbackFileName,
+                fallbackMimeType
+            );
+            return;
+        }
         String script = String.format(
             """
             (() => {
@@ -4520,18 +4530,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             Log.w("InAppBrowser", "Cannot inject JavaScript interface - WebView is null");
             return;
         }
-        if (!shouldInjectJavascriptBridgeScripts()) {
-            return;
-        }
 
         try {
-            String script = createMobileAppBridgeScript();
+            final boolean injectBridgeScripts = shouldInjectJavascriptBridgeScripts();
+            final String script = injectBridgeScripts ? createMobileAppBridgeScript() : null;
 
             _webView.post(() -> {
                 if (_webView != null) {
                     try {
-                        _webView.evaluateJavascript(script, null);
-                        injectFileInputCaptureHookScript();
+                        if (injectBridgeScripts) {
+                            _webView.evaluateJavascript(script, null);
+                            injectFileInputCaptureHookScript();
+                        }
                         injectBlankTargetInCurrentWebViewScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
@@ -4753,6 +4763,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private boolean shouldWaitForPreShowScriptCompletion() {
+        if (!areJavascriptBridgesRegistered()) {
+            return false;
+        }
+        return isJavascriptBridgeAllowedForMainFrame();
+    }
+
     private void injectPreShowScript() {
         //    String script =
         //        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
@@ -4777,6 +4794,20 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
 
         Log.i("InjectPreShowScript", String.format("PreShowScript script:\n%s", script));
+
+        if (!shouldWaitForPreShowScriptCompletion()) {
+            activity.runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (_webView != null) {
+                            _webView.evaluateJavascript(script, null);
+                        }
+                    }
+                }
+            );
+            return;
+        }
 
         preShowSemaphore = new Semaphore(0);
         activity.runOnUiThread(

@@ -2216,6 +2216,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     func injectJavaScriptInterface() {
+        guard !javascriptBridgeOriginPolicy.isDisabled else {
+            return
+        }
         let script = mobileAppScriptSource()
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
@@ -3716,38 +3719,43 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
-        // Safely construct script template with proper escaping
         let userScript = self.preShowScript ?? ""
+        print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(userScript)")
 
-        // Build script using safe concatenation to avoid multi-line string issues
-        let scriptTemplate = [
-            "async function preShowFunction() {",
-            userScript,
-            "}",
-            "preShowFunction().then(",
-            "    () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})",
-            ").catch(",
-            "    err => {",
-            "        console.error('Preshow error', err);",
-            "        window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));",
-            "    }",
-            ")"
-        ]
+        let semaphore = DispatchSemaphore(value: 0)
+        self.preShowSemaphore = semaphore
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let webView = self.webView else {
+                semaphore.signal()
+                return
+            }
 
-        let script = scriptTemplate.joined(separator: "\n")
-        print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
-
-        self.preShowSemaphore = DispatchSemaphore(value: 0)
-        self.executeScript(script: script) // this will run on the main thread
+            webView.callAsyncJavaScript(
+                userScript,
+                arguments: [:],
+                in: nil,
+                in: .page
+            ) { result in
+                if case .failure(let error) = result {
+                    print("[InAppBrowser - InjectPreShowScript] PreShowScript error: \(error)")
+                    self.preShowError = error.localizedDescription
+                }
+                semaphore.signal()
+            }
+        }
 
         defer {
             self.preShowSemaphore = nil
             self.preShowError = nil
         }
 
-        if self.preShowSemaphore?.wait(timeout: .now() + 10) == .timedOut {
+        if semaphore.wait(timeout: .now() + 10) == .timedOut {
             print("[InAppBrowser - InjectPreShowScript] PreShowScript running for over 10 seconds. The plugin will not wait any longer!")
             return
+        }
+
+        if let preShowError = self.preShowError, !preShowError.isEmpty {
+            print("[InAppBrowser - InjectPreShowScript] Error within the user-provided preShowFunction: \(preShowError)")
         }
 
         //            "async function preShowFunction() {\n" +

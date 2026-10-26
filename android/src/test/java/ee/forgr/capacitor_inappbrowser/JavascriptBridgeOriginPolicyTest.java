@@ -56,6 +56,15 @@ public class JavascriptBridgeOriginPolicyTest {
     }
 
     @Test
+    public void allowlistRejectsUserInfoAndSuffixConfusion() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*.trusted.example")
+        );
+        assertFalse(policy.isUrlAllowed("https://login.example.com@evil.example/"));
+        assertFalse(policy.isUrlAllowed("https://eviltrusted.example/"));
+    }
+
+    @Test
     public void originFromUrlNormalizesDefaultPorts() {
         assertEquals("https://example.com", JavascriptBridgeOriginPolicy.originFromUrl("https://example.com:443/page"));
         assertEquals("http://example.com", JavascriptBridgeOriginPolicy.originFromUrl("http://example.com:80/"));

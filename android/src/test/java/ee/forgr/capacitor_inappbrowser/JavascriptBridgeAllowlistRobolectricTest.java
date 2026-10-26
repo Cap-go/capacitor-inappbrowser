@@ -86,10 +86,12 @@ public class JavascriptBridgeAllowlistRobolectricTest {
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicBoolean allowed = new AtomicBoolean(true);
+        AtomicBoolean threw = new AtomicBoolean(false);
         Thread javaBridgeThread = new Thread(() -> {
             try {
                 allowed.set((Boolean) method.invoke(dialog));
             } catch (Exception e) {
+                threw.set(true);
                 allowed.set(false);
             } finally {
                 latch.countDown();
@@ -102,6 +104,7 @@ public class JavascriptBridgeAllowlistRobolectricTest {
             latch.await(25, TimeUnit.MILLISECONDS);
         }
         assertTrue(latch.getCount() == 0);
+        assertFalse("bridge allowlist check threw on JavaBridge thread", threw.get());
         assertFalse(allowed.get());
     }
 
