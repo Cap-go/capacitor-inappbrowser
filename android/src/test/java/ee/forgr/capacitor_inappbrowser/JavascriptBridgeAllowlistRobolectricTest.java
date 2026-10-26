@@ -55,8 +55,12 @@ public class JavascriptBridgeAllowlistRobolectricTest {
             }
         }, "JavaBridge");
         javaBridgeThread.start();
-        assertTrue("bridge allowlist check timed out", latch.await(5, TimeUnit.SECONDS));
-        ShadowLooper.idleMainLooper();
+        long deadlineMs = System.currentTimeMillis() + 5000;
+        while (latch.getCount() > 0 && System.currentTimeMillis() < deadlineMs) {
+            ShadowLooper.idleMainLooper();
+            latch.await(25, TimeUnit.MILLISECONDS);
+        }
+        assertTrue("bridge allowlist check timed out", latch.getCount() == 0);
         assertFalse("bridge allowlist check threw on JavaBridge thread", threw.get());
         assertTrue(allowed.get());
     }
@@ -92,8 +96,12 @@ public class JavascriptBridgeAllowlistRobolectricTest {
             }
         }, "JavaBridge");
         javaBridgeThread.start();
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
-        ShadowLooper.idleMainLooper();
+        long deadlineMs = System.currentTimeMillis() + 5000;
+        while (latch.getCount() > 0 && System.currentTimeMillis() < deadlineMs) {
+            ShadowLooper.idleMainLooper();
+            latch.await(25, TimeUnit.MILLISECONDS);
+        }
+        assertTrue(latch.getCount() == 0);
         assertFalse(allowed.get());
     }
 
