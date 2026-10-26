@@ -72,7 +72,7 @@ enum JavascriptBridgeOriginPolicy: Equatable {
     }
 
     static func origin(from securityOrigin: WKSecurityOrigin) -> String? {
-        let scheme = securityOrigin.protocol.lowercased()
+        let scheme = securityOrigin.`protocol`.lowercased()
         let host = securityOrigin.host.lowercased()
         if scheme.isEmpty || host.isEmpty {
             return nil
