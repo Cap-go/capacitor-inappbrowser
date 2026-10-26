@@ -1,7 +1,7 @@
 import Foundation
 import WebKit
 
-enum JavascriptBridgeOriginPolicy: Equatable {
+public enum JavascriptBridgeOriginPolicy: Equatable {
     case unrestricted
     case disabled
     case allowlist([String])
