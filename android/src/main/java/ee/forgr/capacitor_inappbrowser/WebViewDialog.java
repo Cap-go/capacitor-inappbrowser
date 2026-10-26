@@ -1497,10 +1497,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (policy.isUnrestricted()) {
             return true;
         }
-        if (_webView == null) {
-            return false;
-        }
-        return policy.isUrlAllowed(_webView.getUrl());
+        return policy.isUrlAllowed(getWebViewUrlOnMainThread(null));
     }
 
     private void logBlockedJavascriptBridgeCall(String methodName) {

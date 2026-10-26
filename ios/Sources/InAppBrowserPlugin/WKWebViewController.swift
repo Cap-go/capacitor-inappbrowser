@@ -2523,6 +2523,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
         self.blockedHosts = parent.blockedHosts
         self.authorizedAppLinks = parent.authorizedAppLinks
+        self.javascriptBridgeOriginPolicy = parent.javascriptBridgeOriginPolicy
         self.disablePrivacyScreen = parent.disablePrivacyScreen
         // createWebViewWith configs copy parent script handlers; start clean so
         // initWebview can register blobDownload/etc without NSInvalidArgumentException.

@@ -832,7 +832,9 @@ export interface OpenWebViewOptions {
    * Host wildcards are supported (`https://*.example.com`). Scheme and port must match.
    *
    * On Android, `postMessage` prefers `WebMessageListener` with matching origin rules when supported.
-   * Subframe-originated bridge calls are rejected when an allowlist is configured.
+   * Subframe-originated bridge calls are rejected when an allowlist is configured on iOS and on Android
+   * for the `WebMessageListener` path. Other Android `addJavascriptInterface` bridges validate the main-frame
+   * URL only, so a cross-origin iframe inside an allowed page can still invoke them.
    *
    * @platform android, ios
    * @default undefined (all origins)

@@ -77,7 +77,7 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         if scheme.isEmpty || host.isEmpty {
             return nil
         }
-        let port = Int(securityOrigin.port)
+        let port = securityOrigin.port > 0 ? Int(securityOrigin.port) : -1
         return buildOrigin(scheme: scheme, host: host, port: port)
     }
 
