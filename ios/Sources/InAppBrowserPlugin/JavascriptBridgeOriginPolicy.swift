@@ -6,21 +6,21 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
     case disabled
     case allowlist([String])
 
-    var isDisabled: Bool {
+    public var isDisabled: Bool {
         if case .disabled = self {
             return true
         }
         return false
     }
 
-    var isUnrestricted: Bool {
+    public var isUnrestricted: Bool {
         if case .unrestricted = self {
             return true
         }
         return false
     }
 
-    static func from(allowlist rules: [String]) -> JavascriptBridgeOriginPolicy {
+    public static func from(allowlist rules: [String]) -> JavascriptBridgeOriginPolicy {
         let normalized = rules.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         if normalized.isEmpty {
             return .disabled
@@ -28,7 +28,7 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         return .allowlist(normalized)
     }
 
-    func isUrlAllowed(_ url: String?) -> Bool {
+    public func isUrlAllowed(_ url: String?) -> Bool {
         switch self {
         case .unrestricted:
             return true
@@ -42,7 +42,7 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         }
     }
 
-    func isOriginAllowed(_ origin: String?) -> Bool {
+    public func isOriginAllowed(_ origin: String?) -> Bool {
         switch self {
         case .unrestricted:
             return true
@@ -52,11 +52,11 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
             guard let origin, !origin.isEmpty else {
                 return false
             }
-            return rules.contains { Self.matchesAllowRule(origin: origin, rule: $0) }
+            return rules.contains { Self.matchesAllowRule(pageOrigin: origin, rule: $0) }
         }
     }
 
-    func allows(message: WKScriptMessage) -> Bool {
+    public func allows(message: WKScriptMessage) -> Bool {
         switch self {
         case .unrestricted:
             return true
@@ -100,16 +100,16 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         return "\(scheme)://\(host):\(normalizedPort)"
     }
 
-    static func matchesAllowRule(origin: String, rule: String) -> Bool {
+    static func matchesAllowRule(pageOrigin: String, rule: String) -> Bool {
         let trimmedRule = rule.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let normalizedRule = origin(fromUrl: trimmedRule) ?? origin(fromUrl: "https://\(trimmedRule)") else {
             return false
         }
-        if origin.caseInsensitiveCompare(normalizedRule) == .orderedSame {
+        if pageOrigin.caseInsensitiveCompare(normalizedRule) == .orderedSame {
             return true
         }
 
-        guard let originComponents = URLComponents(string: origin),
+        guard let originComponents = URLComponents(string: pageOrigin),
               let ruleComponents = URLComponents(string: normalizedRule),
               let originScheme = originComponents.scheme?.lowercased(),
               let ruleScheme = ruleComponents.scheme?.lowercased(),
