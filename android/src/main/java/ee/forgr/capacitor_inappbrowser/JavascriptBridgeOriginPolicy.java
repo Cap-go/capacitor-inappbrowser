@@ -85,14 +85,25 @@ public final class JavascriptBridgeOriginPolicy {
     }
 
     public String proxyBridgeOriginRulesJson() {
-        if (mode != Mode.ALLOWLIST) {
+        if (mode != Mode.ALLOWLIST || allowlistRules.isEmpty()) {
             return "[]";
         }
-        JSONArray array = new JSONArray();
-        for (String rule : allowlistRules) {
-            array.put(rule);
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < allowlistRules.size(); i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(quoteJsonString(allowlistRules.get(i)));
         }
-        return array.toString();
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private static String quoteJsonString(String value) {
+        if (value == null) {
+            return "null";
+        }
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     @Nullable
