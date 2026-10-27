@@ -181,7 +181,8 @@
         return `${scheme}://${host}`;
       }
       return `${scheme}://${host}:${normalizedPort}`;
-    } catch (e) {
+    } catch (error) {
+      void error;
       return null;
     }
   }
@@ -240,7 +241,8 @@
         return [];
       }
       return parsed.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
-    } catch (e) {
+    } catch (error) {
+      void error;
       return [];
     }
   }

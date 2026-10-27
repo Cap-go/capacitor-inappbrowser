@@ -2,28 +2,42 @@ import XCTest
 @testable import InAppBrowserPlugin
 
 final class JavascriptBridgeOriginPolicyTests: XCTestCase {
+    private enum Fixture {
+        static func httpsUrl(host: String, path: String = "/") -> String {
+            "https://\(host)\(path)"
+        }
+
+        static func httpsAllowRule(host: String) -> String {
+            "https://\(host)"
+        }
+
+        static func httpsWildcardAllowRule(domain: String) -> String {
+            "https://*.\(domain)"
+        }
+    }
+
     func testUnrestrictedAllowsAnyUrl() {
         let policy = JavascriptBridgeOriginPolicy.unrestricted
-        XCTAssertTrue(policy.isUrlAllowed("https://evil.example/phish"))
+        XCTAssertTrue(policy.isUrlAllowed(Fixture.httpsUrl(host: "evil.example", path: "/phish")))
         XCTAssertTrue(policy.isUnrestricted)
     }
 
     func testDisabledRejectsUrls() {
         let policy = JavascriptBridgeOriginPolicy.disabled
-        XCTAssertFalse(policy.isUrlAllowed("https://trusted.example/"))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "trusted.example")))
         XCTAssertTrue(policy.isDisabled)
     }
 
     func testAllowlistMatchesExactOrigin() {
-        let policy = JavascriptBridgeOriginPolicy.from(allowlist: ["https://login.example.com"])
-        XCTAssertTrue(policy.isUrlAllowed("https://login.example.com/oauth"))
-        XCTAssertFalse(policy.isUrlAllowed("https://evil.example.com/"))
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: [Fixture.httpsAllowRule(host: "login.example.com")])
+        XCTAssertTrue(policy.isUrlAllowed(Fixture.httpsUrl(host: "login.example.com", path: "/oauth")))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "evil.example.com")))
     }
 
     func testAllowlistSupportsHostWildcards() {
-        let policy = JavascriptBridgeOriginPolicy.from(allowlist: ["https://*.trusted.example"])
-        XCTAssertTrue(policy.isUrlAllowed("https://app.trusted.example/path"))
-        XCTAssertFalse(policy.isUrlAllowed("https://trusted.example/"))
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: [Fixture.httpsWildcardAllowRule(domain: "trusted.example")])
+        XCTAssertTrue(policy.isUrlAllowed(Fixture.httpsUrl(host: "app.trusted.example", path: "/path")))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "trusted.example")))
     }
 
     func testEmptyAllowlistIsDisabled() {
@@ -32,22 +46,22 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
     }
 
     func testAllowlistMatchesNormalizedDefaultPortOrigin() {
-        let policy = JavascriptBridgeOriginPolicy.from(allowlist: ["https://login.example.com"])
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: [Fixture.httpsAllowRule(host: "login.example.com")])
         let normalized = JavascriptBridgeOriginPolicy.buildOrigin(scheme: "https", host: "login.example.com", port: -1)
-        XCTAssertEqual(normalized, "https://login.example.com")
+        XCTAssertEqual(normalized, Fixture.httpsAllowRule(host: "login.example.com"))
         XCTAssertTrue(policy.isOriginAllowed(normalized))
-        XCTAssertFalse(policy.isOriginAllowed("https://login.example.com:0"))
+        XCTAssertFalse(policy.isOriginAllowed(Fixture.httpsUrl(host: "login.example.com:0")))
     }
 
     func testBuildOriginOmitsExplicitDefaultHttpsPort() {
         XCTAssertEqual(
             JavascriptBridgeOriginPolicy.buildOrigin(scheme: "https", host: "example.com", port: 443),
-            "https://example.com"
+            Fixture.httpsAllowRule(host: "example.com")
         )
     }
 
     func testParsePluginOptionRejectsNonArrayValues() {
-        let result = JavascriptBridgeOriginPolicy.parsePluginOption("https://login.example.com")
+        let result = JavascriptBridgeOriginPolicy.parsePluginOption("not-an-array")
         switch result {
         case .failure(let message):
             XCTAssertEqual(message, "javascriptBridgeOrigins must be an array of strings")

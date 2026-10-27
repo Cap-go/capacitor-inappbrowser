@@ -51,16 +51,14 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
     }
 
     public var proxyBridgeOriginRulesJson: String {
-        switch self {
-        case .allowlist(let rules):
+        if case .allowlist(let rules) = self {
             guard let data = try? JSONSerialization.data(withJSONObject: rules),
                   let json = String(data: data, encoding: .utf8) else {
                 return "[]"
             }
             return json
-        default:
-            return "[]"
         }
+        return "[]"
     }
 
     public static func from(allowlist rules: [String]) -> JavascriptBridgeOriginPolicy {
@@ -115,7 +113,10 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
     }
 
     static func origin(from securityOrigin: WKSecurityOrigin) -> String? {
-        let scheme = securityOrigin.`protocol`.lowercased()
+        guard let schemeValue = securityOrigin.value(forKey: "protocol") as? String else {
+            return nil
+        }
+        let scheme = schemeValue.lowercased()
         let host = securityOrigin.host.lowercased()
         if scheme.isEmpty || host.isEmpty {
             return nil
