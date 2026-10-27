@@ -251,8 +251,9 @@ public final class JavascriptBridgeOriginPolicy {
         if (parts == null) {
             return null;
         }
-        if (parts.host.startsWith("*.")) {
-            return parts.scheme + "://" + parts.host;
+        if (!"http".equals(parts.scheme) && !"https".equals(parts.scheme)) {
+            // Custom schemes must not carry a host or port in WebMessageListener rules.
+            return parts.scheme + "://";
         }
         int defaultPort = defaultPort(parts.scheme);
         if (parts.port != defaultPort) {

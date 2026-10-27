@@ -80,6 +80,20 @@ public class JavascriptBridgeOriginPolicyTest {
     }
 
     @Test
+    public void webMessageRulesRetainWildcardHostPorts() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://*.trusted.example:8443")
+        );
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("https://*.trusted.example:8443"));
+    }
+
+    @Test
+    public void webMessageRulesUseSchemeOnlyForCustomSchemes() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.singletonList("myapp://localhost"));
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("myapp://"));
+    }
+
+    @Test
     public void emptyAllowlistIsDisabled() {
         JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.emptyList());
         assertTrue(policy.isDisabled());

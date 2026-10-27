@@ -2191,10 +2191,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        // With an allowlist, subframe bridge messages are rejected; do not rewrite subframe requests.
+        let proxyBridgeMainFrameOnly = !javascriptBridgeOriginPolicy.isUnrestricted
+
         let bootstrapScript = WKUserScript(
             source: ProxyBridgeSupport.bootstrapScriptSource(),
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: proxyBridgeMainFrameOnly
         )
         userContentController.addUserScript(bootstrapScript)
 
@@ -2210,7 +2213,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let bridgeScript = WKUserScript(
             source: bridgeScriptSource,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: proxyBridgeMainFrameOnly
         )
         userContentController.addUserScript(bridgeScript)
     }
