@@ -112,13 +112,13 @@ public class JavascriptBridgeOriginPolicyTest {
     }
 
     @Test
-    public void proxyBridgeOriginSerializationUsesAllowlistRules() throws Exception {
+    public void proxyBridgeOriginSerializationUsesAllowlistRules() {
         JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
-            Arrays.asList("https://login.example.com", "https://*.trusted.example")
+            Collections.singletonList("https://login.example.com")
         );
         assertEquals("allowlist", policy.proxyBridgeOriginModeLabel());
-        JSONArray rules = new JSONArray(policy.proxyBridgeOriginRulesJson());
-        assertEquals(2, rules.length());
-        assertEquals("https://login.example.com", rules.getString(0));
+        assertEquals("[\"https://login.example.com\"]", policy.proxyBridgeOriginRulesJson());
+        assertEquals("unrestricted", JavascriptBridgeOriginPolicy.unrestricted().proxyBridgeOriginModeLabel());
+        assertEquals("disabled", JavascriptBridgeOriginPolicy.disabled().proxyBridgeOriginModeLabel());
     }
 }

@@ -88,7 +88,11 @@ public final class JavascriptBridgeOriginPolicy {
         if (mode != Mode.ALLOWLIST) {
             return "[]";
         }
-        return new JSONArray(allowlistRules).toString();
+        JSONArray array = new JSONArray();
+        for (String rule : allowlistRules) {
+            array.put(rule);
+        }
+        return array.toString();
     }
 
     @Nullable
