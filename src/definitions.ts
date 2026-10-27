@@ -831,13 +831,15 @@ export interface OpenWebViewOptions {
    * Entries are origin strings such as `https://login.example.com` or `https://localhost`.
    * Host wildcards are supported (`https://*.example.com`). Scheme and port must match.
    *
-   * On Android, `postMessage` prefers `WebMessageListener` with matching origin rules when supported.
-   * Subframe-originated bridge calls are rejected when an allowlist is configured on iOS and on Android
-   * for the `WebMessageListener` path. Other Android `addJavascriptInterface` bridges validate the main-frame
-   * URL only, so a cross-origin iframe inside an allowed page can still invoke them.
+   * On Android with an allowlist, `WebMessageListener` carries `postMessage`, `close`, `hide`, `show`, `print`,
+   * and `takeScreenshot` when the API is supported, so subframe callers are rejected by origin.
+   * When `WebMessageListener` is unavailable, Android falls back to `addJavascriptInterface` and validates the
+   * main-frame URL only.
+   * Subframe-originated bridge calls are rejected when an allowlist is configured on iOS.
    *
    * @platform android, ios
    * @default undefined (all origins)
+   * Future-major default candidate: restrict bridges by default instead of allowing all origins.
    * @example
    * // OIDC login only: no native bridge exposure on the IdP pages
    * javascriptBridgeOrigins: []
