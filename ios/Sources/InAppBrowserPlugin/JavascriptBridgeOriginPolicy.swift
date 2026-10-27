@@ -20,7 +20,12 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         return false
     }
 
-    public static func parsePluginOption(_ rawValue: Any?) -> Result<JavascriptBridgeOriginPolicy, String> {
+    public enum PluginParseResult {
+        case success(JavascriptBridgeOriginPolicy)
+        case failure(String)
+    }
+
+    public static func parsePluginOption(_ rawValue: Any?) -> PluginParseResult {
         guard let rawValue else {
             return .success(.unrestricted)
         }

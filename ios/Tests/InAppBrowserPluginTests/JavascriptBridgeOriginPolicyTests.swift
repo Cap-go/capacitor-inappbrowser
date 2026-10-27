@@ -51,7 +51,7 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
         switch result {
         case .failure(let message):
             XCTAssertEqual(message, "javascriptBridgeOrigins must be an array of strings")
-        default:
+        case .success:
             XCTFail("Expected invalid type rejection")
         }
     }
@@ -61,7 +61,7 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
         switch result {
         case .success(let policy):
             XCTAssertTrue(policy.isUnrestricted)
-        default:
+        case .failure:
             XCTFail("Expected unrestricted policy")
         }
     }
