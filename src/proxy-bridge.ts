@@ -4,7 +4,10 @@ import {
   consumeProxySubmitReplayBypass,
   ensureInferredContentType,
   getSubmitEventSubmitter,
+  isJavascriptBridgeDocumentOriginAllowed,
   isNativeProxyErrorResponse,
+  type JavascriptBridgeOriginMode,
+  parseJavascriptBridgeOriginRules,
   nativeProxyErrorMessage,
   replaySubmitAfterProxyFailure,
   replaceCapturedHeader,
@@ -30,6 +33,8 @@ import {
 
   const accessToken = '___CAPGO_PROXY_TOKEN___';
   const proxyRegexSource = '___CAPGO_PROXY_REGEX___';
+  const bridgeOriginMode = '___CAPGO_BRIDGE_ORIGIN_MODE___' as JavascriptBridgeOriginMode;
+  const bridgeOriginRules = parseJavascriptBridgeOriginRules('___CAPGO_BRIDGE_ORIGIN_RULES___');
   let requestCounter = 0;
   let proxyRequestPattern: RegExp | null = null;
 
@@ -158,7 +163,10 @@ import {
     ) {
       throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
     }
-    proxyBridge.storeRequest(
+    if (!isJavascriptBridgeDocumentOriginAllowed(window.location.href, bridgeOriginMode, bridgeOriginRules)) {
+      throw new Error('[proxy-bridge] JavaScript bridge is not allowed for this document origin');
+    }
+    const stored = proxyBridge.storeRequest(
       accessToken,
       requestId,
       normalizedMethod,
@@ -166,6 +174,9 @@ import {
       base64Body || '',
       normalizeCredentialsMode(credentialsMode),
     );
+    if (stored === false) {
+      throw new Error('[proxy-bridge] Native bridge rejected proxy request storage');
+    }
 
     return '/_capgo_proxy_?u=' + encodeURIComponent(url) + '&rid=' + requestId;
   }

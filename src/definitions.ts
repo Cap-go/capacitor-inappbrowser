@@ -824,7 +824,7 @@ export interface OpenWebViewOptions {
   /**
    * Restrict native JavaScript bridges (`window.mobileApp`, print, preShow callbacks, proxy bridge) to trusted document origins.
    *
-   * - **Omit** (default): bridges remain available on every origin loaded in the webview (backward compatible).
+   * - **Not set** (default): bridges remain available on every origin loaded in the webview (backward compatible).
    * - **Empty array `[]`**: disable native bridges for this webview (no handlers or injection).
    * - **Non-empty**: allow bridge calls only when the main document URL matches an entry.
    *

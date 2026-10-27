@@ -49,18 +49,26 @@ public class ProxyBridge {
     }
 
     @JavascriptInterface
-    public void storeRequest(String token, String requestId, String method, String headersJson, String base64Body, String credentialsMode) {
+    public boolean storeRequest(
+        String token,
+        String requestId,
+        String method,
+        String headersJson,
+        String base64Body,
+        String credentialsMode
+    ) {
         if (!bridgeAllowed.getAsBoolean()) {
-            return;
+            return false;
         }
         if (token == null || !token.equals(accessToken) || requestId == null || requestId.isEmpty()) {
-            return;
+            return false;
         }
 
         long now = clock.getAsLong();
         cleanupExpiredRequests(now);
         storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body, credentialsMode, now));
         storedRequestOrder.add(requestId);
+        return true;
     }
 
     public StoredRequest getAndRemove(String requestId) {

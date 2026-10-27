@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Controls which document origins may invoke native JavaScript bridges in {@link WebViewDialog}.
@@ -57,6 +59,36 @@ public final class JavascriptBridgeOriginPolicy {
             return DISABLED;
         }
         return new JavascriptBridgeOriginPolicy(Mode.ALLOWLIST, normalized);
+    }
+
+    @Nullable
+    public static String validatePluginOriginsRawValue(@Nullable Object rawValue) {
+        if (rawValue == null || rawValue == JSONObject.NULL) {
+            return null;
+        }
+        if (!(rawValue instanceof JSONArray)) {
+            return "javascriptBridgeOrigins must be an array of strings";
+        }
+        return null;
+    }
+
+    public String proxyBridgeOriginModeLabel() {
+        switch (mode) {
+            case UNRESTRICTED:
+                return "unrestricted";
+            case DISABLED:
+                return "disabled";
+            case ALLOWLIST:
+            default:
+                return "allowlist";
+        }
+    }
+
+    public String proxyBridgeOriginRulesJson() {
+        if (mode != Mode.ALLOWLIST) {
+            return "[]";
+        }
+        return new JSONArray(allowlistRules).toString();
     }
 
     @Nullable

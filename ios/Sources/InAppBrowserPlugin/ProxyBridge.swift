@@ -201,7 +201,12 @@ enum ProxyBridgeSupport {
         """
     }
 
-    static func loadBundledBridgeScript(accessToken: String, proxyRegexSource: String) -> String? {
+    static func loadBundledBridgeScript(
+        accessToken: String,
+        proxyRegexSource: String,
+        bridgeOriginMode: String,
+        bridgeOriginRulesJson: String
+    ) -> String? {
         #if SWIFT_PACKAGE
         let bundle = Bundle.module
         #else
@@ -216,5 +221,10 @@ enum ProxyBridgeSupport {
         return rawScript
             .replacingOccurrences(of: "___CAPGO_PROXY_TOKEN___", with: escapeJavaScriptLiteral(accessToken))
             .replacingOccurrences(of: "___CAPGO_PROXY_REGEX___", with: escapeJavaScriptLiteral(proxyRegexSource))
+            .replacingOccurrences(of: "___CAPGO_BRIDGE_ORIGIN_MODE___", with: escapeJavaScriptLiteral(bridgeOriginMode))
+            .replacingOccurrences(
+                of: "___CAPGO_BRIDGE_ORIGIN_RULES___",
+                with: escapeJavaScriptLiteral(bridgeOriginRulesJson)
+            )
     }
 }

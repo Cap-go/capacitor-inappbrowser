@@ -45,4 +45,24 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
             "https://example.com"
         )
     }
+
+    func testParsePluginOptionRejectsNonArrayValues() {
+        let result = JavascriptBridgeOriginPolicy.parsePluginOption("https://login.example.com")
+        switch result {
+        case .failure(let message):
+            XCTAssertEqual(message, "javascriptBridgeOrigins must be an array of strings")
+        default:
+            XCTFail("Expected invalid type rejection")
+        }
+    }
+
+    func testParsePluginOptionTreatsNullAsUnrestricted() {
+        let result = JavascriptBridgeOriginPolicy.parsePluginOption(NSNull())
+        switch result {
+        case .success(let policy):
+            XCTAssertTrue(policy.isUnrestricted)
+        default:
+            XCTFail("Expected unrestricted policy")
+        }
+    }
 }

@@ -2302,10 +2302,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         String fallbackMimeType = normalizeMimeType(mimeType, "download");
         String fallbackFileName = URLUtil.guessFileName("download", contentDisposition, fallbackMimeType);
-        if (getJavascriptBridgeOriginPolicy().isDisabled()) {
+        if (!isJavascriptBridgeAllowedForMainFrame()) {
             showDownloadError(
                 "Blob download bridge is not available",
-                new IllegalStateException("JavaScript bridges are disabled"),
+                new IllegalStateException("JavaScript bridge is disabled or not allowed for this origin"),
                 blobUrl,
                 fallbackFileName,
                 fallbackMimeType
@@ -7373,9 +7373,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             proxyRegexSource = _options.getProxyRequestsPattern().pattern();
         }
 
+        JavascriptBridgeOriginPolicy bridgeOriginPolicy = getJavascriptBridgeOriginPolicy();
         return proxyBridgeScript
             .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
-            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
+            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource))
+            .replace("___CAPGO_BRIDGE_ORIGIN_MODE___", escapeJavaScriptLiteral(bridgeOriginPolicy.proxyBridgeOriginModeLabel()))
+            .replace("___CAPGO_BRIDGE_ORIGIN_RULES___", escapeJavaScriptLiteral(bridgeOriginPolicy.proxyBridgeOriginRulesJson()));
     }
 
     private boolean loadHtmlDataUrlIfNeeded(String url) {

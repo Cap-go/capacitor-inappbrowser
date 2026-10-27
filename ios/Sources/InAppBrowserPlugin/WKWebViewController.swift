@@ -2204,7 +2204,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let proxyRegexSource = legacyProxyRequestURLRegexPattern ?? ""
         guard let bridgeScriptSource = ProxyBridgeSupport.loadBundledBridgeScript(
             accessToken: accessToken,
-            proxyRegexSource: proxyRegexSource
+            proxyRegexSource: proxyRegexSource,
+            bridgeOriginMode: javascriptBridgeOriginPolicy.proxyBridgeOriginModeLabel,
+            bridgeOriginRulesJson: javascriptBridgeOriginPolicy.proxyBridgeOriginRulesJson
         ) else {
             print("[InAppBrowser][Proxy] WARNING: Failed to load proxy-bridge.js for iOS injection")
             return
@@ -2340,6 +2342,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             userContentController.add(weakHandler, name: "magicPrint")
 
+            let printOverrideMainFrameOnly = !javascriptBridgeOriginPolicy.isUnrestricted
             // Inject JavaScript to override window.print
             let script = WKUserScript(
                 source: """
@@ -2348,7 +2351,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 };
                 """,
                 injectionTime: .atDocumentStart,
-                forMainFrameOnly: false
+                forMainFrameOnly: printOverrideMainFrameOnly
             )
             userContentController.addUserScript(script)
             addMobileAppUserScript(to: userContentController)

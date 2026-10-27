@@ -2,10 +2,12 @@ package ee.forgr.capacitor_inappbrowser;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.json.JSONArray;
 import org.junit.Test;
 
 public class JavascriptBridgeOriginPolicyTest {
@@ -97,5 +99,24 @@ public class JavascriptBridgeOriginPolicyTest {
     public void emptyAllowlistIsDisabled() {
         JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.emptyList());
         assertTrue(policy.isDisabled());
+    }
+
+    @Test
+    public void validatePluginOriginsRawValueRejectsNonArray() {
+        assertEquals(
+            "javascriptBridgeOrigins must be an array of strings",
+            JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue("https://login.example.com")
+        );
+        assertNull(JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue(null));
+        assertNull(JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue(new JSONArray()));
+    }
+
+    @Test
+    public void proxyBridgeOriginSerializationUsesAllowlistRules() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*.trusted.example")
+        );
+        assertEquals("allowlist", policy.proxyBridgeOriginModeLabel());
+        assertTrue(policy.proxyBridgeOriginRulesJson().contains("login.example.com"));
     }
 }

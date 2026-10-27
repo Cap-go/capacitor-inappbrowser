@@ -20,6 +20,44 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         return false
     }
 
+    public static func parsePluginOption(_ rawValue: Any?) -> Result<JavascriptBridgeOriginPolicy, String> {
+        guard let rawValue else {
+            return .success(.unrestricted)
+        }
+        if rawValue is NSNull {
+            return .success(.unrestricted)
+        }
+        if let entries = rawValue as? [Any] {
+            let rules = entries.compactMap { $0 as? String }
+            return .success(from(allowlist: rules))
+        }
+        return .failure("javascriptBridgeOrigins must be an array of strings")
+    }
+
+    public var proxyBridgeOriginModeLabel: String {
+        switch self {
+        case .unrestricted:
+            return "unrestricted"
+        case .disabled:
+            return "disabled"
+        case .allowlist:
+            return "allowlist"
+        }
+    }
+
+    public var proxyBridgeOriginRulesJson: String {
+        switch self {
+        case .allowlist(let rules):
+            guard let data = try? JSONSerialization.data(withJSONObject: rules),
+                  let json = String(data: data, encoding: .utf8) else {
+                return "[]"
+            }
+            return json
+        default:
+            return "[]"
+        }
+    }
+
     public static func from(allowlist rules: [String]) -> JavascriptBridgeOriginPolicy {
         let normalized = rules.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         if normalized.isEmpty {

@@ -154,6 +154,109 @@
       xhr.overrideMimeType(state.overrideMimeType);
     }
   }
+  function defaultPortForScheme(scheme) {
+    if (scheme === "http") {
+      return 80;
+    }
+    if (scheme === "https") {
+      return 443;
+    }
+    return -1;
+  }
+  function originFromUrl(url) {
+    if (!url) {
+      return null;
+    }
+    try {
+      const parsed = new URL(url);
+      const scheme = parsed.protocol.replace(/:$/, "").toLowerCase();
+      const host = parsed.hostname.toLowerCase();
+      if (!scheme || !host) {
+        return null;
+      }
+      const explicitPort = parsed.port ? Number(parsed.port) : -1;
+      const defaultPort = defaultPortForScheme(scheme);
+      const normalizedPort = explicitPort > 0 ? explicitPort : defaultPort;
+      if (normalizedPort === defaultPort) {
+        return `${scheme}://${host}`;
+      }
+      return `${scheme}://${host}:${normalizedPort}`;
+    } catch (e) {
+      return null;
+    }
+  }
+  function normalizeOriginCandidate(origin) {
+    const trimmed = origin.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const candidate = trimmed.includes("://") ? trimmed : `https://${trimmed}`;
+    return originFromUrl(candidate);
+  }
+  function matchesHostWildcard(host, patternHost) {
+    if (!patternHost.startsWith("*.")) {
+      return false;
+    }
+    const baseDomain = patternHost.slice(2);
+    if (!baseDomain || host.toLowerCase() === baseDomain.toLowerCase()) {
+      return false;
+    }
+    return host.toLowerCase().endsWith(`.${baseDomain.toLowerCase()}`);
+  }
+  function matchesJavascriptBridgeAllowRule(pageOrigin, rule) {
+    const normalizedRule = normalizeOriginCandidate(rule);
+    if (!normalizedRule) {
+      return false;
+    }
+    if (pageOrigin.toLowerCase() === normalizedRule.toLowerCase()) {
+      return true;
+    }
+    const originParts = new URL(pageOrigin);
+    const ruleParts = new URL(normalizedRule);
+    const originScheme = originParts.protocol.replace(/:$/, "").toLowerCase();
+    const ruleScheme = ruleParts.protocol.replace(/:$/, "").toLowerCase();
+    const originHost = originParts.hostname.toLowerCase();
+    const ruleHost = ruleParts.hostname.toLowerCase();
+    if (originScheme !== ruleScheme) {
+      return false;
+    }
+    const originPort = originParts.port ? Number(originParts.port) : defaultPortForScheme(originScheme);
+    const rulePort = ruleParts.port ? Number(ruleParts.port) : defaultPortForScheme(ruleScheme);
+    if (originPort !== rulePort) {
+      return false;
+    }
+    if (originHost === ruleHost) {
+      return true;
+    }
+    return matchesHostWildcard(originHost, ruleHost);
+  }
+  function parseJavascriptBridgeOriginRules(rulesJson) {
+    if (!rulesJson) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(rulesJson);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
+    } catch (e) {
+      return [];
+    }
+  }
+  function isJavascriptBridgeDocumentOriginAllowed(documentUrl, mode, allowlistRules) {
+    if (mode === "unrestricted") {
+      return true;
+    }
+    if (mode === "disabled") {
+      return false;
+    }
+    const origin = originFromUrl(documentUrl);
+    if (!origin) {
+      return false;
+    }
+    return allowlistRules.some((rule) => matchesJavascriptBridgeAllowRule(origin, rule));
+  }
 
   // src/proxy-bridge.ts
   (function() {
@@ -163,6 +266,8 @@
     }
     const accessToken = "___CAPGO_PROXY_TOKEN___";
     const proxyRegexSource = "___CAPGO_PROXY_REGEX___";
+    const bridgeOriginMode = "___CAPGO_BRIDGE_ORIGIN_MODE___";
+    const bridgeOriginRules = parseJavascriptBridgeOriginRules("___CAPGO_BRIDGE_ORIGIN_RULES___");
     let requestCounter = 0;
     let proxyRequestPattern = null;
     if (proxyRegexSource) {
@@ -268,7 +373,10 @@
         if (normalizedBody !== null && normalizedBody !== void 0 && base64Body === null && methodSupportsRequestBody(normalizedMethod)) {
           throw new Error(`[proxy-bridge] Unsupported request body for ${normalizedMethod} proxy replay`);
         }
-        proxyBridge.storeRequest(
+        if (!isJavascriptBridgeDocumentOriginAllowed(window.location.href, bridgeOriginMode, bridgeOriginRules)) {
+          throw new Error("[proxy-bridge] JavaScript bridge is not allowed for this document origin");
+        }
+        const stored = proxyBridge.storeRequest(
           accessToken,
           requestId,
           normalizedMethod,
@@ -276,6 +384,9 @@
           base64Body || "",
           normalizeCredentialsMode(credentialsMode)
         );
+        if (stored === false) {
+          throw new Error("[proxy-bridge] Native bridge rejected proxy request storage");
+        }
         return "/_capgo_proxy_?u=" + encodeURIComponent(url) + "&rid=" + requestId;
       });
     }

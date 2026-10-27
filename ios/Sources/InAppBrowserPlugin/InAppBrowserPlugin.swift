@@ -1536,11 +1536,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
         let javascriptBridgeOriginPolicy: JavascriptBridgeOriginPolicy
         if let rawValue = call.options["javascriptBridgeOrigins"] {
-            if let entries = rawValue as? [Any] {
-                let rules = entries.compactMap { $0 as? String }
-                javascriptBridgeOriginPolicy = JavascriptBridgeOriginPolicy.from(allowlist: rules)
-            } else {
-                javascriptBridgeOriginPolicy = .unrestricted
+            switch JavascriptBridgeOriginPolicy.parsePluginOption(rawValue) {
+            case .success(let policy):
+                javascriptBridgeOriginPolicy = policy
+            case .failure(let message):
+                call.reject(message)
+                return
             }
         } else {
             javascriptBridgeOriginPolicy = .unrestricted

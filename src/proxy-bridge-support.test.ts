@@ -16,6 +16,8 @@ import {
   shouldProxyBridgeUrl,
   shouldProxySubmitEvent,
   shouldProxySubmitRequest,
+  isJavascriptBridgeDocumentOriginAllowed,
+  matchesJavascriptBridgeAllowRule,
 } from './proxy-bridge-support';
 
 describe('proxy bridge header helpers', () => {
@@ -232,5 +234,22 @@ describe('proxy bridge url helpers', () => {
     expect(shouldProxyBridgeUrl('https://api.example.com/login', 'https://www.grailed.com', /api\.example\.com/)).toBe(
       true,
     );
+  });
+});
+
+describe('javascript bridge origin policy helpers', () => {
+  it('allows every origin when unrestricted', () => {
+    expect(isJavascriptBridgeDocumentOriginAllowed('https://evil.example/phish', 'unrestricted', [])).toBe(true);
+  });
+
+  it('rejects disallowed main-frame origins in allowlist mode', () => {
+    const rules = ['https://login.example.com'];
+    expect(isJavascriptBridgeDocumentOriginAllowed('https://login.example.com/oauth', 'allowlist', rules)).toBe(true);
+    expect(isJavascriptBridgeDocumentOriginAllowed('https://evil.example.com/', 'allowlist', rules)).toBe(false);
+  });
+
+  it('matches host wildcards consistently with native rules', () => {
+    expect(matchesJavascriptBridgeAllowRule('https://app.trusted.example', 'https://*.trusted.example')).toBe(true);
+    expect(matchesJavascriptBridgeAllowRule('https://trusted.example', 'https://*.trusted.example')).toBe(false);
   });
 });
