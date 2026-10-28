@@ -68,6 +68,41 @@ public class JavascriptBridgeOriginPolicyTest {
     }
 
     @Test
+    public void allowlistRejectsBrokenMatcherEdgeCasesForExactRule() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://login.example.com")
+        );
+        assertTrue(policy.isUrlAllowed("https://login.example.com/oauth"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com.evil.com/"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com:8443/"));
+        assertFalse(policy.isUrlAllowed("http://login.example.com/"));
+        assertFalse(policy.isUrlAllowed("https://evillogin.example.com/"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com@evil.com/"));
+        assertFalse(policy.isUrlAllowed("about:blank"));
+        assertFalse(policy.isUrlAllowed("data:text/html,hello"));
+        assertFalse(policy.isUrlAllowed(null));
+    }
+
+    @Test
+    public void allowlistRejectsBrokenMatcherEdgeCasesForWildcardRule() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://*.trusted.example")
+        );
+        assertTrue(policy.isUrlAllowed("https://app.trusted.example/path"));
+        assertFalse(policy.isUrlAllowed("https://eviltrusted.example/"));
+        assertFalse(policy.isUrlAllowed("https://trusted.example.evil.com/"));
+    }
+
+    @Test
+    public void allowlistRejectsDefaultPortWhenRuleRequiresExplicitPort() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://localhost:8443")
+        );
+        assertTrue(policy.isUrlAllowed("https://localhost:8443/app"));
+        assertFalse(policy.isUrlAllowed("https://localhost/app"));
+    }
+
+    @Test
     public void originFromUrlNormalizesDefaultPorts() {
         assertEquals("https://example.com", JavascriptBridgeOriginPolicy.originFromUrl("https://example.com:443/page"));
         assertEquals("http://example.com", JavascriptBridgeOriginPolicy.originFromUrl("http://example.com:80/"));

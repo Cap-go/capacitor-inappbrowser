@@ -90,4 +90,30 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
             XCTFail("Expected unrestricted policy")
         }
     }
+
+    func testAllowlistRejectsBrokenMatcherEdgeCasesForExactRule() {
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: [Fixture.httpsAllowRule(host: "login.example.com")])
+        XCTAssertTrue(policy.isUrlAllowed(Fixture.httpsUrl(host: "login.example.com", path: "/oauth")))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "login.example.com.evil.com")))
+        XCTAssertFalse(policy.isUrlAllowed("https://login.example.com:8443/"))
+        XCTAssertFalse(policy.isUrlAllowed("http://login.example.com/"))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "evillogin.example.com")))
+        XCTAssertFalse(policy.isUrlAllowed("https://login.example.com@evil.com/"))
+        XCTAssertFalse(policy.isUrlAllowed("about:blank"))
+        XCTAssertFalse(policy.isUrlAllowed("data:text/html,hello"))
+        XCTAssertFalse(policy.isUrlAllowed(nil))
+    }
+
+    func testAllowlistRejectsBrokenMatcherEdgeCasesForWildcardRule() {
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: [Fixture.httpsWildcardAllowRule(domain: "trusted.example")])
+        XCTAssertTrue(policy.isUrlAllowed(Fixture.httpsUrl(host: "app.trusted.example", path: "/path")))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "eviltrusted.example")))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "trusted.example.evil.com")))
+    }
+
+    func testAllowlistRejectsDefaultPortWhenRuleRequiresExplicitPort() {
+        let policy = JavascriptBridgeOriginPolicy.from(allowlist: ["https://localhost:8443"])
+        XCTAssertTrue(policy.isUrlAllowed("https://localhost:8443/app"))
+        XCTAssertFalse(policy.isUrlAllowed(Fixture.httpsUrl(host: "localhost", path: "/app")))
+    }
 }

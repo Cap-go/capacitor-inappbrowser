@@ -252,4 +252,42 @@ describe('javascript bridge origin policy helpers', () => {
     expect(matchesJavascriptBridgeAllowRule('https://app.trusted.example', 'https://*.trusted.example')).toBe(true);
     expect(matchesJavascriptBridgeAllowRule('https://trusted.example', 'https://*.trusted.example')).toBe(false);
   });
+
+  it('rejects suffix host confusion for an exact allow rule', () => {
+    const rule = 'https://login.example.com';
+    const rejects = [
+      'https://login.example.com.evil.com',
+      'https://login.example.com:8443',
+      'http://login.example.com',
+      'https://evillogin.example.com',
+    ];
+    for (const origin of rejects) {
+      expect(matchesJavascriptBridgeAllowRule(origin, rule)).toBe(false);
+    }
+    expect(matchesJavascriptBridgeAllowRule('https://login.example.com', rule)).toBe(true);
+  });
+
+  it('rejects userinfo, non-http schemes, and invalid document urls in allowlist mode', () => {
+    const rules = ['https://login.example.com'];
+    const rejects = ['https://login.example.com@evil.com', 'about:blank', 'data:text/html,hello'];
+    for (const url of rejects) {
+      expect(isJavascriptBridgeDocumentOriginAllowed(url, 'allowlist', rules)).toBe(false);
+    }
+    expect(isJavascriptBridgeDocumentOriginAllowed('', 'allowlist', rules)).toBe(false);
+  });
+
+  it('rejects wildcard host confusion patterns', () => {
+    const rule = 'https://*.trusted.example';
+    expect(matchesJavascriptBridgeAllowRule('https://app.trusted.example', rule)).toBe(true);
+    expect(matchesJavascriptBridgeAllowRule('https://eviltrusted.example', rule)).toBe(false);
+    expect(matchesJavascriptBridgeAllowRule('https://trusted.example.evil.com', rule)).toBe(false);
+  });
+
+  it('requires explicit port match when the rule specifies a port', () => {
+    const rule = 'https://localhost:8443';
+    expect(matchesJavascriptBridgeAllowRule('https://localhost:8443', rule)).toBe(true);
+    expect(matchesJavascriptBridgeAllowRule('https://localhost', rule)).toBe(false);
+    expect(isJavascriptBridgeDocumentOriginAllowed('https://localhost:8443/app', 'allowlist', [rule])).toBe(true);
+    expect(isJavascriptBridgeDocumentOriginAllowed('https://localhost/app', 'allowlist', [rule])).toBe(false);
+  });
 });

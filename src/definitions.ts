@@ -840,6 +840,7 @@ export interface OpenWebViewOptions {
    *
    * @platform android, ios
    * @default undefined (all origins)
+   * @since 8.27.0
    * @example
    * // OIDC login only: no native bridge exposure on the IdP pages
    * javascriptBridgeOrigins: []
