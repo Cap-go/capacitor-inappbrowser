@@ -833,7 +833,7 @@ export interface OpenWebViewOptions {
    *
    * On Android with an allowlist, `WebMessageListener` carries `postMessage`, `close`, `hide`, `show`, `print`,
    * and `takeScreenshot` when the API is supported, so subframe callers are rejected by origin.
-   * When `WebMessageListener` is unavailable, Android falls back to `addJavascriptInterface` and validates the
+   * When `WebMessageListener` or `DOCUMENT_START_SCRIPT` is unavailable, Android falls back to `addJavascriptInterface` and validates the
    * main-frame URL only.
    * Subframe-originated bridge calls are rejected when an allowlist is configured on iOS.
    * Future-major default candidate: restrict bridges by default instead of allowing all origins.
