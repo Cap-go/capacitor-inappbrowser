@@ -78,8 +78,6 @@ enum BlobDownloadSupport {
 enum ScriptMessageHandlerSupport {
     static let allNames = [
         "messageHandler",
-        "preShowScriptError",
-        "preShowScriptSuccess",
         "close",
         "hide",
         "show",
@@ -1953,7 +1951,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func isJavascriptBridgeScriptMessage(_ name: String) -> Bool {
         switch name {
-        case "messageHandler", "preShowScriptError", "preShowScriptSuccess", "close", "hide", "show",
+        case "messageHandler", "close", "hide", "show",
              "blobDownload", "blobDownloadStart", "blobDownloadChunk", "blobDownloadFinish", "blobDownloadAbort",
              "blobDownloadRejectAck", "takeScreenshot", "magicPrint", "capgoProxyBridge":
             return true
@@ -1965,6 +1963,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if isJavascriptBridgeScriptMessage(message.name), !javascriptBridgeOriginPolicy.allows(message: message) {
+            if message.name == "takeScreenshot",
+               let body = message.body as? [String: Any],
+               let requestId = body["requestId"] as? String,
+               !requestId.isEmpty {
+                rejectJavaScriptScreenshot(requestId: requestId, message: "Screenshot bridge is not allowed for this origin")
+            }
             return
         }
         if message.name == "messageHandler" {
@@ -2001,20 +2005,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                     )
                 )
             }
-        } else if message.name == "preShowScriptSuccess" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptSuccess]: Semaphore not found")
-                return
-            }
-
-            semaphore.signal()
-        } else if message.name == "preShowScriptError" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptError]: Semaphore not found")
-                return
-            }
-            print("[InAppBrowser - preShowScriptError]: Error!!!!")
-            semaphore.signal()
         } else if message.name == "capgoProxyBridge" {
             guard let messageBody = message.body as? [String: Any],
                   let token = messageBody["token"] as? String,
@@ -2288,8 +2278,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let weakHandler = WeakScriptMessageHandler(self)
         if !javascriptBridgeOriginPolicy.isDisabled {
             userContentController.add(weakHandler, name: "messageHandler")
-            userContentController.add(weakHandler, name: "preShowScriptError")
-            userContentController.add(weakHandler, name: "preShowScriptSuccess")
             userContentController.add(weakHandler, name: "close")
             userContentController.add(weakHandler, name: "hide")
             userContentController.add(weakHandler, name: "show")

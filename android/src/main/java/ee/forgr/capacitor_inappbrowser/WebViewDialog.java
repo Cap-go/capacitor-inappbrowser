@@ -1458,7 +1458,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private boolean usesWebMessageOriginBoundJavascriptBridges() {
-        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+        if (
+            !WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) ||
+            !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
             return false;
         }
         JavascriptBridgeOriginPolicy policy = getJavascriptBridgeOriginPolicy();

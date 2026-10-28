@@ -836,10 +836,10 @@ export interface OpenWebViewOptions {
    * When `WebMessageListener` is unavailable, Android falls back to `addJavascriptInterface` and validates the
    * main-frame URL only.
    * Subframe-originated bridge calls are rejected when an allowlist is configured on iOS.
+   * Future-major default candidate: restrict bridges by default instead of allowing all origins.
    *
    * @platform android, ios
    * @default undefined (all origins)
-   * Future-major default candidate: restrict bridges by default instead of allowing all origins.
    * @example
    * // OIDC login only: no native bridge exposure on the IdP pages
    * javascriptBridgeOrigins: []
