@@ -100,6 +100,13 @@ final class ProxyBridgeSupportTests: XCTestCase {
         }
         context.evaluateScript(
             """
+            var URL = function(value) {
+                var match = /^([a-z][a-z0-9+.-]*):\\/\\/([^\\/?#:]+)(?::(\\d+))?/i.exec(String(value));
+                if (!match) { throw new TypeError('Invalid URL'); }
+                this.protocol = match[1].toLowerCase() + ':';
+                this.hostname = match[2].toLowerCase();
+                this.port = match[3] || '';
+            };
             var nativeCalls = 0;
             var originalCalls = 0;
             var window = {

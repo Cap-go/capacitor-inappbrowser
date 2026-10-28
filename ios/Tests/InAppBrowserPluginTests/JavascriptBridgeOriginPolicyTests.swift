@@ -53,6 +53,17 @@ final class JavascriptBridgeOriginPolicyTests: XCTestCase {
         XCTAssertFalse(policy.isOriginAllowed(Fixture.httpsUrl(host: "login.example.com:0")))
     }
 
+    func testOriginFromSecurityOriginPortZeroUsesDefaultPort() {
+        XCTAssertEqual(
+            JavascriptBridgeOriginPolicy.origin(scheme: "https", host: "login.example.com", securityOriginPort: 0),
+            Fixture.httpsAllowRule(host: "login.example.com")
+        )
+        XCTAssertEqual(
+            JavascriptBridgeOriginPolicy.origin(scheme: "HTTPS", host: "Login.Example.com", securityOriginPort: 0),
+            Fixture.httpsAllowRule(host: "login.example.com")
+        )
+    }
+
     func testBuildOriginOmitsExplicitDefaultHttpsPort() {
         XCTAssertEqual(
             JavascriptBridgeOriginPolicy.buildOrigin(scheme: "https", host: "example.com", port: 443),

@@ -116,13 +116,18 @@ public enum JavascriptBridgeOriginPolicy: Equatable {
         guard let schemeValue = securityOrigin.value(forKey: "protocol") as? String else {
             return nil
         }
-        let scheme = schemeValue.lowercased()
-        let host = securityOrigin.host.lowercased()
-        if scheme.isEmpty || host.isEmpty {
+        return origin(scheme: schemeValue, host: securityOrigin.host, securityOriginPort: Int(securityOrigin.port))
+    }
+
+    /// `WKSecurityOrigin.port` is 0 when the origin uses the scheme's default port.
+    static func origin(scheme: String, host: String, securityOriginPort: Int) -> String? {
+        let normalizedScheme = scheme.lowercased()
+        let normalizedHost = host.lowercased()
+        if normalizedScheme.isEmpty || normalizedHost.isEmpty {
             return nil
         }
-        let port = securityOrigin.port > 0 ? Int(securityOrigin.port) : -1
-        return buildOrigin(scheme: scheme, host: host, port: port)
+        let port = securityOriginPort > 0 ? securityOriginPort : -1
+        return buildOrigin(scheme: normalizedScheme, host: normalizedHost, port: port)
     }
 
     static func origin(fromUrl url: String?) -> String? {
