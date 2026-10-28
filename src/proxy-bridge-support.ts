@@ -192,3 +192,125 @@ export function restoreXhrReplayState(xhr: XhrReplayStateSource, state: XhrRepla
     xhr.overrideMimeType(state.overrideMimeType);
   }
 }
+
+export type JavascriptBridgeOriginMode = 'unrestricted' | 'disabled' | 'allowlist';
+
+function defaultPortForScheme(scheme: string): number {
+  if (scheme === 'http') {
+    return 80;
+  }
+  if (scheme === 'https') {
+    return 443;
+  }
+  return -1;
+}
+
+export function originFromUrl(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    const parsed = new URL(url);
+    const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
+    const host = parsed.hostname.toLowerCase();
+    if (!scheme || !host) {
+      return null;
+    }
+    const explicitPort = parsed.port ? Number(parsed.port) : -1;
+    const defaultPort = defaultPortForScheme(scheme);
+    const normalizedPort = explicitPort > 0 ? explicitPort : defaultPort;
+    if (normalizedPort === defaultPort) {
+      return `${scheme}://${host}`;
+    }
+    return `${scheme}://${host}:${normalizedPort}`;
+  } catch (error: unknown) {
+    console.debug('[proxy-bridge] Invalid origin URL', error);
+    return null;
+  }
+}
+
+function normalizeOriginCandidate(origin: string): string | null {
+  const trimmed = origin.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const candidate = trimmed.includes('://') ? trimmed : `https://${trimmed}`;
+  return originFromUrl(candidate);
+}
+
+function matchesHostWildcard(host: string, patternHost: string): boolean {
+  if (!patternHost.startsWith('*.')) {
+    return false;
+  }
+  const baseDomain = patternHost.slice(2);
+  if (!baseDomain || host.toLowerCase() === baseDomain.toLowerCase()) {
+    return false;
+  }
+  return host.toLowerCase().endsWith(`.${baseDomain.toLowerCase()}`);
+}
+
+export function matchesJavascriptBridgeAllowRule(pageOrigin: string, rule: string): boolean {
+  const normalizedRule = normalizeOriginCandidate(rule);
+  if (!normalizedRule) {
+    return false;
+  }
+  if (pageOrigin.toLowerCase() === normalizedRule.toLowerCase()) {
+    return true;
+  }
+
+  const originParts = new URL(pageOrigin);
+  const ruleParts = new URL(normalizedRule);
+  const originScheme = originParts.protocol.replace(/:$/, '').toLowerCase();
+  const ruleScheme = ruleParts.protocol.replace(/:$/, '').toLowerCase();
+  const originHost = originParts.hostname.toLowerCase();
+  const ruleHost = ruleParts.hostname.toLowerCase();
+  if (originScheme !== ruleScheme) {
+    return false;
+  }
+
+  const originPort = originParts.port ? Number(originParts.port) : defaultPortForScheme(originScheme);
+  const rulePort = ruleParts.port ? Number(ruleParts.port) : defaultPortForScheme(ruleScheme);
+  if (originPort !== rulePort) {
+    return false;
+  }
+
+  if (originHost === ruleHost) {
+    return true;
+  }
+
+  return matchesHostWildcard(originHost, ruleHost);
+}
+
+export function parseJavascriptBridgeOriginRules(rulesJson: string): string[] {
+  if (!rulesJson) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(rulesJson) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
+  } catch (error: unknown) {
+    console.debug('[proxy-bridge] Invalid bridge origin rules JSON', error);
+    return [];
+  }
+}
+
+export function isJavascriptBridgeDocumentOriginAllowed(
+  documentUrl: string,
+  mode: JavascriptBridgeOriginMode,
+  allowlistRules: string[],
+): boolean {
+  if (mode === 'unrestricted') {
+    return true;
+  }
+  if (mode === 'disabled') {
+    return false;
+  }
+  const origin = originFromUrl(documentUrl);
+  if (!origin) {
+    return false;
+  }
+  return allowlistRules.some((rule) => matchesJavascriptBridgeAllowRule(origin, rule));
+}

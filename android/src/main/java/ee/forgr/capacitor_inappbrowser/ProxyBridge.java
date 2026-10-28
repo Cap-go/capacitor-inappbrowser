@@ -4,6 +4,7 @@ import android.webkit.JavascriptInterface;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 
 public class ProxyBridge {
@@ -32,6 +33,7 @@ public class ProxyBridge {
     private final ConcurrentLinkedQueue<String> storedRequestOrder = new ConcurrentLinkedQueue<>();
     private final String accessToken;
     private final LongSupplier clock;
+    private volatile BooleanSupplier bridgeAllowed = () -> true;
 
     public ProxyBridge(String accessToken) {
         this(accessToken, System::currentTimeMillis);
@@ -42,16 +44,31 @@ public class ProxyBridge {
         this.clock = clock;
     }
 
+    public void setBridgeAllowedSupplier(BooleanSupplier bridgeAllowed) {
+        this.bridgeAllowed = bridgeAllowed != null ? bridgeAllowed : () -> true;
+    }
+
     @JavascriptInterface
-    public void storeRequest(String token, String requestId, String method, String headersJson, String base64Body, String credentialsMode) {
+    public boolean storeRequest(
+        String token,
+        String requestId,
+        String method,
+        String headersJson,
+        String base64Body,
+        String credentialsMode
+    ) {
+        if (!bridgeAllowed.getAsBoolean()) {
+            return false;
+        }
         if (token == null || !token.equals(accessToken) || requestId == null || requestId.isEmpty()) {
-            return;
+            return false;
         }
 
         long now = clock.getAsLong();
         cleanupExpiredRequests(now);
         storedRequests.put(requestId, new StoredRequest(method, headersJson, base64Body, credentialsMode, now));
         storedRequestOrder.add(requestId);
+        return true;
     }
 
     public StoredRequest getAndRemove(String requestId) {

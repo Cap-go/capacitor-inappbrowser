@@ -128,6 +128,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -1124,107 +1125,95 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     // Add this class to provide safer JavaScript interface
     private class JavaScriptInterface {
 
+        private boolean rejectsOriginBoundJavascriptInterface(String methodName) {
+            if (!usesWebMessageOriginBoundJavascriptBridges()) {
+                return false;
+            }
+            logBlockedJavascriptBridgeCall(methodName + "(javascript-interface)");
+            return true;
+        }
+
         @JavascriptInterface
         public void postMessage(String message) {
+            if (rejectsOriginBoundJavascriptInterface("postMessage")) {
+                return;
+            }
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("postMessage");
+                return;
+            }
             handleJavaScriptPostMessage(message);
         }
 
         @JavascriptInterface
         public void setFileInputCapture(String captureValue) {
+            if (rejectsOriginBoundJavascriptInterface("setFileInputCapture")) {
+                return;
+            }
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("setFileInputCapture");
+                return;
+            }
             storeLastFileInputCaptureValue(captureValue == null || captureValue.isEmpty() ? "environment" : captureValue);
         }
 
         @JavascriptInterface
         public void close() {
-            try {
-                // close webview safely
-                if (activity == null) {
-                    Log.e("InAppBrowser", "Cannot close - activity is null");
-                    return;
-                }
-
-                activity.runOnUiThread(() -> {
-                    try {
-                        if (isDismissing) {
-                            // Dismissal already started (e.g. close button or back); do not close twice.
-                            return;
-                        }
-                        String currentUrl = getUrl();
-                        dismiss();
-
-                        if (_options != null && _options.getCallbacks() != null) {
-                            _options.getCallbacks().closeEvent(currentUrl);
-                        }
-                    } catch (Exception e) {
-                        Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
-                    }
-                });
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error in close: " + e.getMessage());
+            if (rejectsOriginBoundJavascriptInterface("close")) {
+                return;
             }
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("close");
+                return;
+            }
+            performCloseFromJavascriptBridge();
         }
 
         @JavascriptInterface
         public void hide() {
-            if (!isJavaScriptControlAllowed()) {
-                Log.w("InAppBrowser", "hide() blocked: allowWebViewJsVisibilityControl is false");
+            if (rejectsOriginBoundJavascriptInterface("hide")) {
                 return;
             }
-            if (activity == null) {
-                Log.e("InAppBrowser", "Cannot hide - activity is null");
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("hide");
                 return;
             }
-            activity.runOnUiThread(() -> {
-                clearFullscreen();
-                setHidden(true);
-            });
+            performHideFromJavascriptBridge();
         }
 
         @JavascriptInterface
         public void show() {
-            if (!isJavaScriptControlAllowed()) {
-                Log.w("InAppBrowser", "show() blocked: allowWebViewJsVisibilityControl is false");
+            if (rejectsOriginBoundJavascriptInterface("show")) {
                 return;
             }
-            if (activity == null) {
-                Log.e("InAppBrowser", "Cannot show - activity is null");
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("show");
                 return;
             }
-            activity.runOnUiThread(() -> {
-                setHidden(false);
-                showAccordingToLayerModeOrFallback();
-            });
+            performShowFromJavascriptBridge();
         }
 
         @JavascriptInterface
         public void takeScreenshot(String requestId) {
-            if (requestId == null || requestId.isEmpty()) {
-                Log.e("InAppBrowser", "Cannot take screenshot - requestId is empty");
+            if (rejectsOriginBoundJavascriptInterface("takeScreenshot")) {
                 return;
             }
-
-            if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
-                rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
-                return;
-            }
-
-            WebViewDialog.this.takeScreenshot(
-                new ScreenshotResultCallback() {
-                    @Override
-                    public void onSuccess(JSObject screenshot) {
-                        resolveJavaScriptScreenshot(requestId, screenshot);
-                    }
-
-                    @Override
-                    public void onError(String message) {
-                        rejectJavaScriptScreenshot(requestId, message);
-                    }
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("takeScreenshot");
+                if (requestId != null && !requestId.isEmpty()) {
+                    rejectJavaScriptScreenshot(requestId, "JavaScript bridge is not allowed for this origin");
                 }
-            );
+                return;
+            }
+            performTakeScreenshotFromJavascriptBridge(requestId);
         }
 
         @JavascriptInterface
         public void handleBlobDownload(String payload) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("handleBlobDownload");
+                return;
+            }
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
@@ -1270,6 +1259,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void startBlobDownload(String payload) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("startBlobDownload");
+                return;
+            }
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
@@ -1306,6 +1299,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void appendBlobDownloadChunk(String payload) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("appendBlobDownloadChunk");
+                return;
+            }
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
@@ -1345,6 +1342,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void finishBlobDownload(String payload) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("finishBlobDownload");
+                return;
+            }
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
@@ -1388,6 +1389,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void abortBlobDownload(String payload) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("abortBlobDownload");
+                return;
+            }
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
@@ -1427,6 +1432,161 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private boolean isJavaScriptControlAllowed() {
         return _options != null && _options.getAllowWebViewJsVisibilityControl();
+    }
+
+    private JavascriptBridgeOriginPolicy getJavascriptBridgeOriginPolicy() {
+        return _options != null ? _options.getJavascriptBridgeOriginPolicy() : JavascriptBridgeOriginPolicy.unrestricted();
+    }
+
+    private boolean areJavascriptBridgesRegistered() {
+        return !getJavascriptBridgeOriginPolicy().isDisabled();
+    }
+
+    private boolean shouldInjectJavascriptBridgeScripts() {
+        return areJavascriptBridgesRegistered();
+    }
+
+    private boolean isJavascriptBridgeAllowedForMainFrame() {
+        if (!areJavascriptBridgesRegistered()) {
+            return false;
+        }
+        JavascriptBridgeOriginPolicy policy = getJavascriptBridgeOriginPolicy();
+        if (policy.isUnrestricted()) {
+            return true;
+        }
+        return policy.isUrlAllowed(getWebViewUrlOnMainThread(null));
+    }
+
+    private boolean usesWebMessageOriginBoundJavascriptBridges() {
+        if (
+            !WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) ||
+            !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
+            return false;
+        }
+        JavascriptBridgeOriginPolicy policy = getJavascriptBridgeOriginPolicy();
+        return !policy.isUnrestricted() && !policy.isDisabled();
+    }
+
+    private void handleWebMessageBridgeAction(String actionPayload) {
+        if (actionPayload == null || actionPayload.isEmpty()) {
+            return;
+        }
+        if ("close".equals(actionPayload)) {
+            performCloseFromJavascriptBridge();
+            return;
+        }
+        if ("hide".equals(actionPayload)) {
+            performHideFromJavascriptBridge();
+            return;
+        }
+        if ("show".equals(actionPayload)) {
+            performShowFromJavascriptBridge();
+            return;
+        }
+        if ("print".equals(actionPayload)) {
+            if (_webView == null || activity == null) {
+                return;
+            }
+            new PrintInterface(activity, _webView).print();
+            return;
+        }
+        if (actionPayload.startsWith("takeScreenshot:")) {
+            performTakeScreenshotFromJavascriptBridge(actionPayload.substring("takeScreenshot:".length()));
+        }
+    }
+
+    private void performCloseFromJavascriptBridge() {
+        try {
+            if (activity == null) {
+                Log.e("InAppBrowser", "Cannot close - activity is null");
+                return;
+            }
+
+            activity.runOnUiThread(() -> {
+                try {
+                    if (isDismissing) {
+                        return;
+                    }
+                    String currentUrl = getUrl();
+                    dismiss();
+
+                    if (_options != null && _options.getCallbacks() != null) {
+                        _options.getCallbacks().closeEvent(currentUrl);
+                    }
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error in close: " + e.getMessage());
+        }
+    }
+
+    private void performHideFromJavascriptBridge() {
+        if (!isJavaScriptControlAllowed()) {
+            Log.w("InAppBrowser", "hide() blocked: allowWebViewJsVisibilityControl is false");
+            return;
+        }
+        if (activity == null) {
+            Log.e("InAppBrowser", "Cannot hide - activity is null");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            clearFullscreen();
+            setHidden(true);
+        });
+    }
+
+    private void performShowFromJavascriptBridge() {
+        if (!isJavaScriptControlAllowed()) {
+            Log.w("InAppBrowser", "show() blocked: allowWebViewJsVisibilityControl is false");
+            return;
+        }
+        if (activity == null) {
+            Log.e("InAppBrowser", "Cannot show - activity is null");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            setHidden(false);
+            showAccordingToLayerModeOrFallback();
+        });
+    }
+
+    private void performTakeScreenshotFromJavascriptBridge(String requestId) {
+        if (requestId == null || requestId.isEmpty()) {
+            Log.e("InAppBrowser", "Cannot take screenshot - requestId is empty");
+            return;
+        }
+
+        if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
+            rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
+            return;
+        }
+
+        WebViewDialog.this.takeScreenshot(
+            new ScreenshotResultCallback() {
+                @Override
+                public void onSuccess(JSObject screenshot) {
+                    resolveJavaScriptScreenshot(requestId, screenshot);
+                }
+
+                @Override
+                public void onError(String message) {
+                    rejectJavaScriptScreenshot(requestId, message);
+                }
+            }
+        );
+    }
+
+    private void logBlockedJavascriptBridgeCall(String methodName) {
+        Log.w(
+            "InAppBrowser",
+            "Blocked JavaScript bridge call " +
+                methodName +
+                " for origin " +
+                JavascriptBridgeOriginPolicy.originFromUrl(getWebViewUrlOnMainThread(null))
+        );
     }
 
     /**
@@ -2221,6 +2381,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         String fallbackMimeType = normalizeMimeType(mimeType, "download");
         String fallbackFileName = URLUtil.guessFileName("download", contentDisposition, fallbackMimeType);
+        if (!isJavascriptBridgeAllowedForMainFrame()) {
+            showDownloadError(
+                "Blob download bridge is not available",
+                new IllegalStateException("JavaScript bridge is disabled or not allowed for this origin"),
+                blobUrl,
+                fallbackFileName,
+                fallbackMimeType
+            );
+            return;
+        }
         String script = String.format(
             """
             (() => {
@@ -2350,6 +2520,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void error(String error) {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("preShowScript.error");
+                return;
+            }
             try {
                 // Handle message from JavaScript
                 if (preShowSemaphore != null) {
@@ -2363,6 +2537,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void success() {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("preShowScript.success");
+                return;
+            }
             try {
                 // Handle message from JavaScript
                 if (preShowSemaphore != null) {
@@ -2386,6 +2564,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         @JavascriptInterface
         public void print() {
+            if (!isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("print");
+                return;
+            }
             // Run on UI thread since printing requires UI operations
             ((Activity) context).runOnUiThread(
                 new Runnable() {
@@ -2513,16 +2695,21 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         // Apply insets to fix edge-to-edge issues on Android 15+
         applyInsets();
 
-        _webView.addJavascriptInterface(new JavaScriptInterface(), "AndroidInterface");
-        // Provide window.mobileApp at document start via native interface
-        _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
-        _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
-        _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
-        if (_options.shouldEnableNativeProxy()) {
-            proxyAccessToken = UUID.randomUUID().toString();
-            proxyBridge = new ProxyBridge(proxyAccessToken);
-            _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
-            proxyBridgeScript = loadProxyBridgeScript();
+        if (areJavascriptBridgesRegistered()) {
+            _webView.addJavascriptInterface(new JavaScriptInterface(), "AndroidInterface");
+            if (!usesWebMessageOriginBoundJavascriptBridges()) {
+                // Provide window.mobileApp at document start via native interface
+                _webView.addJavascriptInterface(new JavaScriptInterface(), "mobileApp");
+                _webView.addJavascriptInterface(new PrintInterface(this._context, _webView), "PrintInterface");
+            }
+            _webView.addJavascriptInterface(new PreShowScriptInterface(), "PreShowScriptInterface");
+            if (_options.shouldEnableNativeProxy()) {
+                proxyAccessToken = UUID.randomUUID().toString();
+                proxyBridge = new ProxyBridge(proxyAccessToken);
+                proxyBridge.setBridgeAllowedSupplier(WebViewDialog.this::isJavascriptBridgeAllowedForMainFrame);
+                _webView.addJavascriptInterface(proxyBridge, "__capgoProxy");
+                proxyBridgeScript = loadProxyBridgeScript();
+            }
         }
         ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
@@ -4426,13 +4613,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         try {
-            String script = createMobileAppBridgeScript();
+            final boolean injectBridgeScripts = shouldInjectJavascriptBridgeScripts();
+            final String script = injectBridgeScripts ? createMobileAppBridgeScript() : null;
 
             _webView.post(() -> {
                 if (_webView != null) {
                     try {
-                        _webView.evaluateJavascript(script, null);
-                        injectFileInputCaptureHookScript();
+                        if (injectBridgeScripts) {
+                            _webView.evaluateJavascript(script, null);
+                            injectFileInputCaptureHookScript();
+                        }
                         injectBlankTargetInCurrentWebViewScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
@@ -4466,9 +4656,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         try {
-            injectDocumentStartPostMessageBridge();
-            WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureHookScript(), Collections.singleton("*"));
-            WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
+            if (shouldInjectJavascriptBridgeScripts()) {
+                injectDocumentStartPostMessageBridge();
+                WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureHookScript(), Collections.singleton("*"));
+                WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
+            }
             // Honor preShowScriptInjectionTime: "documentStart" (matches iOS WKUserScript
             // .atDocumentStart). Runs before page scripts and persists across navigations,
             // so the blocking semaphore injection in onPageFinished is not needed.
@@ -4486,22 +4678,46 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (_webView == null) {
             return;
         }
+        if (!shouldInjectJavascriptBridgeScripts()) {
+            return;
+        }
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             Log.d("InAppBrowser", "Document-start postMessage bridge is not supported; using JavaScript interface fallback");
             return;
         }
 
         try {
+            JavascriptBridgeOriginPolicy policy = getJavascriptBridgeOriginPolicy();
+            Set<String> allowedOriginRules = policy.getWebMessageAllowedOriginRules();
+            if (allowedOriginRules.isEmpty()) {
+                return;
+            }
             WebViewCompat.addWebMessageListener(
                 _webView,
                 MobileAppBridgeScript.POST_MESSAGE_BRIDGE_NAME,
-                Collections.singleton("*"),
+                allowedOriginRules,
                 (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
                     if (message == null || message.getType() != WebMessageCompat.TYPE_STRING) {
                         Log.e("InAppBrowser", "Received unsupported postMessage payload from WebView");
                         return;
                     }
-                    handleJavaScriptPostMessage(message.getData());
+                    if (!policy.isUnrestricted()) {
+                        if (!isMainFrame) {
+                            logBlockedJavascriptBridgeCall("postMessage(subframe)");
+                            return;
+                        }
+                        String origin = sourceOrigin != null ? JavascriptBridgeOriginPolicy.originFromUrl(sourceOrigin.toString()) : null;
+                        if (!policy.isOriginAllowed(origin)) {
+                            logBlockedJavascriptBridgeCall("postMessage");
+                            return;
+                        }
+                    }
+                    String payload = message.getData();
+                    if (payload != null && payload.startsWith(MobileAppBridgeScript.BRIDGE_ACTION_PREFIX)) {
+                        handleWebMessageBridgeAction(payload.substring(MobileAppBridgeScript.BRIDGE_ACTION_PREFIX.length()));
+                        return;
+                    }
+                    handleJavaScriptPostMessage(payload, policy.isUnrestricted());
                 }
             );
         } catch (Exception e) {
@@ -4510,11 +4726,23 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private String createMobileAppBridgeScript() {
-        return MobileAppBridgeScript.create(isJavaScriptControlAllowed(), _options != null && _options.getAllowScreenshotsFromWebPage());
+        return MobileAppBridgeScript.create(
+            isJavaScriptControlAllowed(),
+            _options != null && _options.getAllowScreenshotsFromWebPage(),
+            usesWebMessageOriginBoundJavascriptBridges()
+        );
     }
 
     private void handleJavaScriptPostMessage(String message) {
+        handleJavaScriptPostMessage(message, true);
+    }
+
+    private void handleJavaScriptPostMessage(String message, boolean originAlreadyValidated) {
         try {
+            if (!originAlreadyValidated && !isJavascriptBridgeAllowedForMainFrame()) {
+                logBlockedJavascriptBridgeCall("postMessage");
+                return;
+            }
             if (message == null || message.isEmpty()) {
                 Log.e("InAppBrowser", "Received empty message from WebView");
                 return;
@@ -4625,6 +4853,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private boolean shouldWaitForPreShowScriptCompletion() {
+        if (!areJavascriptBridgesRegistered()) {
+            return false;
+        }
+        return isJavascriptBridgeAllowedForMainFrame();
+    }
+
     private void injectPreShowScript() {
         //    String script =
         //        "import('https://unpkg.com/darkreader@4.9.89/darkreader.js').then(() => {DarkReader.enable({ brightness: 100, contrast: 90, sepia: 10 });window.PreLoadScriptInterface.finished()})";
@@ -4649,6 +4884,20 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
 
         Log.i("InjectPreShowScript", String.format("PreShowScript script:\n%s", script));
+
+        if (!shouldWaitForPreShowScriptCompletion()) {
+            activity.runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (_webView != null) {
+                            _webView.evaluateJavascript(script, null);
+                        }
+                    }
+                }
+            );
+            return;
+        }
 
         preShowSemaphore = new Semaphore(0);
         activity.runOnUiThread(
@@ -6941,8 +7190,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 // Remove JavaScript interfaces before destroying
                 _webView.removeJavascriptInterface("AndroidInterface");
+                _webView.removeJavascriptInterface("mobileApp");
                 _webView.removeJavascriptInterface("PreShowScriptInterface");
                 _webView.removeJavascriptInterface("PrintInterface");
+                _webView.removeJavascriptInterface("__capgoProxy");
 
                 _webView.removeAllViews();
 
@@ -7195,6 +7446,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         return value
             .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
             .replace("'", "\\'")
             .replace("\r", "\\r")
             .replace("\n", "\\n")
@@ -7212,9 +7464,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             proxyRegexSource = _options.getProxyRequestsPattern().pattern();
         }
 
+        JavascriptBridgeOriginPolicy bridgeOriginPolicy = getJavascriptBridgeOriginPolicy();
         return proxyBridgeScript
             .replace("___CAPGO_PROXY_TOKEN___", escapeJavaScriptLiteral(proxyAccessToken))
-            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource));
+            .replace("___CAPGO_PROXY_REGEX___", escapeJavaScriptLiteral(proxyRegexSource))
+            .replace("___CAPGO_BRIDGE_ORIGIN_MODE___", escapeJavaScriptLiteral(bridgeOriginPolicy.proxyBridgeOriginModeLabel()))
+            .replace("___CAPGO_BRIDGE_ORIGIN_RULES___", escapeJavaScriptLiteral(bridgeOriginPolicy.proxyBridgeOriginRulesJson()));
     }
 
     private boolean loadHtmlDataUrlIfNeeded(String url) {

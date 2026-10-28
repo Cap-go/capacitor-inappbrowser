@@ -1344,6 +1344,14 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             Log.d("InAppBrowserPlugin", "No blocked hosts provided.");
         }
 
+        Object rawBridgeOrigins = call.getData().opt("javascriptBridgeOrigins");
+        String bridgeOriginsValidationError = JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue(rawBridgeOrigins);
+        if (bridgeOriginsValidationError != null) {
+            call.reject(bridgeOriginsValidationError);
+            return;
+        }
+        options.setJavascriptBridgeOriginPolicy(JavascriptBridgeOriginPolicy.fromPluginArray(call.getArray("javascriptBridgeOrigins")));
+
         // Set Google Pay support option
         options.setEnableGooglePaySupport(Boolean.TRUE.equals(call.getBoolean("enableGooglePaySupport", false)));
         options.setHiddenPopupWindow(Boolean.TRUE.equals(call.getBoolean("hiddenPopupWindow", false)));

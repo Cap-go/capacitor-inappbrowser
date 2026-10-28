@@ -1534,6 +1534,18 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
         let blockedHostsRaw = call.getArray("blockedHosts", [])
         let blockedHosts = blockedHostsRaw.compactMap { $0 as? String }
+        let javascriptBridgeOriginPolicy: JavascriptBridgeOriginPolicy
+        if let rawValue = call.options["javascriptBridgeOrigins"] {
+            switch JavascriptBridgeOriginPolicy.parsePluginOption(rawValue) {
+            case .success(let policy):
+                javascriptBridgeOriginPolicy = policy
+            case .failure(let message):
+                call.reject(message)
+                return
+            }
+        } else {
+            javascriptBridgeOriginPolicy = .unrestricted
+        }
 
         let authorizedAppLinksRaw = call.getArray("authorizedAppLinks", [])
         let authorizedAppLinks = authorizedAppLinksRaw.compactMap { $0 as? String }
@@ -1614,6 +1626,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.allowWebViewJsVisibilityControl = allowWebViewJsVisibilityControl
             webViewController.preferredContentMode = preferredContentMode
             webViewController.allowScreenshotsFromWebPage = allowScreenshotsFromWebPage
+            webViewController.javascriptBridgeOriginPolicy = javascriptBridgeOriginPolicy
             webViewController.captureConsoleLogs = captureConsoleLogs
             webViewController.proxyRequests = legacyProxyRequests.isEnabled
             webViewController.proxySchemeHandler = proxyHandler

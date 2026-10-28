@@ -78,8 +78,6 @@ enum BlobDownloadSupport {
 enum ScriptMessageHandlerSupport {
     static let allNames = [
         "messageHandler",
-        "preShowScriptError",
-        "preShowScriptSuccess",
         "close",
         "hide",
         "show",
@@ -456,6 +454,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var downloadPreview = DownloadPreviewSupport.defaultMode
     open var allowWebViewJsVisibilityControl = false
     open var allowScreenshotsFromWebPage = false
+    open var javascriptBridgeOriginPolicy: JavascriptBridgeOriginPolicy = .unrestricted
     open var captureConsoleLogs = false
     open var persistWebViewData = true
     open var useSharedDataStore = false
@@ -1950,8 +1949,28 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
     }
 
+    private func isJavascriptBridgeScriptMessage(_ name: String) -> Bool {
+        switch name {
+        case "messageHandler", "close", "hide", "show",
+             "blobDownload", "blobDownloadStart", "blobDownloadChunk", "blobDownloadFinish", "blobDownloadAbort",
+             "blobDownloadRejectAck", "takeScreenshot", "magicPrint", "capgoProxyBridge":
+            return true
+        default:
+            return false
+        }
+    }
+
     // Method to receive messages from JavaScript
     public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if isJavascriptBridgeScriptMessage(message.name), !javascriptBridgeOriginPolicy.allows(message: message) {
+            if message.name == "takeScreenshot",
+               let body = message.body as? [String: Any],
+               let requestId = body["requestId"] as? String,
+               !requestId.isEmpty {
+                rejectJavaScriptScreenshot(requestId: requestId, message: "Screenshot bridge is not allowed for this origin")
+            }
+            return
+        }
         if message.name == "messageHandler" {
             if let messageBody = message.body as? [String: Any] {
                 print("Received message from JavaScript:", messageBody)
@@ -1986,20 +2005,6 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                     )
                 )
             }
-        } else if message.name == "preShowScriptSuccess" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptSuccess]: Semaphore not found")
-                return
-            }
-
-            semaphore.signal()
-        } else if message.name == "preShowScriptError" {
-            guard let semaphore = preShowSemaphore else {
-                print("[InAppBrowser - preShowScriptError]: Semaphore not found")
-                return
-            }
-            print("[InAppBrowser - preShowScriptError]: Error!!!!")
-            semaphore.signal()
         } else if message.name == "capgoProxyBridge" {
             guard let messageBody = message.body as? [String: Any],
                   let token = messageBody["token"] as? String,
@@ -2091,6 +2096,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         window.webkit.messageHandlers.show.postMessage(null);
                                 }
                 """ : ""
+        let windowCloseOverride = ProxyBridgeSupport.mobileAppWindowCloseOverrideScript(
+            bridgeOriginMode: javascriptBridgeOriginPolicy.proxyBridgeOriginModeLabel,
+            bridgeOriginRulesJson: javascriptBridgeOriginPolicy.proxyBridgeOriginRulesJson
+        )
         return """
                 window.__capgoInAppBrowserPendingScreenshots = window.__capgoInAppBrowserPendingScreenshots || {};
                 window.__capgoInAppBrowserResolveScreenshot = window.__capgoInAppBrowserResolveScreenshot || function(payload) {
@@ -2137,19 +2146,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 window.webkit.messageHandlers.blobDownloadRejectAck.postMessage(payload);
                         }\(extraControls)\(screenshotControls)
                 });
-                if (!window.__capgoInAppBrowserWindowCloseInstalled) {
-                        window.__capgoInAppBrowserWindowCloseInstalled = true;
-                        window.__capgoInAppBrowserOriginalClose = window.close;
-                        window.close = function() {
-                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
-                                        window.webkit.messageHandlers.close.postMessage(null);
-                                        return;
-                                }
-                                if (typeof window.__capgoInAppBrowserOriginalClose === 'function') {
-                                        return window.__capgoInAppBrowserOriginalClose.apply(window, arguments);
-                                }
-                        };
-                }
+                \(windowCloseOverride)
                 """
     }
 
@@ -2176,17 +2173,22 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return
         }
 
+        // With an allowlist, subframe bridge messages are rejected; do not rewrite subframe requests.
+        let proxyBridgeMainFrameOnly = !javascriptBridgeOriginPolicy.isUnrestricted
+
         let bootstrapScript = WKUserScript(
             source: ProxyBridgeSupport.bootstrapScriptSource(),
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: proxyBridgeMainFrameOnly
         )
         userContentController.addUserScript(bootstrapScript)
 
         let proxyRegexSource = legacyProxyRequestURLRegexPattern ?? ""
         guard let bridgeScriptSource = ProxyBridgeSupport.loadBundledBridgeScript(
             accessToken: accessToken,
-            proxyRegexSource: proxyRegexSource
+            proxyRegexSource: proxyRegexSource,
+            bridgeOriginMode: javascriptBridgeOriginPolicy.proxyBridgeOriginModeLabel,
+            bridgeOriginRulesJson: javascriptBridgeOriginPolicy.proxyBridgeOriginRulesJson
         ) else {
             print("[InAppBrowser][Proxy] WARNING: Failed to load proxy-bridge.js for iOS injection")
             return
@@ -2195,12 +2197,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let bridgeScript = WKUserScript(
             source: bridgeScriptSource,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: proxyBridgeMainFrameOnly
         )
         userContentController.addUserScript(bridgeScript)
     }
 
     func injectJavaScriptInterface() {
+        guard !javascriptBridgeOriginPolicy.isDisabled else {
+            return
+        }
         let script = mobileAppScriptSource()
         DispatchQueue.main.async {
             self.webView?.evaluateJavaScript(script) { result, error in
@@ -2265,25 +2270,26 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             webConfiguration.setURLSchemeHandler(bundledAssetHandler, forURLScheme: bundledAssetLocalScheme)
         }
 
-        if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
+        if !javascriptBridgeOriginPolicy.isDisabled,
+           ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
             addProxyBridgeUserScripts(to: userContentController)
         }
 
         let weakHandler = WeakScriptMessageHandler(self)
-        userContentController.add(weakHandler, name: "messageHandler")
-        userContentController.add(weakHandler, name: "preShowScriptError")
-        userContentController.add(weakHandler, name: "preShowScriptSuccess")
-        userContentController.add(weakHandler, name: "close")
-        userContentController.add(weakHandler, name: "hide")
-        userContentController.add(weakHandler, name: "show")
-        userContentController.add(weakHandler, name: "blobDownload")
-        userContentController.add(weakHandler, name: "blobDownloadStart")
-        userContentController.add(weakHandler, name: "blobDownloadChunk")
-        userContentController.add(weakHandler, name: "blobDownloadFinish")
-        userContentController.add(weakHandler, name: "blobDownloadAbort")
-        userContentController.add(weakHandler, name: "blobDownloadRejectAck")
-        if allowScreenshotsFromWebPage {
-            userContentController.add(weakHandler, name: "takeScreenshot")
+        if !javascriptBridgeOriginPolicy.isDisabled {
+            userContentController.add(weakHandler, name: "messageHandler")
+            userContentController.add(weakHandler, name: "close")
+            userContentController.add(weakHandler, name: "hide")
+            userContentController.add(weakHandler, name: "show")
+            userContentController.add(weakHandler, name: "blobDownload")
+            userContentController.add(weakHandler, name: "blobDownloadStart")
+            userContentController.add(weakHandler, name: "blobDownloadChunk")
+            userContentController.add(weakHandler, name: "blobDownloadFinish")
+            userContentController.add(weakHandler, name: "blobDownloadAbort")
+            userContentController.add(weakHandler, name: "blobDownloadRejectAck")
+            if allowScreenshotsFromWebPage {
+                userContentController.add(weakHandler, name: "takeScreenshot")
+            }
         }
         if captureConsoleLogs {
             userContentController.add(weakHandler, name: "consoleMessageHandler")
@@ -2310,23 +2316,26 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 )
             )
         }
-        if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
-            userContentController.add(weakHandler, name: "capgoProxyBridge")
-        }
-        userContentController.add(weakHandler, name: "magicPrint")
+        if !javascriptBridgeOriginPolicy.isDisabled {
+            if ProxyBridgeSupport.shouldInjectBridge(hasProxySchemeHandler: proxySchemeHandler != nil) {
+                userContentController.add(weakHandler, name: "capgoProxyBridge")
+            }
+            userContentController.add(weakHandler, name: "magicPrint")
 
-        // Inject JavaScript to override window.print
-        let script = WKUserScript(
-            source: """
-            window.print = function() {
-                window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
-            };
-            """,
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
-        )
-        userContentController.addUserScript(script)
-        addMobileAppUserScript(to: userContentController)
+            let printOverrideMainFrameOnly = !javascriptBridgeOriginPolicy.isUnrestricted
+            // Inject JavaScript to override window.print
+            let script = WKUserScript(
+                source: """
+                window.print = function() {
+                    window.webkit.messageHandlers.magicPrint.postMessage('magicPrint');
+                };
+                """,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: printOverrideMainFrameOnly
+            )
+            userContentController.addUserScript(script)
+            addMobileAppUserScript(to: userContentController)
+        }
 
         webConfiguration.allowsInlineMediaPlayback = true
         webConfiguration.userContentController = userContentController
@@ -2504,6 +2513,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         self.enabledSafeTopMargin = parent.enabledSafeTopMargin
         self.blockedHosts = parent.blockedHosts
         self.authorizedAppLinks = parent.authorizedAppLinks
+        self.javascriptBridgeOriginPolicy = parent.javascriptBridgeOriginPolicy
         self.disablePrivacyScreen = parent.disablePrivacyScreen
         // createWebViewWith configs copy parent script handlers; start clean so
         // initWebview can register blobDownload/etc without NSInvalidArgumentException.
@@ -3695,38 +3705,43 @@ extension WKWebViewController: WKNavigationDelegate {
             return
         }
 
-        // Safely construct script template with proper escaping
         let userScript = self.preShowScript ?? ""
+        print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(userScript)")
 
-        // Build script using safe concatenation to avoid multi-line string issues
-        let scriptTemplate = [
-            "async function preShowFunction() {",
-            userScript,
-            "}",
-            "preShowFunction().then(",
-            "    () => window.webkit.messageHandlers.preShowScriptSuccess.postMessage({})",
-            ").catch(",
-            "    err => {",
-            "        console.error('Preshow error', err);",
-            "        window.webkit.messageHandlers.preShowScriptError.postMessage(JSON.stringify(err, Object.getOwnPropertyNames(err)));",
-            "    }",
-            ")"
-        ]
+        let semaphore = DispatchSemaphore(value: 0)
+        self.preShowSemaphore = semaphore
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let webView = self.webView else {
+                semaphore.signal()
+                return
+            }
 
-        let script = scriptTemplate.joined(separator: "\n")
-        print("[InAppBrowser - InjectPreShowScript] PreShowScript script: \(script)")
-
-        self.preShowSemaphore = DispatchSemaphore(value: 0)
-        self.executeScript(script: script) // this will run on the main thread
+            webView.callAsyncJavaScript(
+                userScript,
+                arguments: [:],
+                in: nil,
+                in: .page
+            ) { result in
+                if case .failure(let error) = result {
+                    print("[InAppBrowser - InjectPreShowScript] PreShowScript error: \(error)")
+                    self.preShowError = error.localizedDescription
+                }
+                semaphore.signal()
+            }
+        }
 
         defer {
             self.preShowSemaphore = nil
             self.preShowError = nil
         }
 
-        if self.preShowSemaphore?.wait(timeout: .now() + 10) == .timedOut {
+        if semaphore.wait(timeout: .now() + 10) == .timedOut {
             print("[InAppBrowser - InjectPreShowScript] PreShowScript running for over 10 seconds. The plugin will not wait any longer!")
             return
+        }
+
+        if let preShowError = self.preShowError, !preShowError.isEmpty {
+            print("[InAppBrowser - InjectPreShowScript] Error within the user-provided preShowFunction: \(preShowError)")
         }
 
         //            "async function preShowFunction() {\n" +

@@ -1,0 +1,172 @@
+package ee.forgr.capacitor_inappbrowser;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
+import org.json.JSONArray;
+import org.junit.Test;
+
+public class JavascriptBridgeOriginPolicyTest {
+
+    @Test
+    public void unrestrictedAllowsAnyUrl() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.unrestricted();
+        assertTrue(policy.isUrlAllowed("https://evil.example/phish"));
+        assertTrue(policy.isUnrestricted());
+        assertEquals(Collections.singleton("*"), policy.getWebMessageAllowedOriginRules());
+    }
+
+    @Test
+    public void disabledRejectsAllUrls() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.disabled();
+        assertFalse(policy.isUrlAllowed("https://trusted.example/"));
+        assertTrue(policy.isDisabled());
+        assertTrue(policy.getWebMessageAllowedOriginRules().isEmpty());
+    }
+
+    @Test
+    public void allowlistMatchesExactOrigin() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://login.example.com")
+        );
+        assertTrue(policy.isUrlAllowed("https://login.example.com/oauth"));
+        assertFalse(policy.isUrlAllowed("https://evil.example.com/"));
+        assertFalse(policy.isUrlAllowed("http://login.example.com/"));
+    }
+
+    @Test
+    public void allowlistSupportsHostWildcards() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://*.trusted.example")
+        );
+        assertTrue(policy.isUrlAllowed("https://app.trusted.example/path"));
+        assertFalse(policy.isUrlAllowed("https://trusted.example/"));
+        assertFalse(policy.isUrlAllowed("https://evil.example/"));
+    }
+
+    @Test
+    public void allowlistHonorsNonDefaultPorts() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://localhost:8443")
+        );
+        assertTrue(policy.isUrlAllowed("https://localhost:8443/app"));
+        assertFalse(policy.isUrlAllowed("https://localhost/app"));
+    }
+
+    @Test
+    public void allowlistRejectsUserInfoAndSuffixConfusion() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*.trusted.example")
+        );
+        assertFalse(policy.isUrlAllowed("https://login.example.com@evil.example/"));
+        assertFalse(policy.isUrlAllowed("https://eviltrusted.example/"));
+    }
+
+    @Test
+    public void allowlistRejectsBrokenMatcherEdgeCasesForExactRule() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://login.example.com")
+        );
+        assertTrue(policy.isUrlAllowed("https://login.example.com/oauth"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com.evil.com/"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com:8443/"));
+        assertFalse(policy.isUrlAllowed("http://login.example.com/"));
+        assertFalse(policy.isUrlAllowed("https://evillogin.example.com/"));
+        assertFalse(policy.isUrlAllowed("https://login.example.com@evil.com/"));
+        assertFalse(policy.isUrlAllowed("about:blank"));
+        assertFalse(policy.isUrlAllowed("data:text/html,hello"));
+        assertFalse(policy.isUrlAllowed(null));
+    }
+
+    @Test
+    public void allowlistRejectsBrokenMatcherEdgeCasesForWildcardRule() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://*.trusted.example")
+        );
+        assertTrue(policy.isUrlAllowed("https://app.trusted.example/path"));
+        assertFalse(policy.isUrlAllowed("https://eviltrusted.example/"));
+        assertFalse(policy.isUrlAllowed("https://trusted.example.evil.com/"));
+    }
+
+    @Test
+    public void allowlistRejectsDefaultPortWhenRuleRequiresExplicitPort() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://localhost:8443")
+        );
+        assertTrue(policy.isUrlAllowed("https://localhost:8443/app"));
+        assertFalse(policy.isUrlAllowed("https://localhost/app"));
+    }
+
+    @Test
+    public void originFromUrlNormalizesDefaultPorts() {
+        assertEquals("https://example.com", JavascriptBridgeOriginPolicy.originFromUrl("https://example.com:443/page"));
+        assertEquals("http://example.com", JavascriptBridgeOriginPolicy.originFromUrl("http://example.com:80/"));
+    }
+
+    @Test
+    public void webMessageRulesSkipInvalidWildcardPatterns() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*", "https://a.*.com")
+        );
+        Set<String> rules = policy.getWebMessageAllowedOriginRules();
+        assertTrue(rules.contains("https://login.example.com"));
+        assertFalse(rules.contains("https://*"));
+        assertFalse(rules.contains("https://a.*.com"));
+        assertEquals(1, rules.size());
+    }
+
+    @Test
+    public void webMessageRulesMirrorAllowlist() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*.trusted.example")
+        );
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("https://login.example.com"));
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("https://*.trusted.example"));
+    }
+
+    @Test
+    public void webMessageRulesRetainWildcardHostPorts() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://*.trusted.example:8443")
+        );
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("https://*.trusted.example:8443"));
+    }
+
+    @Test
+    public void webMessageRulesUseSchemeOnlyForCustomSchemes() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.singletonList("myapp://localhost"));
+        assertTrue(policy.getWebMessageAllowedOriginRules().contains("myapp://"));
+    }
+
+    @Test
+    public void emptyAllowlistIsDisabled() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.emptyList());
+        assertTrue(policy.isDisabled());
+    }
+
+    @Test
+    public void validatePluginOriginsRawValueRejectsNonArray() {
+        assertEquals(
+            "javascriptBridgeOrigins must be an array of strings",
+            JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue("https://login.example.com")
+        );
+        assertNull(JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue(null));
+        assertNull(JavascriptBridgeOriginPolicy.validatePluginOriginsRawValue(new JSONArray()));
+    }
+
+    @Test
+    public void proxyBridgeOriginSerializationUsesAllowlistRules() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Collections.singletonList("https://login.example.com")
+        );
+        assertEquals("allowlist", policy.proxyBridgeOriginModeLabel());
+        assertEquals("[\"https://login.example.com\"]", policy.proxyBridgeOriginRulesJson());
+        assertEquals("unrestricted", JavascriptBridgeOriginPolicy.unrestricted().proxyBridgeOriginModeLabel());
+        assertEquals("disabled", JavascriptBridgeOriginPolicy.disabled().proxyBridgeOriginModeLabel());
+    }
+}

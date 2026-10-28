@@ -20,6 +20,16 @@ public class MobileAppBridgeScriptTest {
     }
 
     @Test
+    public void webMessageOriginBoundModeRoutesActionsThroughPostMessageBridge() {
+        String script = MobileAppBridgeScript.create(true, true, true);
+
+        assertTrue(script.contains(MobileAppBridgeScript.BRIDGE_ACTION_PREFIX + "close"));
+        assertTrue(script.contains(MobileAppBridgeScript.BRIDGE_ACTION_PREFIX + "print"));
+        assertFalse(script.contains("window.AndroidInterface.hide()"));
+        assertFalse(script.contains("window.PrintInterface.print()"));
+    }
+
+    @Test
     public void optionalBridgeMethodsFollowOptions() {
         String defaultScript = MobileAppBridgeScript.create(false, false);
         String fullScript = MobileAppBridgeScript.create(true, true);

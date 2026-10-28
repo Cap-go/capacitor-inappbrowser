@@ -1,7 +1,9 @@
 package ee.forgr.capacitor_inappbrowser;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.Test;
@@ -45,5 +47,22 @@ public class ProxyBridgeTest {
 
         assertNull(bridge.getAndRemove("expired-request"));
         assertNotNull(bridge.getAndRemove("fresh-request"));
+    }
+
+    @Test
+    public void storeRequestReturnsFalseWhenBridgeDisallowed() {
+        ProxyBridge bridge = new ProxyBridge("token");
+        bridge.setBridgeAllowedSupplier(() -> false);
+
+        assertFalse(bridge.storeRequest("token", "rid-1", "GET", "{}", "", "same-origin"));
+        assertNull(bridge.getAndRemove("rid-1"));
+    }
+
+    @Test
+    public void storeRequestReturnsTrueWhenBridgeAllowed() {
+        ProxyBridge bridge = new ProxyBridge("token");
+
+        assertTrue(bridge.storeRequest("token", "rid-1", "GET", "{}", "", "same-origin"));
+        assertNotNull(bridge.getAndRemove("rid-1"));
     }
 }

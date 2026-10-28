@@ -192,6 +192,7 @@ public class Options {
     private boolean enableGooglePaySupport = false;
     private boolean enableZoom = false;
     private List<String> blockedHosts = new ArrayList<>();
+    private JavascriptBridgeOriginPolicy javascriptBridgeOriginPolicy = JavascriptBridgeOriginPolicy.unrestricted();
     private Integer width = null;
     private Integer height = null;
     private Integer x = null;
@@ -805,6 +806,15 @@ public class Options {
         this.blockedHosts = blockedHosts;
     }
 
+    public JavascriptBridgeOriginPolicy getJavascriptBridgeOriginPolicy() {
+        return javascriptBridgeOriginPolicy != null ? javascriptBridgeOriginPolicy : JavascriptBridgeOriginPolicy.unrestricted();
+    }
+
+    public void setJavascriptBridgeOriginPolicy(JavascriptBridgeOriginPolicy javascriptBridgeOriginPolicy) {
+        this.javascriptBridgeOriginPolicy =
+            javascriptBridgeOriginPolicy != null ? javascriptBridgeOriginPolicy : JavascriptBridgeOriginPolicy.unrestricted();
+    }
+
     public boolean isHidden() {
         return hidden;
     }
@@ -913,6 +923,7 @@ public class Options {
         copy.setUseTopInset(useTopInset);
         copy.setEnableGooglePaySupport(enableGooglePaySupport);
         copy.setBlockedHosts(new ArrayList<>(getBlockedHosts()));
+        copy.setJavascriptBridgeOriginPolicy(getJavascriptBridgeOriginPolicy());
         copy.setWidth(width);
         copy.setPersistWebViewData(persistWebViewData);
         copy.setClearCookiesOnOpen(clearCookiesOnOpen);

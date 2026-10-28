@@ -168,11 +168,116 @@ enum ProxyBridgeSupport {
     static func escapeJavaScriptLiteral(_ value: String) -> String {
         value
             .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
             .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+    }
+
+    static func javascriptBridgeDocumentOriginAllowedCheckScript(
+        bridgeOriginMode: String,
+        bridgeOriginRulesJson: String
+    ) -> String {
+        let modeLiteral = escapeJavaScriptLiteral(bridgeOriginMode)
+        let rulesLiteral = escapeJavaScriptLiteral(bridgeOriginRulesJson)
+        return """
+        function __capgoInAppBrowserBridgeDocumentOriginAllowed() {
+          var mode = "\(modeLiteral)";
+          if (mode === 'unrestricted') {
+            return true;
+          }
+          if (mode !== 'allowlist') {
+            return false;
+          }
+          var rulesJson = "\(rulesLiteral)";
+          var allowlistRules = [];
+          try {
+            var parsed = JSON.parse(rulesJson);
+            if (Array.isArray(parsed)) {
+              allowlistRules = parsed.filter(function(entry) {
+                return typeof entry === 'string' && entry.trim().length > 0;
+              });
+            }
+          } catch (e) {}
+          function defaultPortForScheme(scheme) {
+            if (scheme === 'http') { return 80; }
+            if (scheme === 'https') { return 443; }
+            return -1;
+          }
+          function originFromUrl(url) {
+            try {
+              var parts = new URL(url);
+              var scheme = parts.protocol.replace(/:$/, '').toLowerCase();
+              var host = parts.hostname.toLowerCase();
+              if (!scheme || !host) { return null; }
+              var port = parts.port ? Number(parts.port) : defaultPortForScheme(scheme);
+              var defaultPort = defaultPortForScheme(scheme);
+              if (port === defaultPort) {
+                return scheme + '://' + host;
+              }
+              return scheme + '://' + host + ':' + port;
+            } catch (e) {
+              return null;
+            }
+          }
+          function matchesHostWildcard(host, patternHost) {
+            if (!patternHost.startsWith('*.')) { return false; }
+            var baseDomain = patternHost.slice(2);
+            if (!baseDomain || host.toLowerCase() === baseDomain.toLowerCase()) { return false; }
+            return host.toLowerCase().endsWith('.' + baseDomain.toLowerCase());
+          }
+          function matchesAllowRule(pageOrigin, rule) {
+            var trimmedRule = (rule || '').trim();
+            var normalizedRule = originFromUrl(trimmedRule) || originFromUrl('https://' + trimmedRule);
+            if (!normalizedRule) { return false; }
+            if (pageOrigin.toLowerCase() === normalizedRule.toLowerCase()) { return true; }
+            var originParts = new URL(pageOrigin);
+            var ruleParts = new URL(normalizedRule);
+            var originScheme = originParts.protocol.replace(/:$/, '').toLowerCase();
+            var ruleScheme = ruleParts.protocol.replace(/:$/, '').toLowerCase();
+            var originHost = originParts.hostname.toLowerCase();
+            var ruleHost = ruleParts.hostname.toLowerCase();
+            if (originScheme !== ruleScheme) { return false; }
+            var originPort = originParts.port ? Number(originParts.port) : defaultPortForScheme(originScheme);
+            var rulePort = ruleParts.port ? Number(ruleParts.port) : defaultPortForScheme(ruleScheme);
+            if (originPort !== rulePort) { return false; }
+            if (originHost === ruleHost) { return true; }
+            return matchesHostWildcard(originHost, ruleHost);
+          }
+          var origin = originFromUrl(window.location.href);
+          if (!origin) { return false; }
+          return allowlistRules.some(function(rule) { return matchesAllowRule(origin, rule); });
+        }
+        """
+    }
+
+    static func mobileAppWindowCloseOverrideScript(
+        bridgeOriginMode: String,
+        bridgeOriginRulesJson: String
+    ) -> String {
+        let originCheck = javascriptBridgeDocumentOriginAllowedCheckScript(
+            bridgeOriginMode: bridgeOriginMode,
+            bridgeOriginRulesJson: bridgeOriginRulesJson
+        )
+        return """
+        \(originCheck)
+        if (!window.__capgoInAppBrowserWindowCloseInstalled) {
+                window.__capgoInAppBrowserWindowCloseInstalled = true;
+                window.__capgoInAppBrowserOriginalClose = window.close;
+                window.close = function() {
+                        if (__capgoInAppBrowserBridgeDocumentOriginAllowed()
+                                && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
+                                window.webkit.messageHandlers.close.postMessage(null);
+                                return;
+                        }
+                        if (typeof window.__capgoInAppBrowserOriginalClose === 'function') {
+                                return window.__capgoInAppBrowserOriginalClose.apply(window, arguments);
+                        }
+                };
+        }
+        """
     }
 
     static func bootstrapScriptSource() -> String {
@@ -201,7 +306,12 @@ enum ProxyBridgeSupport {
         """
     }
 
-    static func loadBundledBridgeScript(accessToken: String, proxyRegexSource: String) -> String? {
+    static func loadBundledBridgeScript(
+        accessToken: String,
+        proxyRegexSource: String,
+        bridgeOriginMode: String,
+        bridgeOriginRulesJson: String
+    ) -> String? {
         #if SWIFT_PACKAGE
         let bundle = Bundle.module
         #else
@@ -216,5 +326,10 @@ enum ProxyBridgeSupport {
         return rawScript
             .replacingOccurrences(of: "___CAPGO_PROXY_TOKEN___", with: escapeJavaScriptLiteral(accessToken))
             .replacingOccurrences(of: "___CAPGO_PROXY_REGEX___", with: escapeJavaScriptLiteral(proxyRegexSource))
+            .replacingOccurrences(of: "___CAPGO_BRIDGE_ORIGIN_MODE___", with: escapeJavaScriptLiteral(bridgeOriginMode))
+            .replacingOccurrences(
+                of: "___CAPGO_BRIDGE_ORIGIN_RULES___",
+                with: escapeJavaScriptLiteral(bridgeOriginRulesJson)
+            )
     }
 }
