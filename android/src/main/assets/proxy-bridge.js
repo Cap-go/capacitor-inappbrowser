@@ -182,7 +182,7 @@
       }
       return `${scheme}://${host}:${normalizedPort}`;
     } catch (error) {
-      void error;
+      console.debug("[proxy-bridge] Invalid origin URL", error);
       return null;
     }
   }
@@ -242,7 +242,7 @@
       }
       return parsed.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
     } catch (error) {
-      void error;
+      console.debug("[proxy-bridge] Invalid bridge origin rules JSON", error);
       return [];
     }
   }

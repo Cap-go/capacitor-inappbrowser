@@ -224,7 +224,7 @@ export function originFromUrl(url: string | null | undefined): string | null {
     }
     return `${scheme}://${host}:${normalizedPort}`;
   } catch (error: unknown) {
-    void error;
+    console.debug('[proxy-bridge] Invalid origin URL', error);
     return null;
   }
 }
@@ -292,7 +292,7 @@ export function parseJavascriptBridgeOriginRules(rulesJson: string): string[] {
     }
     return parsed.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
   } catch (error: unknown) {
-    void error;
+    console.debug('[proxy-bridge] Invalid bridge origin rules JSON', error);
     return [];
   }
 }
