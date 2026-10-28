@@ -2106,6 +2106,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                         window.webkit.messageHandlers.show.postMessage(null);
                                 }
                 """ : ""
+        let windowCloseOverride = ProxyBridgeSupport.mobileAppWindowCloseOverrideScript(
+            bridgeOriginMode: javascriptBridgeOriginPolicy.proxyBridgeOriginModeLabel,
+            bridgeOriginRulesJson: javascriptBridgeOriginPolicy.proxyBridgeOriginRulesJson
+        )
         return """
                 window.__capgoInAppBrowserPendingScreenshots = window.__capgoInAppBrowserPendingScreenshots || {};
                 window.__capgoInAppBrowserResolveScreenshot = window.__capgoInAppBrowserResolveScreenshot || function(payload) {
@@ -2152,19 +2156,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                                 window.webkit.messageHandlers.blobDownloadRejectAck.postMessage(payload);
                         }\(extraControls)\(screenshotControls)
                 });
-                if (!window.__capgoInAppBrowserWindowCloseInstalled) {
-                        window.__capgoInAppBrowserWindowCloseInstalled = true;
-                        window.__capgoInAppBrowserOriginalClose = window.close;
-                        window.close = function() {
-                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.close) {
-                                        window.webkit.messageHandlers.close.postMessage(null);
-                                        return;
-                                }
-                                if (typeof window.__capgoInAppBrowserOriginalClose === 'function') {
-                                        return window.__capgoInAppBrowserOriginalClose.apply(window, arguments);
-                                }
-                        };
-                }
+                \(windowCloseOverride)
                 """
     }
 

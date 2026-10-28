@@ -302,6 +302,11 @@ public final class JavascriptBridgeOriginPolicy {
             // Custom schemes must not carry a host or port in WebMessageListener rules.
             return parts.scheme + "://";
         }
+        boolean hasWildcard = parts.host.indexOf('*') >= 0;
+        if (hasWildcard && !(parts.host.startsWith("*.") && parts.host.indexOf('*', 1) < 0)) {
+            // Not a valid WebMessageListener host pattern; matchesAllowRule never matches it either.
+            return null;
+        }
         int defaultPort = defaultPort(parts.scheme);
         if (parts.port != defaultPort) {
             return parts.scheme + "://" + parts.host + ":" + parts.port;

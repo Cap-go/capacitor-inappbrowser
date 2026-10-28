@@ -63,4 +63,15 @@ final class ProxyBridgeSupportTests: XCTestCase {
             )
         )
     }
+
+    func testMobileAppWindowCloseOverrideFallsBackWhenOriginDisallowed() {
+        let script = ProxyBridgeSupport.mobileAppWindowCloseOverrideScript(
+            bridgeOriginMode: "allowlist",
+            bridgeOriginRulesJson: "[\"https://login.example.com\"]"
+        )
+        XCTAssertTrue(script.contains("__capgoInAppBrowserBridgeDocumentOriginAllowed"))
+        XCTAssertTrue(script.contains("__capgoInAppBrowserOriginalClose"))
+        XCTAssertTrue(script.contains("window.webkit.messageHandlers.close.postMessage(null)"))
+        XCTAssertTrue(script.contains("__capgoInAppBrowserOriginalClose.apply(window, arguments)"))
+    }
 }

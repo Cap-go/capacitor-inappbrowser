@@ -1166,32 +1166,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 logBlockedJavascriptBridgeCall("close");
                 return;
             }
-            try {
-                // close webview safely
-                if (activity == null) {
-                    Log.e("InAppBrowser", "Cannot close - activity is null");
-                    return;
-                }
-
-                activity.runOnUiThread(() -> {
-                    try {
-                        if (isDismissing) {
-                            // Dismissal already started (e.g. close button or back); do not close twice.
-                            return;
-                        }
-                        String currentUrl = getUrl();
-                        dismiss();
-
-                        if (_options != null && _options.getCallbacks() != null) {
-                            _options.getCallbacks().closeEvent(currentUrl);
-                        }
-                    } catch (Exception e) {
-                        Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
-                    }
-                });
-            } catch (Exception e) {
-                Log.e("InAppBrowser", "Error in close: " + e.getMessage());
-            }
+            performCloseFromJavascriptBridge();
         }
 
         @JavascriptInterface
@@ -1203,18 +1178,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 logBlockedJavascriptBridgeCall("hide");
                 return;
             }
-            if (!isJavaScriptControlAllowed()) {
-                Log.w("InAppBrowser", "hide() blocked: allowWebViewJsVisibilityControl is false");
-                return;
-            }
-            if (activity == null) {
-                Log.e("InAppBrowser", "Cannot hide - activity is null");
-                return;
-            }
-            activity.runOnUiThread(() -> {
-                clearFullscreen();
-                setHidden(true);
-            });
+            performHideFromJavascriptBridge();
         }
 
         @JavascriptInterface
@@ -1226,18 +1190,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 logBlockedJavascriptBridgeCall("show");
                 return;
             }
-            if (!isJavaScriptControlAllowed()) {
-                Log.w("InAppBrowser", "show() blocked: allowWebViewJsVisibilityControl is false");
-                return;
-            }
-            if (activity == null) {
-                Log.e("InAppBrowser", "Cannot show - activity is null");
-                return;
-            }
-            activity.runOnUiThread(() -> {
-                setHidden(false);
-                showAccordingToLayerModeOrFallback();
-            });
+            performShowFromJavascriptBridge();
         }
 
         @JavascriptInterface
@@ -1252,29 +1205,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
                 return;
             }
-            if (requestId == null || requestId.isEmpty()) {
-                Log.e("InAppBrowser", "Cannot take screenshot - requestId is empty");
-                return;
-            }
-
-            if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
-                rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
-                return;
-            }
-
-            WebViewDialog.this.takeScreenshot(
-                new ScreenshotResultCallback() {
-                    @Override
-                    public void onSuccess(JSObject screenshot) {
-                        resolveJavaScriptScreenshot(requestId, screenshot);
-                    }
-
-                    @Override
-                    public void onError(String message) {
-                        rejectJavaScriptScreenshot(requestId, message);
-                    }
-                }
-            );
+            performTakeScreenshotFromJavascriptBridge(requestId);
         }
 
         @JavascriptInterface
@@ -1538,17 +1469,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (actionPayload == null || actionPayload.isEmpty()) {
             return;
         }
-        JavaScriptInterface bridge = new JavaScriptInterface();
         if ("close".equals(actionPayload)) {
-            bridge.close();
+            performCloseFromJavascriptBridge();
             return;
         }
         if ("hide".equals(actionPayload)) {
-            bridge.hide();
+            performHideFromJavascriptBridge();
             return;
         }
         if ("show".equals(actionPayload)) {
-            bridge.show();
+            performShowFromJavascriptBridge();
             return;
         }
         if ("print".equals(actionPayload)) {
@@ -1559,8 +1489,91 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
         if (actionPayload.startsWith("takeScreenshot:")) {
-            bridge.takeScreenshot(actionPayload.substring("takeScreenshot:".length()));
+            performTakeScreenshotFromJavascriptBridge(actionPayload.substring("takeScreenshot:".length()));
         }
+    }
+
+    private void performCloseFromJavascriptBridge() {
+        try {
+            if (activity == null) {
+                Log.e("InAppBrowser", "Cannot close - activity is null");
+                return;
+            }
+
+            activity.runOnUiThread(() -> {
+                try {
+                    if (isDismissing) {
+                        return;
+                    }
+                    String currentUrl = getUrl();
+                    dismiss();
+
+                    if (_options != null && _options.getCallbacks() != null) {
+                        _options.getCallbacks().closeEvent(currentUrl);
+                    }
+                } catch (Exception e) {
+                    Log.e("InAppBrowser", "Error closing WebView: " + e.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            Log.e("InAppBrowser", "Error in close: " + e.getMessage());
+        }
+    }
+
+    private void performHideFromJavascriptBridge() {
+        if (!isJavaScriptControlAllowed()) {
+            Log.w("InAppBrowser", "hide() blocked: allowWebViewJsVisibilityControl is false");
+            return;
+        }
+        if (activity == null) {
+            Log.e("InAppBrowser", "Cannot hide - activity is null");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            clearFullscreen();
+            setHidden(true);
+        });
+    }
+
+    private void performShowFromJavascriptBridge() {
+        if (!isJavaScriptControlAllowed()) {
+            Log.w("InAppBrowser", "show() blocked: allowWebViewJsVisibilityControl is false");
+            return;
+        }
+        if (activity == null) {
+            Log.e("InAppBrowser", "Cannot show - activity is null");
+            return;
+        }
+        activity.runOnUiThread(() -> {
+            setHidden(false);
+            showAccordingToLayerModeOrFallback();
+        });
+    }
+
+    private void performTakeScreenshotFromJavascriptBridge(String requestId) {
+        if (requestId == null || requestId.isEmpty()) {
+            Log.e("InAppBrowser", "Cannot take screenshot - requestId is empty");
+            return;
+        }
+
+        if (_options == null || !_options.getAllowScreenshotsFromWebPage()) {
+            rejectJavaScriptScreenshot(requestId, "Screenshot bridge is not enabled for this page");
+            return;
+        }
+
+        WebViewDialog.this.takeScreenshot(
+            new ScreenshotResultCallback() {
+                @Override
+                public void onSuccess(JSObject screenshot) {
+                    resolveJavaScriptScreenshot(requestId, screenshot);
+                }
+
+                @Override
+                public void onError(String message) {
+                    rejectJavaScriptScreenshot(requestId, message);
+                }
+            }
+        );
     }
 
     private void logBlockedJavascriptBridgeCall(String methodName) {

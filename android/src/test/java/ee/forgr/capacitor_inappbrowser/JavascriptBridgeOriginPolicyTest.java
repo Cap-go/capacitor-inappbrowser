@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Set;
 import org.json.JSONArray;
 import org.junit.Test;
 
@@ -70,6 +71,18 @@ public class JavascriptBridgeOriginPolicyTest {
     public void originFromUrlNormalizesDefaultPorts() {
         assertEquals("https://example.com", JavascriptBridgeOriginPolicy.originFromUrl("https://example.com:443/page"));
         assertEquals("http://example.com", JavascriptBridgeOriginPolicy.originFromUrl("http://example.com:80/"));
+    }
+
+    @Test
+    public void webMessageRulesSkipInvalidWildcardPatterns() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(
+            Arrays.asList("https://login.example.com", "https://*", "https://a.*.com")
+        );
+        Set<String> rules = policy.getWebMessageAllowedOriginRules();
+        assertTrue(rules.contains("https://login.example.com"));
+        assertFalse(rules.contains("https://*"));
+        assertFalse(rules.contains("https://a.*.com"));
+        assertEquals(1, rules.size());
     }
 
     @Test
