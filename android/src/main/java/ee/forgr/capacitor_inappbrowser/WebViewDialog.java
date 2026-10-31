@@ -5290,7 +5290,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
             _options.setUrl(resolution.url);
-            setPendingBundledAssetResolution(resolution.url, resolution.needsAssetLoader);
+            setPendingBundledAssetLoaderResolution(resolution.url, resolution.needsAssetLoader);
             if (_webView != null) {
                 int currentIndex = _webView.copyBackForwardList().getCurrentIndex();
                 while (bundledAssetLoaderHistoryStates.size() > currentIndex + 1) {
