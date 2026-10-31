@@ -95,6 +95,26 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void treatsFullIpv4LoopbackRangeAsBundledLocalUrl() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "127.0.0.2");
+
+        assertTrue(BundledAssetSupport.isBundledLocalUrl("https://127.0.0.2/assets/app.js", localConfig));
+    }
+
+    @Test
+    public void keepsSameHostHttpsRemoteWithCustomAndroidScheme() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
+        String remoteUrl = "https://portal.example.com/auth/signin?state=example";
+
+        assertFalse(BundledAssetSupport.isBundledLocalUrl(remoteUrl, localConfig));
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(remoteUrl, localConfig);
+
+        assertEquals(remoteUrl, resolution.url);
+        assertFalse(resolution.needsAssetLoader);
+    }
+
+    @Test
     public void encodingForMimeTypeReturnsUtf8ForTextLikeTypes() {
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("text/html"));
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/json"));

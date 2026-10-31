@@ -18,11 +18,22 @@ export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLo
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 const RESERVED_WEB_SCHEMES = ['http', 'https'];
 
+function isIpv4LoopbackHost(host: string): boolean {
+  const match = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) {
+    return false;
+  }
+  return match.slice(1).every((octet) => {
+    const value = Number(octet);
+    return value >= 0 && value <= 255;
+  });
+}
+
 function isLoopbackHost(host: string): boolean {
   const normalizedHost = host.toLowerCase();
   return (
     normalizedHost === 'localhost' ||
-    normalizedHost === '127.0.0.1' ||
+    isIpv4LoopbackHost(normalizedHost) ||
     normalizedHost === '[::1]' ||
     normalizedHost === '::1'
   );
@@ -121,7 +132,7 @@ export function isBundledLocalUrl(
 
     const urlUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(scheme);
     const configUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(config.scheme);
-    if (urlUsesReservedWebScheme && configUsesReservedWebScheme && !isLoopbackHost(host)) {
+    if (urlUsesReservedWebScheme && !isLoopbackHost(host)) {
       return false;
     }
 

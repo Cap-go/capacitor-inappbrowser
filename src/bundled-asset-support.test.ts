@@ -148,6 +148,20 @@ describe('bundled asset url resolution', () => {
     const localConfig = { scheme: 'https', host: '127.0.0.1' };
     expect(isBundledLocalUrl('https://127.0.0.1/assets/app.js', 'android', localConfig)).toBe(true);
   });
+
+  it('treats full ipv4 loopback range as bundled local urls', () => {
+    const localConfig = { scheme: 'https', host: '127.0.0.2' };
+    expect(isBundledLocalUrl('https://127.0.0.2/assets/app.js', 'android', localConfig)).toBe(true);
+  });
+
+  it('keeps same-host https remote with custom android scheme', () => {
+    const localConfig = { scheme: 'myapp', host: 'portal.example.com' };
+    const remoteUrl = 'https://portal.example.com/auth/signin?state=example';
+    expect(isBundledLocalUrl(remoteUrl, 'android', localConfig)).toBe(false);
+    expect(resolveBundledAssetUrl(remoteUrl, 'android', localConfig)).toEqual({
+      url: remoteUrl,
+    });
+  });
 });
 
 describe('legacy native webview url fallback', () => {
