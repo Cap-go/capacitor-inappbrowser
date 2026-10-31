@@ -703,7 +703,8 @@ export interface OpenWebViewOptions {
   /**
    * Target URL to load.
    *
-   * Remote `http://` and `https://` URLs are loaded as-is.
+   * Remote `http://` and `https://` URLs are loaded as-is, including when the host matches the app's
+   * configured Capacitor `server.hostname`. Use a relative path to load bundled assets from the app bundle.
    *
    * To open bundled web assets from the app bundle without running a local HTTP server,
    * pass a relative path such as `/index.html` or `assets/page.html`. The plugin resolves it to

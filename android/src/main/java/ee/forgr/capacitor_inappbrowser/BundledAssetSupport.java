@@ -239,11 +239,17 @@ final class BundledAssetSupport {
             }
 
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+            boolean urlUsesReservedWebScheme = isReservedWebScheme(normalizedScheme);
+            boolean localConfigUsesReservedWebScheme = isReservedWebScheme(localConfig.scheme);
+            if (urlUsesReservedWebScheme && !isLoopbackHost(host)) {
+                return false;
+            }
+
             if (normalizedScheme.equalsIgnoreCase(localConfig.scheme) || normalizedScheme.equals(assetLoaderScheme(localConfig))) {
                 return true;
             }
 
-            return isReservedWebScheme(normalizedScheme) && isReservedWebScheme(localConfig.scheme);
+            return urlUsesReservedWebScheme && localConfigUsesReservedWebScheme;
         } catch (IllegalArgumentException error) {
             return false;
         }
@@ -407,6 +413,39 @@ final class BundledAssetSupport {
             }
         }
         return false;
+    }
+
+    static boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        if ("localhost".equals(normalizedHost) || "[::1]".equals(normalizedHost) || "::1".equals(normalizedHost)) {
+            return true;
+        }
+
+        return isIpv4LoopbackHost(normalizedHost);
+    }
+
+    private static boolean isIpv4LoopbackHost(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4 || !"127".equals(parts[0])) {
+            return false;
+        }
+
+        for (int index = 0; index < parts.length; index++) {
+            try {
+                int value = Integer.parseInt(parts[index]);
+                if (value < 0 || value > 255) {
+                    return false;
+                }
+            } catch (NumberFormatException error) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static boolean isAbsoluteUrl(String url) {

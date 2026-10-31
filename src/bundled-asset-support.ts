@@ -18,6 +18,27 @@ export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLo
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 const RESERVED_WEB_SCHEMES = ['http', 'https'];
 
+function isIpv4LoopbackHost(host: string): boolean {
+  const match = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) {
+    return false;
+  }
+  return match.slice(1).every((octet) => {
+    const value = Number(octet);
+    return value >= 0 && value <= 255;
+  });
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalizedHost = host.toLowerCase();
+  return (
+    normalizedHost === 'localhost' ||
+    isIpv4LoopbackHost(normalizedHost) ||
+    normalizedHost === '[::1]' ||
+    normalizedHost === '::1'
+  );
+}
+
 /** Returns true when the input looks like an absolute URL (including protocol-relative URLs). */
 export function isAbsoluteUrl(url: string): boolean {
   return ABSOLUTE_URL_PATTERN.test(url) || url.startsWith('//');
@@ -109,11 +130,17 @@ export function isBundledLocalUrl(
       return false;
     }
 
+    const urlUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(scheme);
+    const configUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(config.scheme);
+    if (urlUsesReservedWebScheme && !isLoopbackHost(host)) {
+      return false;
+    }
+
     if (scheme === config.scheme || scheme === handlerSchemeForPlatform(platform, config)) {
       return true;
     }
 
-    return RESERVED_WEB_SCHEMES.includes(scheme) && RESERVED_WEB_SCHEMES.includes(config.scheme);
+    return urlUsesReservedWebScheme && configUsesReservedWebScheme;
   } catch {
     return false;
   }

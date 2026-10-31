@@ -74,11 +74,38 @@ enum BundledAssetSupport {
             return false
         }
 
+        let urlUsesReservedWebScheme = reservedWebKitSchemes.contains(scheme)
+        let localConfigUsesReservedWebScheme = reservedWebKitSchemes.contains(localConfig.scheme)
+        if urlUsesReservedWebScheme && !isLoopbackHost(host) {
+            return false
+        }
+
         if scheme == localConfig.scheme || scheme == handlerScheme(for: localConfig) {
             return true
         }
 
-        return reservedWebKitSchemes.contains(scheme) && reservedWebKitSchemes.contains(localConfig.scheme)
+        return urlUsesReservedWebScheme && localConfigUsesReservedWebScheme
+    }
+
+    static func isLoopbackHost(_ host: String) -> Bool {
+        let normalizedHost = host.lowercased()
+        if normalizedHost == "localhost" || normalizedHost == "[::1]" || normalizedHost == "::1" {
+            return true
+        }
+        return isIpv4LoopbackHost(normalizedHost)
+    }
+
+    private static func isIpv4LoopbackHost(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 4, parts[0] == "127" else {
+            return false
+        }
+        for part in parts {
+            guard let value = Int(part), value >= 0, value <= 255 else {
+                return false
+            }
+        }
+        return true
     }
 
     static func isRelativeBundledPath(_ urlString: String) -> Bool {

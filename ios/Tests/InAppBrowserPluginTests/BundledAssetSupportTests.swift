@@ -44,6 +44,31 @@ final class BundledAssetSupportTests: XCTestCase {
         XCTAssertFalse(BundledAssetSupport.isBundledLocalURL("https://example.com/assets/app.js", localConfig: localConfig))
     }
 
+    func testKeepsAbsoluteHttpsSameHostRemoteWithQueryString() {
+        let localURL = URL(string: "https://portal.example.com/")!
+        let remoteURL = "https://portal.example.com/auth/signin?state=example"
+        let resolution = BundledAssetSupport.resolve(remoteURL, localURL: localURL)
+
+        XCTAssertEqual(resolution?.url, remoteURL)
+    }
+
+    func testResolvesRelativePathForCustomHostnameLocalURL() {
+        let localURL = URL(string: "https://portal.example.com/")!
+        let resolution = BundledAssetSupport.resolve("/index.html", localURL: localURL)
+
+        XCTAssertEqual(resolution?.url, "capacitor://portal.example.com/index.html")
+    }
+
+    func testTreatsLoopbackAbsoluteHttpsAsBundledLocalURL() {
+        let localConfig = BundledAssetSupport.LocalConfig(scheme: "https", host: "127.0.0.1")
+        XCTAssertTrue(BundledAssetSupport.isBundledLocalURL("https://127.0.0.1/assets/app.js", localConfig: localConfig))
+    }
+
+    func testTreatsFullIpv4LoopbackRangeAsBundledLocalURL() {
+        let localConfig = BundledAssetSupport.LocalConfig(scheme: "https", host: "127.0.0.2")
+        XCTAssertTrue(BundledAssetSupport.isBundledLocalURL("https://127.0.0.2/assets/app.js", localConfig: localConfig))
+    }
+
     func testRoutesExtensionlessPathsToIndexHtml() {
         let basePath = "/tmp/public"
         XCTAssertEqual(BundledAssetSupport.routeAssetPath(for: "/dashboard", basePath: basePath), "/tmp/public/index.html")

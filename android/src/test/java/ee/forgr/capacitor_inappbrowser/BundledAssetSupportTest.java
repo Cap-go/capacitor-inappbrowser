@@ -62,7 +62,56 @@ public class BundledAssetSupportTest {
 
         assertEquals("https", localConfig.scheme);
         assertEquals("example.com", localConfig.host);
-        assertTrue(BundledAssetSupport.isBundledLocalUrl("https://example.com/app/index.html", localConfig));
+        assertFalse(BundledAssetSupport.isBundledLocalUrl("https://example.com/app/index.html", localConfig));
+    }
+
+    @Test
+    public void keepsAbsoluteHttpsSameHostRemoteWithQueryString() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "portal.example.com");
+        String remoteUrl = "https://portal.example.com/auth/signin?state=example";
+
+        assertFalse(BundledAssetSupport.isBundledLocalUrl(remoteUrl, localConfig));
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(remoteUrl, localConfig);
+
+        assertEquals(remoteUrl, resolution.url);
+        assertFalse(resolution.needsAssetLoader);
+    }
+
+    @Test
+    public void resolvesRelativePathForCustomHostnameLocalConfig() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "portal.example.com");
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("/index.html", localConfig);
+
+        assertEquals("https://portal.example.com/index.html", resolution.url);
+        assertTrue(resolution.needsAssetLoader);
+    }
+
+    @Test
+    public void treatsLoopbackAbsoluteHttpsAsBundledLocalUrl() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "127.0.0.1");
+
+        assertTrue(BundledAssetSupport.isBundledLocalUrl("https://127.0.0.1/assets/app.js", localConfig));
+    }
+
+    @Test
+    public void treatsFullIpv4LoopbackRangeAsBundledLocalUrl() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "127.0.0.2");
+
+        assertTrue(BundledAssetSupport.isBundledLocalUrl("https://127.0.0.2/assets/app.js", localConfig));
+    }
+
+    @Test
+    public void keepsSameHostHttpsRemoteWithCustomAndroidScheme() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
+        String remoteUrl = "https://portal.example.com/auth/signin?state=example";
+
+        assertFalse(BundledAssetSupport.isBundledLocalUrl(remoteUrl, localConfig));
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(remoteUrl, localConfig);
+
+        assertEquals(remoteUrl, resolution.url);
+        assertFalse(resolution.needsAssetLoader);
     }
 
     @Test
