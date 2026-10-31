@@ -239,11 +239,17 @@ final class BundledAssetSupport {
             }
 
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+            boolean urlUsesReservedWebScheme = isReservedWebScheme(normalizedScheme);
+            boolean localConfigUsesReservedWebScheme = isReservedWebScheme(localConfig.scheme);
+            if (urlUsesReservedWebScheme && localConfigUsesReservedWebScheme && !isLoopbackHost(host)) {
+                return false;
+            }
+
             if (normalizedScheme.equalsIgnoreCase(localConfig.scheme) || normalizedScheme.equals(assetLoaderScheme(localConfig))) {
                 return true;
             }
 
-            return isReservedWebScheme(normalizedScheme) && isReservedWebScheme(localConfig.scheme);
+            return urlUsesReservedWebScheme && localConfigUsesReservedWebScheme;
         } catch (IllegalArgumentException error) {
             return false;
         }
@@ -407,6 +413,20 @@ final class BundledAssetSupport {
             }
         }
         return false;
+    }
+
+    static boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        return (
+            "localhost".equals(normalizedHost) ||
+            "127.0.0.1".equals(normalizedHost) ||
+            "[::1]".equals(normalizedHost) ||
+            "::1".equals(normalizedHost)
+        );
     }
 
     private static boolean isAbsoluteUrl(String url) {

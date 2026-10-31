@@ -122,10 +122,31 @@ describe('bundled asset url resolution', () => {
   it('uses custom local config when provided', () => {
     const localConfig = parseBundledLocalConfig('https://example.com/');
     expect(localConfig).toEqual({ scheme: 'https', host: 'example.com' });
-    expect(isBundledLocalUrl('https://example.com/app/index.html', 'android', localConfig)).toBe(true);
+    expect(isBundledLocalUrl('https://example.com/app/index.html', 'android', localConfig)).toBe(false);
     expect(resolveBundledAssetUrl('/app/index.html', 'android', localConfig)).toEqual({
       url: 'https://example.com/app/index.html',
     });
+  });
+
+  it('keeps absolute https same-host remote urls with query strings', () => {
+    const localConfig = parseBundledLocalConfig('https://portal.example.com/');
+    expect(localConfig).not.toBeNull();
+    if (!localConfig) {
+      return;
+    }
+    const remoteUrl = 'https://portal.example.com/auth/signin?state=example';
+    expect(isBundledLocalUrl(remoteUrl, 'android', localConfig)).toBe(false);
+    expect(resolveBundledAssetUrl(remoteUrl, 'android', localConfig)).toEqual({
+      url: remoteUrl,
+    });
+    expect(resolveBundledAssetUrl('/index.html', 'android', localConfig)).toEqual({
+      url: 'https://portal.example.com/index.html',
+    });
+  });
+
+  it('treats loopback absolute https urls as bundled local urls', () => {
+    const localConfig = { scheme: 'https', host: '127.0.0.1' };
+    expect(isBundledLocalUrl('https://127.0.0.1/assets/app.js', 'android', localConfig)).toBe(true);
   });
 });
 
