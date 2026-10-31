@@ -115,7 +115,7 @@ public class BundledAssetSupportTest {
         BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
         BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("myapp://portal.example.com./index.html", localConfig);
 
-        assertNotNull(resolution);
+        assertTrue(resolution != null);
         assertTrue(resolution.needsAssetLoader);
         assertEquals("https://portal.example.com/index.html", resolution.url);
     }
