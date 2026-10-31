@@ -55,6 +55,7 @@ import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
+import android.webkit.WebBackForwardList;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -120,6 +121,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -579,6 +581,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private volatile WebViewAssetLoader bundledAssetLoader;
     private final Object bundledAssetLoaderLock = new Object();
     private String bundledAssetLocalUrl;
+    private final List<Boolean> bundledAssetLoaderHistoryStates = new ArrayList<>();
+    private int lastWebHistoryIndex = -1;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -5294,8 +5298,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
-    private void syncBundledAssetLoaderForHistoryUrl(String url) {
-        if (_options == null || url == null || url.trim().isEmpty()) {
+    private void resetBundledAssetLoaderHistory() {
+        bundledAssetLoaderHistoryStates.clear();
+        lastWebHistoryIndex = -1;
+    }
+
+    private void syncBundledAssetLoaderForHistoryUrl(WebView view, String url) {
+        if (_options == null || view == null || url == null || url.trim().isEmpty()) {
             return;
         }
 
@@ -5304,14 +5313,32 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             localConfig = new BundledAssetSupport.LocalConfig("https", "localhost");
         }
 
-        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, localConfig);
-        if (resolution == null) {
-            return;
-        }
+        WebBackForwardList history = view.copyBackForwardList();
+        int currentIndex = history.getCurrentIndex();
+        boolean needsAssetLoader = resolveNeedsAssetLoaderForUrl(url, localConfig);
 
         synchronized (bundledAssetLoaderLock) {
+            while (bundledAssetLoaderHistoryStates.size() <= currentIndex) {
+                bundledAssetLoaderHistoryStates.add(null);
+            }
+
+            if (currentIndex > lastWebHistoryIndex) {
+                if (currentIndex == 0 && _options.getServeBundledAssets() && !needsAssetLoader) {
+                    needsAssetLoader = true;
+                }
+                bundledAssetLoaderHistoryStates.set(currentIndex, needsAssetLoader);
+            } else if (currentIndex < lastWebHistoryIndex) {
+                Boolean storedState = bundledAssetLoaderHistoryStates.get(currentIndex);
+                if (storedState != null) {
+                    needsAssetLoader = storedState;
+                }
+            } else {
+                bundledAssetLoaderHistoryStates.set(currentIndex, needsAssetLoader);
+            }
+
+            lastWebHistoryIndex = currentIndex;
             bundledAssetLoader = null;
-            if (resolution.needsAssetLoader) {
+            if (needsAssetLoader) {
                 _options.setBundledAssetHost(localConfig.host);
                 _options.setBundledAssetScheme(BundledAssetSupport.assetLoaderScheme(localConfig));
                 _options.setServeBundledAssets(true);
@@ -5319,6 +5346,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 _options.setServeBundledAssets(false);
             }
         }
+    }
+
+    private boolean resolveNeedsAssetLoaderForUrl(String url, BundledAssetSupport.LocalConfig localConfig) {
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, localConfig);
+        return resolution != null && resolution.needsAssetLoader;
     }
 
     private void applyTrustedBundledFileCrossOriginSettings(String url) {
@@ -6941,7 +6973,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return;
                     }
                     applyTrustedBundledFileCrossOriginSettings(url);
-                    syncBundledAssetLoaderForHistoryUrl(url);
+                    syncBundledAssetLoaderForHistoryUrl(view, url);
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }
@@ -6964,6 +6996,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
+                        resetBundledAssetLoaderHistory();
                         if (_options.isPresentAfterPageLoad() && !_options.isHidden()) {
                             boolean usePreShowScript =
                                 _options.getPreShowScript() != null &&
