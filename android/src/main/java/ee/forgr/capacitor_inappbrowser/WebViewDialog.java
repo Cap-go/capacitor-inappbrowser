@@ -578,6 +578,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private ProxyBridge proxyBridge;
     private volatile WebViewAssetLoader bundledAssetLoader;
     private final Object bundledAssetLoaderLock = new Object();
+    private String bundledAssetLocalUrl;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -5268,10 +5269,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
     }
 
+    public void setBundledAssetLocalUrl(String localUrl) {
+        bundledAssetLocalUrl = localUrl;
+    }
+
     public void applyBundledAssetResolution(BundledAssetSupport.Resolution resolution, String localUrl) {
         if (_options == null || resolution == null) {
             return;
         }
+
+        bundledAssetLocalUrl = localUrl;
 
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
@@ -5280,6 +5287,33 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
                 _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
                 _options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
+                _options.setServeBundledAssets(true);
+            } else {
+                _options.setServeBundledAssets(false);
+            }
+        }
+    }
+
+    private void syncBundledAssetLoaderForHistoryUrl(String url) {
+        if (_options == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(bundledAssetLocalUrl);
+        if (localConfig == null) {
+            localConfig = new BundledAssetSupport.LocalConfig("https", "localhost");
+        }
+
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, localConfig);
+        if (resolution == null) {
+            return;
+        }
+
+        synchronized (bundledAssetLoaderLock) {
+            bundledAssetLoader = null;
+            if (resolution.needsAssetLoader) {
+                _options.setBundledAssetHost(localConfig.host);
+                _options.setBundledAssetScheme(BundledAssetSupport.assetLoaderScheme(localConfig));
                 _options.setServeBundledAssets(true);
             } else {
                 _options.setServeBundledAssets(false);
@@ -6907,6 +6941,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return;
                     }
                     applyTrustedBundledFileCrossOriginSettings(url);
+                    syncBundledAssetLoaderForHistoryUrl(url);
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }

@@ -115,6 +115,21 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void restoresBundledAssetLoaderAfterRemoteNavigation() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
+        BundledAssetSupport.Resolution bundled = BundledAssetSupport.resolve("/index.html", localConfig);
+        BundledAssetSupport.Resolution remote = BundledAssetSupport.resolve(
+            "https://portal.example.com/auth/signin?state=example",
+            localConfig
+        );
+        BundledAssetSupport.Resolution restored = BundledAssetSupport.resolve(bundled.url, localConfig);
+
+        assertTrue(bundled.needsAssetLoader);
+        assertFalse(remote.needsAssetLoader);
+        assertTrue(restored.needsAssetLoader);
+    }
+
+    @Test
     public void encodingForMimeTypeReturnsUtf8ForTextLikeTypes() {
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("text/html"));
         assertEquals("utf-8", BundledAssetSupport.encodingForMimeType("application/json"));
