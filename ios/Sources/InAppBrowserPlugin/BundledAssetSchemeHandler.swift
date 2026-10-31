@@ -134,7 +134,8 @@ final class BundledAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private static func isAllowedBundledAssetRequest(_ requestURL: URL, expectedHost: String) -> Bool {
-        guard let host = requestURL.host?.lowercased(), host == expectedHost else {
+        guard let host = requestURL.host?.lowercased(),
+              BundledAssetSupport.bundledHostsMatch(host, expectedHost) else {
             return false
         }
 

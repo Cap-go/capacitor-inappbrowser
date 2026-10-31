@@ -102,6 +102,10 @@ enum BundledAssetSupport {
         normalizedHost == "localhost" || normalizedHost.hasSuffix(".localhost")
     }
 
+    static func bundledHostsMatch(_ host: String, _ expectedHost: String) -> Bool {
+        normalizeHost(host) == normalizeHost(expectedHost)
+    }
+
     private static func normalizeHost(_ host: String) -> String {
         var normalizedHost = host.lowercased()
         if normalizedHost.hasSuffix(".") {
@@ -240,6 +244,7 @@ enum BundledAssetSupport {
 
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.scheme = navigationScheme
+        components?.host = localConfig.host
         return components?.url?.absoluteString
     }
 

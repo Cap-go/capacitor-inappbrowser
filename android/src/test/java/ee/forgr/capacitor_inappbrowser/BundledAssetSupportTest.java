@@ -111,6 +111,23 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void rewritesBundledLocalUrlToConfiguredAuthority() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve("myapp://portal.example.com./index.html", localConfig);
+
+        assertNotNull(resolution);
+        assertTrue(resolution.needsAssetLoader);
+        assertEquals("https://portal.example.com/index.html", resolution.url);
+    }
+
+    @Test
+    public void canonicalHistoryUrlTreatsDotSegmentsAsEquivalent() {
+        assertTrue(
+            BundledAssetSupport.historyUrlsEquivalent("https://portal.example.com/./index.html", "https://portal.example.com/index.html")
+        );
+    }
+
+    @Test
     public void keepsSameHostHttpsRemoteWithCustomAndroidScheme() {
         BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
         String remoteUrl = "https://portal.example.com/auth/signin?state=example";

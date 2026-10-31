@@ -2,6 +2,7 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.net.Uri;
 import android.webkit.MimeTypeMap;
 import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
@@ -9,6 +10,7 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -446,6 +448,60 @@ final class BundledAssetSupport {
         return normalizedHost;
     }
 
+    static boolean historyUrlsEquivalent(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return canonicalHistoryUrl(left).equals(canonicalHistoryUrl(right));
+    }
+
+    static String canonicalHistoryUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+
+        String trimmed = url.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+
+        try {
+            Uri uri = Uri.parse(trimmed);
+            String scheme = uri.getScheme();
+            if (scheme == null) {
+                return trimmed;
+            }
+
+            String host = normalizeHost(uri.getHost());
+            int port = uri.getPort();
+            String authority = port == -1 ? host : host + ":" + port;
+            String path = normalizeHistoryPath(uri.getPath());
+            StringBuilder builder = new StringBuilder();
+            builder.append(scheme.toLowerCase(Locale.ROOT)).append("://").append(authority).append(path);
+            if (uri.getEncodedQuery() != null) {
+                builder.append('?').append(uri.getEncodedQuery());
+            }
+            if (uri.getEncodedFragment() != null) {
+                builder.append('#').append(uri.getEncodedFragment());
+            }
+            return builder.toString();
+        } catch (Exception error) {
+            return trimmed;
+        }
+    }
+
+    private static String normalizeHistoryPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return "/";
+        }
+
+        try {
+            return new URI("https", "canonical", path, null).normalize().getPath();
+        } catch (URISyntaxException error) {
+            return path;
+        }
+    }
+
     private static boolean isIpv4LoopbackHost(String host) {
         String[] parts = host.split("\\.", -1);
         if (parts.length != 4 || !"127".equals(parts[0])) {
@@ -509,7 +565,7 @@ final class BundledAssetSupport {
             return new URI(
                 navigationScheme,
                 uri.getUserInfo(),
-                host,
+                localConfig.host,
                 uri.getPort(),
                 uri.getPath(),
                 uri.getQuery(),

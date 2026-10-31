@@ -76,6 +76,13 @@ final class BundledAssetSupportTests: XCTestCase {
         XCTAssertTrue(BundledAssetSupport.isBundledLocalURL("https://app.localhost/assets/app.js", localConfig: localConfig))
     }
 
+    func testRewritesBundledLocalURLToConfiguredHost() {
+        let localURL = URL(string: "https://localhost")!
+        let resolution = BundledAssetSupport.resolve("https://localhost./index.html", localURL: localURL)
+
+        XCTAssertEqual(resolution?.url, "capacitor://localhost/index.html")
+    }
+
     func testRoutesExtensionlessPathsToIndexHtml() {
         let basePath = "/tmp/public"
         XCTAssertEqual(BundledAssetSupport.routeAssetPath(for: "/dashboard", basePath: basePath), "/tmp/public/index.html")

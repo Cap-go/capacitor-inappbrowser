@@ -186,7 +186,7 @@ function rewriteBundledLocalUrl(
     const hash = parsed.hash;
     const userinfo =
       parsed.username.length > 0 ? `${parsed.username}${parsed.password.length > 0 ? `:${parsed.password}` : ''}@` : '';
-    return `${navigationScheme}://${userinfo}${host}${pathname}${search}${hash}`;
+    return `${navigationScheme}://${userinfo}${localConfig.host}${pathname}${search}${hash}`;
   } catch {
     return null;
   }

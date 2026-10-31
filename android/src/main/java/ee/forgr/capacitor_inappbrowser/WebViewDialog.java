@@ -587,6 +587,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private String pendingBundledAssetLoaderUrl;
     private Boolean pendingBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
+    private int bundledHistoryNavigationTargetIndex = -1;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -5289,7 +5290,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
             _options.setUrl(resolution.url);
-            setPendingBundledAssetLoaderResolution(resolution.url, resolution.needsAssetLoader);
+            setPendingBundledAssetResolution(resolution.url, resolution.needsAssetLoader);
+            if (_webView != null) {
+                int currentIndex = _webView.copyBackForwardList().getCurrentIndex();
+                while (bundledAssetLoaderHistoryStates.size() > currentIndex + 1) {
+                    bundledAssetLoaderHistoryStates.remove(bundledAssetLoaderHistoryStates.size() - 1);
+                }
+            }
             if (resolution.needsAssetLoader) {
                 BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
                 _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
@@ -5341,14 +5348,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         int historyIndex,
         boolean useStoredHistoryState
     ) {
+        if (pendingBundledAssetLoaderState != null && BundledAssetSupport.historyUrlsEquivalent(url, pendingBundledAssetLoaderUrl)) {
+            return pendingBundledAssetLoaderState;
+        }
         if (useStoredHistoryState && historyIndex >= 0 && historyIndex < bundledAssetLoaderHistoryStates.size()) {
             Boolean storedState = bundledAssetLoaderHistoryStates.get(historyIndex);
             if (storedState != null) {
                 return storedState;
             }
-        }
-        if (pendingBundledAssetLoaderState != null && url != null && url.equals(pendingBundledAssetLoaderUrl)) {
-            return pendingBundledAssetLoaderState;
         }
         return resolveNeedsAssetLoaderForUrl(url, localConfig);
     }
@@ -5360,6 +5367,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         BundledAssetSupport.LocalConfig localConfig = bundledAssetLocalConfigOrDefault();
         boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, historyIndex, true);
+        bundledHistoryNavigationTargetIndex = historyIndex;
         synchronized (bundledAssetLoaderLock) {
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
         }
@@ -5369,6 +5377,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         bundledAssetLoaderHistoryStates.clear();
         clearPendingBundledAssetLoaderResolution();
         lastWebHistoryIndex = -1;
+        bundledHistoryNavigationTargetIndex = -1;
     }
 
     private void seedBundledAssetLoaderHistoryAfterClear(String url) {
@@ -5391,21 +5400,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         WebBackForwardList history = view.copyBackForwardList();
         int currentIndex = history.getCurrentIndex();
-        boolean useStoredHistoryState = currentIndex < lastWebHistoryIndex;
+        boolean traversingHistory = bundledHistoryNavigationTargetIndex == currentIndex;
+        if (traversingHistory) {
+            bundledHistoryNavigationTargetIndex = -1;
+        }
+        boolean useStoredHistoryState = currentIndex < lastWebHistoryIndex || traversingHistory || currentIndex == lastWebHistoryIndex;
         boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex, useStoredHistoryState);
 
         synchronized (bundledAssetLoaderLock) {
-            if (currentIndex > lastWebHistoryIndex) {
-                while (bundledAssetLoaderHistoryStates.size() > currentIndex) {
-                    bundledAssetLoaderHistoryStates.remove(bundledAssetLoaderHistoryStates.size() - 1);
-                }
-            }
-
             while (bundledAssetLoaderHistoryStates.size() <= currentIndex) {
                 bundledAssetLoaderHistoryStates.add(null);
             }
 
-            if (currentIndex > lastWebHistoryIndex) {
+            if (currentIndex > lastWebHistoryIndex && !traversingHistory) {
                 bundledAssetLoaderHistoryStates.set(currentIndex, needsAssetLoader);
             } else if (currentIndex < lastWebHistoryIndex) {
                 Boolean storedState = bundledAssetLoaderHistoryStates.get(currentIndex);
