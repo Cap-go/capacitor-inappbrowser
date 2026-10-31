@@ -69,6 +69,13 @@ final class BundledAssetSupportTests: XCTestCase {
         XCTAssertTrue(BundledAssetSupport.isBundledLocalURL("https://127.0.0.2/assets/app.js", localConfig: localConfig))
     }
 
+    func testTreatsLocalhostSubdomainsAsLoopbackHosts() {
+        let localConfig = BundledAssetSupport.LocalConfig(scheme: "https", host: "app.localhost")
+        XCTAssertTrue(BundledAssetSupport.isLoopbackHost("app.localhost"))
+        XCTAssertTrue(BundledAssetSupport.isLoopbackHost("app.localhost."))
+        XCTAssertTrue(BundledAssetSupport.isBundledLocalURL("https://app.localhost/assets/app.js", localConfig: localConfig))
+    }
+
     func testRoutesExtensionlessPathsToIndexHtml() {
         let basePath = "/tmp/public"
         XCTAssertEqual(BundledAssetSupport.routeAssetPath(for: "/dashboard", basePath: basePath), "/tmp/public/index.html")

@@ -29,10 +29,19 @@ function isIpv4LoopbackHost(host: string): boolean {
   });
 }
 
-function isLoopbackHost(host: string): boolean {
+function normalizeLoopbackHost(host: string): string {
   const normalizedHost = host.toLowerCase();
+  return normalizedHost.endsWith('.') ? normalizedHost.slice(0, -1) : normalizedHost;
+}
+
+function isLocalhostDomain(host: string): boolean {
+  return host === 'localhost' || host.endsWith('.localhost');
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalizedHost = normalizeLoopbackHost(host);
   return (
-    normalizedHost === 'localhost' ||
+    isLocalhostDomain(normalizedHost) ||
     isIpv4LoopbackHost(normalizedHost) ||
     normalizedHost === '[::1]' ||
     normalizedHost === '::1'
@@ -119,10 +128,11 @@ export function isBundledLocalUrl(
   try {
     const parsed = new URL(url);
     const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
-    const host = parsed.hostname.toLowerCase();
+    const host = normalizeLoopbackHost(parsed.hostname.toLowerCase());
     const config = localConfig ?? BUNDLED_ASSET_DEFAULTS[platform];
+    const configHost = normalizeLoopbackHost(config.host.toLowerCase());
 
-    if (host !== config.host) {
+    if (host !== configHost) {
       return false;
     }
 
@@ -163,10 +173,11 @@ function rewriteBundledLocalUrl(
 ): string | null {
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
+    const host = normalizeLoopbackHost(parsed.hostname.toLowerCase());
     const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
+    const configHost = normalizeLoopbackHost(localConfig.host.toLowerCase());
 
-    if (host !== localConfig.host || scheme === navigationScheme) {
+    if (host !== configHost || scheme === navigationScheme) {
       return null;
     }
 

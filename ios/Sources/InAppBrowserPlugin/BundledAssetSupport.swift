@@ -66,7 +66,7 @@ enum BundledAssetSupport {
             return false
         }
 
-        guard host == localConfig.host else {
+        guard normalizeHost(host) == normalizeHost(localConfig.host) else {
             return false
         }
 
@@ -88,11 +88,26 @@ enum BundledAssetSupport {
     }
 
     static func isLoopbackHost(_ host: String) -> Bool {
-        let normalizedHost = host.lowercased()
-        if normalizedHost == "localhost" || normalizedHost == "[::1]" || normalizedHost == "::1" {
+        var normalizedHost = host.lowercased()
+        if normalizedHost.hasSuffix(".") {
+            normalizedHost.removeLast()
+        }
+        if isLocalhostDomain(normalizedHost) || normalizedHost == "[::1]" || normalizedHost == "::1" {
             return true
         }
         return isIpv4LoopbackHost(normalizedHost)
+    }
+
+    private static func isLocalhostDomain(_ normalizedHost: String) -> Bool {
+        normalizedHost == "localhost" || normalizedHost.hasSuffix(".localhost")
+    }
+
+    private static func normalizeHost(_ host: String) -> String {
+        var normalizedHost = host.lowercased()
+        if normalizedHost.hasSuffix(".") {
+            normalizedHost.removeLast()
+        }
+        return normalizedHost
     }
 
     private static func isIpv4LoopbackHost(_ host: String) -> Bool {
@@ -215,7 +230,7 @@ enum BundledAssetSupport {
     ) -> String? {
         guard let url = URL(string: urlString),
               let host = url.host?.lowercased(),
-              host == localConfig.host else {
+              normalizeHost(host) == normalizeHost(localConfig.host) else {
             return nil
         }
 

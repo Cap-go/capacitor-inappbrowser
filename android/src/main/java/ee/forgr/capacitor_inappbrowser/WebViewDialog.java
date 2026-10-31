@@ -584,7 +584,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private final Object bundledAssetLoaderLock = new Object();
     private String bundledAssetLocalUrl;
     private final List<Boolean> bundledAssetLoaderHistoryStates = new ArrayList<>();
-    private final Set<String> bundledAssetLoaderUrls = new HashSet<>();
+    private String pendingBundledAssetLoaderUrl;
+    private Boolean pendingBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
     private String proxyBridgeScript;
     private String proxyAccessToken;
@@ -3427,9 +3428,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 exitCustomFullscreenView();
                 return;
             case WEBVIEW_GO_BACK:
-                if (_webView != null) {
-                    _webView.goBack();
-                }
+                goBack();
                 return;
             case IGNORE:
                 return;
@@ -5290,9 +5289,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
             _options.setUrl(resolution.url);
+            setPendingBundledAssetLoaderResolution(resolution.url, resolution.needsAssetLoader);
             if (resolution.needsAssetLoader) {
                 BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
-                rememberBundledAssetLoaderUrl(resolution.url);
                 _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
                 _options.setBundledAssetScheme(localConfig != null ? BundledAssetSupport.assetLoaderScheme(localConfig) : "https");
                 _options.setServeBundledAssets(true);
@@ -5302,11 +5301,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
-    private void rememberBundledAssetLoaderUrl(String url) {
+    private void setPendingBundledAssetLoaderResolution(String url, boolean needsAssetLoader) {
         if (url == null || url.trim().isEmpty()) {
+            pendingBundledAssetLoaderUrl = null;
+            pendingBundledAssetLoaderState = null;
             return;
         }
-        bundledAssetLoaderUrls.add(url);
+        pendingBundledAssetLoaderUrl = url;
+        pendingBundledAssetLoaderState = needsAssetLoader;
+    }
+
+    private void clearPendingBundledAssetLoaderResolution() {
+        pendingBundledAssetLoaderUrl = null;
+        pendingBundledAssetLoaderState = null;
     }
 
     private BundledAssetSupport.LocalConfig bundledAssetLocalConfigOrDefault() {
@@ -5328,15 +5335,20 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
-    private boolean needsAssetLoaderForHistoryUrl(String url, BundledAssetSupport.LocalConfig localConfig, int historyIndex) {
-        if (bundledAssetLoaderUrls.contains(url)) {
-            return true;
-        }
-        if (historyIndex >= 0 && historyIndex < bundledAssetLoaderHistoryStates.size()) {
+    private boolean needsAssetLoaderForHistoryUrl(
+        String url,
+        BundledAssetSupport.LocalConfig localConfig,
+        int historyIndex,
+        boolean useStoredHistoryState
+    ) {
+        if (useStoredHistoryState && historyIndex >= 0 && historyIndex < bundledAssetLoaderHistoryStates.size()) {
             Boolean storedState = bundledAssetLoaderHistoryStates.get(historyIndex);
             if (storedState != null) {
                 return storedState;
             }
+        }
+        if (pendingBundledAssetLoaderState != null && url != null && url.equals(pendingBundledAssetLoaderUrl)) {
+            return pendingBundledAssetLoaderState;
         }
         return resolveNeedsAssetLoaderForUrl(url, localConfig);
     }
@@ -5347,7 +5359,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         BundledAssetSupport.LocalConfig localConfig = bundledAssetLocalConfigOrDefault();
-        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, historyIndex);
+        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, historyIndex, true);
         synchronized (bundledAssetLoaderLock) {
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
         }
@@ -5355,7 +5367,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void resetBundledAssetLoaderHistory() {
         bundledAssetLoaderHistoryStates.clear();
-        bundledAssetLoaderUrls.clear();
+        clearPendingBundledAssetLoaderResolution();
         lastWebHistoryIndex = -1;
     }
 
@@ -5367,7 +5379,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (_options.getServeBundledAssets()) {
             bundledAssetLoaderHistoryStates.add(true);
             lastWebHistoryIndex = 0;
-            rememberBundledAssetLoaderUrl(url);
         }
     }
 
@@ -5380,9 +5391,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         WebBackForwardList history = view.copyBackForwardList();
         int currentIndex = history.getCurrentIndex();
-        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex);
+        boolean useStoredHistoryState = currentIndex < lastWebHistoryIndex;
+        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex, useStoredHistoryState);
 
         synchronized (bundledAssetLoaderLock) {
+            if (currentIndex > lastWebHistoryIndex) {
+                while (bundledAssetLoaderHistoryStates.size() > currentIndex) {
+                    bundledAssetLoaderHistoryStates.remove(bundledAssetLoaderHistoryStates.size() - 1);
+                }
+            }
+
             while (bundledAssetLoaderHistoryStates.size() <= currentIndex) {
                 bundledAssetLoaderHistoryStates.add(null);
             }
@@ -5400,6 +5418,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
             lastWebHistoryIndex = currentIndex;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
+            clearPendingBundledAssetLoaderResolution();
         }
     }
 
@@ -6066,9 +6085,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if (_webView != null && _webView.canGoBack()) {
-                            _webView.goBack();
-                        }
+                        goBack();
                     }
                 }
             );
@@ -6087,9 +6104,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if (_webView != null && _webView.canGoForward()) {
-                            _webView.goForward();
-                        }
+                        goForward();
                     }
                 }
             );
@@ -7169,6 +7184,22 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
             }
             _webView.goBack();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean goForward() {
+        if (_webView != null && _webView.canGoForward()) {
+            WebBackForwardList history = _webView.copyBackForwardList();
+            int forwardIndex = history.getCurrentIndex() + 1;
+            if (forwardIndex < history.getSize()) {
+                WebHistoryItem forwardItem = history.getItemAtIndex(forwardIndex);
+                if (forwardItem != null) {
+                    prepareBundledAssetLoaderBeforeNavigation(forwardItem.getUrl(), forwardIndex);
+                }
+            }
+            _webView.goForward();
             return true;
         }
         return false;

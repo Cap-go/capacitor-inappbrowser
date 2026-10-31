@@ -230,7 +230,7 @@ final class BundledAssetSupport {
                 return false;
             }
 
-            if (!host.equalsIgnoreCase(localConfig.host)) {
+            if (!normalizeHost(host).equals(normalizeHost(localConfig.host))) {
                 return false;
             }
 
@@ -421,11 +421,29 @@ final class BundledAssetSupport {
         }
 
         String normalizedHost = host.toLowerCase(Locale.ROOT);
-        if ("localhost".equals(normalizedHost) || "[::1]".equals(normalizedHost) || "::1".equals(normalizedHost)) {
+        if (normalizedHost.endsWith(".")) {
+            normalizedHost = normalizedHost.substring(0, normalizedHost.length() - 1);
+        }
+        if (isLocalhostDomain(normalizedHost) || "[::1]".equals(normalizedHost) || "::1".equals(normalizedHost)) {
             return true;
         }
 
         return isIpv4LoopbackHost(normalizedHost);
+    }
+
+    private static boolean isLocalhostDomain(String normalizedHost) {
+        return "localhost".equals(normalizedHost) || normalizedHost.endsWith(".localhost");
+    }
+
+    private static String normalizeHost(String host) {
+        if (host == null) {
+            return "";
+        }
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        if (normalizedHost.endsWith(".")) {
+            normalizedHost = normalizedHost.substring(0, normalizedHost.length() - 1);
+        }
+        return normalizedHost;
     }
 
     private static boolean isIpv4LoopbackHost(String host) {
@@ -482,7 +500,7 @@ final class BundledAssetSupport {
             URI uri = URI.create(url);
             String scheme = uri.getScheme();
             String host = uri.getHost();
-            if (scheme == null || host == null || !host.equalsIgnoreCase(localConfig.host)) {
+            if (scheme == null || host == null || !normalizeHost(host).equals(normalizeHost(localConfig.host))) {
                 return null;
             }
             if (scheme.equalsIgnoreCase(navigationScheme)) {

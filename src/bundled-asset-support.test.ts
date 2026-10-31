@@ -154,6 +154,12 @@ describe('bundled asset url resolution', () => {
     expect(isBundledLocalUrl('https://127.0.0.2/assets/app.js', 'android', localConfig)).toBe(true);
   });
 
+  it('treats localhost subdomains as loopback hosts', () => {
+    const localConfig = { scheme: 'https', host: 'app.localhost' };
+    expect(isBundledLocalUrl('https://app.localhost/assets/app.js', 'android', localConfig)).toBe(true);
+    expect(isBundledLocalUrl('https://app.localhost./index.html', 'android', localConfig)).toBe(true);
+  });
+
   it('keeps same-host https remote with custom android scheme', () => {
     const localConfig = { scheme: 'myapp', host: 'portal.example.com' };
     const remoteUrl = 'https://portal.example.com/auth/signin?state=example';

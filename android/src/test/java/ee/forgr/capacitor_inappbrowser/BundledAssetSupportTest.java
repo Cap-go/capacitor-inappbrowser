@@ -102,6 +102,15 @@ public class BundledAssetSupportTest {
     }
 
     @Test
+    public void treatsLocalhostSubdomainsAsLoopbackHosts() {
+        BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("https", "app.localhost");
+
+        assertTrue(BundledAssetSupport.isLoopbackHost("app.localhost"));
+        assertTrue(BundledAssetSupport.isLoopbackHost("app.localhost."));
+        assertTrue(BundledAssetSupport.isBundledLocalUrl("https://app.localhost/assets/app.js", localConfig));
+    }
+
+    @Test
     public void keepsSameHostHttpsRemoteWithCustomAndroidScheme() {
         BundledAssetSupport.LocalConfig localConfig = new BundledAssetSupport.LocalConfig("myapp", "portal.example.com");
         String remoteUrl = "https://portal.example.com/auth/signin?state=example";
