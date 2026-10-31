@@ -2,7 +2,6 @@ package ee.forgr.capacitor_inappbrowser;
 
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.net.Uri;
 import android.webkit.MimeTypeMap;
 import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
@@ -466,7 +465,7 @@ final class BundledAssetSupport {
         }
 
         try {
-            Uri uri = Uri.parse(trimmed);
+            URI uri = URI.create(trimmed);
             String scheme = uri.getScheme();
             if (scheme == null) {
                 return trimmed;
@@ -478,14 +477,14 @@ final class BundledAssetSupport {
             String path = normalizeHistoryPath(uri.getPath());
             StringBuilder builder = new StringBuilder();
             builder.append(scheme.toLowerCase(Locale.ROOT)).append("://").append(authority).append(path);
-            if (uri.getEncodedQuery() != null) {
-                builder.append('?').append(uri.getEncodedQuery());
+            if (uri.getRawQuery() != null) {
+                builder.append('?').append(uri.getRawQuery());
             }
-            if (uri.getEncodedFragment() != null) {
-                builder.append('#').append(uri.getEncodedFragment());
+            if (uri.getRawFragment() != null) {
+                builder.append('#').append(uri.getRawFragment());
             }
             return builder.toString();
-        } catch (Exception error) {
+        } catch (IllegalArgumentException error) {
             return trimmed;
         }
     }
