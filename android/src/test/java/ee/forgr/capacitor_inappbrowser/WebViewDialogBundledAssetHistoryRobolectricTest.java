@@ -130,6 +130,7 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     private static final class StubBackForwardList extends WebBackForwardList {
+
         private final int currentIndex;
 
         private StubBackForwardList(int currentIndex) {
