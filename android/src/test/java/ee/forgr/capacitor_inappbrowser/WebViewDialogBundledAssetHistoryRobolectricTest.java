@@ -4,7 +4,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
-import android.webkit.WebView;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import org.junit.Test;
@@ -44,11 +43,8 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
 
         assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
 
-        WebView webView = new WebView(context);
-        webView.loadUrl("about:blank");
-        setWebView(dialog, webView);
         setBooleanField(dialog, "isInitialized", true);
-        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/a.html");
+        invokeClearCommittedBundledAssetNavigationIntent(dialog);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
     }
@@ -66,16 +62,10 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/auth/signin?state=example", 0, false));
     }
 
-    private static void invokeSyncBundledAssetLoaderForHistoryUrl(WebViewDialog dialog, WebView webView, String url) throws Exception {
-        Method method = WebViewDialog.class.getDeclaredMethod("syncBundledAssetLoaderForHistoryUrl", WebView.class, String.class);
+    private static void invokeClearCommittedBundledAssetNavigationIntent(WebViewDialog dialog) throws Exception {
+        Method method = WebViewDialog.class.getDeclaredMethod("clearCommittedBundledAssetNavigationIntent");
         method.setAccessible(true);
-        method.invoke(dialog, webView, url);
-    }
-
-    private static void setWebView(WebViewDialog dialog, WebView webView) throws Exception {
-        Field field = WebViewDialog.class.getDeclaredField("_webView");
-        field.setAccessible(true);
-        field.set(dialog, webView);
+        method.invoke(dialog);
     }
 
     private static void setBooleanField(Object target, String name, boolean value) throws Exception {
