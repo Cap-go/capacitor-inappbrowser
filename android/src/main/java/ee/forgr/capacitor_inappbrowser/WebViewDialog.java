@@ -5458,6 +5458,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             lastWebHistoryIndex = currentIndex;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
             clearPendingBundledAssetLoaderResolution();
+            if (isInitialized) {
+                clearCommittedBundledAssetNavigationIntent();
+            }
         }
     }
 

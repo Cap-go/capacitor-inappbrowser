@@ -4,6 +4,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.webkit.WebView;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -30,6 +32,28 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     @Test
+    public void committedNavigationIntentClearsAfterInitializedHistorySync() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://portal.example.com/a.html");
+        options.setServeBundledAssets(true);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        dialog.preserveBundledAssetNavigationIntent("https://portal.example.com/a.html", true);
+
+        assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
+
+        WebView webView = new WebView(context);
+        webView.loadUrl("about:blank");
+        setWebView(dialog, webView);
+        setBooleanField(dialog, "isInitialized", true);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/a.html");
+
+        assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
+    }
+
+    @Test
     public void explicitRemoteNavigationIntentStaysRemoteForCustomHostname() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Options options = new Options();
@@ -40,6 +64,24 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         dialog.preserveBundledAssetNavigationIntent("https://portal.example.com/auth/signin?state=example", false);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/auth/signin?state=example", 0, false));
+    }
+
+    private static void invokeSyncBundledAssetLoaderForHistoryUrl(WebViewDialog dialog, WebView webView, String url) throws Exception {
+        Method method = WebViewDialog.class.getDeclaredMethod("syncBundledAssetLoaderForHistoryUrl", WebView.class, String.class);
+        method.setAccessible(true);
+        method.invoke(dialog, webView, url);
+    }
+
+    private static void setWebView(WebViewDialog dialog, WebView webView) throws Exception {
+        Field field = WebViewDialog.class.getDeclaredField("_webView");
+        field.setAccessible(true);
+        field.set(dialog, webView);
+    }
+
+    private static void setBooleanField(Object target, String name, boolean value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.setBoolean(target, value);
     }
 
     private static boolean invokeNeedsAssetLoaderForHistoryUrl(
