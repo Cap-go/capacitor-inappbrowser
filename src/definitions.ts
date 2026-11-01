@@ -705,6 +705,9 @@ export interface OpenWebViewOptions {
    *
    * Remote `http://` and `https://` URLs are loaded as-is, including when the host matches the app's
    * configured Capacitor `server.hostname`. Use a relative path to load bundled assets from the app bundle.
+   * Absolute `http://` or `https://` URLs on loopback hosts (`localhost`, `127.0.0.1`, `::1`, and `*.localhost`)
+   * are treated as bundled local content and rewritten to the platform handler URL (for example
+   * `capacitor://localhost/...` on iOS or `https://localhost/...` on Android), not sent to a local HTTP server.
    *
    * To open bundled web assets from the app bundle without running a local HTTP server,
    * pass a relative path such as `/index.html` or `assets/page.html`. The plugin resolves it to

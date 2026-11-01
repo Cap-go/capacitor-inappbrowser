@@ -586,6 +586,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private final List<Boolean> bundledAssetLoaderHistoryStates = new ArrayList<>();
     private String pendingBundledAssetLoaderUrl;
     private Boolean pendingBundledAssetLoaderState;
+    private String committedBundledAssetLoaderUrl;
+    private Boolean committedBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
     private int bundledHistoryNavigationTargetIndex = -1;
     private String proxyBridgeScript;
@@ -5280,6 +5282,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         bundledAssetLocalUrl = localUrl;
     }
 
+    public void preserveBundledAssetNavigationIntent(String url, boolean needsAssetLoader) {
+        setPendingBundledAssetLoaderResolution(url, needsAssetLoader);
+        if (url == null || url.trim().isEmpty()) {
+            committedBundledAssetLoaderUrl = null;
+            committedBundledAssetLoaderState = null;
+            return;
+        }
+        committedBundledAssetLoaderUrl = url;
+        committedBundledAssetLoaderState = needsAssetLoader;
+    }
+
     public void applyBundledAssetResolution(BundledAssetSupport.Resolution resolution, String localUrl) {
         if (_options == null || resolution == null) {
             return;
@@ -5290,7 +5303,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
             _options.setUrl(resolution.url);
-            setPendingBundledAssetLoaderResolution(resolution.url, resolution.needsAssetLoader);
+            preserveBundledAssetNavigationIntent(resolution.url, resolution.needsAssetLoader);
             if (_webView != null) {
                 int currentIndex = _webView.copyBackForwardList().getCurrentIndex();
                 while (bundledAssetLoaderHistoryStates.size() > currentIndex + 1) {
@@ -5351,6 +5364,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (pendingBundledAssetLoaderState != null && BundledAssetSupport.historyUrlsEquivalent(url, pendingBundledAssetLoaderUrl)) {
             return pendingBundledAssetLoaderState;
         }
+        if (committedBundledAssetLoaderState != null && BundledAssetSupport.historyUrlsEquivalent(url, committedBundledAssetLoaderUrl)) {
+            return committedBundledAssetLoaderState;
+        }
         if (useStoredHistoryState && historyIndex >= 0 && historyIndex < bundledAssetLoaderHistoryStates.size()) {
             Boolean storedState = bundledAssetLoaderHistoryStates.get(historyIndex);
             if (storedState != null) {
@@ -5380,15 +5396,31 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         bundledHistoryNavigationTargetIndex = -1;
     }
 
+    private void clearCommittedBundledAssetNavigationIntent() {
+        committedBundledAssetLoaderUrl = null;
+        committedBundledAssetLoaderState = null;
+    }
+
     private void seedBundledAssetLoaderHistoryAfterClear(String url) {
         if (_options == null) {
             return;
         }
 
-        if (_options.getServeBundledAssets()) {
+        boolean needsAssetLoader = _options.getServeBundledAssets();
+        if (
+            !needsAssetLoader &&
+            committedBundledAssetLoaderState != null &&
+            BundledAssetSupport.historyUrlsEquivalent(url, committedBundledAssetLoaderUrl)
+        ) {
+            needsAssetLoader = committedBundledAssetLoaderState;
+        }
+
+        if (needsAssetLoader) {
             bundledAssetLoaderHistoryStates.add(true);
             lastWebHistoryIndex = 0;
+            applyBundledAssetLoaderState(true, bundledAssetLocalConfigOrDefault());
         }
+        clearCommittedBundledAssetNavigationIntent();
     }
 
     private void syncBundledAssetLoaderForHistoryUrl(WebView view, String url) {
