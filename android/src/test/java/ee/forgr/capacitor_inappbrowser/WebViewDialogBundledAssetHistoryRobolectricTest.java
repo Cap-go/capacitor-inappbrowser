@@ -124,29 +124,42 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         return new WebView(context) {
             @Override
             public WebBackForwardList copyBackForwardList() {
-                return new WebBackForwardList() {
-                    @Override
-                    public int getCurrentIndex() {
-                        return currentIndex;
-                    }
-
-                    @Override
-                    public WebHistoryItem getCurrentItem() {
-                        return null;
-                    }
-
-                    @Override
-                    public WebHistoryItem getItemAtIndex(int index) {
-                        return null;
-                    }
-
-                    @Override
-                    public int getSize() {
-                        return currentIndex + 1;
-                    }
-                };
+                return new StubBackForwardList(currentIndex);
             }
         };
+    }
+
+    private static final class StubBackForwardList extends WebBackForwardList {
+        private final int currentIndex;
+
+        private StubBackForwardList(int currentIndex) {
+            this.currentIndex = currentIndex;
+        }
+
+        @Override
+        public WebBackForwardList clone() {
+            return new StubBackForwardList(currentIndex);
+        }
+
+        @Override
+        public int getCurrentIndex() {
+            return currentIndex;
+        }
+
+        @Override
+        public WebHistoryItem getCurrentItem() {
+            return null;
+        }
+
+        @Override
+        public WebHistoryItem getItemAtIndex(int index) {
+            return null;
+        }
+
+        @Override
+        public int getSize() {
+            return currentIndex + 1;
+        }
     }
 
     private static boolean invokeNeedsAssetLoaderForHistoryUrl(
