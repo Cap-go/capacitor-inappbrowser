@@ -590,6 +590,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private Boolean committedBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
     private int bundledHistoryNavigationTargetIndex = -1;
+    private boolean pendingCrossDocumentNavigation = false;
+    private Boolean activeDocumentBundledAssetLoaderState = null;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -5394,6 +5396,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         clearPendingBundledAssetLoaderResolution();
         lastWebHistoryIndex = -1;
         bundledHistoryNavigationTargetIndex = -1;
+        pendingCrossDocumentNavigation = false;
+        activeDocumentBundledAssetLoaderState = null;
     }
 
     private void clearCommittedBundledAssetNavigationIntent() {
@@ -5418,6 +5422,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (needsAssetLoader) {
             bundledAssetLoaderHistoryStates.add(true);
             lastWebHistoryIndex = 0;
+            activeDocumentBundledAssetLoaderState = true;
             applyBundledAssetLoaderState(true, bundledAssetLocalConfigOrDefault());
         }
         clearCommittedBundledAssetNavigationIntent();
@@ -5437,7 +5442,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             bundledHistoryNavigationTargetIndex = -1;
         }
         boolean useStoredHistoryState = currentIndex < lastWebHistoryIndex || traversingHistory || currentIndex == lastWebHistoryIndex;
-        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex, useStoredHistoryState);
+        boolean sameDocumentHistoryEntry = currentIndex > lastWebHistoryIndex && !traversingHistory && !pendingCrossDocumentNavigation;
+        boolean needsAssetLoader;
+        if (sameDocumentHistoryEntry && activeDocumentBundledAssetLoaderState != null) {
+            needsAssetLoader = activeDocumentBundledAssetLoaderState;
+        } else {
+            needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex, useStoredHistoryState);
+        }
 
         synchronized (bundledAssetLoaderLock) {
             while (bundledAssetLoaderHistoryStates.size() <= currentIndex) {
@@ -5461,6 +5472,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (isInitialized) {
                 clearCommittedBundledAssetNavigationIntent();
             }
+            activeDocumentBundledAssetLoaderState = needsAssetLoader;
         }
     }
 
@@ -7061,6 +7073,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView == null) {
                         return;
                     }
+                    pendingCrossDocumentNavigation = true;
                     if (_options.getCallbacks() != null) {
                         _options.getCallbacks().pageLoadStart();
                     }
@@ -7105,6 +7118,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView != view || isDismissing) {
                         return;
                     }
+                    pendingCrossDocumentNavigation = false;
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
