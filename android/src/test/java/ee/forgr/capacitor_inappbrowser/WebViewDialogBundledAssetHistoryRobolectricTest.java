@@ -44,6 +44,7 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
 
         setBooleanField(dialog, "isInitialized", true);
+        invokeClearPendingBundledAssetLoaderResolution(dialog);
         invokeClearCommittedBundledAssetNavigationIntent(dialog);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
@@ -60,6 +61,12 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         dialog.preserveBundledAssetNavigationIntent("https://portal.example.com/auth/signin?state=example", false);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/auth/signin?state=example", 0, false));
+    }
+
+    private static void invokeClearPendingBundledAssetLoaderResolution(WebViewDialog dialog) throws Exception {
+        Method method = WebViewDialog.class.getDeclaredMethod("clearPendingBundledAssetLoaderResolution");
+        method.setAccessible(true);
+        method.invoke(dialog);
     }
 
     private static void invokeClearCommittedBundledAssetNavigationIntent(WebViewDialog dialog) throws Exception {
