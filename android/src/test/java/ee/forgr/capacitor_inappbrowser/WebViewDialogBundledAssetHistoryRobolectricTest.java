@@ -131,6 +131,11 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
                     }
 
                     @Override
+                    public WebHistoryItem getCurrentItem() {
+                        return null;
+                    }
+
+                    @Override
                     public WebHistoryItem getItemAtIndex(int index) {
                         return null;
                     }
