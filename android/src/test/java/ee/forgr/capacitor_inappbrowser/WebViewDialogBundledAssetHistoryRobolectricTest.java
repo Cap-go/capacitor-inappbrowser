@@ -5,11 +5,14 @@ import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.webkit.WebBackForwardList;
 import android.webkit.WebHistoryItem;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -102,6 +105,32 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     @Test
+    public void rendererHistoryBackPreparesBundledLoaderInShouldInterceptRequest() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://remote.example/page");
+        options.setServeBundledAssets(false);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        addHistoryState(dialog, true);
+        addHistoryState(dialog, false);
+
+        String bundledUrl = "https://portal.example.com/index.html";
+        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
+        setWebView(dialog, webView);
+
+        Method setupClient = WebViewDialog.class.getDeclaredMethod("setWebViewClient");
+        setupClient.setAccessible(true);
+        setupClient.invoke(dialog);
+
+        WebResourceRequest request = mainFrameRequest(bundledUrl);
+        webView.getWebViewClient().shouldInterceptRequest(webView, request);
+
+        assertTrue(options.getServeBundledAssets());
+    }
+
+    @Test
     public void pushStateHistoryEntryPreservesActiveDocumentBundledLoaderState() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Options options = new Options();
@@ -134,6 +163,56 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         dialog.preserveBundledAssetNavigationIntent("https://portal.example.com/auth/signin?state=example", false);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/auth/signin?state=example", 0, false));
+    }
+
+    private static void setWebView(WebViewDialog dialog, WebView webView) throws Exception {
+        Field field = WebViewDialog.class.getDeclaredField("_webView");
+        field.setAccessible(true);
+        field.set(dialog, webView);
+    }
+
+    private static WebResourceRequest mainFrameRequest(String url) {
+        return new WebResourceRequest() {
+            @Override
+            public Uri getUrl() {
+                return Uri.parse(url);
+            }
+
+            @Override
+            public boolean isForMainFrame() {
+                return true;
+            }
+
+            @Override
+            public boolean isRedirect() {
+                return false;
+            }
+
+            @Override
+            public boolean hasGesture() {
+                return false;
+            }
+
+            @Override
+            public String getMethod() {
+                return "GET";
+            }
+
+            @Override
+            public Map<String, String> getRequestHeaders() {
+                return Map.of();
+            }
+
+            @Override
+            public boolean isOnlyIfCached() {
+                return false;
+            }
+
+            @Override
+            public boolean isPrefetch() {
+                return false;
+            }
+        };
     }
 
     private static void invokeSyncBundledAssetLoaderForHistoryUrl(WebViewDialog dialog, WebView webView, String url) throws Exception {

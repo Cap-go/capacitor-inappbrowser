@@ -6755,6 +6755,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return null;
                     }
 
+                    if (request.isForMainFrame()) {
+                        prepareBundledAssetLoaderForRendererHistoryNavigation(view, request.getUrl().toString());
+                    }
+
                     if (shouldUseNativeProxy()) {
                         String requestUrl = request.getUrl().toString();
                         boolean bridgeBackedRequest = ProxyRequestSupport.isBridgeMarkerRequestUrl(requestUrl);
