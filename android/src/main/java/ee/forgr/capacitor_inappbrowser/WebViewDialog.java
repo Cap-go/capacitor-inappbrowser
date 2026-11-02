@@ -5391,6 +5391,31 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
     }
 
+    private void prepareBundledAssetLoaderForRendererHistoryNavigation(WebView view, String url) {
+        if (_options == null || view == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        WebBackForwardList history = view.copyBackForwardList();
+        int currentIndex = history.getCurrentIndex();
+        int backIndex = currentIndex - 1;
+        if (backIndex >= 0) {
+            WebHistoryItem backItem = history.getItemAtIndex(backIndex);
+            if (backItem != null && BundledAssetSupport.historyUrlsEquivalent(url, backItem.getUrl())) {
+                prepareBundledAssetLoaderBeforeNavigation(backItem.getUrl(), backIndex);
+                return;
+            }
+        }
+
+        int forwardIndex = currentIndex + 1;
+        if (forwardIndex < history.getSize()) {
+            WebHistoryItem forwardItem = history.getItemAtIndex(forwardIndex);
+            if (forwardItem != null && BundledAssetSupport.historyUrlsEquivalent(url, forwardItem.getUrl())) {
+                prepareBundledAssetLoaderBeforeNavigation(forwardItem.getUrl(), forwardIndex);
+            }
+        }
+    }
+
     private void resetBundledAssetLoaderHistory() {
         bundledAssetLoaderHistoryStates.clear();
         clearPendingBundledAssetLoaderResolution();
@@ -5467,6 +5492,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
 
             lastWebHistoryIndex = currentIndex;
+            pendingCrossDocumentNavigation = false;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
             clearPendingBundledAssetLoaderResolution();
             if (isInitialized) {
@@ -6609,6 +6635,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             stopReloadGesture();
                             return true; // Block the navigation
                         }
+                    }
+
+                    if (request.isForMainFrame() && !request.hasGesture() && !request.isRedirect()) {
+                        prepareBundledAssetLoaderForRendererHistoryNavigation(view, url);
                     }
 
                     return false;

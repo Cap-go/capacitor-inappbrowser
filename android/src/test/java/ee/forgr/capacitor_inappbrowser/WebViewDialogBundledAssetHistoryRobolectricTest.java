@@ -4,6 +4,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.webkit.WebBackForwardList;
 import android.webkit.WebHistoryItem;
 import android.webkit.WebView;
@@ -54,6 +55,53 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     @Test
+    public void committedCrossDocumentSyncClearsPendingFlagBeforePushStatePreservesBundledLoader() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://portal.example.com/index.html");
+        options.setServeBundledAssets(true);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        setBooleanField(dialog, "isInitialized", true);
+        setBooleanField(dialog, "pendingCrossDocumentNavigation", true);
+        setIntField(dialog, "lastWebHistoryIndex", -1);
+
+        WebView webViewAtZero = webViewWithHistoryIndex(context, 0);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtZero, "https://portal.example.com/index.html");
+
+        assertFalse(getBooleanField(dialog, "pendingCrossDocumentNavigation"));
+        setBooleanObjectField(dialog, "activeDocumentBundledAssetLoaderState", true);
+        addHistoryState(dialog, true);
+
+        WebView webViewAtOne = webViewWithHistoryIndex(context, 1);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtOne, "https://portal.example.com/app/route?tab=1");
+
+        assertTrue(options.getServeBundledAssets());
+        assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/app/route?tab=1", 1, true));
+    }
+
+    @Test
+    public void rendererHistoryBackPreparesBundledLoaderBeforeNavigation() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://remote.example/page");
+        options.setServeBundledAssets(false);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        addHistoryState(dialog, true);
+        addHistoryState(dialog, false);
+
+        String bundledUrl = "https://portal.example.com/index.html";
+        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
+
+        invokePrepareBundledAssetLoaderForRendererHistoryNavigation(dialog, webView, bundledUrl);
+
+        assertTrue(options.getServeBundledAssets());
+    }
+
+    @Test
     public void pushStateHistoryEntryPreservesActiveDocumentBundledLoaderState() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Options options = new Options();
@@ -94,6 +142,23 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         method.invoke(dialog, webView, url);
     }
 
+    private static void invokePrepareBundledAssetLoaderForRendererHistoryNavigation(WebViewDialog dialog, WebView webView, String url)
+        throws Exception {
+        Method method = WebViewDialog.class.getDeclaredMethod(
+            "prepareBundledAssetLoaderForRendererHistoryNavigation",
+            WebView.class,
+            String.class
+        );
+        method.setAccessible(true);
+        method.invoke(dialog, webView, url);
+    }
+
+    private static boolean getBooleanField(Object target, String name) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.getBoolean(target);
+    }
+
     private static void setBooleanField(Object target, String name, boolean value) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
@@ -121,10 +186,14 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     private static WebView webViewWithHistoryIndex(Context context, int currentIndex) {
+        return webViewWithHistoryItems(context, currentIndex, null);
+    }
+
+    private static WebView webViewWithHistoryItems(Context context, int currentIndex, String[] urls) {
         return new WebView(context) {
             @Override
             public WebBackForwardList copyBackForwardList() {
-                return new StubBackForwardList(currentIndex);
+                return new StubBackForwardList(currentIndex, urls);
             }
         };
     }
@@ -132,14 +201,20 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     private static final class StubBackForwardList extends WebBackForwardList {
 
         private final int currentIndex;
+        private final String[] urls;
 
         private StubBackForwardList(int currentIndex) {
+            this(currentIndex, null);
+        }
+
+        private StubBackForwardList(int currentIndex, String[] urls) {
             this.currentIndex = currentIndex;
+            this.urls = urls;
         }
 
         @Override
         public WebBackForwardList clone() {
-            return new StubBackForwardList(currentIndex);
+            return new StubBackForwardList(currentIndex, urls);
         }
 
         @Override
@@ -149,17 +224,46 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
 
         @Override
         public WebHistoryItem getCurrentItem() {
-            return null;
+            return getItemAtIndex(currentIndex);
         }
 
         @Override
         public WebHistoryItem getItemAtIndex(int index) {
-            return null;
+            if (urls == null || index < 0 || index >= urls.length) {
+                return null;
+            }
+            final String itemUrl = urls[index];
+            return new WebHistoryItem() {
+                @Override
+                public WebHistoryItem clone() {
+                    return this;
+                }
+
+                @Override
+                public String getUrl() {
+                    return itemUrl;
+                }
+
+                @Override
+                public String getOriginalUrl() {
+                    return itemUrl;
+                }
+
+                @Override
+                public String getTitle() {
+                    return null;
+                }
+
+                @Override
+                public Bitmap getFavicon() {
+                    return null;
+                }
+            };
         }
 
         @Override
         public int getSize() {
-            return currentIndex + 1;
+            return urls != null ? urls.length : currentIndex + 1;
         }
     }
 
