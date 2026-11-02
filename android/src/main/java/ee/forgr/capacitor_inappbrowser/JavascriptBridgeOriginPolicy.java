@@ -194,7 +194,9 @@ public final class JavascriptBridgeOriginPolicy {
             return null;
         }
         try {
-            URI uri = new URI(url);
+            // WebView keeps characters java.net.URI rejects (|, {, a bare %) in the path, query and
+            // fragment. Only the scheme and authority decide the origin, so parse just those.
+            URI uri = new URI(stripPathQueryAndFragment(url));
             String scheme = uri.getScheme();
             String host = uri.getHost();
             if (scheme == null || host == null) {
@@ -204,6 +206,20 @@ public final class JavascriptBridgeOriginPolicy {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String stripPathQueryAndFragment(String url) {
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return url;
+        }
+        for (int i = schemeEnd + 3; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                return url.substring(0, i);
+            }
+        }
+        return url;
     }
 
     @Nullable

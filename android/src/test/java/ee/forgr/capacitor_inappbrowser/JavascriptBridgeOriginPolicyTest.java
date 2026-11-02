@@ -14,6 +14,28 @@ import org.junit.Test;
 public class JavascriptBridgeOriginPolicyTest {
 
     @Test
+    public void allowlistAcceptsUrlsWithCharactersJavaNetUriRejects() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.singletonList("https://app.example"));
+        assertTrue(policy.isUrlAllowed("https://app.example/?ids=1|2"));
+        assertTrue(policy.isUrlAllowed("https://app.example/?d={x}"));
+        assertTrue(policy.isUrlAllowed("https://app.example/?discount=100%"));
+        assertTrue(policy.isUrlAllowed("https://app.example/#/x|y"));
+        assertTrue(policy.isUrlAllowed("https://app.example?ids=1|2"));
+    }
+
+    @Test
+    public void originComesFromAuthorityNotPathOrQuery() {
+        JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.fromAllowlist(Collections.singletonList("https://app.example"));
+        assertFalse(policy.isUrlAllowed("https://evil.example/?a=1|2&u=https://app.example/"));
+        assertFalse(policy.isUrlAllowed("https://evil.example?u=https://app.example/"));
+        assertFalse(policy.isUrlAllowed("https://evil.example#https://app.example/"));
+        assertFalse(policy.isUrlAllowed("https://app.example@evil.example/?a=1|2"));
+        assertFalse(policy.isUrlAllowed("https://app.example\\@evil.example/"));
+        assertFalse(policy.isUrlAllowed("about:blank"));
+        assertEquals("https://app.example", JavascriptBridgeOriginPolicy.originFromUrl("HTTPS://APP.example:443/?a=1|2"));
+    }
+
+    @Test
     public void unrestrictedAllowsAnyUrl() {
         JavascriptBridgeOriginPolicy policy = JavascriptBridgeOriginPolicy.unrestricted();
         assertTrue(policy.isUrlAllowed("https://evil.example/phish"));
