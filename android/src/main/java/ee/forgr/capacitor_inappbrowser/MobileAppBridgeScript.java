@@ -15,7 +15,8 @@ final class MobileAppBridgeScript {
         String mobileAppExtras = "";
         if (allowJavaScriptControl) {
             if (webMessageOriginBound) {
-                mobileAppExtras = """
+                mobileAppExtras = String.format(
+                    """
                             , hide: function() {
                               try {
                                 postMessageBridge.postMessage('%shide');
@@ -30,7 +31,10 @@ final class MobileAppBridgeScript {
                                 console.error('Error in mobileApp.show:', e);
                               }
                             }
-                    """.formatted(BRIDGE_ACTION_PREFIX, BRIDGE_ACTION_PREFIX);
+                    """,
+                    BRIDGE_ACTION_PREFIX,
+                    BRIDGE_ACTION_PREFIX
+                );
             } else {
                 mobileAppExtras = """
                             , hide: function() {
@@ -53,24 +57,27 @@ final class MobileAppBridgeScript {
 
         String screenshotBridge = allowScreenshotsFromWebPage
             ? webMessageOriginBound
-                ? """
-                      ,
-                      takeScreenshot: function() {
-                        return new Promise(function(resolve, reject) {
-                          try {
-                                if (!postMessageBridge || !postMessageBridge.postMessage) {
-                                  reject(new Error('Screenshot bridge is not available'));
-                                  return;
-                                }
-                                var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-                                window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
-                                postMessageBridge.postMessage('%stakeScreenshot:' + requestId);
-                          } catch(e) {
-                            reject(e);
+                ? String.format(
+                      """
+                          ,
+                          takeScreenshot: function() {
+                            return new Promise(function(resolve, reject) {
+                              try {
+                                    if (!postMessageBridge || !postMessageBridge.postMessage) {
+                                      reject(new Error('Screenshot bridge is not available'));
+                                      return;
+                                    }
+                                    var requestId = 'screenshot_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                                    window.__capgoInAppBrowserPendingScreenshots[requestId] = { resolve: resolve, reject: reject };
+                                    postMessageBridge.postMessage('%stakeScreenshot:' + requestId);
+                              } catch(e) {
+                                reject(e);
+                              }
+                            });
                           }
-                        });
-                      }
-                  """.formatted(BRIDGE_ACTION_PREFIX)
+                      """,
+                      BRIDGE_ACTION_PREFIX
+                  )
                 : """
                       ,
                       takeScreenshot: function() {
@@ -93,16 +100,19 @@ final class MobileAppBridgeScript {
             : "";
 
         String closeBridgeBody = webMessageOriginBound
-            ? """
-              close: function() {
-                try {
-                  if (postMessageBridge && postMessageBridge.postMessage) {
-                    postMessageBridge.postMessage('%sclose');
-                  }
-                } catch(e) {
-                  console.error('Error in mobileApp.close:', e);
-                }
-              }""".formatted(BRIDGE_ACTION_PREFIX)
+            ? String.format(
+                  """
+                  close: function() {
+                    try {
+                      if (postMessageBridge && postMessageBridge.postMessage) {
+                        postMessageBridge.postMessage('%sclose');
+                      }
+                    } catch(e) {
+                      console.error('Error in mobileApp.close:', e);
+                    }
+                  }""",
+                  BRIDGE_ACTION_PREFIX
+              )
             : """
               close: function() {
                 try {
@@ -116,17 +126,20 @@ final class MobileAppBridgeScript {
               }""";
 
         String printOverride = webMessageOriginBound
-            ? """
-                if (postMessageBridge && postMessageBridge.postMessage) {
-                  window.print = function() {
-                    try {
-                      postMessageBridge.postMessage('%sprint');
-                    } catch(e) {
-                      console.error('Error in print:', e);
+            ? String.format(
+                  """
+                    if (postMessageBridge && postMessageBridge.postMessage) {
+                      window.print = function() {
+                        try {
+                          postMessageBridge.postMessage('%sprint');
+                        } catch(e) {
+                          console.error('Error in print:', e);
+                        }
+                      };
                     }
-                  };
-                }
-              """.formatted(BRIDGE_ACTION_PREFIX)
+                  """,
+                  BRIDGE_ACTION_PREFIX
+              )
             : """
                 if (window.PrintInterface) {
                   window.print = function() {
