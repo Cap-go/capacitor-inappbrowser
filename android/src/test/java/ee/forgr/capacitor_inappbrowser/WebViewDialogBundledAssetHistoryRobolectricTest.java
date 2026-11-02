@@ -52,7 +52,7 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
 
         setBooleanField(dialog, "isInitialized", true);
         WebView webView = webViewWithHistoryIndex(context, 0);
-        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/a.html");
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/a.html", false);
 
         assertFalse(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/a.html", 0, false));
     }
@@ -71,14 +71,14 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         setIntField(dialog, "lastWebHistoryIndex", -1);
 
         WebView webViewAtZero = webViewWithHistoryIndex(context, 0);
-        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtZero, "https://portal.example.com/index.html");
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtZero, "https://portal.example.com/index.html", false);
 
         assertFalse(getBooleanField(dialog, "pendingCrossDocumentNavigation"));
         setBooleanObjectField(dialog, "activeDocumentBundledAssetLoaderState", true);
         addHistoryState(dialog, true);
 
         WebView webViewAtOne = webViewWithHistoryIndex(context, 1);
-        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtOne, "https://portal.example.com/app/route?tab=1");
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webViewAtOne, "https://portal.example.com/app/route?tab=1", false);
 
         assertTrue(options.getServeBundledAssets());
         assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/app/route?tab=1", 1, true));
@@ -118,6 +118,7 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
 
         String bundledUrl = "https://portal.example.com/index.html";
         WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
+        setWebHistorySnapshot(dialog, 1, bundledUrl, null);
         setWebView(dialog, webView);
 
         Method setupClient = WebViewDialog.class.getDeclaredMethod("setWebViewClient");
@@ -146,7 +147,7 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         addHistoryState(dialog, true);
 
         WebView webView = webViewWithHistoryIndex(context, 1);
-        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/app/route?tab=1");
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/app/route?tab=1", false);
 
         assertTrue(options.getServeBundledAssets());
         assertTrue(invokeNeedsAssetLoaderForHistoryUrl(dialog, "https://portal.example.com/app/route?tab=1", 1, true));
@@ -205,10 +206,76 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         };
     }
 
-    private static void invokeSyncBundledAssetLoaderForHistoryUrl(WebViewDialog dialog, WebView webView, String url) throws Exception {
-        Method method = WebViewDialog.class.getDeclaredMethod("syncBundledAssetLoaderForHistoryUrl", WebView.class, String.class);
+    @Test
+    public void sameIndexCrossDocumentNavigationDoesNotReuseStoredBundledLoader() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://portal.example.com/index.html");
+        options.setServeBundledAssets(true);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        setBooleanField(dialog, "isInitialized", true);
+        setIntField(dialog, "lastWebHistoryIndex", 0);
+        setBooleanField(dialog, "pendingCrossDocumentNavigation", true);
+        addHistoryState(dialog, true);
+
+        WebView webView = webViewWithHistoryIndex(context, 0);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/auth/signin?state=example", false);
+
+        assertFalse(options.getServeBundledAssets());
+    }
+
+    @Test
+    public void reloadAtSameHistoryIndexRestoresStoredBundledLoader() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://portal.example.com/index.html");
+        options.setServeBundledAssets(false);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        setBooleanField(dialog, "isInitialized", true);
+        setIntField(dialog, "lastWebHistoryIndex", 0);
+        addHistoryState(dialog, true);
+
+        WebView webView = webViewWithHistoryIndex(context, 0);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/index.html", true);
+
+        assertTrue(options.getServeBundledAssets());
+    }
+
+    @Test
+    public void replaceStateAtSameIndexPreservesActiveDocumentBundledLoader() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://portal.example.com/index.html");
+        options.setServeBundledAssets(false);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        setBooleanField(dialog, "isInitialized", true);
+        setIntField(dialog, "lastWebHistoryIndex", 0);
+        setBooleanField(dialog, "pendingCrossDocumentNavigation", false);
+        setBooleanObjectField(dialog, "activeDocumentBundledAssetLoaderState", true);
+        addHistoryState(dialog, true);
+
+        WebView webView = webViewWithHistoryIndex(context, 0);
+        invokeSyncBundledAssetLoaderForHistoryUrl(dialog, webView, "https://portal.example.com/app/route?tab=1", false);
+
+        assertTrue(options.getServeBundledAssets());
+    }
+
+    private static void invokeSyncBundledAssetLoaderForHistoryUrl(WebViewDialog dialog, WebView webView, String url, boolean isReload)
+        throws Exception {
+        Method method = WebViewDialog.class.getDeclaredMethod(
+            "syncBundledAssetLoaderForHistoryUrl",
+            WebView.class,
+            String.class,
+            boolean.class
+        );
         method.setAccessible(true);
-        method.invoke(dialog, webView, url);
+        method.invoke(dialog, webView, url, isReload);
     }
 
     private static void invokePrepareBundledAssetLoaderForRendererHistoryNavigation(WebViewDialog dialog, WebView webView, String url)
@@ -238,6 +305,18 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);
         field.setInt(target, value);
+    }
+
+    private static void setStringField(Object target, String name, String value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
+    }
+
+    private static void setWebHistorySnapshot(WebViewDialog dialog, int currentIndex, String backUrl, String forwardUrl) throws Exception {
+        setIntField(dialog, "webHistorySnapshotCurrentIndex", currentIndex);
+        setStringField(dialog, "webHistorySnapshotBackUrl", backUrl);
+        setStringField(dialog, "webHistorySnapshotForwardUrl", forwardUrl);
     }
 
     private static void setBooleanObjectField(Object target, String name, boolean value) throws Exception {
