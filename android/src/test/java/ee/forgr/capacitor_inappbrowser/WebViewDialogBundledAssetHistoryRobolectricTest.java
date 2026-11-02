@@ -202,16 +202,6 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
             public Map<String, String> getRequestHeaders() {
                 return Map.of();
             }
-
-            @Override
-            public boolean isOnlyIfCached() {
-                return false;
-            }
-
-            @Override
-            public boolean isPrefetch() {
-                return false;
-            }
         };
     }
 
