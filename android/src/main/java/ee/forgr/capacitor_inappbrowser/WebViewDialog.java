@@ -590,6 +590,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private Boolean committedBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
     private int lastWebHistorySize = 0;
+    private String lastWebHistoryFirstUrl;
     private volatile int bundledHistoryNavigationTargetIndex = -1;
     private boolean pendingCrossDocumentNavigation = false;
     private Boolean activeDocumentBundledAssetLoaderState = null;
@@ -5524,6 +5525,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         clearPendingBundledAssetLoaderResolution();
         lastWebHistoryIndex = -1;
         lastWebHistorySize = 0;
+        lastWebHistoryFirstUrl = null;
         bundledHistoryNavigationTargetIndex = -1;
         pendingCrossDocumentNavigation = false;
         activeDocumentBundledAssetLoaderState = null;
@@ -5585,6 +5587,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         // A full WebView history drops its oldest entry on a new cross-document navigation:
         // the index and size stay the same while the list shifts left by one.
+        WebHistoryItem firstItem = historySize > 0 ? history.getItemAtIndex(0) : null;
+        String firstUrl = firstItem != null ? firstItem.getUrl() : null;
         boolean historyPruned =
             pendingCrossDocumentNavigation &&
             !traversingHistory &&
@@ -5592,7 +5596,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             lastWebHistoryIndex >= 0 &&
             currentIndex == lastWebHistoryIndex &&
             currentIndex == historySize - 1 &&
-            historySize == lastWebHistorySize;
+            historySize == lastWebHistorySize &&
+            lastWebHistoryFirstUrl != null &&
+            firstUrl != null &&
+            !BundledAssetSupport.historyUrlsEquivalent(firstUrl, lastWebHistoryFirstUrl);
         if (historyPruned) {
             synchronized (bundledAssetLoaderLock) {
                 if (!bundledAssetLoaderHistoryStates.isEmpty()) {
@@ -5630,6 +5637,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
             lastWebHistoryIndex = currentIndex;
             lastWebHistorySize = historySize;
+            lastWebHistoryFirstUrl = firstUrl;
             pendingCrossDocumentNavigation = false;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
             clearPendingBundledAssetLoaderResolution();
