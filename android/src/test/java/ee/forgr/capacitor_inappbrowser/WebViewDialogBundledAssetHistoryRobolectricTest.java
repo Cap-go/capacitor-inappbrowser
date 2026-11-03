@@ -132,6 +132,33 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     @Test
+    public void gesturedMainFrameRequestMatchingBackEntryDoesNotPrepareBundledLoader() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Options options = new Options();
+        options.setUrl("https://remote.example/page");
+        options.setServeBundledAssets(false);
+
+        WebViewDialog dialog = new WebViewDialog(context, android.R.style.Theme_NoTitleBar, options, noopPermissionHandler(), null);
+        dialog.setBundledAssetLocalUrl("https://portal.example.com/");
+        addHistoryState(dialog, true);
+        addHistoryState(dialog, false);
+
+        String bundledUrl = "https://portal.example.com/index.html";
+        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
+        setWebHistorySnapshot(dialog, 1, bundledUrl, null);
+        setWebView(dialog, webView);
+
+        Method setupClient = WebViewDialog.class.getDeclaredMethod("setWebViewClient");
+        setupClient.setAccessible(true);
+        setupClient.invoke(dialog);
+
+        WebResourceRequest request = mainFrameRequest(bundledUrl, true, false);
+        webView.getWebViewClient().shouldInterceptRequest(webView, request);
+
+        assertFalse(options.getServeBundledAssets());
+    }
+
+    @Test
     public void pushStateHistoryEntryPreservesActiveDocumentBundledLoaderState() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Options options = new Options();
@@ -173,6 +200,10 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
     }
 
     private static WebResourceRequest mainFrameRequest(String url) {
+        return mainFrameRequest(url, false, false);
+    }
+
+    private static WebResourceRequest mainFrameRequest(String url, boolean hasGesture, boolean isRedirect) {
         return new WebResourceRequest() {
             @Override
             public Uri getUrl() {
@@ -186,12 +217,12 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
 
             @Override
             public boolean isRedirect() {
-                return false;
+                return isRedirect;
             }
 
             @Override
             public boolean hasGesture() {
-                return false;
+                return hasGesture;
             }
 
             @Override
