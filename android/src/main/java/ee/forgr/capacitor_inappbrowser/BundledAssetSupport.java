@@ -9,6 +9,7 @@ import com.getcapacitor.Bridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -230,7 +231,7 @@ final class BundledAssetSupport {
                 return false;
             }
 
-            if (!host.equalsIgnoreCase(localConfig.host)) {
+            if (!normalizeHost(host).equals(normalizeHost(localConfig.host))) {
                 return false;
             }
 
@@ -239,11 +240,17 @@ final class BundledAssetSupport {
             }
 
             String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+            boolean urlUsesReservedWebScheme = isReservedWebScheme(normalizedScheme);
+            boolean localConfigUsesReservedWebScheme = isReservedWebScheme(localConfig.scheme);
+            if (urlUsesReservedWebScheme && !isLoopbackHost(host)) {
+                return false;
+            }
+
             if (normalizedScheme.equalsIgnoreCase(localConfig.scheme) || normalizedScheme.equals(assetLoaderScheme(localConfig))) {
                 return true;
             }
 
-            return isReservedWebScheme(normalizedScheme) && isReservedWebScheme(localConfig.scheme);
+            return urlUsesReservedWebScheme && localConfigUsesReservedWebScheme;
         } catch (IllegalArgumentException error) {
             return false;
         }
@@ -409,6 +416,111 @@ final class BundledAssetSupport {
         return false;
     }
 
+    static boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        if (normalizedHost.endsWith(".")) {
+            normalizedHost = normalizedHost.substring(0, normalizedHost.length() - 1);
+        }
+        if (isLocalhostDomain(normalizedHost) || "[::1]".equals(normalizedHost) || "::1".equals(normalizedHost)) {
+            return true;
+        }
+
+        return isIpv4LoopbackHost(normalizedHost);
+    }
+
+    private static boolean isLocalhostDomain(String normalizedHost) {
+        return "localhost".equals(normalizedHost) || normalizedHost.endsWith(".localhost");
+    }
+
+    private static String normalizeHost(String host) {
+        if (host == null) {
+            return "";
+        }
+        String normalizedHost = host.toLowerCase(Locale.ROOT);
+        if (normalizedHost.endsWith(".")) {
+            normalizedHost = normalizedHost.substring(0, normalizedHost.length() - 1);
+        }
+        return normalizedHost;
+    }
+
+    static boolean historyUrlsEquivalent(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return canonicalHistoryUrl(left).equals(canonicalHistoryUrl(right));
+    }
+
+    static String canonicalHistoryUrl(String url) {
+        if (url == null) {
+            return "";
+        }
+
+        String trimmed = url.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+
+        try {
+            URI uri = URI.create(trimmed);
+            String scheme = uri.getScheme();
+            if (scheme == null) {
+                return trimmed;
+            }
+
+            String host = normalizeHost(uri.getHost());
+            int port = uri.getPort();
+            String authority = port == -1 ? host : host + ":" + port;
+            String path = normalizeHistoryPath(uri.getPath());
+            StringBuilder builder = new StringBuilder();
+            builder.append(scheme.toLowerCase(Locale.ROOT)).append("://").append(authority).append(path);
+            if (uri.getRawQuery() != null) {
+                builder.append('?').append(uri.getRawQuery());
+            }
+            if (uri.getRawFragment() != null) {
+                builder.append('#').append(uri.getRawFragment());
+            }
+            return builder.toString();
+        } catch (IllegalArgumentException error) {
+            return trimmed;
+        }
+    }
+
+    private static String normalizeHistoryPath(String path) {
+        if (path == null || path.isEmpty()) {
+            return "/";
+        }
+
+        try {
+            return new URI("https", "canonical", path, null).normalize().getPath();
+        } catch (URISyntaxException error) {
+            return path;
+        }
+    }
+
+    private static boolean isIpv4LoopbackHost(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length != 4 || !"127".equals(parts[0])) {
+            return false;
+        }
+
+        for (int index = 0; index < parts.length; index++) {
+            try {
+                int value = Integer.parseInt(parts[index]);
+                if (value < 0 || value > 255) {
+                    return false;
+                }
+            } catch (NumberFormatException error) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static boolean isAbsoluteUrl(String url) {
         if (url.startsWith("//")) {
             return true;
@@ -443,7 +555,7 @@ final class BundledAssetSupport {
             URI uri = URI.create(url);
             String scheme = uri.getScheme();
             String host = uri.getHost();
-            if (scheme == null || host == null || !host.equalsIgnoreCase(localConfig.host)) {
+            if (scheme == null || host == null || !normalizeHost(host).equals(normalizeHost(localConfig.host))) {
                 return null;
             }
             if (scheme.equalsIgnoreCase(navigationScheme)) {
@@ -452,7 +564,7 @@ final class BundledAssetSupport {
             return new URI(
                 navigationScheme,
                 uri.getUserInfo(),
-                host,
+                localConfig.host,
                 uri.getPort(),
                 uri.getPath(),
                 uri.getQuery(),

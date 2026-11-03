@@ -18,6 +18,36 @@ export const BUNDLED_ASSET_DEFAULTS: Record<BundledAssetPlatform, BundledAssetLo
 const ABSOLUTE_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+\-.]*:/;
 const RESERVED_WEB_SCHEMES = ['http', 'https'];
 
+function isIpv4LoopbackHost(host: string): boolean {
+  const match = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) {
+    return false;
+  }
+  return match.slice(1).every((octet) => {
+    const value = Number(octet);
+    return value >= 0 && value <= 255;
+  });
+}
+
+function normalizeLoopbackHost(host: string): string {
+  const normalizedHost = host.toLowerCase();
+  return normalizedHost.endsWith('.') ? normalizedHost.slice(0, -1) : normalizedHost;
+}
+
+function isLocalhostDomain(host: string): boolean {
+  return host === 'localhost' || host.endsWith('.localhost');
+}
+
+function isLoopbackHost(host: string): boolean {
+  const normalizedHost = normalizeLoopbackHost(host);
+  return (
+    isLocalhostDomain(normalizedHost) ||
+    isIpv4LoopbackHost(normalizedHost) ||
+    normalizedHost === '[::1]' ||
+    normalizedHost === '::1'
+  );
+}
+
 /** Returns true when the input looks like an absolute URL (including protocol-relative URLs). */
 export function isAbsoluteUrl(url: string): boolean {
   return ABSOLUTE_URL_PATTERN.test(url) || url.startsWith('//');
@@ -98,10 +128,11 @@ export function isBundledLocalUrl(
   try {
     const parsed = new URL(url);
     const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
-    const host = parsed.hostname.toLowerCase();
+    const host = normalizeLoopbackHost(parsed.hostname.toLowerCase());
     const config = localConfig ?? BUNDLED_ASSET_DEFAULTS[platform];
+    const configHost = normalizeLoopbackHost(config.host.toLowerCase());
 
-    if (host !== config.host) {
+    if (host !== configHost) {
       return false;
     }
 
@@ -109,11 +140,17 @@ export function isBundledLocalUrl(
       return false;
     }
 
+    const urlUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(scheme);
+    const configUsesReservedWebScheme = RESERVED_WEB_SCHEMES.includes(config.scheme);
+    if (urlUsesReservedWebScheme && !isLoopbackHost(host)) {
+      return false;
+    }
+
     if (scheme === config.scheme || scheme === handlerSchemeForPlatform(platform, config)) {
       return true;
     }
 
-    return RESERVED_WEB_SCHEMES.includes(scheme) && RESERVED_WEB_SCHEMES.includes(config.scheme);
+    return urlUsesReservedWebScheme && configUsesReservedWebScheme;
   } catch {
     return false;
   }
@@ -136,10 +173,11 @@ function rewriteBundledLocalUrl(
 ): string | null {
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
+    const host = normalizeLoopbackHost(parsed.hostname.toLowerCase());
     const scheme = parsed.protocol.replace(/:$/, '').toLowerCase();
+    const configHost = normalizeLoopbackHost(localConfig.host.toLowerCase());
 
-    if (host !== localConfig.host || scheme === navigationScheme) {
+    if (host !== configHost || scheme === navigationScheme) {
       return null;
     }
 
@@ -148,7 +186,7 @@ function rewriteBundledLocalUrl(
     const hash = parsed.hash;
     const userinfo =
       parsed.username.length > 0 ? `${parsed.username}${parsed.password.length > 0 ? `:${parsed.password}` : ''}@` : '';
-    return `${navigationScheme}://${userinfo}${host}${pathname}${search}${hash}`;
+    return `${navigationScheme}://${userinfo}${localConfig.host}${pathname}${search}${hash}`;
   } catch {
     return null;
   }

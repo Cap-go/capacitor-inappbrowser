@@ -66,7 +66,7 @@ enum BundledAssetSupport {
             return false
         }
 
-        guard host == localConfig.host else {
+        guard normalizeHost(host) == normalizeHost(localConfig.host) else {
             return false
         }
 
@@ -74,11 +74,57 @@ enum BundledAssetSupport {
             return false
         }
 
+        let urlUsesReservedWebScheme = reservedWebKitSchemes.contains(scheme)
+        let localConfigUsesReservedWebScheme = reservedWebKitSchemes.contains(localConfig.scheme)
+        if urlUsesReservedWebScheme && !isLoopbackHost(host) {
+            return false
+        }
+
         if scheme == localConfig.scheme || scheme == handlerScheme(for: localConfig) {
             return true
         }
 
-        return reservedWebKitSchemes.contains(scheme) && reservedWebKitSchemes.contains(localConfig.scheme)
+        return urlUsesReservedWebScheme && localConfigUsesReservedWebScheme
+    }
+
+    static func isLoopbackHost(_ host: String) -> Bool {
+        var normalizedHost = host.lowercased()
+        if normalizedHost.hasSuffix(".") {
+            normalizedHost.removeLast()
+        }
+        if isLocalhostDomain(normalizedHost) || normalizedHost == "[::1]" || normalizedHost == "::1" {
+            return true
+        }
+        return isIpv4LoopbackHost(normalizedHost)
+    }
+
+    private static func isLocalhostDomain(_ normalizedHost: String) -> Bool {
+        normalizedHost == "localhost" || normalizedHost.hasSuffix(".localhost")
+    }
+
+    static func bundledHostsMatch(_ host: String, _ expectedHost: String) -> Bool {
+        normalizeHost(host) == normalizeHost(expectedHost)
+    }
+
+    private static func normalizeHost(_ host: String) -> String {
+        var normalizedHost = host.lowercased()
+        if normalizedHost.hasSuffix(".") {
+            normalizedHost.removeLast()
+        }
+        return normalizedHost
+    }
+
+    private static func isIpv4LoopbackHost(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard parts.count == 4, parts[0] == "127" else {
+            return false
+        }
+        for part in parts {
+            guard let value = Int(part), value >= 0, value <= 255 else {
+                return false
+            }
+        }
+        return true
     }
 
     static func isRelativeBundledPath(_ urlString: String) -> Bool {
@@ -188,7 +234,7 @@ enum BundledAssetSupport {
     ) -> String? {
         guard let url = URL(string: urlString),
               let host = url.host?.lowercased(),
-              host == localConfig.host else {
+              normalizeHost(host) == normalizeHost(localConfig.host) else {
             return nil
         }
 
@@ -198,6 +244,7 @@ enum BundledAssetSupport {
 
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.scheme = navigationScheme
+        components?.host = localConfig.host
         return components?.url?.absoluteString
     }
 

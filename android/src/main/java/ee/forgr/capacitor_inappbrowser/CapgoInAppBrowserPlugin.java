@@ -355,6 +355,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         });
         dialog.setInstanceId(webViewId);
         dialog.activity = CapgoInAppBrowserPlugin.this.getActivity();
+        dialog.setBundledAssetLocalUrl(getBridge() != null ? getBridge().getLocalUrl() : null);
+        if (options.getServeBundledAssets()) {
+            dialog.preserveBundledAssetNavigationIntent(options.getUrl(), true);
+        }
         dialog.bindToHostActivity();
         registerWebView(webViewId, dialog, makeActive);
         return dialog;

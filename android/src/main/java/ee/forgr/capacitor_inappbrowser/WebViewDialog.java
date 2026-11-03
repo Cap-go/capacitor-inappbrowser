@@ -55,7 +55,9 @@ import android.webkit.PermissionRequest;
 import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
+import android.webkit.WebBackForwardList;
 import android.webkit.WebChromeClient;
+import android.webkit.WebHistoryItem;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -120,9 +122,11 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -578,6 +582,23 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private ProxyBridge proxyBridge;
     private volatile WebViewAssetLoader bundledAssetLoader;
     private final Object bundledAssetLoaderLock = new Object();
+    private String bundledAssetLocalUrl;
+    private final List<Boolean> bundledAssetLoaderHistoryStates = new ArrayList<>();
+    private String pendingBundledAssetLoaderUrl;
+    private Boolean pendingBundledAssetLoaderState;
+    private String committedBundledAssetLoaderUrl;
+    private Boolean committedBundledAssetLoaderState;
+    private int lastWebHistoryIndex = -1;
+    private int lastWebHistorySize = 0;
+    private String lastWebHistoryFirstUrl;
+    private volatile int bundledHistoryNavigationTargetIndex = -1;
+    private boolean pendingCrossDocumentNavigation = false;
+    private Boolean activeDocumentBundledAssetLoaderState = null;
+    private volatile int webHistorySnapshotCurrentIndex = -1;
+    private volatile String webHistorySnapshotCurrentUrl;
+    private volatile String webHistorySnapshotBackUrl;
+    private volatile String webHistorySnapshotForwardUrl;
+    private volatile boolean expectRendererHistoryTraversalPrepare = false;
     private String proxyBridgeScript;
     private String proxyAccessToken;
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -3419,9 +3440,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 exitCustomFullscreenView();
                 return;
             case WEBVIEW_GO_BACK:
-                if (_webView != null) {
-                    _webView.goBack();
-                }
+                goBack();
                 return;
             case IGNORE:
                 return;
@@ -5268,14 +5287,40 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
     }
 
+    public void setBundledAssetLocalUrl(String localUrl) {
+        bundledAssetLocalUrl = localUrl;
+    }
+
+    public void preserveBundledAssetNavigationIntent(String url, boolean needsAssetLoader) {
+        synchronized (bundledAssetLoaderLock) {
+            setPendingBundledAssetLoaderResolution(url, needsAssetLoader);
+            if (url == null || url.trim().isEmpty()) {
+                committedBundledAssetLoaderUrl = null;
+                committedBundledAssetLoaderState = null;
+                return;
+            }
+            committedBundledAssetLoaderUrl = url;
+            committedBundledAssetLoaderState = needsAssetLoader;
+        }
+    }
+
     public void applyBundledAssetResolution(BundledAssetSupport.Resolution resolution, String localUrl) {
         if (_options == null || resolution == null) {
             return;
         }
 
+        bundledAssetLocalUrl = localUrl;
+
         synchronized (bundledAssetLoaderLock) {
             bundledAssetLoader = null;
             _options.setUrl(resolution.url);
+            preserveBundledAssetNavigationIntent(resolution.url, resolution.needsAssetLoader);
+            if (_webView != null) {
+                int currentIndex = _webView.copyBackForwardList().getCurrentIndex();
+                while (bundledAssetLoaderHistoryStates.size() > currentIndex + 1) {
+                    bundledAssetLoaderHistoryStates.remove(bundledAssetLoaderHistoryStates.size() - 1);
+                }
+            }
             if (resolution.needsAssetLoader) {
                 BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(localUrl);
                 _options.setBundledAssetHost(localConfig != null ? localConfig.host : "localhost");
@@ -5285,6 +5330,327 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 _options.setServeBundledAssets(false);
             }
         }
+    }
+
+    private void setPendingBundledAssetLoaderResolution(String url, boolean needsAssetLoader) {
+        synchronized (bundledAssetLoaderLock) {
+            if (url == null || url.trim().isEmpty()) {
+                pendingBundledAssetLoaderUrl = null;
+                pendingBundledAssetLoaderState = null;
+                return;
+            }
+            pendingBundledAssetLoaderUrl = url;
+            pendingBundledAssetLoaderState = needsAssetLoader;
+        }
+    }
+
+    private void clearPendingBundledAssetLoaderResolution() {
+        synchronized (bundledAssetLoaderLock) {
+            pendingBundledAssetLoaderUrl = null;
+            pendingBundledAssetLoaderState = null;
+        }
+    }
+
+    private BundledAssetSupport.LocalConfig bundledAssetLocalConfigOrDefault() {
+        BundledAssetSupport.LocalConfig localConfig = BundledAssetSupport.parseLocalConfig(bundledAssetLocalUrl);
+        if (localConfig == null) {
+            return new BundledAssetSupport.LocalConfig("https", "localhost");
+        }
+        return localConfig;
+    }
+
+    private void applyBundledAssetLoaderState(boolean needsAssetLoader, BundledAssetSupport.LocalConfig localConfig) {
+        bundledAssetLoader = null;
+        if (needsAssetLoader) {
+            _options.setBundledAssetHost(localConfig.host);
+            _options.setBundledAssetScheme(BundledAssetSupport.assetLoaderScheme(localConfig));
+            _options.setServeBundledAssets(true);
+        } else {
+            _options.setServeBundledAssets(false);
+        }
+    }
+
+    private boolean needsAssetLoaderForHistoryUrl(
+        String url,
+        BundledAssetSupport.LocalConfig localConfig,
+        int historyIndex,
+        boolean useStoredHistoryState
+    ) {
+        final String pendingUrl;
+        final Boolean pendingState;
+        final String committedUrl;
+        final Boolean committedState;
+        synchronized (bundledAssetLoaderLock) {
+            pendingUrl = pendingBundledAssetLoaderUrl;
+            pendingState = pendingBundledAssetLoaderState;
+            committedUrl = committedBundledAssetLoaderUrl;
+            committedState = committedBundledAssetLoaderState;
+        }
+        if (pendingState != null && BundledAssetSupport.historyUrlsEquivalent(url, pendingUrl)) {
+            return pendingState;
+        }
+        if (committedState != null && BundledAssetSupport.historyUrlsEquivalent(url, committedUrl)) {
+            return committedState;
+        }
+        if (useStoredHistoryState && historyIndex >= 0) {
+            synchronized (bundledAssetLoaderLock) {
+                if (historyIndex < bundledAssetLoaderHistoryStates.size()) {
+                    Boolean storedState = bundledAssetLoaderHistoryStates.get(historyIndex);
+                    if (storedState != null) {
+                        return storedState;
+                    }
+                }
+            }
+        }
+        return resolveNeedsAssetLoaderForUrl(url, localConfig);
+    }
+
+    private void prepareBundledAssetLoaderBeforeNavigation(String url, int historyIndex) {
+        if (_options == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        BundledAssetSupport.LocalConfig localConfig = bundledAssetLocalConfigOrDefault();
+        boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, historyIndex, true);
+        synchronized (bundledAssetLoaderLock) {
+            bundledHistoryNavigationTargetIndex = historyIndex;
+            applyBundledAssetLoaderState(needsAssetLoader, localConfig);
+        }
+    }
+
+    private void refreshWebHistorySnapshot(WebView view) {
+        if (view == null) {
+            webHistorySnapshotCurrentIndex = -1;
+            webHistorySnapshotCurrentUrl = null;
+            webHistorySnapshotBackUrl = null;
+            webHistorySnapshotForwardUrl = null;
+            return;
+        }
+
+        WebBackForwardList history = view.copyBackForwardList();
+        int currentIndex = history.getCurrentIndex();
+        webHistorySnapshotCurrentIndex = currentIndex;
+        webHistorySnapshotBackUrl = null;
+        webHistorySnapshotForwardUrl = null;
+        WebHistoryItem currentItem = history.getItemAtIndex(currentIndex);
+        webHistorySnapshotCurrentUrl = currentItem != null ? currentItem.getUrl() : null;
+
+        int backIndex = currentIndex - 1;
+        if (backIndex >= 0) {
+            WebHistoryItem backItem = history.getItemAtIndex(backIndex);
+            if (backItem != null) {
+                webHistorySnapshotBackUrl = backItem.getUrl();
+            }
+        }
+
+        int forwardIndex = currentIndex + 1;
+        if (forwardIndex < history.getSize()) {
+            WebHistoryItem forwardItem = history.getItemAtIndex(forwardIndex);
+            if (forwardItem != null) {
+                webHistorySnapshotForwardUrl = forwardItem.getUrl();
+            }
+        }
+    }
+
+    private void clearWebHistorySnapshot() {
+        webHistorySnapshotCurrentIndex = -1;
+        webHistorySnapshotCurrentUrl = null;
+        webHistorySnapshotBackUrl = null;
+        webHistorySnapshotForwardUrl = null;
+    }
+
+    private void prepareBundledAssetLoaderForRendererHistoryNavigation(WebView view, String url) {
+        if (_options == null || view == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        refreshWebHistorySnapshot(view);
+        prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(url);
+    }
+
+    private boolean isAdjacentSnapshotTraversalTarget(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+
+        String currentUrl = webHistorySnapshotCurrentUrl;
+        if (currentUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, currentUrl)) {
+            return false;
+        }
+
+        int currentIndex = webHistorySnapshotCurrentIndex;
+        int backIndex = currentIndex - 1;
+        if (
+            backIndex >= 0 && webHistorySnapshotBackUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotBackUrl)
+        ) {
+            return true;
+        }
+
+        return webHistorySnapshotForwardUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotForwardUrl);
+    }
+
+    private boolean isAdjacentRendererHistoryTraversalTarget(WebView view, String url) {
+        if (view == null || url == null || url.trim().isEmpty()) {
+            return false;
+        }
+
+        refreshWebHistorySnapshot(view);
+        return isAdjacentSnapshotTraversalTarget(url);
+    }
+
+    private void prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(String url) {
+        if (_options == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        int currentIndex = webHistorySnapshotCurrentIndex;
+        int backIndex = currentIndex - 1;
+        if (
+            backIndex >= 0 && webHistorySnapshotBackUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotBackUrl)
+        ) {
+            prepareBundledAssetLoaderBeforeNavigation(webHistorySnapshotBackUrl, backIndex);
+            return;
+        }
+
+        int forwardIndex = currentIndex + 1;
+        if (webHistorySnapshotForwardUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotForwardUrl)) {
+            prepareBundledAssetLoaderBeforeNavigation(webHistorySnapshotForwardUrl, forwardIndex);
+        }
+    }
+
+    private void resetBundledAssetLoaderHistory() {
+        synchronized (bundledAssetLoaderLock) {
+            bundledAssetLoaderHistoryStates.clear();
+        }
+        clearPendingBundledAssetLoaderResolution();
+        lastWebHistoryIndex = -1;
+        lastWebHistorySize = 0;
+        lastWebHistoryFirstUrl = null;
+        bundledHistoryNavigationTargetIndex = -1;
+        pendingCrossDocumentNavigation = false;
+        activeDocumentBundledAssetLoaderState = null;
+        expectRendererHistoryTraversalPrepare = false;
+        clearWebHistorySnapshot();
+    }
+
+    private void clearCommittedBundledAssetNavigationIntent() {
+        synchronized (bundledAssetLoaderLock) {
+            committedBundledAssetLoaderUrl = null;
+            committedBundledAssetLoaderState = null;
+        }
+    }
+
+    private void seedBundledAssetLoaderHistoryAfterClear(String url) {
+        if (_options == null) {
+            return;
+        }
+
+        boolean needsAssetLoader = _options.getServeBundledAssets();
+        final String committedUrl;
+        final Boolean committedState;
+        synchronized (bundledAssetLoaderLock) {
+            committedUrl = committedBundledAssetLoaderUrl;
+            committedState = committedBundledAssetLoaderState;
+        }
+        if (!needsAssetLoader && committedState != null && BundledAssetSupport.historyUrlsEquivalent(url, committedUrl)) {
+            needsAssetLoader = committedState;
+        }
+
+        if (needsAssetLoader) {
+            synchronized (bundledAssetLoaderLock) {
+                bundledAssetLoaderHistoryStates.add(true);
+            }
+            lastWebHistoryIndex = 0;
+            activeDocumentBundledAssetLoaderState = true;
+            applyBundledAssetLoaderState(true, bundledAssetLocalConfigOrDefault());
+        }
+        clearCommittedBundledAssetNavigationIntent();
+    }
+
+    private void syncBundledAssetLoaderForHistoryUrl(WebView view, String url, boolean isReload) {
+        if (_options == null || view == null || url == null || url.trim().isEmpty()) {
+            return;
+        }
+
+        BundledAssetSupport.LocalConfig localConfig = bundledAssetLocalConfigOrDefault();
+
+        WebBackForwardList history = view.copyBackForwardList();
+        int currentIndex = history.getCurrentIndex();
+        refreshWebHistorySnapshot(view);
+        int historySize = history.getSize();
+        boolean traversingHistory;
+        synchronized (bundledAssetLoaderLock) {
+            traversingHistory = bundledHistoryNavigationTargetIndex == currentIndex;
+            if (traversingHistory) {
+                bundledHistoryNavigationTargetIndex = -1;
+            }
+        }
+        // A full WebView history drops its oldest entry on a new cross-document navigation:
+        // the index and size stay the same while the list shifts left by one.
+        WebHistoryItem firstItem = historySize > 0 ? history.getItemAtIndex(0) : null;
+        String firstUrl = firstItem != null ? firstItem.getUrl() : null;
+        boolean historyPruned =
+            pendingCrossDocumentNavigation &&
+            !traversingHistory &&
+            !isReload &&
+            lastWebHistoryIndex >= 0 &&
+            currentIndex == lastWebHistoryIndex &&
+            currentIndex == historySize - 1 &&
+            historySize == lastWebHistorySize &&
+            lastWebHistoryFirstUrl != null &&
+            firstUrl != null &&
+            !BundledAssetSupport.historyUrlsEquivalent(firstUrl, lastWebHistoryFirstUrl);
+        if (historyPruned) {
+            synchronized (bundledAssetLoaderLock) {
+                if (!bundledAssetLoaderHistoryStates.isEmpty()) {
+                    bundledAssetLoaderHistoryStates.remove(0);
+                }
+            }
+            lastWebHistoryIndex = currentIndex - 1;
+        }
+        boolean useStoredHistoryState =
+            currentIndex < lastWebHistoryIndex || traversingHistory || (currentIndex == lastWebHistoryIndex && isReload);
+        boolean sameDocumentHistoryEntry =
+            currentIndex >= lastWebHistoryIndex && !traversingHistory && !isReload && !pendingCrossDocumentNavigation;
+        boolean needsAssetLoader;
+        if (sameDocumentHistoryEntry && activeDocumentBundledAssetLoaderState != null) {
+            needsAssetLoader = activeDocumentBundledAssetLoaderState;
+        } else {
+            needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, currentIndex, useStoredHistoryState);
+        }
+
+        synchronized (bundledAssetLoaderLock) {
+            while (bundledAssetLoaderHistoryStates.size() <= currentIndex) {
+                bundledAssetLoaderHistoryStates.add(null);
+            }
+
+            if (currentIndex > lastWebHistoryIndex && !traversingHistory) {
+                bundledAssetLoaderHistoryStates.set(currentIndex, needsAssetLoader);
+            } else if (currentIndex < lastWebHistoryIndex) {
+                Boolean storedState = bundledAssetLoaderHistoryStates.get(currentIndex);
+                if (storedState != null) {
+                    needsAssetLoader = storedState;
+                }
+            } else {
+                bundledAssetLoaderHistoryStates.set(currentIndex, needsAssetLoader);
+            }
+
+            lastWebHistoryIndex = currentIndex;
+            lastWebHistorySize = historySize;
+            lastWebHistoryFirstUrl = firstUrl;
+            pendingCrossDocumentNavigation = false;
+            applyBundledAssetLoaderState(needsAssetLoader, localConfig);
+            clearPendingBundledAssetLoaderResolution();
+            if (isInitialized) {
+                clearCommittedBundledAssetNavigationIntent();
+            }
+            activeDocumentBundledAssetLoaderState = needsAssetLoader;
+        }
+    }
+
+    private boolean resolveNeedsAssetLoaderForUrl(String url, BundledAssetSupport.LocalConfig localConfig) {
+        BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, localConfig);
+        return resolution != null && resolution.needsAssetLoader;
     }
 
     private void applyTrustedBundledFileCrossOriginSettings(String url) {
@@ -5945,9 +6311,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if (_webView != null && _webView.canGoBack()) {
-                            _webView.goBack();
-                        }
+                        goBack();
                     }
                 }
             );
@@ -5966,9 +6330,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        if (_webView != null && _webView.canGoForward()) {
-                            _webView.goForward();
-                        }
+                        goForward();
                     }
                 }
             );
@@ -6421,6 +6783,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         }
                     }
 
+                    if (request.isForMainFrame() && !request.hasGesture() && !request.isRedirect()) {
+                        if (isAdjacentRendererHistoryTraversalTarget(view, url)) {
+                            expectRendererHistoryTraversalPrepare = true;
+                            prepareBundledAssetLoaderForRendererHistoryNavigation(view, url);
+                        }
+                    }
+
                     return false;
                 }
 
@@ -6533,6 +6902,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     if (view == null || _webView == null) {
                         return null;
+                    }
+
+                    if (request.isForMainFrame() && !request.hasGesture() && !request.isRedirect()) {
+                        String requestUrl = request.getUrl().toString();
+                        if (expectRendererHistoryTraversalPrepare) {
+                            prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(requestUrl);
+                            expectRendererHistoryTraversalPrepare = false;
+                        } else if (isAdjacentSnapshotTraversalTarget(requestUrl)) {
+                            prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(requestUrl);
+                        }
                     }
 
                     if (shouldUseNativeProxy()) {
@@ -6883,6 +7262,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView == null) {
                         return;
                     }
+                    pendingCrossDocumentNavigation = true;
                     if (_options.getCallbacks() != null) {
                         _options.getCallbacks().pageLoadStart();
                     }
@@ -6907,6 +7287,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return;
                     }
                     applyTrustedBundledFileCrossOriginSettings(url);
+                    syncBundledAssetLoaderForHistoryUrl(view, url, isReload);
                     if (!isReload) {
                         _options.getCallbacks().urlChangeEvent(url);
                     }
@@ -6926,9 +7307,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     if (view == null || _webView != view || isDismissing) {
                         return;
                     }
+                    pendingCrossDocumentNavigation = false;
                     if (!isInitialized) {
                         isInitialized = true;
                         _webView.clearHistory();
+                        resetBundledAssetLoaderHistory();
+                        seedBundledAssetLoaderHistoryAfterClear(url);
                         if (_options.isPresentAfterPageLoad() && !_options.isHidden()) {
                             boolean usePreShowScript =
                                 _options.getPreShowScript() != null &&
@@ -7036,7 +7420,31 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
      */
     public boolean goBack() {
         if (_webView != null && _webView.canGoBack()) {
+            WebBackForwardList history = _webView.copyBackForwardList();
+            int backIndex = history.getCurrentIndex() - 1;
+            if (backIndex >= 0) {
+                WebHistoryItem backItem = history.getItemAtIndex(backIndex);
+                if (backItem != null) {
+                    prepareBundledAssetLoaderBeforeNavigation(backItem.getUrl(), backIndex);
+                }
+            }
             _webView.goBack();
+            return true;
+        }
+        return false;
+    }
+
+    public boolean goForward() {
+        if (_webView != null && _webView.canGoForward()) {
+            WebBackForwardList history = _webView.copyBackForwardList();
+            int forwardIndex = history.getCurrentIndex() + 1;
+            if (forwardIndex < history.getSize()) {
+                WebHistoryItem forwardItem = history.getItemAtIndex(forwardIndex);
+                if (forwardItem != null) {
+                    prepareBundledAssetLoaderBeforeNavigation(forwardItem.getUrl(), forwardIndex);
+                }
+            }
+            _webView.goForward();
             return true;
         }
         return false;
