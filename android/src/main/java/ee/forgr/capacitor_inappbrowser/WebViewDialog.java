@@ -593,6 +593,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private boolean pendingCrossDocumentNavigation = false;
     private Boolean activeDocumentBundledAssetLoaderState = null;
     private volatile int webHistorySnapshotCurrentIndex = -1;
+    private volatile String webHistorySnapshotCurrentUrl;
     private volatile String webHistorySnapshotBackUrl;
     private volatile String webHistorySnapshotForwardUrl;
     private volatile boolean expectRendererHistoryTraversalPrepare = false;
@@ -5402,6 +5403,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private void refreshWebHistorySnapshot(WebView view) {
         if (view == null) {
             webHistorySnapshotCurrentIndex = -1;
+            webHistorySnapshotCurrentUrl = null;
             webHistorySnapshotBackUrl = null;
             webHistorySnapshotForwardUrl = null;
             return;
@@ -5412,6 +5414,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         webHistorySnapshotCurrentIndex = currentIndex;
         webHistorySnapshotBackUrl = null;
         webHistorySnapshotForwardUrl = null;
+        WebHistoryItem currentItem = history.getItemAtIndex(currentIndex);
+        webHistorySnapshotCurrentUrl = currentItem != null ? currentItem.getUrl() : null;
 
         int backIndex = currentIndex - 1;
         if (backIndex >= 0) {
@@ -5432,6 +5436,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void clearWebHistorySnapshot() {
         webHistorySnapshotCurrentIndex = -1;
+        webHistorySnapshotCurrentUrl = null;
         webHistorySnapshotBackUrl = null;
         webHistorySnapshotForwardUrl = null;
     }
@@ -5445,20 +5450,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(url);
     }
 
-    private boolean isAdjacentRendererHistoryTraversalTarget(WebView view, String url) {
-        if (view == null || url == null || url.trim().isEmpty()) {
+    private boolean isAdjacentSnapshotTraversalTarget(String url) {
+        if (url == null || url.trim().isEmpty()) {
             return false;
         }
 
-        refreshWebHistorySnapshot(view);
-        WebBackForwardList history = view.copyBackForwardList();
-        int currentIndex = history.getCurrentIndex();
-        WebHistoryItem currentItem = history.getItemAtIndex(currentIndex);
-        String currentUrl = currentItem != null ? currentItem.getUrl() : null;
+        String currentUrl = webHistorySnapshotCurrentUrl;
         if (currentUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, currentUrl)) {
             return false;
         }
 
+        int currentIndex = webHistorySnapshotCurrentIndex;
         int backIndex = currentIndex - 1;
         if (
             backIndex >= 0 && webHistorySnapshotBackUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotBackUrl)
@@ -5467,6 +5469,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         return webHistorySnapshotForwardUrl != null && BundledAssetSupport.historyUrlsEquivalent(url, webHistorySnapshotForwardUrl);
+    }
+
+    private boolean isAdjacentRendererHistoryTraversalTarget(WebView view, String url) {
+        if (view == null || url == null || url.trim().isEmpty()) {
+            return false;
+        }
+
+        refreshWebHistorySnapshot(view);
+        return isAdjacentSnapshotTraversalTarget(url);
     }
 
     private void prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(String url) {
@@ -6845,8 +6856,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         if (expectRendererHistoryTraversalPrepare) {
                             prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(requestUrl);
                             expectRendererHistoryTraversalPrepare = false;
-                        } else if (isAdjacentRendererHistoryTraversalTarget(view, requestUrl)) {
-                            prepareBundledAssetLoaderForRendererHistoryNavigation(view, requestUrl);
+                        } else if (isAdjacentSnapshotTraversalTarget(requestUrl)) {
+                            prepareBundledAssetLoaderForRendererHistoryNavigationFromSnapshot(requestUrl);
                         }
                     }
 

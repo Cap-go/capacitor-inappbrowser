@@ -13,6 +13,11 @@ import android.webkit.WebView;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -117,8 +122,9 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         addHistoryState(dialog, false);
 
         String bundledUrl = "https://portal.example.com/index.html";
-        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
-        setWebHistorySnapshot(dialog, 1, bundledUrl, null);
+        String remoteUrl = "https://remote.example/page";
+        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, remoteUrl });
+        setWebHistorySnapshot(dialog, 1, remoteUrl, bundledUrl, null);
         setWebView(dialog, webView);
 
         Method setupClient = WebViewDialog.class.getDeclaredMethod("setWebViewClient");
@@ -126,7 +132,26 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         setupClient.invoke(dialog);
 
         WebResourceRequest request = mainFrameRequest(bundledUrl);
-        webView.getWebViewClient().shouldInterceptRequest(webView, request);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        try {
+            executor.execute(() -> {
+                try {
+                    webView.getWebViewClient().shouldInterceptRequest(webView, request);
+                } catch (Throwable error) {
+                    failure.set(error);
+                } finally {
+                    done.countDown();
+                }
+            });
+            assertTrue(done.await(5, TimeUnit.SECONDS));
+        } finally {
+            executor.shutdownNow();
+        }
+        if (failure.get() != null) {
+            throw new AssertionError(failure.get());
+        }
 
         assertTrue(options.getServeBundledAssets());
     }
@@ -144,8 +169,9 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         addHistoryState(dialog, false);
 
         String bundledUrl = "https://portal.example.com/index.html";
-        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, "https://remote.example/page" });
-        setWebHistorySnapshot(dialog, 1, bundledUrl, null);
+        String remoteUrl = "https://remote.example/page";
+        WebView webView = webViewWithHistoryItems(context, 1, new String[] { bundledUrl, remoteUrl });
+        setWebHistorySnapshot(dialog, 1, remoteUrl, bundledUrl, null);
         setWebView(dialog, webView);
 
         Method setupClient = WebViewDialog.class.getDeclaredMethod("setWebViewClient");
@@ -344,8 +370,10 @@ public class WebViewDialogBundledAssetHistoryRobolectricTest {
         field.set(target, value);
     }
 
-    private static void setWebHistorySnapshot(WebViewDialog dialog, int currentIndex, String backUrl, String forwardUrl) throws Exception {
+    private static void setWebHistorySnapshot(WebViewDialog dialog, int currentIndex, String currentUrl, String backUrl, String forwardUrl)
+        throws Exception {
         setIntField(dialog, "webHistorySnapshotCurrentIndex", currentIndex);
+        setStringField(dialog, "webHistorySnapshotCurrentUrl", currentUrl);
         setStringField(dialog, "webHistorySnapshotBackUrl", backUrl);
         setStringField(dialog, "webHistorySnapshotForwardUrl", forwardUrl);
     }
