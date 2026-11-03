@@ -589,7 +589,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private String committedBundledAssetLoaderUrl;
     private Boolean committedBundledAssetLoaderState;
     private int lastWebHistoryIndex = -1;
-    private int bundledHistoryNavigationTargetIndex = -1;
+    private int lastWebHistorySize = 0;
+    private volatile int bundledHistoryNavigationTargetIndex = -1;
     private boolean pendingCrossDocumentNavigation = false;
     private Boolean activeDocumentBundledAssetLoaderState = null;
     private volatile int webHistorySnapshotCurrentIndex = -1;
@@ -5410,8 +5411,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         BundledAssetSupport.LocalConfig localConfig = bundledAssetLocalConfigOrDefault();
         boolean needsAssetLoader = needsAssetLoaderForHistoryUrl(url, localConfig, historyIndex, true);
-        bundledHistoryNavigationTargetIndex = historyIndex;
         synchronized (bundledAssetLoaderLock) {
+            bundledHistoryNavigationTargetIndex = historyIndex;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
         }
     }
@@ -5522,6 +5523,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         clearPendingBundledAssetLoaderResolution();
         lastWebHistoryIndex = -1;
+        lastWebHistorySize = 0;
         bundledHistoryNavigationTargetIndex = -1;
         pendingCrossDocumentNavigation = false;
         activeDocumentBundledAssetLoaderState = null;
@@ -5573,9 +5575,31 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         WebBackForwardList history = view.copyBackForwardList();
         int currentIndex = history.getCurrentIndex();
         refreshWebHistorySnapshot(view);
-        boolean traversingHistory = bundledHistoryNavigationTargetIndex == currentIndex;
-        if (traversingHistory) {
-            bundledHistoryNavigationTargetIndex = -1;
+        int historySize = history.getSize();
+        boolean traversingHistory;
+        synchronized (bundledAssetLoaderLock) {
+            traversingHistory = bundledHistoryNavigationTargetIndex == currentIndex;
+            if (traversingHistory) {
+                bundledHistoryNavigationTargetIndex = -1;
+            }
+        }
+        // A full WebView history drops its oldest entry on a new cross-document navigation:
+        // the index and size stay the same while the list shifts left by one.
+        boolean historyPruned =
+            pendingCrossDocumentNavigation &&
+            !traversingHistory &&
+            !isReload &&
+            lastWebHistoryIndex >= 0 &&
+            currentIndex == lastWebHistoryIndex &&
+            currentIndex == historySize - 1 &&
+            historySize == lastWebHistorySize;
+        if (historyPruned) {
+            synchronized (bundledAssetLoaderLock) {
+                if (!bundledAssetLoaderHistoryStates.isEmpty()) {
+                    bundledAssetLoaderHistoryStates.remove(0);
+                }
+            }
+            lastWebHistoryIndex = currentIndex - 1;
         }
         boolean useStoredHistoryState =
             currentIndex < lastWebHistoryIndex || traversingHistory || (currentIndex == lastWebHistoryIndex && isReload);
@@ -5605,6 +5629,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
 
             lastWebHistoryIndex = currentIndex;
+            lastWebHistorySize = historySize;
             pendingCrossDocumentNavigation = false;
             applyBundledAssetLoaderState(needsAssetLoader, localConfig);
             clearPendingBundledAssetLoaderResolution();
