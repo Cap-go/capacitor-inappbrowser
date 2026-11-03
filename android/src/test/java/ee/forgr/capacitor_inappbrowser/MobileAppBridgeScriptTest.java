@@ -17,6 +17,8 @@ public class MobileAppBridgeScriptTest {
 
     // String.formatted needs API 34 and D8 does not backport it, so it throws NoSuchMethodError on
     // older devices. The host JDK has the method, which is why this checks the source instead.
+    private static final java.util.regex.Pattern STRING_FORMATTED_USAGE = java.util.regex.Pattern.compile("(\\.|::)formatted\\b");
+
     @Test
     public void mainSourcesDoNotUseStringFormatted() throws IOException {
         List<Path> offenders;
@@ -25,7 +27,7 @@ public class MobileAppBridgeScriptTest {
                 .filter((file) -> file.toString().endsWith(".java"))
                 .filter((file) -> {
                     try {
-                        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains(".formatted(");
+                        return STRING_FORMATTED_USAGE.matcher(new String(Files.readAllBytes(file), StandardCharsets.UTF_8)).find();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
