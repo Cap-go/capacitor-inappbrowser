@@ -14,8 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: pr775-ios-screenshots
-  cancel-in-progress: true
+  group: pr775-ios-screenshots-${{ github.run_id }}
+  cancel-in-progress: false
 
 env:
   PR775_AFTER_REF: b15a3e5a6ca900682ae833be5b960b19d8f68dc4
