@@ -4,12 +4,29 @@ set -euo pipefail
 REF="${1:?git ref required}"
 OUTPUT_REL="${2:?output path relative to repo root required}"
 
-SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 16}"
+SIMULATOR_NAME="${SIMULATOR_NAME:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 HELPER_MJS="$REPO_ROOT/.github/pr775/status-bar-auto-open.mjs"
 OUTPUT_PATH="$REPO_ROOT/$OUTPUT_REL"
 WORKTREE="$(mktemp -d "${TMPDIR:-/tmp}/pr775-worktree.XXXXXX")"
+
+resolve_simulator_name() {
+  if [[ -n "$SIMULATOR_NAME" ]]; then
+    return 0
+  fi
+  local candidate
+  for candidate in "iPhone 17" "iPhone 17 Pro" "iPhone 16e" "iPhone 17 Pro Max"; do
+    if xcrun simctl list devices available | grep -F "${candidate} (" | head -n 1 | grep -q .; then
+      SIMULATOR_NAME="$candidate"
+      echo "Using simulator: ${SIMULATOR_NAME}"
+      return 0
+    fi
+  done
+  echo "Could not find a supported iPhone simulator"
+  xcrun simctl list devices available
+  exit 1
+}
 
 cleanup() {
   git -C "$REPO_ROOT" worktree remove --force "$WORKTREE" 2>/dev/null || true
@@ -62,11 +79,13 @@ run_with_retries bun install --frozen-lockfile
 bun run build
 bunx cap sync ios
 
+resolve_simulator_name
+
 xcodebuild \
   -project ios/App/App.xcodeproj \
   -scheme App \
   -configuration Debug \
-  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME},OS=latest" \
+  -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
   -derivedDataPath "$DERIVED" \
   CODE_SIGNING_ALLOWED=NO \
   build

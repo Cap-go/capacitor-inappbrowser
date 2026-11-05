@@ -24,6 +24,16 @@ jobs:
   capture:
     runs-on: macos-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - git_ref: origin/main
+            output_file: pr775-before-ios-status-bar.png
+            artifact_name: pr775-before
+          - git_ref: b15a3e5a6ca900682ae833be5b960b19d8f68dc4
+            output_file: pr775-after-ios-status-bar.png
+            artifact_name: pr775-after
     steps:
       - name: Check out helper branch
         uses: actions/checkout@v4
@@ -38,14 +48,39 @@ jobs:
         with:
           node-version: 24.x
 
-      - name: Capture before (main)
-        run: bash .github/scripts/pr775-capture-ios-screenshot.sh origin/main screenshots/pr775-before-ios-status-bar.png
+      - name: Capture iOS simulator screenshot
+        run: bash .github/scripts/pr775-capture-ios-screenshot.sh "${{ matrix.git_ref }}" "screenshots/${{ matrix.output_file }}"
 
-      - name: Capture after (PR HEAD)
-        run: bash .github/scripts/pr775-capture-ios-screenshot.sh "${PR775_AFTER_REF}" screenshots/pr775-after-ios-status-bar.png
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: screenshots/${{ matrix.output_file }}
+          if-no-files-found: error
+
+  commit:
+    needs: capture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out helper branch
+        uses: actions/checkout@v4
+        with:
+          ref: cursor/screenshots-775
+          fetch-depth: 0
+
+      - name: Download screenshots
+        uses: actions/download-artifact@v4
+        with:
+          path: artifact-download
+          pattern: pr775-*
+          merge-multiple: true
 
       - name: Commit and push screenshots
         run: |
+          mkdir -p screenshots
+          cp artifact-download/pr775-before-ios-status-bar.png screenshots/
+          cp artifact-download/pr775-after-ios-status-bar.png screenshots/
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add screenshots/pr775-before-ios-status-bar.png screenshots/pr775-after-ios-status-bar.png
