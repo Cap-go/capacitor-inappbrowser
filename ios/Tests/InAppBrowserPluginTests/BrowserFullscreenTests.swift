@@ -146,6 +146,7 @@ final class BrowserFullscreenTests: XCTestCase {
         XCTAssertFalse(controller.enabledSafeBottomMargin)
         XCTAssertTrue(controller.capableWebView === webView)
         XCTAssertTrue(navigation.childForStatusBarHidden === controller)
+        XCTAssertTrue(navigation.childForStatusBarStyle === controller)
         let exit = controller.view.subviews.compactMap { $0 as? UIButton }.first {
             $0.accessibilityIdentifier == "inappbrowser.exitFullscreen"
         }
@@ -161,6 +162,24 @@ final class BrowserFullscreenTests: XCTestCase {
         XCTAssertTrue(controller.enabledSafeBottomMargin)
         XCTAssertTrue(controller.capableWebView === webView)
         XCTAssertNil(exit?.superview)
+        controller.cleanupWebView()
+    }
+
+    @MainActor
+    func testNavigationControllerForwardsStatusBarStyleWhenToolbarVisible() {
+        let controller = WKWebViewController(source: .remote(URL(string: "https://example.com")!))
+        let navigation = BrowserNavigationController(rootViewController: controller)
+        navigation.loadViewIfNeeded()
+        controller.loadViewIfNeeded()
+        navigation.setNavigationBarHidden(false, animated: false)
+        XCTAssertFalse(controller.isBrowserFullscreen)
+        XCTAssertTrue(navigation.childForStatusBarStyle === controller)
+
+        controller.statusBarStyle = .lightContent
+        XCTAssertEqual(controller.preferredStatusBarStyle, .lightContent)
+
+        controller.statusBarStyle = .darkContent
+        XCTAssertEqual(controller.preferredStatusBarStyle, .darkContent)
         controller.cleanupWebView()
     }
 
