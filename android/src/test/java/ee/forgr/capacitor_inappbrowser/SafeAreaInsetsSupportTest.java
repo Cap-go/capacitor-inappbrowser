@@ -51,6 +51,8 @@ public class SafeAreaInsetsSupportTest {
         // Top split-screen pane: status bar insets the window, navigation bar sits on the other pane.
         assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 24, 8, 0, 0, 0, 0, 144, true));
         assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 0, 0, 0, 0, 0, 0, 144, true));
+        // Same top-pane layout when nav bar height resource is unavailable (fallback 0).
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 24, 8, 0, 0, 0, 0, 0, true));
     }
 
     @Test

@@ -27,17 +27,21 @@ final class SafeAreaInsetsSupport {
         boolean applyFallbackWhenZero
     ) {
         int navigationBarBottom = Math.max(systemBarsBottom, navigationBarsBottom);
-        if (!applyFallbackWhenZero || fallbackBottomInset <= 0) {
+        if (!applyFallbackWhenZero) {
             return resolveSafeBottomInset(systemBarsBottom, navigationBarsBottom, systemGesturesBottom, mandatoryGesturesBottom);
-        }
-
-        if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight, fallbackBottomInset)) {
-            return navigationBarBottom;
         }
 
         // Multi-window top pane: status bar insets this window but the navigation bar does not (#772).
         if (systemBarsTop > 0 && navigationBarBottom <= 0) {
             return 0;
+        }
+
+        if (fallbackBottomInset <= 0) {
+            return resolveSafeBottomInset(systemBarsBottom, navigationBarsBottom, systemGesturesBottom, mandatoryGesturesBottom);
+        }
+
+        if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight, fallbackBottomInset)) {
+            return navigationBarBottom;
         }
 
         int inset = Math.max(navigationBarBottom, resolveSafeBottomInset(0, 0, systemGesturesBottom, mandatoryGesturesBottom));
