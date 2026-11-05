@@ -55,7 +55,7 @@ public class SafeAreaInsetsSupportTest {
 
     @Test
     public void safeBottomInsetStillAppliesWhenNavigationBarInsetsWindowBottom() {
-        assertEquals(126, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 126, 126, 24, 8, 0, 0, 0, 0, 144, true));
+        assertEquals(126, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 126, 126, 24, 8, 0, 0, 0, 0, 126, true));
     }
 
     @Test
