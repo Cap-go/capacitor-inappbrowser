@@ -41,7 +41,7 @@ final class SafeAreaInsetsSupport {
         }
 
         if (hasSideNavigationBarInsets(systemBarsLeft, systemBarsRight, navigationBarsLeft, navigationBarsRight, fallbackBottomInset)) {
-            return navigationBarBottom;
+            return Math.max(navigationBarBottom, resolveSafeBottomInset(0, 0, systemGesturesBottom, mandatoryGesturesBottom));
         }
 
         int inset = Math.max(navigationBarBottom, resolveSafeBottomInset(0, 0, systemGesturesBottom, mandatoryGesturesBottom));

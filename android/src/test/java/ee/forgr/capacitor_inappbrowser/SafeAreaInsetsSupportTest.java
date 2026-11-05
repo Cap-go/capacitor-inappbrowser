@@ -47,6 +47,11 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void safeBottomInsetKeepsBottomGestureInsetWhenNavigationBarIsOnTheSide() {
+        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 24, 8, 48, 0, 0, 0, 48, true));
+    }
+
+    @Test
     public void safeBottomInsetStaysZeroForSplitScreenTopPaneWithoutNavigationBar() {
         // Top split-screen pane: status bar insets the window, navigation bar sits on the other pane.
         assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 24, 8, 0, 0, 0, 0, 144, true));
