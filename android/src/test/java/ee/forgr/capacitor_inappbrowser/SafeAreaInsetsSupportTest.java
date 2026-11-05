@@ -156,6 +156,18 @@ public class SafeAreaInsetsSupportTest {
     }
 
     @Test
+    public void physicalToCssPixelsDividesByDensity() {
+        assertEquals(48, SafeAreaInsetsSupport.physicalToCssPixels(144, 3f));
+        assertEquals(47, SafeAreaInsetsSupport.physicalToCssPixels(130, 2.75f));
+        assertEquals(0, SafeAreaInsetsSupport.physicalToCssPixels(0, 3f));
+    }
+
+    @Test
+    public void physicalToCssPixelsKeepsValueWithoutDensity() {
+        assertEquals(144, SafeAreaInsetsSupport.physicalToCssPixels(144, 0f));
+    }
+
+    @Test
     public void cssBottomInsetFollowsSafeBottomOption() {
         assertEquals(84, SafeAreaInsetsSupport.cssBottomInset(true, 84));
         assertEquals(0, SafeAreaInsetsSupport.cssBottomInset(false, 84));

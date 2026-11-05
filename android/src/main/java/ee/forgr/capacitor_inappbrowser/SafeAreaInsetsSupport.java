@@ -147,4 +147,12 @@ final class SafeAreaInsetsSupport {
     static int cssBottomInset(boolean enabledSafeBottomMargin, int safeBottomInset) {
         return enabledSafeBottomMargin ? Math.max(0, safeBottomInset) : 0;
     }
+
+    /**
+     * Window insets are physical pixels, but the safe-area CSS variables are read as CSS pixels, so
+     * an unconverted inset would be too large by the display density.
+     */
+    static int physicalToCssPixels(int physicalPixels, float density) {
+        return density > 0 ? Math.round(physicalPixels / density) : physicalPixels;
+    }
 }
