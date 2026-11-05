@@ -1,0 +1,57 @@
+name: PR 775 iOS status bar screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/screenshots-775
+    paths:
+      - .github/workflows/pr775-ios-screenshots.yml
+      - .github/scripts/pr775-capture-ios-screenshot.sh
+      - .github/pr775/**
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pr775-ios-screenshots
+  cancel-in-progress: true
+
+env:
+  PR775_AFTER_REF: b15a3e5a6ca900682ae833be5b960b19d8f68dc4
+
+jobs:
+  capture:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out helper branch
+        uses: actions/checkout@v4
+        with:
+          ref: cursor/screenshots-775
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Capture before (main)
+        run: bash .github/scripts/pr775-capture-ios-screenshot.sh origin/main screenshots/pr775-before-ios-status-bar.png
+
+      - name: Capture after (PR HEAD)
+        run: bash .github/scripts/pr775-capture-ios-screenshot.sh "${PR775_AFTER_REF}" screenshots/pr775-after-ios-status-bar.png
+
+      - name: Commit and push screenshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add screenshots/pr775-before-ios-status-bar.png screenshots/pr775-after-ios-status-bar.png
+          if git diff --staged --quiet; then
+            echo "Screenshot files unchanged"
+            exit 0
+          fi
+          git commit -m "Add PR 775 iOS status bar before/after simulator screenshots"
+          git push origin HEAD:cursor/screenshots-775
