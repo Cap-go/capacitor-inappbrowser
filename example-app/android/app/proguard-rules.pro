@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# MainActivity injects MaestroHarnessBridge via WebView.addJavascriptInterface; keep bridge method names for JS.
+-keepclassmembers class app.capgo.inappbrowser.MainActivity$MaestroHarnessBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}
