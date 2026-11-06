@@ -51,6 +51,10 @@ final class BrowserNavigationController: UINavigationController {
         (topViewController as? WKWebViewController)?.isBrowserFullscreen == true
             ? topViewController : super.childForHomeIndicatorAutoHidden
     }
+
+    override var childForStatusBarStyle: UIViewController? {
+        (topViewController as? WKWebViewController) ?? super.childForStatusBarStyle
+    }
 }
 
 extension WKWebViewController {
