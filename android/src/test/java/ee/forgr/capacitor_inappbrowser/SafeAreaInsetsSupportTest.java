@@ -15,35 +15,54 @@ public class SafeAreaInsetsSupportTest {
 
     @Test
     public void safeBottomInsetUsesFallbackWhenInsetsAreZeroAndOptionEnabled() {
-        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 0, 48, true));
     }
 
     @Test
     public void safeBottomInsetKeepsReportedInsetWhenItMatchesNavigationBarHeight() {
-        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 24, true));
+        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 16, 24, 8, 0, 0, 0, 0, 24, true));
     }
 
     @Test
     public void safeBottomInsetUsesFallbackWhenReportedInsetUndershootsNavigationBarHeight() {
-        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 16, 24, 8, 0, 0, 0, 0, 48, true));
-        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 16, 8, 0, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 16, 24, 8, 0, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 16, 8, 0, 0, 0, 0, 48, true));
     }
 
     @Test
     public void safeBottomInsetUsesFallbackDespiteMinorHorizontalInsets() {
-        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 8, 0, 0, 0, 48, true));
-        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 12, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 8, 0, 0, 0, 48, true));
+        assertEquals(48, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 12, 0, 0, 48, true));
     }
 
     @Test
     public void safeBottomInsetIgnoresFallbackWhenOptionDisabled() {
-        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 48, false));
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 0, 0, 0, 48, false));
     }
 
     @Test
     public void safeBottomInsetSkipsFallbackWhenNavigationBarIsOnTheSide() {
-        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 48, 0, 0, 0, 48, true));
-        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 48, 0, 0, 48, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 48, 0, 0, 0, 48, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 0, 0, 0, 48, 0, 0, 48, true));
+    }
+
+    @Test
+    public void safeBottomInsetKeepsBottomGestureInsetWhenNavigationBarIsOnTheSide() {
+        assertEquals(24, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(0, 0, 0, 24, 8, 48, 0, 0, 0, 48, true));
+    }
+
+    @Test
+    public void safeBottomInsetStaysZeroForSplitScreenTopPaneWithoutNavigationBar() {
+        // Top split-screen pane: status bar insets the window, navigation bar sits on the other pane.
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 24, 8, 0, 0, 0, 0, 144, true));
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 0, 0, 0, 0, 0, 0, 144, true));
+        // Same top-pane layout when nav bar height resource is unavailable (fallback 0).
+        assertEquals(0, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 0, 0, 24, 8, 0, 0, 0, 0, 0, true));
+    }
+
+    @Test
+    public void safeBottomInsetStillAppliesWhenNavigationBarInsetsWindowBottom() {
+        assertEquals(126, SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(59, 126, 126, 24, 8, 0, 0, 0, 0, 126, true));
     }
 
     @Test

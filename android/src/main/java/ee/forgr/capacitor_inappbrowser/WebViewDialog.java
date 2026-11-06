@@ -4272,6 +4272,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
         int fallbackBottomInset = applyBottomInset ? getSystemNavigationBarHeight() : 0;
         int safeBottomInset = SafeAreaInsetsSupport.resolveSafeBottomInsetWithFallback(
+            bars.top,
             bars.bottom,
             navigationBars.bottom,
             systemGestures.bottom,
