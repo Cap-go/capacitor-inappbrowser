@@ -4320,7 +4320,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         int cssTop = SafeAreaInsetsSupport.cssTopInset(_options.getEnabledSafeTopMargin(), padTop);
         int cssBottom = SafeAreaInsetsSupport.cssBottomInset(_options.getEnabledSafeMargin(), safeBottomInset);
-        injectSafeAreaCssVariables(cssTop, cssBottom, bars.left, bars.right);
+        float density = _context.getResources().getDisplayMetrics().density;
+        injectSafeAreaCssVariables(
+            SafeAreaInsetsSupport.physicalToCssPixels(cssTop, density),
+            SafeAreaInsetsSupport.physicalToCssPixels(cssBottom, density),
+            SafeAreaInsetsSupport.physicalToCssPixels(bars.left, density),
+            SafeAreaInsetsSupport.physicalToCssPixels(bars.right, density)
+        );
     }
 
     private void configureBlankToolbarLayout() {
