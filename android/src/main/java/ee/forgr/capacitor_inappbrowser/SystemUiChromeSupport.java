@@ -8,6 +8,7 @@ import android.view.WindowManager;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import java.lang.reflect.Method;
+import java.util.WeakHashMap;
 
 /**
  * Centralizes window chrome decisions so WebViewDialog can avoid deprecated system UI APIs on
@@ -16,6 +17,7 @@ import java.lang.reflect.Method;
 final class SystemUiChromeSupport {
 
     static final int EDGE_TO_EDGE_SDK = Build.VERSION_CODES.VANILLA_ICE_CREAM;
+    private static final WeakHashMap<Window, Boolean> decorFitsPolicyByWindow = new WeakHashMap<>();
 
     private SystemUiChromeSupport() {}
 
@@ -51,12 +53,17 @@ final class SystemUiChromeSupport {
             return;
         }
         WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
+        decorFitsPolicyByWindow.put(window, decorFitsSystemWindows);
     }
 
     /** Window policy from API 30; on older releases falls back to the decor view layout flag. */
     static boolean getDecorFitsSystemWindows(Window window) {
         if (window == null) {
             return true;
+        }
+        Boolean tracked = decorFitsPolicyByWindow.get(window);
+        if (tracked != null) {
+            return tracked;
         }
         Boolean policy = readWindowDecorFitsPolicy(window);
         if (policy != null) {

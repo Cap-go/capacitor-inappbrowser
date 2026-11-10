@@ -4,7 +4,6 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
@@ -46,7 +45,7 @@ final class FullscreenWindowState {
         }
         View decor = window.getDecorView();
         if (usesDecorFitsPolicy) {
-            WindowCompat.setDecorFitsSystemWindows(window, false);
+            SystemUiChromeSupport.setDecorFitsSystemWindows(window, false);
         } else {
             enterLegacyLayoutFullscreen(decor);
         }
@@ -59,7 +58,7 @@ final class FullscreenWindowState {
         systemBars.applyTo(window);
         window.setAttributes(attributes);
         if (usesDecorFitsPolicy) {
-            WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
+            SystemUiChromeSupport.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
         } else {
             restoreLegacyLayoutFullscreen();
         }

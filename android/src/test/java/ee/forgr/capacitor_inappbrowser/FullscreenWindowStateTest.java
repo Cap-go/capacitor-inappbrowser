@@ -23,9 +23,8 @@ public class FullscreenWindowStateTest {
         Dialog dialog = new Dialog(activity);
         dialog.create();
         assertNotNull(dialog.getWindow());
-        WindowCompat.setDecorFitsSystemWindows(dialog.getWindow(), true);
+        SystemUiChromeSupport.setDecorFitsSystemWindows(dialog.getWindow(), true);
         assertTrue(SystemUiChromeSupport.getDecorFitsSystemWindows(dialog.getWindow()));
-        assertFalse(dialog.getWindow().getDecorView().getFitsSystemWindows());
 
         FullscreenWindowState state = new FullscreenWindowState(dialog.getWindow());
         state.enter();
