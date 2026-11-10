@@ -1,6 +1,75 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
+assert_packed_consumer_rules_applied() {
+  local tarball="$1"
+  if [ ! -f "$tarball" ]; then
+    echo "Packed tarball not found: $tarball"
+    exit 1
+  fi
+
+  if ! tar -tzf "$tarball" | grep -qE '(^|/)android/consumer-rules\.pro$'; then
+    echo "Packed package is missing android/consumer-rules.pro"
+    exit 1
+  fi
+
+  local config_file=""
+  if [ -f "app/build/outputs/mapping/release/configuration.txt" ]; then
+    config_file="app/build/outputs/mapping/release/configuration.txt"
+  else
+    config_file="$(find app/build -name configuration.txt 2>/dev/null | head -n 1 || true)"
+  fi
+  if [ -z "${config_file}" ] || [ ! -f "${config_file}" ]; then
+    echo "R8 configuration.txt not found after assembleRelease"
+    exit 1
+  fi
+
+  local extract_dir
+  extract_dir="$(mktemp -d)"
+  tar -xzf "$tarball" -C "$extract_dir"
+  local rules_file
+  rules_file="$(find "$extract_dir" -name consumer-rules.pro | head -n 1 || true)"
+  if [ -z "${rules_file}" ]; then
+    echo "Could not extract android/consumer-rules.pro from packed package"
+    exit 1
+  fi
+
+  local missing=0
+  local tokens_checked=0
+  local token
+  while IFS= read -r token; do
+    [ -z "${token}" ] && continue
+    case "${token}" in
+      android.*|androidx.*|com.getcapacitor.*|java.*|javax.*|kotlin.*)
+        continue
+        ;;
+    esac
+    token="${token%.**}"
+    token="${token%'$*'}"
+    token="${token%\*}"
+    if [ -z "${token}" ]; then
+      continue
+    fi
+    tokens_checked=$((tokens_checked + 1))
+    if ! grep -qF "${token}" "${config_file}"; then
+      echo "Merged R8 configuration is missing consumer-rules token: ${token}"
+      missing=1
+    fi
+  done < <(grep -E '^[[:space:]]*-keep' "${rules_file}" | grep -oE '[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z*][A-Za-z0-9_$*]*)+' | sort -u)
+
+  if [ "${tokens_checked}" -eq 0 ]; then
+    echo "No plugin keep tokens found in packed consumer-rules.pro"
+    exit 1
+  fi
+  if [ "${missing}" -ne 0 ]; then
+    echo "Packed consumer-rules.pro was not applied in ${config_file}"
+    exit 1
+  fi
+  echo "Packed consumer-rules.pro is present and applied in merged R8 configuration"
+}
+
+
 platform="${1:-}"
 case "$platform" in
   android | ios | web) ;;
@@ -68,6 +137,7 @@ case "$platform" in
     bunx cap sync android
     cd android
     ./gradlew build test assembleRelease
+    assert_packed_consumer_rules_applied "${packed_packages[0]}"
     ;;
   ios)
     if [[ ! -d ios ]]; then
