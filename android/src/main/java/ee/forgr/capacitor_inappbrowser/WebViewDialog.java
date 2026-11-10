@@ -2735,7 +2735,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-        _webView.getSettings().setDatabaseEnabled(true);
         _webView.getSettings().setDomStorageEnabled(true);
         _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
@@ -2743,7 +2742,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         _webView.getSettings().setUseWideViewPort(true);
         applyTrustedBundledFileCrossOriginSettings(_options != null ? _options.getUrl() : null);
         if (!_options.getPersistWebViewData()) {
-            _webView.getSettings().setDatabaseEnabled(false);
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.clearCache(true);
             _webView.clearHistory();
@@ -5666,8 +5664,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
 
         boolean trustedBundledFile = BundledAssetSupport.isTrustedBundledFileUrl(url);
-        _webView.getSettings().setAllowFileAccessFromFileURLs(trustedBundledFile);
-        _webView.getSettings().setAllowUniversalAccessFromFileURLs(trustedBundledFile);
+        LegacyWebViewCrossOriginSupport.applyTrustedBundledFileAccess(_webView.getSettings(), trustedBundledFile);
     }
 
     private WebResourceResponse interceptBundledAssetRequest(WebResourceRequest request) {

@@ -4,6 +4,7 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
@@ -12,14 +13,13 @@ final class FullscreenWindowState {
 
     private final Window window;
     private final WindowManager.LayoutParams attributes = new WindowManager.LayoutParams();
-    private final int visibility;
+    private final boolean decorFitsSystemWindows;
     private final SystemBarsControllerState systemBars;
 
     FullscreenWindowState(Window window) {
         this.window = window;
         attributes.copyFrom(window.getAttributes());
-        View decor = window.getDecorView();
-        visibility = decor.getSystemUiVisibility();
+        decorFitsSystemWindows = window.getDecorView().getFitsSystemWindows();
         systemBars = SystemBarsControllerState.capture(window);
     }
 
@@ -33,14 +33,8 @@ final class FullscreenWindowState {
                     : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             window.setAttributes(fullscreenAttributes);
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         View decor = window.getDecorView();
-        decor.setSystemUiVisibility(
-            decor.getSystemUiVisibility() |
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-        );
+        WindowCompat.setDecorFitsSystemWindows(window, false);
         WindowInsetsControllerCompat controller = new WindowInsetsControllerCompat(window, decor);
         controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         controller.hide(WindowInsetsCompat.Type.systemBars());
@@ -49,6 +43,6 @@ final class FullscreenWindowState {
     void restore() {
         systemBars.applyTo(window);
         window.setAttributes(attributes);
-        window.getDecorView().setSystemUiVisibility(visibility);
+        WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
     }
 }
