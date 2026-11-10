@@ -68,6 +68,8 @@ public class SystemBarsControllerStateTest {
     }
 
     @Test
+    @Config(sdk = 29)
+    @SuppressWarnings("deprecation")
     public void captureTreatsSystemUiFullscreenFlagAsHiddenStatusBarWhenInsetsMissing() {
         ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
         Window window = activity.getWindow();

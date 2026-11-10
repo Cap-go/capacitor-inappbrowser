@@ -7,6 +7,8 @@ import android.view.Window;
 import android.view.WindowManager;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import java.lang.reflect.Method;
+import java.util.WeakHashMap;
 
 /**
  * Centralizes window chrome decisions so WebViewDialog can avoid deprecated system UI APIs on
@@ -15,6 +17,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 final class SystemUiChromeSupport {
 
     static final int EDGE_TO_EDGE_SDK = Build.VERSION_CODES.VANILLA_ICE_CREAM;
+    private static final WeakHashMap<Window, Boolean> decorFitsPolicyByWindow = new WeakHashMap<>();
 
     private SystemUiChromeSupport() {}
 
@@ -50,6 +53,36 @@ final class SystemUiChromeSupport {
             return;
         }
         WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
+        decorFitsPolicyByWindow.put(window, decorFitsSystemWindows);
+    }
+
+    /** Window policy from API 30; on older releases falls back to the decor view layout flag. */
+    static boolean getDecorFitsSystemWindows(Window window) {
+        if (window == null) {
+            return true;
+        }
+        Boolean tracked = decorFitsPolicyByWindow.get(window);
+        if (tracked != null) {
+            return tracked;
+        }
+        Boolean policy = readWindowDecorFitsPolicy(window);
+        if (policy != null) {
+            return policy;
+        }
+        View decor = window.getDecorView();
+        return decor == null || decor.getFitsSystemWindows();
+    }
+
+    private static Boolean readWindowDecorFitsPolicy(Window window) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null;
+        }
+        try {
+            Method method = Window.class.getMethod("getDecorFitsSystemWindows");
+            return (Boolean) method.invoke(window);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     static void prepareInitialDialogWindow(Window window, View statusBarColorView) {
