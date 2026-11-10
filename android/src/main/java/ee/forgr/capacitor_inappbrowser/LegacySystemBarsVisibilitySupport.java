@@ -5,7 +5,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
-/** Legacy system bar visibility reads for API 24–29 when window insets are not yet available. */
+/** Legacy system bar visibility reads for API 24 to 29 when window insets are not yet available. */
 final class LegacySystemBarsVisibilitySupport {
 
     private LegacySystemBarsVisibilitySupport() {}
