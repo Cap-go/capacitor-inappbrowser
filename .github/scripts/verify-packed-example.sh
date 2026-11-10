@@ -9,7 +9,8 @@ assert_packed_consumer_rules_applied() {
     exit 1
   fi
 
-  if ! tar -tzf "$tarball" | grep -qE '(^|/)android/consumer-rules\.pro$'; then
+  listing="$(tar -tzf "$tarball")"
+  if ! printf '%s\n' "$listing" | grep -qE '(^|/)android/consumer-rules\.pro$'; then
     echo "Packed package is missing android/consumer-rules.pro"
     exit 1
   fi
