@@ -7,6 +7,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import java.lang.reflect.Method;
 
 /**
  * Centralizes window chrome decisions so WebViewDialog can avoid deprecated system UI APIs on
@@ -57,11 +58,24 @@ final class SystemUiChromeSupport {
         if (window == null) {
             return true;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return window.getDecorFitsSystemWindows();
+        Boolean policy = readWindowDecorFitsPolicy(window);
+        if (policy != null) {
+            return policy;
         }
         View decor = window.getDecorView();
         return decor == null || decor.getFitsSystemWindows();
+    }
+
+    private static Boolean readWindowDecorFitsPolicy(Window window) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return null;
+        }
+        try {
+            Method method = Window.class.getMethod("getDecorFitsSystemWindows");
+            return (Boolean) method.invoke(window);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
     }
 
     static void prepareInitialDialogWindow(Window window, View statusBarColorView) {
