@@ -9,8 +9,9 @@ assert_packed_consumer_rules_applied() {
     exit 1
   fi
 
+  local listing
   listing="$(tar -tzf "$tarball")"
-  if ! printf '%s\n' "$listing" | grep -qE '(^|/)android/consumer-rules\.pro$'; then
+  if ! printf '%s\n' "$listing" | grep -E '(^|/)android/consumer-rules\.pro$' >/dev/null; then
     echo "Packed package is missing android/consumer-rules.pro"
     exit 1
   fi
@@ -19,7 +20,7 @@ assert_packed_consumer_rules_applied() {
   if [ -f "app/build/outputs/mapping/release/configuration.txt" ]; then
     config_file="app/build/outputs/mapping/release/configuration.txt"
   else
-    config_file="$(find app/build -name configuration.txt 2>/dev/null | head -n 1 || true)"
+    config_file="$(find app/build -path '*release*' -name configuration.txt 2>/dev/null | head -n 1 || true)"
   fi
   if [ -z "${config_file}" ] || [ ! -f "${config_file}" ]; then
     echo "R8 configuration.txt not found after assembleRelease"
@@ -28,47 +29,88 @@ assert_packed_consumer_rules_applied() {
 
   local extract_dir
   extract_dir="$(mktemp -d)"
-  tar -xzf "$tarball" -C "$extract_dir"
+  tar -xzf "$tarball" -C "${extract_dir}"
   local rules_file
-  rules_file="$(find "$extract_dir" -name consumer-rules.pro | head -n 1 || true)"
+  rules_file="$(find "${extract_dir}" -name consumer-rules.pro | head -n 1 || true)"
   if [ -z "${rules_file}" ]; then
     echo "Could not extract android/consumer-rules.pro from packed package"
     exit 1
   fi
 
+  local config_flat
+  config_flat="$(tr -s '[:space:]' ' ' < "${config_file}")"
+
+  flatten_rule() {
+    local flat
+    flat="$(printf '%s' "$1" | tr -s '[:space:]' ' ')"
+    flat="${flat# }"
+    flat="${flat% }"
+    printf '%s' "${flat}"
+  }
+
   local missing=0
-  local tokens_checked=0
-  local token
-  while IFS= read -r token; do
-    [ -z "${token}" ] && continue
-    case "${token}" in
-      android.*|androidx.*|com.getcapacitor.*|java.*|javax.*|kotlin.*)
-        continue
+  local rules_checked=0
+  local plugin_method_rules=0
+  local block=""
+  local line trimmed flat_block
+
+  flush_keep_block() {
+    [ -z "${block}" ] && return 0
+    flat_block="$(flatten_rule "${block}")"
+    block=""
+    [ -z "${flat_block}" ] && return 0
+    case "${flat_block}" in
+      -keepattributes*)
+        return 0
         ;;
     esac
-    token="${token%.**}"
-    token="${token%'$*'}"
-    token="${token%\*}"
-    if [ -z "${token}" ]; then
-      continue
-    fi
-    tokens_checked=$((tokens_checked + 1))
-    if ! grep -qF "${token}" "${config_file}"; then
-      echo "Merged R8 configuration is missing consumer-rules token: ${token}"
+    rules_checked=$((rules_checked + 1))
+    if ! grep -qF -- "${flat_block}" <<< "${config_flat}"; then
+      echo "Merged R8 configuration is missing packed keep rule: ${flat_block}"
       missing=1
     fi
-  done < <(grep -E '^[[:space:]]*-keep' "${rules_file}" | grep -oE '[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z*][A-Za-z0-9_$*]*)+' | sort -u)
+    if grep -qE -- '@([[:alnum:]_]+\.)*PluginMethod' <<< "${flat_block}"; then
+      plugin_method_rules=$((plugin_method_rules + 1))
+      if ! grep -qE -- '@([[:alnum:]_]+\.)*PluginMethod' <<< "${config_flat}"; then
+        echo "Merged R8 configuration is missing the @PluginMethod member directive from packed consumer rules"
+        missing=1
+      fi
+    fi
+  }
 
-  if [ "${tokens_checked}" -eq 0 ]; then
-    echo "No plugin keep tokens found in packed consumer-rules.pro"
+  while IFS= read -r line || [ -n "${line}" ]; do
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    if [ -z "${trimmed}" ] || [ "${trimmed#\#}" != "${trimmed}" ]; then
+      continue
+    fi
+    if [ "${trimmed#-keep}" != "${trimmed}" ]; then
+      flush_keep_block
+      block="${trimmed}"
+      if [ "${trimmed%\}}" != "${trimmed}" ]; then
+        flush_keep_block
+      fi
+      continue
+    fi
+    if [ -n "${block}" ]; then
+      block="${block} ${trimmed}"
+      if [ "${trimmed%\}}" != "${trimmed}" ]; then
+        flush_keep_block
+      fi
+    fi
+  done < "${rules_file}"
+  flush_keep_block
+
+  if [ "${rules_checked}" -eq 0 ]; then
+    echo "No plugin keep rules found in packed consumer-rules.pro"
     exit 1
   fi
   if [ "${missing}" -ne 0 ]; then
     echo "Packed consumer-rules.pro was not applied in ${config_file}"
     exit 1
   fi
-  echo "Packed consumer-rules.pro is present and applied in merged R8 configuration"
+  echo "Packed consumer-rules.pro keep rules are present in merged R8 configuration (${rules_checked} rules, ${plugin_method_rules} with @PluginMethod members)"
 }
+
 
 
 platform="${1:-}"
