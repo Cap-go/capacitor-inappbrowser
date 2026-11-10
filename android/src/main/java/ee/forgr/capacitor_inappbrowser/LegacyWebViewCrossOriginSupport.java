@@ -1,15 +1,14 @@
 package ee.forgr.capacitor_inappbrowser;
 
-import android.os.Build;
 import android.webkit.WebSettings;
 
-/** WebSettings file-URL cross-origin toggles; required only below API 30. */
+/** WebSettings file-URL cross-origin toggles for validated bundled file pages. */
 final class LegacyWebViewCrossOriginSupport {
 
     private LegacyWebViewCrossOriginSupport() {}
 
     static void applyTrustedBundledFileAccess(WebSettings settings, boolean enabled) {
-        if (settings == null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (settings == null) {
             return;
         }
         applyTrustedBundledFileAccessLegacy(settings, enabled);

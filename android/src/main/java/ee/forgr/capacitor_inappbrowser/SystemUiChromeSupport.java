@@ -52,6 +52,18 @@ final class SystemUiChromeSupport {
         WindowCompat.setDecorFitsSystemWindows(window, decorFitsSystemWindows);
     }
 
+    /** Window policy from API 30; on older releases falls back to the decor view layout flag. */
+    static boolean getDecorFitsSystemWindows(Window window) {
+        if (window == null) {
+            return true;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return window.getDecorFitsSystemWindows();
+        }
+        View decor = window.getDecorView();
+        return decor == null || decor.getFitsSystemWindows();
+    }
+
     static void prepareInitialDialogWindow(Window window, View statusBarColorView) {
         if (window == null) {
             return;

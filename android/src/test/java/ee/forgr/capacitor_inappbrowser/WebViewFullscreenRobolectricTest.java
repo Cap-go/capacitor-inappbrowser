@@ -310,7 +310,7 @@ public class WebViewFullscreenRobolectricTest {
     public void transitionsKeepLiveWebViewAndRestoreWindowAndPadding() throws Exception {
         Fixture f = new Fixture(false, false);
         int flags = f.dialog.getWindow().getAttributes().flags;
-        boolean decorFitsSystemWindows = f.dialog.getWindow().getDecorView().getFitsSystemWindows();
+        boolean decorFitsSystemWindows = SystemUiChromeSupport.getDecorFitsSystemWindows(f.dialog.getWindow());
         Object parent = f.webView.getParent();
         f.dialog.setFullscreen(true);
         f.dialog.setFullscreen(true);
@@ -321,7 +321,7 @@ public class WebViewFullscreenRobolectricTest {
         f.dialog.setFullscreen(false);
         f.dialog.setFullscreen(false);
         assertEquals(flags, f.dialog.getWindow().getAttributes().flags);
-        assertEquals(decorFitsSystemWindows, f.dialog.getWindow().getDecorView().getFitsSystemWindows());
+        assertEquals(decorFitsSystemWindows, SystemUiChromeSupport.getDecorFitsSystemWindows(f.dialog.getWindow()));
         assertEquals(View.VISIBLE, f.toolbar.getVisibility());
         assertEquals(20, f.container.getPaddingTop());
         assertEquals(40, f.container.getPaddingBottom());

@@ -2735,13 +2735,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ensureBundledAssetLoader();
         _webView.getSettings().setJavaScriptEnabled(true);
         _webView.getSettings().setJavaScriptCanOpenWindowsAutomatically(true);
-        _webView.getSettings().setDomStorageEnabled(true);
+        applyPersistedWebViewStorageSettings(true);
         _webView.getSettings().setAllowContentAccess(true);
         _webView.getSettings().setAllowFileAccess(true);
         _webView.getSettings().setLoadWithOverviewMode(true);
         _webView.getSettings().setUseWideViewPort(true);
         applyTrustedBundledFileCrossOriginSettings(_options != null ? _options.getUrl() : null);
         if (!_options.getPersistWebViewData()) {
+            applyPersistedWebViewStorageSettings(false);
             _webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
             _webView.clearCache(true);
             _webView.clearHistory();
@@ -5656,6 +5657,16 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private boolean resolveNeedsAssetLoaderForUrl(String url, BundledAssetSupport.LocalConfig localConfig) {
         BundledAssetSupport.Resolution resolution = BundledAssetSupport.resolve(url, localConfig);
         return resolution != null && resolution.needsAssetLoader;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void applyPersistedWebViewStorageSettings(boolean enabled) {
+        if (_webView == null) {
+            return;
+        }
+        // WebSQL remains available on older WebView providers when persistWebViewData is enabled.
+        _webView.getSettings().setDatabaseEnabled(enabled);
+        _webView.getSettings().setDomStorageEnabled(enabled);
     }
 
     private void applyTrustedBundledFileCrossOriginSettings(String url) {

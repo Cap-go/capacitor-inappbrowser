@@ -24,12 +24,14 @@ public class FullscreenWindowStateTest {
         dialog.create();
         assertNotNull(dialog.getWindow());
         WindowCompat.setDecorFitsSystemWindows(dialog.getWindow(), true);
-        boolean decorFitsBefore = dialog.getWindow().getDecorView().getFitsSystemWindows();
+        assertTrue(SystemUiChromeSupport.getDecorFitsSystemWindows(dialog.getWindow()));
+        assertFalse(dialog.getWindow().getDecorView().getFitsSystemWindows());
 
         FullscreenWindowState state = new FullscreenWindowState(dialog.getWindow());
         state.enter();
+        assertFalse(SystemUiChromeSupport.getDecorFitsSystemWindows(dialog.getWindow()));
         state.restore();
-        assertEquals(decorFitsBefore, dialog.getWindow().getDecorView().getFitsSystemWindows());
+        assertTrue(SystemUiChromeSupport.getDecorFitsSystemWindows(dialog.getWindow()));
     }
 
     @Test
