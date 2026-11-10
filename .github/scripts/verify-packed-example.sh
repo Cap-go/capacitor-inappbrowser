@@ -4,6 +4,7 @@ set -euo pipefail
 
 assert_packed_consumer_rules_applied() {
   local tarball="$1"
+  local plugin_root="${2:-}"
   if [ ! -f "$tarball" ]; then
     echo "Packed tarball not found: $tarball"
     exit 1
@@ -37,8 +38,16 @@ assert_packed_consumer_rules_applied() {
     exit 1
   fi
 
-  local config_flat
-  config_flat="$(tr -s '[:space:]' ' ' < "${config_file}")"
+  local source_rules=""
+  if [ -n "${plugin_root}" ] && [ -f "${plugin_root}/android/consumer-rules.pro" ]; then
+    source_rules="${plugin_root}/android/consumer-rules.pro"
+  elif [ -n "${plugin_root}" ] && [ -f "${plugin_root}/android/src/main/consumer-rules.pro" ]; then
+    source_rules="${plugin_root}/android/src/main/consumer-rules.pro"
+  fi
+  if [ -z "${source_rules}" ]; then
+    echo "Repo consumer-rules.pro not found"
+    exit 1
+  fi
 
   flatten_rule() {
     local flat
@@ -48,22 +57,68 @@ assert_packed_consumer_rules_applied() {
     printf '%s' "${flat}"
   }
 
+  collect_keep_blocks() {
+    local file="$1"
+    local block="" line trimmed flat_block
+    flush_keep_block() {
+      [ -z "${block}" ] && return 0
+      flat_block="$(flatten_rule "${block}")"
+      block=""
+      [ -z "${flat_block}" ] && return 0
+      case "${flat_block}" in
+        -keepattributes*)
+          return 0
+          ;;
+      esac
+      printf '%s\n' "${flat_block}"
+    }
+    while IFS= read -r line || [ -n "${line}" ]; do
+      trimmed="${line#"${line%%[![:space:]]*}"}"
+      if [ -z "${trimmed}" ] || [ "${trimmed#\#}" != "${trimmed}" ]; then
+        continue
+      fi
+      if [ "${trimmed#-keep}" != "${trimmed}" ]; then
+        flush_keep_block
+        block="${trimmed}"
+        if [ "${trimmed%\}}" != "${trimmed}" ]; then
+          flush_keep_block
+        fi
+        continue
+      fi
+      if [ -n "${block}" ]; then
+        block="${block} ${trimmed}"
+        if [ "${trimmed%\}}" != "${trimmed}" ]; then
+          flush_keep_block
+        fi
+      fi
+    done < "${file}"
+    flush_keep_block
+  }
+
+  local source_blocks packed_blocks
+  source_blocks="$(collect_keep_blocks "${source_rules}")"
+  packed_blocks="$(collect_keep_blocks "${rules_file}")"
+  if [ -z "${source_blocks}" ]; then
+    echo "No plugin keep rules found in ${source_rules}"
+    exit 1
+  fi
+
   local missing=0
   local rules_checked=0
   local plugin_method_rules=0
-  local block=""
-  local line trimmed flat_block
+  local flat_block
+  while IFS= read -r flat_block || [ -n "${flat_block}" ]; do
+    [ -z "${flat_block}" ] && continue
+    if ! grep -qF -- "${flat_block}" <<< "${packed_blocks}"; then
+      echo "Packed consumer-rules.pro is missing repo keep rule: ${flat_block}"
+      missing=1
+    fi
+  done <<< "${source_blocks}"
 
-  flush_keep_block() {
-    [ -z "${block}" ] && return 0
-    flat_block="$(flatten_rule "${block}")"
-    block=""
-    [ -z "${flat_block}" ] && return 0
-    case "${flat_block}" in
-      -keepattributes*)
-        return 0
-        ;;
-    esac
+  local config_flat
+  config_flat="$(tr -s '[:space:]' ' ' < "${config_file}")"
+  while IFS= read -r flat_block || [ -n "${flat_block}" ]; do
+    [ -z "${flat_block}" ] && continue
     rules_checked=$((rules_checked + 1))
     if ! grep -qF -- "${flat_block}" <<< "${config_flat}"; then
       echo "Merged R8 configuration is missing packed keep rule: ${flat_block}"
@@ -76,29 +131,7 @@ assert_packed_consumer_rules_applied() {
         missing=1
       fi
     fi
-  }
-
-  while IFS= read -r line || [ -n "${line}" ]; do
-    trimmed="${line#"${line%%[![:space:]]*}"}"
-    if [ -z "${trimmed}" ] || [ "${trimmed#\#}" != "${trimmed}" ]; then
-      continue
-    fi
-    if [ "${trimmed#-keep}" != "${trimmed}" ]; then
-      flush_keep_block
-      block="${trimmed}"
-      if [ "${trimmed%\}}" != "${trimmed}" ]; then
-        flush_keep_block
-      fi
-      continue
-    fi
-    if [ -n "${block}" ]; then
-      block="${block} ${trimmed}"
-      if [ "${trimmed%\}}" != "${trimmed}" ]; then
-        flush_keep_block
-      fi
-    fi
-  done < "${rules_file}"
-  flush_keep_block
+  done <<< "${packed_blocks}"
 
   if [ "${rules_checked}" -eq 0 ]; then
     echo "No plugin keep rules found in packed consumer-rules.pro"
@@ -110,6 +143,7 @@ assert_packed_consumer_rules_applied() {
   fi
   echo "Packed consumer-rules.pro keep rules are present in merged R8 configuration (${rules_checked} rules, ${plugin_method_rules} with @PluginMethod members)"
 }
+
 
 
 
@@ -180,7 +214,7 @@ case "$platform" in
     bunx cap sync android
     cd android
     ./gradlew build test assembleRelease
-    assert_packed_consumer_rules_applied "${packed_packages[0]}"
+    assert_packed_consumer_rules_applied "${packed_packages[0]}" "$repo_root"
     ;;
   ios)
     if [[ ! -d ios ]]; then
