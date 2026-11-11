@@ -16,6 +16,17 @@ Open web content inside your Capacitor app with a full-featured in-app browser: 
   <img src="https://raw.githubusercontent.com/Cap-go/capacitor-inappbrowser/main/assets/iab-layer-controls-demo.webp" alt="iOS example app showing a web page in the native browser with an Ionic overlay rendered above it" width="300" />
 </p>
 
+## Built and maintained with AI
+
+We build, improve and fix our plugins with heavy use of AI. Capgo the product is mostly AI-optional for you; the AI is our own engineering system, and the speed it gives us is part of what you pay for.
+
+- Most plugin issues get a fix pull request the same day, often within a couple of hours, and are usually resolved in one to two days.
+- Every pull request is reviewed automatically by our AI review system, usually within minutes.
+- Our AI pre-checks tests, code review, conventions and security, then a human validates and merges.
+- In the last 90 days, 95% of plugin issues were resolved.
+
+[Learn more about how we build with AI](https://capgo.app/docs/plugins/ai-engineering/)
+
 ## Key features
 
 - **Two browser modes**: `open()` uses SFSafariViewController on iOS and Chrome Custom Tabs on Android, `openWebView()` opens a WebView with your own toolbar, title, colors and buttons.
