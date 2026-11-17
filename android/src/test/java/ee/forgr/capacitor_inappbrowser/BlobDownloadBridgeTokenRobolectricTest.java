@@ -9,7 +9,10 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -82,6 +85,69 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         assertEquals(0, blobDownloadSessions().size());
     }
 
+    @Test
+    public void handleBlobDownloadRequiresToken() throws Exception {
+        RecordingExecutorService executor = new RecordingExecutorService();
+        setField("executorService", executor);
+
+        callBridge("handleBlobDownload", legacyPayload(null));
+        callBridge("handleBlobDownload", legacyPayload("not-the-token"));
+        assertEquals(0, executor.submitted);
+
+        callBridge("handleBlobDownload", legacyPayload(blobDownloadToken()));
+        assertEquals(1, executor.submitted);
+    }
+
+    @Test
+    public void appendBlobDownloadChunkRequiresToken() throws Exception {
+        String token = blobDownloadToken();
+        callBridge("startBlobDownload", startPayload(token));
+
+        callBridge("appendBlobDownloadChunk", chunkPayload(null));
+        callBridge("appendBlobDownloadChunk", chunkPayload("not-the-token"));
+        assertEquals(0L, sessionBytesWritten("session-1"));
+
+        callBridge("appendBlobDownloadChunk", chunkPayload(token));
+        assertEquals(2L, sessionBytesWritten("session-1"));
+    }
+
+    @Test
+    public void finishBlobDownloadRequiresToken() throws Exception {
+        String token = blobDownloadToken();
+        callBridge("startBlobDownload", startPayload(token));
+        callBridge("appendBlobDownloadChunk", chunkPayload(token));
+
+        callBridge("finishBlobDownload", new JSONObject().put("sessionId", "session-1"));
+        callBridge("finishBlobDownload", new JSONObject().put("token", "not-the-token").put("sessionId", "session-1"));
+        assertTrue("finish without a valid token must not touch the session", blobDownloadSessions().containsKey("session-1"));
+
+        callBridge("finishBlobDownload", new JSONObject().put("token", token).put("sessionId", "session-1"));
+        assertEquals(0, blobDownloadSessions().size());
+    }
+
+    private JSONObject legacyPayload(String token) throws Exception {
+        JSONObject payload = new JSONObject().put("base64", "aGk=").put("mimeType", "text/plain").put("fileName", "a.txt");
+        if (token != null) {
+            payload.put("token", token);
+        }
+        return payload;
+    }
+
+    private JSONObject chunkPayload(String token) throws Exception {
+        JSONObject payload = new JSONObject().put("sessionId", "session-1").put("base64", "aGk=");
+        if (token != null) {
+            payload.put("token", token);
+        }
+        return payload;
+    }
+
+    private long sessionBytesWritten(String sessionId) throws Exception {
+        Object session = blobDownloadSessions().get(sessionId);
+        Field field = session.getClass().getDeclaredField("bytesWritten");
+        field.setAccessible(true);
+        return field.getLong(session);
+    }
+
     private JSONObject startPayload(String token) throws Exception {
         JSONObject payload = new JSONObject()
             .put("sessionId", "session-1")
@@ -117,6 +183,40 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         Field field = WebViewDialog.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(dialog, value);
+    }
+
+    // Counts tasks instead of running them, so the legacy download never touches the file system.
+    private static final class RecordingExecutorService extends AbstractExecutorService {
+
+        int submitted;
+
+        @Override
+        public void execute(Runnable command) {
+            submitted++;
+        }
+
+        @Override
+        public void shutdown() {}
+
+        @Override
+        public List<Runnable> shutdownNow() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public boolean isShutdown() {
+            return false;
+        }
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+
+        @Override
+        public boolean awaitTermination(long timeout, TimeUnit unit) {
+            return true;
+        }
     }
 
     private static final class UrlTrackingWebView extends WebView {
