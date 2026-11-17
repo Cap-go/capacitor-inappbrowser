@@ -3852,6 +3852,11 @@ extension WKWebViewController: WKNavigationDelegate {
             /* allows to open links with self-signed certificates
              Follow Apple's guidelines https://developer.apple.com/documentation/foundation/url_loading_system/handling_an_authentication_challenge/performing_manual_server_trust_authentication
              */
+            print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
+                  "certificate for \(challenge.protectionSpace.host). This option is intended for known, " +
+                  "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
+                  "page load and should never be enabled for a production flow handling sensitive data " +
+                  "(login, payments, personal data).")
             guard let serverTrust = challenge.protectionSpace.serverTrust  else {
                 completionHandler(.useCredential, nil)
                 return

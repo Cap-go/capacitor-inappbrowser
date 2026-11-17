@@ -7420,8 +7420,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return;
                     }
                     boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
-                    if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) handler.proceed();
-                    else {
+                    if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
+                        Log.w(
+                            "InAppBrowser",
+                            "ignoreUntrustedSSLError is enabled — accepting an untrusted certificate for " +
+                            redactUrlForLogging(error.getUrl()) +
+                            ". This option is intended for known, trusted self-signed/internal endpoints only; " +
+                            "it disables certificate validation for this page load and should never be enabled " +
+                            "for a production flow handling sensitive data (login, payments, personal data)."
+                        );
+                        handler.proceed();
+                    } else {
                         super.onReceivedSslError(view, handler, error);
                     }
                 }
