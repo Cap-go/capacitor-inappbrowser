@@ -605,6 +605,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean cookieFlushScheduled = new AtomicBoolean(false);
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
+    // Only the blob download script injected into the main frame knows this token. Iframes can call
+    // the same @JavascriptInterface methods, and the main-frame origin check does not stop them.
+    private final String blobDownloadToken = UUID.randomUUID().toString();
     private final Map<String, ClientCertificateIdentity> clientCertificateIdentities = new ConcurrentHashMap<>();
     private int iconColor = Color.BLACK; // Default icon color
     private Typeface cachedTitleTypeface;
@@ -1229,6 +1232,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             performTakeScreenshotFromJavascriptBridge(requestId);
         }
 
+        private JSONObject parseTrustedBlobDownloadPayload(String payload, String methodName) {
+            try {
+                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download payload is missing");
+                if (blobDownloadToken.equals(jsonPayload.optString("token", null))) {
+                    return jsonPayload;
+                }
+            } catch (JSONException ignored) {}
+            logBlockedJavascriptBridgeCall(methodName + "(invalid-token)");
+            return null;
+        }
+
         @JavascriptInterface
         public void handleBlobDownload(String payload) {
             if (!isJavascriptBridgeAllowedForMainFrame()) {
@@ -1238,10 +1252,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
+            JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "handleBlobDownload");
+            if (jsonPayload == null) {
+                return;
+            }
 
             executorService.execute(() -> {
                 try {
-                    JSONObject jsonPayload = parseBridgePayload(payload, "Blob download payload is missing");
                     String base64 = jsonPayload.optString("base64", "");
                     if (TextUtils.isEmpty(base64)) {
                         throw new IOException("Blob download payload is empty");
@@ -1287,9 +1304,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
+            JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "startBlobDownload");
+            if (jsonPayload == null) {
+                return;
+            }
 
             try {
-                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download start payload is missing");
                 String sessionId = jsonPayload.optString("sessionId", "");
                 if (TextUtils.isEmpty(sessionId)) {
                     throw new IOException("Blob download session id is missing");
@@ -1299,6 +1319,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 String sourceUrl = jsonPayload.optString("sourceUrl", null);
                 String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
                 long expectedSize = jsonPayload.optLong("size", -1L);
+                if (expectedSize < 0) {
+                    throw new IOException("Blob download size is missing");
+                }
                 File outputFile = createDownloadFile(fileName);
                 BlobDownloadSession session = new BlobDownloadSession(
                     outputFile,
@@ -1327,10 +1350,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
+            JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "appendBlobDownloadChunk");
+            if (jsonPayload == null) {
+                return;
+            }
 
             String sessionId = null;
             try {
-                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download chunk payload is missing");
                 sessionId = jsonPayload.optString("sessionId", "");
                 if (TextUtils.isEmpty(sessionId)) {
                     throw new IOException("Blob download session id is missing");
@@ -1370,10 +1396,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
+            JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "finishBlobDownload");
+            if (jsonPayload == null) {
+                return;
+            }
 
             String sessionId = null;
             try {
-                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download completion payload is missing");
                 sessionId = jsonPayload.optString("sessionId", "");
                 if (TextUtils.isEmpty(sessionId)) {
                     throw new IOException("Blob download session id is missing");
@@ -1417,22 +1446,19 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             if (_options == null || !_options.getHandleDownloads()) {
                 return;
             }
+            JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "abortBlobDownload");
+            if (jsonPayload == null) {
+                return;
+            }
 
-            String sessionId = null;
+            String sessionId = jsonPayload.optString("sessionId", "");
             String reason = "Blob download aborted";
-            String sourceUrl = null;
-            String fileName = null;
-            String mimeType = null;
-            try {
-                JSONObject jsonPayload = parseBridgePayload(payload, "Blob download abort payload is missing");
-                sessionId = jsonPayload.optString("sessionId", "");
-                if (!TextUtils.isEmpty(jsonPayload.optString("reason", ""))) {
-                    reason = jsonPayload.optString("reason", reason);
-                }
-                sourceUrl = jsonPayload.optString("sourceUrl", null);
-                fileName = jsonPayload.optString("fileName", null);
-                mimeType = jsonPayload.optString("mimeType", null);
-            } catch (Exception ignored) {}
+            if (!TextUtils.isEmpty(jsonPayload.optString("reason", ""))) {
+                reason = jsonPayload.optString("reason", reason);
+            }
+            String sourceUrl = jsonPayload.optString("sourceUrl", null);
+            String fileName = jsonPayload.optString("fileName", null);
+            String mimeType = jsonPayload.optString("mimeType", null);
 
             BlobDownloadSession session = abortBlobDownloadSession(sessionId, true);
             notifyDownloadFailed(
@@ -2420,6 +2446,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
               const fallbackFileName = %s;
               const legacyMaxBytes = %d;
               const chunkSize = %d;
+              const token = %s;
               const matchingLink = Array.from(document.querySelectorAll('a[download]')).find(link => link.href === blobUrl);
               const bridge = (window.mobileApp && window.mobileApp.startBlobDownload && window.mobileApp.appendBlobDownloadChunk && window.mobileApp.finishBlobDownload)
                 ? window.mobileApp
@@ -2455,6 +2482,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
                   bridge.startBlobDownload(JSON.stringify({
+                    token,
                     sessionId,
                     fileName,
                     sourceUrl: blobUrl,
@@ -2463,9 +2491,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                   }));
                   for (let offset = 0; offset < blob.size; offset += chunkSize) {
                     const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
-                    bridge.appendBlobDownloadChunk(JSON.stringify({ sessionId, base64 }));
+                    bridge.appendBlobDownloadChunk(JSON.stringify({ token, sessionId, base64 }));
                   }
-                  bridge.finishBlobDownload(JSON.stringify({ sessionId }));
+                  bridge.finishBlobDownload(JSON.stringify({ token, sessionId }));
                   return;
                 }
 
@@ -2475,6 +2503,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 const base64 = await readChunkAsBase64(blob);
                 bridge.handleBlobDownload(JSON.stringify({
+                  token,
                   fileName,
                   sourceUrl: blobUrl,
                   mimeType: blob.type || fallbackMimeType,
@@ -2484,6 +2513,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
               })().catch(error => {
               if (bridge && bridge.abortBlobDownload) {
                 bridge.abortBlobDownload(JSON.stringify({
+                  token,
                   sessionId,
                   fileName,
                   sourceUrl: blobUrl,
@@ -2499,7 +2529,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             JSONObject.quote(fallbackMimeType),
             JSONObject.quote(fallbackFileName),
             MAX_LEGACY_BLOB_DOWNLOAD_BYTES,
-            BLOB_DOWNLOAD_CHUNK_BYTES
+            BLOB_DOWNLOAD_CHUNK_BYTES,
+            JSONObject.quote(blobDownloadToken)
         );
 
         final WebView webView = _webView;
