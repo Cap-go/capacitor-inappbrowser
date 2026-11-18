@@ -10,6 +10,7 @@ import UIKit
 import PassKit
 import QuickLook
 import WebKit
+import Security
 
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
@@ -3856,11 +3857,19 @@ extension WKWebViewController: WKNavigationDelegate {
                 completionHandler(.useCredential, nil)
                 return
             }
-            print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
-                  "certificate for \(challenge.protectionSpace.host). This option is intended for known, " +
-                  "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
-                  "page load and should never be enabled for a production flow handling sensitive data " +
-                  "(login, payments, personal data).")
+            // Only warn when this is actually a server-trust challenge whose trust
+            // evaluation genuinely failed — SecTrustEvaluateWithError returning true
+            // means the certificate is in fact valid/trusted, in which case accepting
+            // it here isn't bypassing anything and shouldn't be logged as if it were.
+            let isServerTrustChallenge = challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
+            let trustEvaluationFailed = !SecTrustEvaluateWithError(serverTrust, nil)
+            if isServerTrustChallenge && trustEvaluationFailed {
+                print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
+                      "certificate for \(challenge.protectionSpace.host). This option is intended for known, " +
+                      "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
+                      "page load and should never be enabled for a production flow handling sensitive data " +
+                      "(login, payments, personal data).")
+            }
             let credential = URLCredential(trust: serverTrust)
             completionHandler(.useCredential, credential)
         }
