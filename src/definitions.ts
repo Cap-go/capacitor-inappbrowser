@@ -1307,8 +1307,9 @@ export interface OpenWebViewOptions {
   /**
    * ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.
    *
-   * ⚠️ Security warning: this disables certificate validation for the page load (and, when a
-   * client certificate identity is also configured, for downloads through this WebView too).
+   * ⚠️ Security warning: this disables certificate validation for the page load. On Android, it
+   * also applies to downloads through this WebView, whether or not a client certificate identity
+   * is configured.
    * Only enable this for known, trusted endpoints you control (e.g. a self-signed internal/dev
    * server) — never for a production flow handling sensitive data such as login, payments, or
    * personal data, since it allows a man-in-the-middle attacker to intercept and tamper with

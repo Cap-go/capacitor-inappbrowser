@@ -349,6 +349,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private SwipeRefreshLayout swipeRefreshLayout;
     private boolean reloadFromGestureInProgress = false;
     private WebView _webView;
+    // ARGUS: hosts already warned about ignoreUntrustedSSLError accepting an untrusted
+    // certificate, for this WebViewDialog instance — avoids flooding logcat with an
+    // identical Log.w for every sub-resource (CSS/JS/image/etc.) loaded from the same
+    // untrusted host on a single page.
+    private final Set<String> untrustedSslWarnedHosts = new HashSet<>();
     private FullscreenWindowState nativeFullscreenWindow;
     private FullscreenWindowState mediaFullscreenWindow;
     private MaterialButton fullscreenExitButton;
@@ -2003,7 +2008,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         try {
             Uri parsedUrl = Uri.parse(rawUrl);
-            return parsedUrl.buildUpon().encodedQuery(null).encodedFragment(null).build().toString();
+            // Rebuild the authority from host[:port] only, dropping any userinfo
+            // (e.g. "user:pass@") that may be embedded in the original URL, in
+            // addition to the query/fragment already stripped below — this helper
+            // is used to redact URLs before writing them to the device log.
+            String host = parsedUrl.getHost();
+            Uri.Builder builder = parsedUrl.buildUpon().encodedQuery(null).encodedFragment(null);
+            if (!TextUtils.isEmpty(host)) {
+                int port = parsedUrl.getPort();
+                builder.encodedAuthority(port != -1 ? host + ":" + port : host);
+            }
+            return builder.build().toString();
         } catch (Exception exception) {
             return rawUrl;
         }
@@ -7421,14 +7436,29 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     }
                     boolean ignoreSSLUntrustedError = _options.ignoreUntrustedSSLError();
                     if (ignoreSSLUntrustedError && error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
-                        Log.w(
-                            "InAppBrowser",
-                            "ignoreUntrustedSSLError is enabled — accepting an untrusted certificate for " +
-                            redactUrlForLogging(error.getUrl()) +
-                            ". This option is intended for known, trusted self-signed/internal endpoints only; " +
-                            "it disables certificate validation for this page load and should never be enabled " +
-                            "for a production flow handling sensitive data (login, payments, personal data)."
-                        );
+                        String redactedUrl = redactUrlForLogging(error.getUrl());
+                        // Warn once per host, not once per sub-resource — a page with many
+                        // resources (CSS/JS/images/etc.) from the same untrusted host would
+                        // otherwise flood logcat with an identical message for each one.
+                        String warnKey = redactedUrl != null ? redactedUrl : "";
+                        try {
+                            String host = Uri.parse(error.getUrl()).getHost();
+                            if (!TextUtils.isEmpty(host)) {
+                                warnKey = host;
+                            }
+                        } catch (Exception ignored) {
+                            // fall back to the full redacted URL as the dedup key
+                        }
+                        if (untrustedSslWarnedHosts.add(warnKey)) {
+                            Log.w(
+                                "InAppBrowser",
+                                "ignoreUntrustedSSLError is enabled — accepting an untrusted certificate for " +
+                                redactedUrl +
+                                ". This option is intended for known, trusted self-signed/internal endpoints only; " +
+                                "it disables certificate validation for this page load and should never be enabled " +
+                                "for a production flow handling sensitive data (login, payments, personal data)."
+                            );
+                        }
                         handler.proceed();
                     } else {
                         super.onReceivedSslError(view, handler, error);
