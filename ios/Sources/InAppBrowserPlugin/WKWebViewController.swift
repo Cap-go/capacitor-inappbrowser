@@ -3878,6 +3878,7 @@ extension WKWebViewController: WKNavigationDelegate {
                             completionHandler(.useCredential, credential)
                         }
                     }
+                    // errSecSuccess schedules the callback; any other status must complete here.
                     if status != errSecSuccess {
                         DispatchQueue.main.async {
                             completionHandler(.useCredential, credential)
