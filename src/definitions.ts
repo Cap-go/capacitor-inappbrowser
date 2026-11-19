@@ -72,6 +72,24 @@ export type ConfirmBtnListener = (state: BtnEvent) => void;
 export type ButtonNearListener = (state: ButtonNearDoneEvent) => void;
 export type CustomSchemeInterceptedListener = (state: CustomSchemeInterceptedEvent) => void;
 
+/**
+ * Event emitted when `preventDeeplink` blocks a link that would otherwise leave the in-app browser.
+ *
+ * @since 8.28.0
+ */
+export interface DeepLinkPreventedEvent {
+  /**
+   * Webview instance id.
+   */
+  id?: string;
+  /**
+   * URL the user attempted to open while deeplink prevention was enabled.
+   */
+  url: string;
+}
+
+export type DeepLinkPreventedListener = (state: DeepLinkPreventedEvent) => void;
+
 export type WebViewPointerInputEventType = 'click' | 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel';
 export type WebViewInputEventType = WebViewPointerInputEventType | 'scroll';
 
@@ -1448,6 +1466,8 @@ export interface OpenWebViewOptions {
    * On iOS, listing a custom scheme under `LSApplicationQueriesSchemes` is only required when
    * you rely on `canOpenURL` for that scheme (for example `instagram://`). It is not required
    * for HTTPS `authorizedAppLinks`, and `mailto`/`tel`/`sms` open without that Info.plist entry.
+   * When a blocked link would have opened externally, listen for the `deepLinkPrevented` event to
+   * receive `{ url }` (and optional `id`). The web implementation does not emit this event.
    * @since 0.1.0
    * @default false
    * @example
@@ -1998,6 +2018,13 @@ export interface InAppBrowserPlugin {
     eventName: 'customSchemeIntercepted',
     listenerFunc: CustomSchemeInterceptedListener,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when `preventDeeplink` blocks a link that would leave the in-app browser.
+   * Native Android and iOS only; the web implementation does not emit this event.
+   *
+   * @since 8.28.0
+   */
+  addListener(eventName: 'deepLinkPrevented', listenerFunc: DeepLinkPreventedListener): Promise<PluginListenerHandle>;
   /**
    * Will be triggered after native download handling saves a file locally.
    * Enable this with `handleDownloads: true` when opening the webview.

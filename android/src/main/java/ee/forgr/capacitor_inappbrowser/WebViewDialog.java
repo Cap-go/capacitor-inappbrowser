@@ -6702,20 +6702,30 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                     boolean isNotHttpOrHttps = !url.startsWith("https://") && !url.startsWith("http://");
 
-                    // If preventDeeplink is true, don't handle any non-http(s) URLs
+                    List<String> authorizedLinks = _options.getAuthorizedAppLinks();
+                    boolean urlAuthorized = isUrlAuthorized(url, authorizedLinks);
+
+                    // If preventDeeplink is true, block external handling and emit deepLinkPrevented.
                     if (_options.getPreventDeeplink()) {
                         Log.d("InAppBrowser", "preventDeeplink is true");
+                        if (
+                            DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(url, authorizedLinks) &&
+                            _options.getCallbacks() != null
+                        ) {
+                            _options.getCallbacks().deepLinkPrevented(url);
+                        }
+
                         if (isNotHttpOrHttps) {
                             if (request.isForMainFrame()) {
                                 stopReloadGesture();
                             }
                             return true;
                         }
-                    }
 
-                    // Handle authorized app links
-                    List<String> authorizedLinks = _options.getAuthorizedAppLinks();
-                    boolean urlAuthorized = isUrlAuthorized(url, authorizedLinks);
+                        if (urlAuthorized) {
+                            return false;
+                        }
+                    }
 
                     Log.d("InAppBrowser", "authorizedLinks: " + authorizedLinks);
                     Log.d("InAppBrowser", "urlAuthorized: " + urlAuthorized);

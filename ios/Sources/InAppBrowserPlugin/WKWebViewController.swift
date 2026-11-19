@@ -3180,6 +3180,9 @@ fileprivate extension WKWebViewController {
         // If preventDeeplink is true, don't try to open URLs in external apps
         if preventDeeplink {
             print("[InAppBrowser] preventDeeplink is true, won't try to open URLs in external apps")
+            if DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(for: url, authorizedAppLinks: authorizedAppLinks) {
+                emit("deepLinkPrevented", data: ["url": url.absoluteString])
+            }
             completion(false)
             return
         }
@@ -3576,6 +3579,10 @@ extension WKWebViewController: WKUIDelegate {
             }
             return nil
         case .loadInCurrentWebView:
+            if preventDeeplink,
+               DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(for: url, authorizedAppLinks: authorizedAppLinks) {
+                emit("deepLinkPrevented", data: ["url": url.absoluteString])
+            }
             webView.load(navigationAction.request)
             return nil
         case .createPopup:
