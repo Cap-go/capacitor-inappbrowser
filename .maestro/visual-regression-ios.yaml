@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+env:
+  THRESHOLD_PERCENTAGE: 97
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    id: "maestro-run-visual-regression"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Visual regression ready"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Layout probe"
+    timeout: 60000
+- assertScreenshot:
+    path: visual-regression/baselines/ios/blank-toolbar-layout.png
+    thresholdPercentage: ${THRESHOLD_PERCENTAGE}

@@ -1,0 +1,16 @@
+appId: ${APP_ID}
+androidWebViewHierarchy: devtools
+---
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    id: "maestro-run-visual-regression"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Visual regression ready"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Layout probe"
+    timeout: 60000
+- takeScreenshot: visual-regression/baselines/android/blank-toolbar-layout.png

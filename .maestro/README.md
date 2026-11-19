@@ -10,6 +10,12 @@ This folder contains Maestro coverage for the example app.
 
 `download-handling-android.yaml` opens the example app's auto-download demo and verifies that the downloaded blob file is rendered back inside the in-app browser.
 
+### Visual regression (CI)
+
+`visual-regression-android.yaml` and `visual-regression-ios.yaml` open a blank-toolbar layout probe in the example app and compare emulator or simulator screenshots against baselines in `visual-regression/baselines/`. CI runs both flows in `.github/workflows/test.yml` with animations disabled and a fixed status bar.
+
+Record new baselines locally with `visual-regression-record-android.yaml` or `visual-regression-record-ios.yaml` after intentional UI changes.
+
 ### Run locally
 
 1. Start an Android emulator or connect a device with `adb`.

@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 240000
+- tapOn:
+    id: "maestro-run-visual-regression"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Visual regression ready"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Layout probe"
+    timeout: 60000
+- takeScreenshot: visual-regression/baselines/ios/blank-toolbar-layout.png

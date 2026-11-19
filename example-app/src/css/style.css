@@ -130,6 +130,10 @@ body {
   background: #0ea5e9;
 }
 
+.maestro-btn-visual {
+  background: #7c3aed;
+}
+
 .maestro-status-line {
   margin-top: 8px;
   font-size: 14px;
