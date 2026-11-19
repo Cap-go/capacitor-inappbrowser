@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 
 import android.webkit.WebView;
 import androidx.activity.ComponentActivity;
+import com.getcapacitor.JSObject;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -16,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.TimeUnit;
-import com.getcapacitor.JSObject;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
