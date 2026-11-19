@@ -26,3 +26,4 @@ if ! timeout 75 xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b; then
 fi
 
 xcrun simctl install "$IOS_SIMULATOR_UDID" "$app_bundle"
+open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
