@@ -212,6 +212,10 @@ export function attachVisualRegressionHarness() {
   runButton.disabled = false;
   setStatus("Not started");
 
+  window.__capgoRunMaestroVisualRegression = () => {
+    runButton.click();
+  };
+
   runButton.addEventListener("click", async () => {
     if (currentRun) {
       return;

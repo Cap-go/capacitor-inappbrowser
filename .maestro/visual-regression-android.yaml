@@ -8,12 +8,15 @@ env:
 - tapOn:
     text: "Wait"
     optional: true
+- tapOn:
+    text: "QA tools (Maestro regression)"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
-- scrollUntilVisible:
-    element:
-      text: "Run Visual Regression (Maestro)"
+- extendedWaitUntil:
+    visible: "Run Visual Regression (Maestro)"
+    timeout: 240000
 - tapOn:
     text: "Run Visual Regression (Maestro)"
     retryTapIfNoChange: true
