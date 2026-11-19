@@ -8,7 +8,11 @@ maestro_script="${1:-maestro:test:android}"
 run_maestro_target() {
   case "$maestro_script" in
     *.sh)
-      sh "$maestro_script"
+      if [ -f "$maestro_script" ]; then
+        sh "$maestro_script"
+      else
+        sh "$script_dir/$maestro_script"
+      fi
       ;;
     *)
       if [ -f "$script_dir/${maestro_script}.sh" ]; then
@@ -21,21 +25,7 @@ run_maestro_target() {
 }
 
 set +e
-timeout 10m sh -eu -c "$(cat <<EOS
-maestro_script='$maestro_script'
-script_dir='$script_dir'
-case "\$maestro_script" in
-  *.sh) sh "\$maestro_script" ;;
-  *)
-    if [ -f "\$script_dir/\${maestro_script}.sh" ]; then
-      sh "\$script_dir/\${maestro_script}.sh"
-    else
-      bun run "\$maestro_script"
-    fi
-    ;;
-esac
-EOS
-)"
+run_maestro_target
 first_status=$?
 set -e
 
@@ -47,21 +37,7 @@ echo "Maestro Android run failed or timed out (exit $first_status). Retrying onc
 timeout 30s adb wait-for-device
 sh "$script_dir/wait-android-system-ready.sh"
 set +e
-timeout 10m sh -eu -c "$(cat <<EOS
-maestro_script='$maestro_script'
-script_dir='$script_dir'
-case "\$maestro_script" in
-  *.sh) sh "\$maestro_script" ;;
-  *)
-    if [ -f "\$script_dir/\${maestro_script}.sh" ]; then
-      sh "\$script_dir/\${maestro_script}.sh"
-    else
-      bun run "\$maestro_script"
-    fi
-    ;;
-esac
-EOS
-)"
+run_maestro_target
 retry_status=$?
 set -e
 exit "$retry_status"
