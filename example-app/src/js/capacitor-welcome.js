@@ -912,6 +912,7 @@ window.customElements.define(
           maestroReadyBanner.textContent = 'Maestro Ready';
         }
         openQaToolsPanel();
+        attachDeepLinkPreventedRegressionHarness();
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
         maestroReadyBanner.textContent = 'Maestro Unavailable';

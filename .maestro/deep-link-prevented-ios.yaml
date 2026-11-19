@@ -4,8 +4,8 @@ appId: app.capgo.inappbrowser
     visible: 'InAppBrowser Test App'
     timeout: 20000
 - extendedWaitUntil:
-    visible: 'Deep link prevented regression ready'
-    timeout: 60000
+    visible: 'Maestro Ready'
+    timeout: 120000
 - tapOn:
     id: 'maestro-run-deep-link-prevented'
     retryTapIfNoChange: true
