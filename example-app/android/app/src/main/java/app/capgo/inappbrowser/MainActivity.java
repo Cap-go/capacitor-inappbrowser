@@ -331,32 +331,39 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void maybeRunQueuedMaestroRegression(
-        boolean pending,
+        java.util.function.BooleanSupplier pendingGetter,
         Runnable clearPending,
+        Runnable restorePending,
         String pollJavascript,
         Runnable retryRunnable
     ) {
-        if (!pending || maestroRunning || bridge == null || bridge.getWebView() == null) {
+        if (!pendingGetter.getAsBoolean() || maestroRunning || bridge == null || bridge.getWebView() == null) {
             return;
         }
 
         WebView webView = bridge.getWebView();
-        webView.post(() ->
+        webView.post(() -> {
+            if (!pendingGetter.getAsBoolean() || maestroRunning) {
+                return;
+            }
+            clearPending.run();
+            updateMaestroRunning(true);
             webView.evaluateJavascript(pollJavascript, value -> {
                 if ("\"started\"".equals(value)) {
-                    clearPending.run();
-                    updateMaestroRunning(true);
                     return;
                 }
+                restorePending.run();
+                updateMaestroRunning(false);
                 webView.postDelayed(retryRunnable, MAESTRO_AUTORUN_RETRY_DELAY_MS);
-            })
-        );
+            });
+        });
     }
 
     private void maybeRunQueuedMaestroProxyRegression() {
         maybeRunQueuedMaestroRegression(
-            maestroPendingRun,
+            () -> maestroPendingRun,
             () -> maestroPendingRun = false,
+            () -> maestroPendingRun = true,
             "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return 'started';}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
             this::maybeRunQueuedMaestroProxyRegression
         );
@@ -390,8 +397,9 @@ public class MainActivity extends BridgeActivity {
 
     private void maybeRunQueuedMaestroDeepLinkPrevented() {
         maybeRunQueuedMaestroRegression(
-            maestroPendingDeepLinkRun,
+            () -> maestroPendingDeepLinkRun,
             () -> maestroPendingDeepLinkRun = false,
+            () -> maestroPendingDeepLinkRun = true,
             "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return 'started';}var button=document.getElementById('maestro-run-deep-link-prevented');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
             this::maybeRunQueuedMaestroDeepLinkPrevented
         );

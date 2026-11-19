@@ -12,7 +12,7 @@ fi
 
 bun run build
 cd example-app
-bun install --frozen-lockfile
+bun install --frozen-lockfile --ignore-scripts
 bun run build
 bunx cap sync ios
 
@@ -28,3 +28,6 @@ xcodebuild \
   build
 
 xcrun simctl install "$IOS_SIMULATOR_UDID" ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+
+open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
+xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true

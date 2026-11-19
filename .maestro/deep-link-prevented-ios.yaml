@@ -1,5 +1,6 @@
 appId: app.capgo.inappbrowser
 ---
+- launchApp
 - extendedWaitUntil:
     visible: 'InAppBrowser Test App'
     timeout: 20000

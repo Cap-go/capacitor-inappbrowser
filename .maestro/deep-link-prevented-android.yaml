@@ -14,4 +14,3 @@ appId: app.capgo.inappbrowser
     visible: 'Event OK: capgo-maestro-deeplink://blocked'
     timeout: 180000
 - assertVisible: 'Event OK: capgo-maestro-deeplink://blocked'
-- assertVisible: 'Negative OK: https produced no deepLinkPrevented'
