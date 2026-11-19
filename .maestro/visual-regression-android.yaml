@@ -3,29 +3,7 @@ androidWebViewHierarchy: devtools
 env:
   THRESHOLD_PERCENTAGE: 97
 ---
-- launchApp:
-    clearState: true
-- tapOn:
-    text: "Wait"
-    optional: true
-- tapOn:
-    text: "QA tools (Maestro regression)"
-    retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible: "Maestro Ready"
-    timeout: 240000
-- extendedWaitUntil:
-    visible: "Run Visual Regression (Maestro)"
-    timeout: 240000
-- tapOn:
-    text: "Run Visual Regression (Maestro)"
-    retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible: "Visual regression ready"
-    timeout: 120000
-- extendedWaitUntil:
-    visible: "Layout probe"
-    timeout: 60000
+- runFlow: visual-regression/open-layout-probe.yaml
 - assertScreenshot:
     path: visual-regression/baselines/android/blank-toolbar-layout.png
     thresholdPercentage: ${THRESHOLD_PERCENTAGE}

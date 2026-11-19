@@ -24,8 +24,8 @@ describe('visual regression CI wiring (issue #722)', () => {
       '.maestro/visual-regression/baselines/android/blank-toolbar-layout.png',
       '.maestro/visual-regression/baselines/ios/blank-toolbar-layout.png',
       'example-app/src/js/visual-regression.js',
-      'scripts/run-android-maestro-visual-regression.sh',
-      'scripts/run-ios-maestro-visual-regression.sh',
+      'scripts/run-maestro-visual-regression.sh',
+      '.maestro/visual-regression/open-layout-probe.yaml',
     ];
 
     for (const relativePath of requiredPaths) {
