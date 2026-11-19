@@ -21,8 +21,8 @@ if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
 fi
 
 xcrun simctl boot "$IOS_SIMULATOR_UDID" 2>/dev/null || true
-xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+if ! timeout 75 xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b; then
+  echo "Simulator bootstatus timed out after 75s; continuing for Maestro."
+fi
 
 xcrun simctl install "$IOS_SIMULATOR_UDID" "$app_bundle"
-open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
-xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
