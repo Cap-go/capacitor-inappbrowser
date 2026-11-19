@@ -915,9 +915,17 @@ window.customElements.define(
         attachDeepLinkPreventedRegressionHarness();
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
-        maestroReadyBanner.textContent = 'Maestro Unavailable';
-        window.__capgoRunMaestroProxy = undefined;
-        syncMaestroNativeReady(false);
+        const deepLinkRunButton = document.getElementById('maestro-run-deep-link-prevented');
+        const deepLinkHarnessReady = deepLinkRunButton && !deepLinkRunButton.disabled;
+        if (deepLinkHarnessReady) {
+          maestroReadyBanner.textContent = 'Maestro Ready';
+          openQaToolsPanel();
+          syncMaestroNativeReady(true);
+        } else {
+          maestroReadyBanner.textContent = 'Maestro Unavailable';
+          window.__capgoRunMaestroProxy = undefined;
+          syncMaestroNativeReady(false);
+        }
       }
 
       setupProxyDemoButtons(self.shadowRoot);
