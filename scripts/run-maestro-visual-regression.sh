@@ -54,8 +54,11 @@ if [ -f "$baseline_image" ]; then
 fi
 
 needs_record=0
-if [ "$mode" = "record" ] || [ ! -f "$baseline_image" ] || [ "$baseline_bytes" -lt 500 ]; then
+if [ "$mode" = "record" ]; then
   needs_record=1
+elif [ ! -f "$baseline_image" ] || [ "$baseline_bytes" -lt 500 ]; then
+  echo "Baseline image $baseline_image is missing or too small (${baseline_bytes} bytes). Assert mode never records; run with mode record locally and commit the baseline."
+  exit 1
 fi
 
 if [ "$needs_record" -eq 1 ]; then
