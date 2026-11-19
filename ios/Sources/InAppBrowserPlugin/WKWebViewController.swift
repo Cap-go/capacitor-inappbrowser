@@ -3863,7 +3863,7 @@ extension WKWebViewController: WKNavigationDelegate {
             if isServerTrustChallenge {
                 let evaluateQueue = DispatchQueue.global(qos: .userInitiated)
                 evaluateQueue.async {
-                    let queued = SecTrustEvaluateAsyncWithError(serverTrust, evaluateQueue) { _, trusted, _ in
+                    let status = SecTrustEvaluateAsyncWithError(serverTrust, evaluateQueue) { _, trusted, _ in
                         DispatchQueue.main.async {
                             if !trusted {
                                 let host = challenge.protectionSpace.host
@@ -3878,7 +3878,7 @@ extension WKWebViewController: WKNavigationDelegate {
                             completionHandler(.useCredential, credential)
                         }
                     }
-                    if !queued {
+                    if status != errSecSuccess {
                         DispatchQueue.main.async {
                             completionHandler(.useCredential, credential)
                         }
