@@ -1,4 +1,5 @@
 import { InAppBrowser, ToolBarType, BackgroundColor } from "@capgo/capacitor-inappbrowser";
+import { openQaToolsPanel } from "./qa-tools.js";
 
 const CUSTOM_SCHEME_URL = "capgo-maestro-deeplink://blocked";
 const HTTPS_URL = "https://example.com/";
@@ -194,5 +195,6 @@ export function attachDeepLinkPreventedRegressionHarness() {
     window.__capgoRunMaestroDeepLinkPrevented();
   });
   runButton.disabled = false;
+  openQaToolsPanel();
   setStatus("Deep link prevented regression ready", "");
 }
