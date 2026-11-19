@@ -40,11 +40,23 @@ describe('visual regression CI wiring (issue #722)', () => {
     expect(harness).toContain('openQaToolsPanel');
   });
 
-  it('skips Maestro assert on CI while placeholder baselines are committed', () => {
+  it('fails Maestro assert when baseline screenshots are missing or placeholders', () => {
     const scriptPath = path.join(rootDir, 'scripts', 'run-maestro-visual-regression.sh');
     const script = readFileSync(scriptPath, 'utf8');
 
-    expect(script).toContain('CI placeholder baseline remains');
+    expect(script).toContain('Baseline image');
+    expect(script).toContain('too small');
+  });
+
+  it('ships non-placeholder Android and iOS visual regression baselines', () => {
+    for (const relativePath of [
+      '.maestro/visual-regression/baselines/android/blank-toolbar-layout.png',
+      '.maestro/visual-regression/baselines/ios/blank-toolbar-layout.png',
+    ]) {
+      const absolutePath = path.join(rootDir, relativePath);
+      expect(existsSync(absolutePath)).toBe(true);
+      expect(readFileSync(absolutePath).length).toBeGreaterThan(500);
+    }
   });
 
   it('exposes package scripts for visual regression Maestro runs', () => {

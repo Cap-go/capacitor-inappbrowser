@@ -5,5 +5,5 @@ env:
 ---
 - runFlow: visual-regression/open-layout-probe.yaml
 - assertScreenshot:
-    path: ${BASELINE_PATH}
+    path: ${BASELINE_PATH}.png
     thresholdPercentage: ${THRESHOLD_PERCENTAGE}
