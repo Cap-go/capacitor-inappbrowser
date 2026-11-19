@@ -7,18 +7,16 @@ mode="${2:-assert}"
 
 case "$platform" in
   android)
-    baseline_stem=".maestro/visual-regression/baselines/android/blank-toolbar-layout"
+    baseline_image=".maestro/visual-regression/baselines/android/blank-toolbar-layout.png"
     ;;
   ios)
-    baseline_stem=".maestro/visual-regression/baselines/ios/blank-toolbar-layout"
+    baseline_image=".maestro/visual-regression/baselines/ios/blank-toolbar-layout.png"
     ;;
   *)
     echo "Expected platform android or ios"
     exit 1
     ;;
 esac
-
-baseline_image="${baseline_stem}.png"
 
 flow_path=".maestro/visual-regression-assert.yaml"
 record_flow_path=".maestro/visual-regression-record.yaml"
@@ -36,9 +34,15 @@ if [ -z "$maestro_bin" ] || [ ! -x "$maestro_bin" ]; then
   exit 1
 fi
 
+if [ -f "$baseline_image" ]; then
+  baseline_for_maestro="$(CDPATH= cd -- "$(dirname "$baseline_image")" && pwd)/$(basename "$baseline_image")"
+else
+  baseline_for_maestro="$(pwd)/${baseline_image}"
+fi
+
 run_flow() {
   set +e
-  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_stem}" "$flow_path" >"$log_file" 2>&1
+  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_for_maestro}" "$flow_path" >"$log_file" 2>&1
   status=$?
   cat "$log_file"
   return "$status"
@@ -56,7 +60,7 @@ fi
 
 if [ "$needs_record" -eq 1 ]; then
   echo "Recording baseline at $baseline_image"
-  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_stem}" "$record_flow_path" >"$log_file" 2>&1 || {
+  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_for_maestro}" "$record_flow_path" >"$log_file" 2>&1 || {
     cat "$log_file"
     exit 1
   }

@@ -13,7 +13,8 @@ describe('visual regression CI wiring (issue #722)', () => {
     expect(workflow).toContain('maestro_ios_visual_regression:');
     expect(workflow).toContain('run-android-maestro-visual-regression.sh');
     expect(workflow).toContain('run-maestro-visual-regression.sh');
-    expect(workflow).toContain('MAESTRO_VERSION=2.12.1');
+    expect(workflow).toMatch(/maestro_android_visual_regression:[\s\S]*MAESTRO_VERSION=2\.12\.1/);
+    expect(workflow).toMatch(/maestro_android_deep_link_prevented:[\s\S]*MAESTRO_VERSION=1\.39\.0/);
   });
 
   it('ships Maestro flows and committed screenshot baselines', () => {
