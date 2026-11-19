@@ -28,10 +28,12 @@ public class MainActivity extends BridgeActivity {
     private static final String MAESTRO_BOOTING_TEXT = "Maestro Booting";
     private static final String MAESTRO_READY_TEXT = "Maestro Ready";
     private static final String MAESTRO_RUN_PROXY_TEXT = "Run Proxy Regression (Maestro)";
+    private static final String MAESTRO_RUN_DEEP_LINK_TEXT = "Run Deep Link Prevented (Maestro)";
     private static final String EXTRA_MAESTRO_AUTORUN_PROXY_REGRESSION = "capgo_maestro_autorun_proxy_regression";
 
     private LinearLayout maestroOverlay;
     private Button maestroRunButton;
+    private Button maestroDeepLinkButton;
     private TextView maestroReadyBanner;
     private TextView maestroProxyStatus;
     private TextView maestroProxyDetails;
@@ -132,6 +134,12 @@ public class MainActivity extends BridgeActivity {
         maestroRunButton.setAllCaps(false);
         maestroRunButton.setOnClickListener(view -> triggerMaestroProxyRegression());
 
+        maestroDeepLinkButton = new Button(this);
+        maestroDeepLinkButton.setText(MAESTRO_RUN_DEEP_LINK_TEXT);
+        maestroDeepLinkButton.setContentDescription(MAESTRO_RUN_DEEP_LINK_TEXT);
+        maestroDeepLinkButton.setAllCaps(false);
+        maestroDeepLinkButton.setOnClickListener(view -> triggerMaestroDeepLinkPrevented());
+
         maestroProxyStatus = new TextView(this);
         maestroProxyStatus.setText("Not started");
         maestroProxyStatus.setContentDescription("Not started");
@@ -152,6 +160,7 @@ public class MainActivity extends BridgeActivity {
         );
         buttonParams.topMargin = dp(8);
         buttonRow.addView(maestroRunButton, buttonParams);
+        buttonRow.addView(maestroDeepLinkButton, buttonParams);
 
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -273,6 +282,29 @@ public class MainActivity extends BridgeActivity {
         );
     }
 
+    private void triggerMaestroDeepLinkPrevented() {
+        if (!maestroReady) {
+            updateMaestroStatus("Waiting for Maestro readiness", "Queued deep link prevented regression");
+            return;
+        }
+
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+
+        updateMaestroRunning(true);
+        bridge
+            .getWebView()
+            .post(() ->
+                bridge
+                    .getWebView()
+                    .evaluateJavascript(
+                        "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return true;}var button=document.getElementById('maestro-run-deep-link-prevented');if(button){button.click();return true;}return false;})()",
+                        null
+                    )
+            );
+    }
+
     private void triggerMaestroProxyRegression() {
         if (!maestroReady) {
             maestroPendingRun = true;
@@ -331,6 +363,11 @@ public class MainActivity extends BridgeActivity {
             maestroRunButton.setEnabled(!maestroRunning);
             maestroRunButton.setAlpha(ready ? 1f : 0.92f);
         }
+        if (maestroDeepLinkButton != null) {
+            maestroDeepLinkButton.setVisibility(View.VISIBLE);
+            maestroDeepLinkButton.setEnabled(!maestroRunning);
+            maestroDeepLinkButton.setAlpha(ready ? 1f : 0.92f);
+        }
         bringMaestroOverlayToFront(null);
         if (ready && maestroPendingRun && !maestroRunning) {
             maybeRunQueuedMaestroProxyRegression();
@@ -341,6 +378,9 @@ public class MainActivity extends BridgeActivity {
         maestroRunning = running;
         if (maestroRunButton != null) {
             maestroRunButton.setEnabled(!running);
+        }
+        if (maestroDeepLinkButton != null) {
+            maestroDeepLinkButton.setEnabled(!running);
         }
         bringMaestroOverlayToFront(null);
     }

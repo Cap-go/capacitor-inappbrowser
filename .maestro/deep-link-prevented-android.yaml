@@ -1,5 +1,4 @@
 appId: app.capgo.inappbrowser
-androidWebViewHierarchy: devtools
 ---
 - launchApp:
     clearState: true
@@ -10,23 +9,11 @@ androidWebViewHierarchy: devtools
 - extendedWaitUntil:
     visible: 'InAppBrowser Test App'
     timeout: 20000
-- repeat:
-    times: 16
-    while:
-      notVisible: 'Maestro Ready'
-    commands:
-      - tapOn:
-          text: 'Wait'
-          optional: true
-      - extendedWaitUntil:
-          visible: 'Maestro Ready'
-          timeout: 15000
-          optional: true
 - extendedWaitUntil:
     visible: 'Maestro Ready'
     timeout: 120000
 - tapOn:
-    id: 'maestro-run-deep-link-prevented'
+    text: "Run Deep Link Prevented \\(Maestro\\)"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: 'Deep link prevented regression passed'

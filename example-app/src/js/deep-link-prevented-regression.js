@@ -32,6 +32,14 @@ function syncMaestroNativeRunning(running) {
   });
 }
 
+function syncMaestroNativeStatus(message, details = "") {
+  withMaestroNativeHarness((harness) => {
+    if (typeof harness.setStatus === "function") {
+      harness.setStatus(message, details);
+    }
+  });
+}
+
 function buildDeepLinkPreventedTestUrl() {
   const html = `<!doctype html>
 <html lang="en">
@@ -85,6 +93,7 @@ export function attachDeepLinkPreventedRegressionHarness() {
   const setStatus = (line, extra = "") => {
     status.textContent = line;
     details.textContent = extra;
+    syncMaestroNativeStatus(line, extra);
   };
 
   const runRegression = async () => {
