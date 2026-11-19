@@ -18,16 +18,6 @@ public class DeepLinkPreventedSupportTest {
     }
 
     @Test
-    public void emitsForAuthorizedHttpLinks() {
-        assertTrue(
-            DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(
-                "https://partner.example/path",
-                Arrays.asList("https://partner.example")
-            )
-        );
-    }
-
-    @Test
     public void skipsNormalHttpNavigationAndInternalSchemes() {
         assertFalse(DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent("https://example.com/page", Collections.emptyList()));
         assertFalse(DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent("data:text/html,hello", Collections.emptyList()));
@@ -35,7 +25,12 @@ public class DeepLinkPreventedSupportTest {
     }
 
     @Test
-    public void emitsForAppStoreHosts() {
-        assertTrue(DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent("https://apps.apple.com/app/id123", Collections.emptyList()));
+    public void skipsAuthorizedHttpLinksOnAndroid() {
+        assertFalse(
+            DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(
+                "https://partner.example/path",
+                Arrays.asList("https://partner.example")
+            )
+        );
     }
 }

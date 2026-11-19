@@ -106,6 +106,97 @@ jobs:
       - name: Verify packed package in example app (Web)
         shell: bash
         run: bash ./.github/scripts/verify-packed-example.sh web
+      - name: Verify Maestro selectors
+        run: node example-app/scripts/verify-maestro-selectors.mjs
       - name: Verify
         id: verify_code
         run: bun run verify:web
+
+  maestro_android_deep_link_prevented:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Android Maestro deep link prevented
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+      - name: Install root dependencies
+        run: bun i
+      - name: Setup java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "21"
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build example app for Android
+        run: bun run example-app:prepare:android
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Maestro deep link prevented (Android)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: sh ./scripts/run-android-maestro-with-retry.sh maestro:test:android:deep-link-prevented
+
+  maestro_ios_deep_link_prevented:
+    runs-on: macOS-latest
+    timeout-minutes: 10
+    name: iOS Maestro deep link prevented
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+      - name: Install root dependencies
+        run: bun i
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build example app for iOS
+        run: bun run example-app:prepare:ios
+      - name: Select iOS Simulator
+        run: |
+          xcrun simctl shutdown all || true
+          IOS_SIMULATOR_UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          if [ -z "$IOS_SIMULATOR_UDID" ]; then
+            echo "No available iPhone simulator found"
+            exit 1
+          fi
+          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+      - name: Build and install iOS example app
+        run: |
+          open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
+          xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
+          xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
+          xcodebuild \
+            -project example-app/ios/App/App.xcodeproj \
+            -scheme App \
+            -destination "id=$IOS_SIMULATOR_UDID" \
+            -derivedDataPath example-app/ios/DerivedData \
+            build
+          xcrun simctl install "$IOS_SIMULATOR_UDID" example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+      - name: Run Maestro deep link prevented (iOS)
+        run: |
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
+          sh ./scripts/run-ios-maestro-deep-link-prevented.sh

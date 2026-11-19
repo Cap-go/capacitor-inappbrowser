@@ -12,6 +12,7 @@ import { setupProxyDemoButtons } from './proxy-demo.js';
 import { setupProxyRegression } from './proxy-regression.js';
 import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
+import { attachDeepLinkPreventedRegressionHarness } from './deep-link-prevented-regression.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
 import { openQaToolsPanel } from './qa-tools.js';
@@ -412,6 +413,7 @@ window.customElements.define(
 
       attachKeyboardRegressionHarness();
       attachFeatureSmokeHarness();
+      attachDeepLinkPreventedRegressionHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {

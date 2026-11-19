@@ -33,6 +33,7 @@ We build, improve and fix our plugins with heavy use of AI, so issues usually ge
 - **Two browser modes**: `open()` uses SFSafariViewController on iOS and Chrome Custom Tabs on Android, `openWebView()` opens a WebView with your own toolbar, title, colors and buttons.
 - **Two-way messaging**: `postMessage()` and the `messageFromWebview` event, plus `executeScript()` to run code in the page.
 - **Navigation events**: `urlChangeEvent`, `browserPageLoaded`, `pageLoadError`, `closeEvent`, downloads and popups.
+- **`deepLinkPrevented`**: when `preventDeeplink: true` blocks a link that would leave the in-app browser, listen for `{ url, id? }` on Android and iOS (not on web).
 - **Layout control**: `updateDimensions()`, fullscreen, safe-area margins, `hide()`, `show()` and `sendToBack()` to place the browser behind your Ionic UI.
 - **Session data**: `getCookies()`, `clearCookies()`, `clearCache()` and `clearAllBrowsingData()`.
 - **OAuth**: `openSecureWindow()` runs an auth flow with ASWebAuthenticationSession on iOS and Custom Tabs on Android, and a popup on web.
@@ -203,9 +204,9 @@ await listener.remove();
 await InAppBrowser.close({ id });
 ```
 
-#### Know when `preventDeeplink` blocks a link
+#### `deepLinkPrevented` when `preventDeeplink` blocks a link
 
-When `preventDeeplink: true`, custom schemes, `tel:` / `mailto:` / `sms:`, authorized App Links, and other URLs that would normally hand off to another app stay in the managed WebView. Listen for `deepLinkPrevented` to get the clicked URL and react in your app (show a message, route in-app, log analytics, and so on). Android and iOS emit this event; the web implementation does not.
+Use `preventDeeplink: true` when taps on `tel:`, `mailto:`, custom schemes, authorized Universal Links (iOS), and similar hand-offs should stay inside your app. Listen for `deepLinkPrevented` to receive `{ url, id? }` and show UI, route in-app, or log analytics. **Android and iOS emit this event; web does not.** On Android, authorized App Links still follow existing external-launch behavior; the event focuses on non-http(s) URLs that `preventDeeplink` blocks. On iOS, authorized Universal Links and App Store hosts are included when prevention blocks the hand-off.
 
 ```js
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';

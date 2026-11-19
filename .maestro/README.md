@@ -10,6 +10,10 @@ This folder contains Maestro coverage for the example app.
 
 `download-handling-android.yaml` opens the example app's auto-download demo and verifies that the downloaded blob file is rendered back inside the in-app browser.
 
+### Deep link prevented smoke test
+
+`deep-link-prevented-android.yaml` and `deep-link-prevented-ios.yaml` run the example app regression harness: a custom scheme must emit `deepLinkPrevented`, and a normal `https://` navigation must not.
+
 ### Run locally
 
 1. Start an Android emulator or connect a device with `adb`.

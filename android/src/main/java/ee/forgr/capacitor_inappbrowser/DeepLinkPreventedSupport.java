@@ -12,8 +12,6 @@ final class DeepLinkPreventedSupport {
 
     private static final Set<String> INTERNAL_SCHEMES = new HashSet<>(Arrays.asList("about", "data", "blob", "javascript"));
 
-    private static final Set<String> APP_STORE_HOSTS = new HashSet<>(Arrays.asList("itunes.apple.com", "apps.apple.com"));
-
     private DeepLinkPreventedSupport() {}
 
     static boolean shouldEmitDeepLinkPreventedEvent(String rawUrl, List<String> authorizedAppLinks) {
@@ -30,21 +28,7 @@ final class DeepLinkPreventedSupport {
             return false;
         }
 
-        if (!scheme.equals("http") && !scheme.equals("https")) {
-            return true;
-        }
-
-        if (isAuthorizedAppLink(rawUrl, authorizedAppLinks)) {
-            return true;
-        }
-
-        try {
-            URI uri = new URI(rawUrl);
-            String host = normalizeHost(uri.getHost());
-            return host != null && APP_STORE_HOSTS.contains(host);
-        } catch (URISyntaxException ignored) {
-            return false;
-        }
+        return !scheme.equals("http") && !scheme.equals("https");
     }
 
     static boolean isAuthorizedAppLink(String url, List<String> authorizedLinks) {
