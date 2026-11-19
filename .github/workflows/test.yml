@@ -146,7 +146,7 @@ jobs:
           java-version: "21"
       - name: Install Maestro CLI
         run: |
-          export MAESTRO_VERSION=1.39.0
+          export MAESTRO_VERSION=2.12.1
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       - name: Build example app for Android
@@ -203,7 +203,7 @@ jobs:
           java-version: "21"
       - name: Install Maestro CLI
         run: |
-          export MAESTRO_VERSION=1.39.0
+          export MAESTRO_VERSION=2.12.1
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       - name: Build example app for Android
@@ -241,11 +241,11 @@ jobs:
         id: maestro-cache
         with:
           path: ~/.maestro
-          key: maestro-cli-1.39.0-${{ runner.os }}
+          key: maestro-cli-2.12.1-${{ runner.os }}
       - name: Install Maestro CLI
         if: steps.maestro-cache.outputs.cache-hit != 'true'
         run: |
-          export MAESTRO_VERSION=1.39.0
+          export MAESTRO_VERSION=2.12.1
           curl -fsSL "https://get.maestro.mobile.dev" | bash
       - name: Add Maestro to PATH
         run: echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
@@ -294,11 +294,11 @@ jobs:
         id: maestro-cache-deep-link
         with:
           path: ~/.maestro
-          key: maestro-cli-1.39.0-${{ runner.os }}
+          key: maestro-cli-2.12.1-${{ runner.os }}
       - name: Install Maestro CLI
         if: steps.maestro-cache-deep-link.outputs.cache-hit != 'true'
         run: |
-          export MAESTRO_VERSION=1.39.0
+          export MAESTRO_VERSION=2.12.1
           curl -fsSL "https://get.maestro.mobile.dev" | bash
       - name: Add Maestro to PATH
         run: echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
