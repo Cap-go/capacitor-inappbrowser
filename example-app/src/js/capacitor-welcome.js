@@ -13,6 +13,7 @@ import { setupProxyRegression } from './proxy-regression.js';
 import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachVisualRegressionHarness } from './visual-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
+import { attachDeepLinkPreventedRegressionHarness } from './deep-link-prevented-regression.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
 import { openQaToolsPanel } from './qa-tools.js';
@@ -414,6 +415,7 @@ window.customElements.define(
       attachKeyboardRegressionHarness();
       attachVisualRegressionHarness();
       attachFeatureSmokeHarness();
+      attachDeepLinkPreventedRegressionHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {
@@ -912,11 +914,20 @@ window.customElements.define(
           maestroReadyBanner.textContent = 'Maestro Ready';
         }
         openQaToolsPanel();
+        attachDeepLinkPreventedRegressionHarness();
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
-        maestroReadyBanner.textContent = 'Maestro Unavailable';
-        window.__capgoRunMaestroProxy = undefined;
-        syncMaestroNativeReady(false);
+        const deepLinkRunButton = document.getElementById('maestro-run-deep-link-prevented');
+        const deepLinkHarnessReady = deepLinkRunButton && !deepLinkRunButton.disabled;
+        if (deepLinkHarnessReady) {
+          maestroReadyBanner.textContent = 'Maestro Ready';
+          openQaToolsPanel();
+          syncMaestroNativeReady(true);
+        } else {
+          maestroReadyBanner.textContent = 'Maestro Unavailable';
+          window.__capgoRunMaestroProxy = undefined;
+          syncMaestroNativeReady(false);
+        }
       }
 
       setupProxyDemoButtons(self.shadowRoot);

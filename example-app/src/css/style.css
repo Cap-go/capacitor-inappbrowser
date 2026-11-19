@@ -130,7 +130,8 @@ body {
   background: #0ea5e9;
 }
 
-.maestro-btn-visual {
+.maestro-btn-visual,
+.maestro-btn-deep-link-prevented {
   background: #7c3aed;
 }
 

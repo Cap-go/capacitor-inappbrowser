@@ -500,6 +500,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
+    private var recentDeepLinkPreventedEmissionKeys: [String: Date] = [:]
     var openBlankTargetInWebView: Bool = false
     var openCustomSchemesWithoutQuery: Bool = false
     var blankNavigationTab: Bool = false
@@ -3173,6 +3174,35 @@ fileprivate extension WKWebViewController {
         return openBlankTargetInWebView || preventDeeplink
     }
 
+    private func emitDeepLinkPreventedIfNeeded(for url: URL) {
+        let bundledLocalConfig = BundledAssetSupport.LocalConfig(
+            scheme: bundledAssetLocalScheme,
+            host: bundledAssetLocalHost
+        )
+        if BundledAssetSupport.isBundledLocalURL(url.absoluteString, localConfig: bundledLocalConfig) {
+            return
+        }
+
+        guard DeepLinkPreventedSupport.shouldEmitDeepLinkPreventedEvent(for: url, authorizedAppLinks: authorizedAppLinks) else {
+            return
+        }
+
+        // Suppress duplicate policy callbacks for one navigation, not intentional repeat taps.
+        let emissionKey = url.absoluteString
+        let duplicateCallbackWindow: TimeInterval = 0.35
+        let now = Date()
+        recentDeepLinkPreventedEmissionKeys = recentDeepLinkPreventedEmissionKeys.filter {
+            now.timeIntervalSince($0.value) < duplicateCallbackWindow
+        }
+        if let lastEmission = recentDeepLinkPreventedEmissionKeys[emissionKey],
+           now.timeIntervalSince(lastEmission) < duplicateCallbackWindow {
+            return
+        }
+
+        recentDeepLinkPreventedEmissionKeys[emissionKey] = now
+        emit("deepLinkPrevented", data: ["url": url.absoluteString])
+    }
+
     /// Attempts to open URL in an external app if it's a custom scheme OR an authorized universal link.
     /// Returns via completion whether an external app was opened (true) or not (false).
     private func handleURLWithApp(_ url: URL, targetFrame _: WKFrameInfo?, completion: @escaping (Bool) -> Void) {
@@ -3180,6 +3210,7 @@ fileprivate extension WKWebViewController {
         // If preventDeeplink is true, don't try to open URLs in external apps
         if preventDeeplink {
             print("[InAppBrowser] preventDeeplink is true, won't try to open URLs in external apps")
+            emitDeepLinkPreventedIfNeeded(for: url)
             completion(false)
             return
         }

@@ -16,6 +16,10 @@ This folder contains Maestro coverage for the example app.
 
 Record new baselines locally with `visual-regression-record.yaml` after intentional UI changes.
 
+### Deep link prevented smoke test
+
+`deep-link-prevented-android.yaml` and `deep-link-prevented-ios.yaml` run the example app regression harness: a custom scheme must emit `deepLinkPrevented`, and a normal `https://` navigation must not.
+
 ### Run locally
 
 1. Start an Android emulator or connect a device with `adb`.

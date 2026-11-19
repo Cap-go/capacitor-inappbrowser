@@ -204,6 +204,11 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             }
 
             @Override
+            public void deepLinkPrevented(String url) {
+                notifyListeners("deepLinkPrevented", new JSObject().put("id", webViewId).put("url", url));
+            }
+
+            @Override
             public void buttonNearDoneClicked() {
                 notifyListeners("buttonNearDoneClick", new JSObject().put("id", webViewId));
             }
