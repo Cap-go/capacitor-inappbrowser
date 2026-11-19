@@ -7453,10 +7453,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             Log.w(
                                 "InAppBrowser",
                                 "ignoreUntrustedSSLError is enabled — accepting an untrusted certificate for " +
-                                redactedUrl +
-                                ". This option is intended for known, trusted self-signed/internal endpoints only; " +
-                                "it disables certificate validation for this page load and should never be enabled " +
-                                "for a production flow handling sensitive data (login, payments, personal data)."
+                                    redactedUrl +
+                                    ". This option is intended for known, trusted self-signed/internal endpoints only; " +
+                                    "it disables certificate validation for this page load and should never be enabled " +
+                                    "for a production flow handling sensitive data (login, payments, personal data)."
                             );
                         }
                         handler.proceed();
