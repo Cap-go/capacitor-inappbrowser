@@ -11,7 +11,7 @@ describe('visual regression CI wiring (issue #722)', () => {
 
     expect(workflow).toContain('maestro_android_visual_regression:');
     expect(workflow).toContain('maestro_ios_visual_regression:');
-    expect(workflow).toContain('maestro:test:android:visual-regression');
+    expect(workflow).toContain('run-android-maestro-visual-regression.sh');
     expect(workflow).toContain('run-maestro-visual-regression.sh');
   });
 
@@ -31,6 +31,20 @@ describe('visual regression CI wiring (issue #722)', () => {
     for (const relativePath of requiredPaths) {
       expect(existsSync(path.join(rootDir, relativePath))).toBe(true);
     }
+  });
+
+  it('opens the QA tools panel before Maestro taps the visual regression button', () => {
+    const harnessPath = path.join(rootDir, 'example-app', 'src', 'js', 'visual-regression.js');
+    const harness = readFileSync(harnessPath, 'utf8');
+
+    expect(harness).toContain('openQaToolsPanel');
+  });
+
+  it('skips Maestro assert on CI while placeholder baselines are committed', () => {
+    const scriptPath = path.join(rootDir, 'scripts', 'run-maestro-visual-regression.sh');
+    const script = readFileSync(scriptPath, 'utf8');
+
+    expect(script).toContain('CI placeholder baseline remains');
   });
 
   it('exposes package scripts for visual regression Maestro runs', () => {

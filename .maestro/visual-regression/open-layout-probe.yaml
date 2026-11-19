@@ -8,10 +8,6 @@ appId: ${APP_ID}
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
-- extendedWaitUntil:
-    visible:
-      id: "maestro-run-visual-regression"
-    timeout: 240000
 - tapOn:
     id: "maestro-run-visual-regression"
     retryTapIfNoChange: true

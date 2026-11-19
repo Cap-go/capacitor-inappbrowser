@@ -4,6 +4,7 @@ import {
   syncMaestroNativeRunning,
   syncMaestroNativeStatus,
 } from "./maestro-native-harness.js";
+import { openQaToolsPanel } from "./qa-tools.js";
 
 const harnessState = {
   attached: false,
@@ -71,6 +72,7 @@ export function attachVisualRegressionHarness() {
   };
 
   readyBanner.textContent = "Maestro Ready";
+  openQaToolsPanel();
   runButton.disabled = false;
   setStatus("Not started");
 
