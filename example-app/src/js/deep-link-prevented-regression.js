@@ -241,5 +241,14 @@ export function attachDeepLinkPreventedRegressionHarness() {
   });
   runButton.disabled = false;
   openQaToolsPanel();
+  const readyBanner = document.getElementById("maestro-ready-banner");
+  if (readyBanner) {
+    readyBanner.textContent = "Maestro Ready";
+  }
+  withMaestroNativeHarness((harness) => {
+    if (typeof harness.setReady === "function") {
+      harness.setReady(true);
+    }
+  });
   setStatus("Deep link prevented regression ready", "");
 }
