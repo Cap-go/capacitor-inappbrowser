@@ -1314,12 +1314,12 @@ export interface OpenWebViewOptions {
    * Only enable this for known, trusted endpoints you control (e.g. a self-signed internal/dev
    * server) — never for a production flow handling sensitive data such as login, payments, or
    * personal data, since it allows a man-in-the-middle attacker to intercept and tamper with
-   * that traffic. Both platforms log a warning on first use (`Log.w("InAppBrowser", ...)` on
-   * Android — logged once per host per WebView instance, not on every subsequent accepted
-   * error for that same host; `print("[InAppBrowser] WARNING: ...")` on iOS — also once per
-   * host per WebView controller instance) when this option
-   * actually causes a failed certificate trust evaluation to be accepted, so it is visible in
-   * the device log if left enabled unintentionally.
+   * that traffic. Both platforms log when this option actually causes a failed certificate trust
+   * evaluation to be accepted. On Android page loads (`Log.w("InAppBrowser", ...)`), the message
+   * is logged once per host per WebView instance; Android download trust bypasses log on each
+   * bypassed check (no per-host deduplication). On iOS (`print("[InAppBrowser] WARNING: ...")`),
+   * once per host per WebView controller instance, so it is visible in the device log if left
+   * enabled unintentionally.
    * @since 6.1.0
    * @default false
    */

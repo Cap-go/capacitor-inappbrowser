@@ -3861,19 +3861,27 @@ extension WKWebViewController: WKNavigationDelegate {
             let credential = URLCredential(trust: serverTrust)
             let isServerTrustChallenge = challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
             if isServerTrustChallenge {
-                SecTrustEvaluateAsyncWithError(serverTrust, DispatchQueue.global(qos: .userInitiated)) { _, trusted, _ in
-                    DispatchQueue.main.async {
-                        if !trusted {
-                            let host = challenge.protectionSpace.host
-                            if self.untrustedSslWarnedHosts.insert(host).inserted {
-                                print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
-                                      "certificate for \(host). This option is intended for known, " +
-                                      "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
-                                      "page load and should never be enabled for a production flow handling sensitive data " +
-                                      "(login, payments, personal data).")
+                let evaluateQueue = DispatchQueue.global(qos: .userInitiated)
+                evaluateQueue.async {
+                    let queued = SecTrustEvaluateAsyncWithError(serverTrust, evaluateQueue) { _, trusted, _ in
+                        DispatchQueue.main.async {
+                            if !trusted {
+                                let host = challenge.protectionSpace.host
+                                if self.untrustedSslWarnedHosts.insert(host).inserted {
+                                    print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
+                                          "certificate for \(host). This option is intended for known, " +
+                                          "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
+                                          "page load and should never be enabled for a production flow handling sensitive data " +
+                                          "(login, payments, personal data).")
+                                }
                             }
+                            completionHandler(.useCredential, credential)
                         }
-                        completionHandler(.useCredential, credential)
+                    }
+                    if !queued {
+                        DispatchQueue.main.async {
+                            completionHandler(.useCredential, credential)
+                        }
                     }
                 }
             } else {
