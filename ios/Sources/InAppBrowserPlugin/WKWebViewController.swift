@@ -3187,11 +3187,15 @@ fileprivate extension WKWebViewController {
             return
         }
 
+        // Suppress duplicate policy callbacks for one navigation, not intentional repeat taps.
         let emissionKey = url.absoluteString
+        let duplicateCallbackWindow: TimeInterval = 0.35
         let now = Date()
-        recentDeepLinkPreventedEmissionKeys = recentDeepLinkPreventedEmissionKeys.filter { now.timeIntervalSince($0.value) < 1.5 }
+        recentDeepLinkPreventedEmissionKeys = recentDeepLinkPreventedEmissionKeys.filter {
+            now.timeIntervalSince($0.value) < duplicateCallbackWindow
+        }
         if let lastEmission = recentDeepLinkPreventedEmissionKeys[emissionKey],
-           now.timeIntervalSince(lastEmission) < 1.5 {
+           now.timeIntervalSince(lastEmission) < duplicateCallbackWindow {
             return
         }
 

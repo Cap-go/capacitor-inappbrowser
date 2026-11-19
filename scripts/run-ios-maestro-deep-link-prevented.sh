@@ -5,9 +5,15 @@ set -eu
 maestro_bin="${HOME}/.maestro/bin/maestro"
 flow_path=".maestro/deep-link-prevented-ios.yaml"
 app_id="${APP_ID:-app.capgo.inappbrowser}"
+log_file="/tmp/maestro-ios-deep-link.log"
 
 run_flow() {
-  "$maestro_bin" test -e "APP_ID=${app_id}" "$flow_path" 2>&1 | tee /tmp/maestro-ios-deep-link.log
+  set +e
+  "$maestro_bin" test -e "APP_ID=${app_id}" "$flow_path" >"$log_file" 2>&1
+  status=$?
+  set -e
+  cat "$log_file"
+  return $status
 }
 
 set +e
@@ -19,10 +25,14 @@ if [ "$first_status" -eq 0 ]; then
   exit 0
 fi
 
-if ! grep -q 'IOSDriverTimeoutException' /tmp/maestro-ios-deep-link.log; then
+if ! grep -q 'IOSDriverTimeoutException' "$log_file"; then
   exit "$first_status"
 fi
 
 echo "Maestro iOS deep link run failed with IOSDriverTimeoutException. Retrying once..."
 sleep 5
+set +e
 run_flow
+retry_status=$?
+set -e
+exit "$retry_status"

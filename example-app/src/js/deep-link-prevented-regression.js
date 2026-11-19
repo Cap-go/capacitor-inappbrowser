@@ -7,6 +7,7 @@ const RUN_TIMEOUT_MS = 60_000;
 
 let harnessAttached = false;
 let harnessAttachPending = false;
+let activeRegressionGeneration = 0;
 
 function sleep(ms) {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
@@ -87,6 +88,9 @@ export function attachDeepLinkPreventedRegressionHarness() {
   };
 
   const runRegression = async () => {
+    const runGeneration = ++activeRegressionGeneration;
+    const isActiveRun = () => runGeneration === activeRegressionGeneration;
+
     runButton.disabled = true;
     syncMaestroNativeRunning(true);
     setStatus("Deep link prevented regression running", "Opening webview...");
@@ -94,12 +98,15 @@ export function attachDeepLinkPreventedRegressionHarness() {
     const preventedEvents = [];
     let webViewId = null;
     let deepLinkListener = null;
+    let timeoutId = null;
 
-    const timeout = globalThis.setTimeout(() => {
-      throw new Error("Deep link prevented regression timed out");
-    }, RUN_TIMEOUT_MS);
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = globalThis.setTimeout(() => {
+        reject(new Error("Deep link prevented regression timed out"));
+      }, RUN_TIMEOUT_MS);
+    });
 
-    try {
+    const work = async () => {
       deepLinkListener = await InAppBrowser.addListener("deepLinkPrevented", (event) => {
         preventedEvents.push(event);
       });
@@ -163,25 +170,39 @@ export function attachDeepLinkPreventedRegressionHarness() {
       await InAppBrowser.close({ id: webViewId });
       webViewId = null;
 
+      if (!isActiveRun()) {
+        return;
+      }
+
       const successDetails = [
         `Event OK: ${CUSTOM_SCHEME_URL}`,
         "Negative OK: https produced no deepLinkPrevented",
       ].join("\n");
       setStatus("Deep link prevented regression passed", successDetails);
+    };
+
+    try {
+      await Promise.race([work(), timeoutPromise]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setStatus("Deep link prevented regression failed", message);
+      if (isActiveRun()) {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus("Deep link prevented regression failed", message);
+      }
       if (webViewId) {
         await InAppBrowser.close({ id: webViewId }).catch(() => {});
       }
       throw error;
     } finally {
-      globalThis.clearTimeout(timeout);
+      if (timeoutId !== null) {
+        globalThis.clearTimeout(timeoutId);
+      }
       if (deepLinkListener) {
         await deepLinkListener.remove().catch(() => {});
       }
-      runButton.disabled = false;
-      syncMaestroNativeRunning(false);
+      if (isActiveRun()) {
+        runButton.disabled = false;
+        syncMaestroNativeRunning(false);
+      }
     }
   };
 
