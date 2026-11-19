@@ -3,11 +3,19 @@ androidWebViewHierarchy: devtools
 env:
   THRESHOLD_PERCENTAGE: 97
 ---
+- launchApp:
+    clearState: true
+- tapOn:
+    text: "Wait"
+    optional: true
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
+- scrollUntilVisible:
+    element:
+      text: "Run Visual Regression (Maestro)"
 - tapOn:
-    id: "maestro-run-visual-regression"
+    text: "Run Visual Regression (Maestro)"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Visual regression ready"

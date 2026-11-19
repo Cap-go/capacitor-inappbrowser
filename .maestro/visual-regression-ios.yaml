@@ -7,8 +7,11 @@ env:
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
+- scrollUntilVisible:
+    element:
+      text: "Run Visual Regression (Maestro)"
 - tapOn:
-    id: "maestro-run-visual-regression"
+    text: "Run Visual Regression (Maestro)"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Visual regression ready"
