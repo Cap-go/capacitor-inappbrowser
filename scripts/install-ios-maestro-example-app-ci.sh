@@ -18,6 +18,13 @@ if [ -z "$app_bundle" ]; then
   fi
 fi
 if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
+  if [ -f maestro-artifacts/Info.plist ]; then
+    app_bundle="$(mktemp -d)/App.app"
+    mkdir -p "$app_bundle"
+    cp -R maestro-artifacts/. "$app_bundle/"
+  fi
+fi
+if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
   echo "Simulator app bundle not found"
   exit 1
 fi
