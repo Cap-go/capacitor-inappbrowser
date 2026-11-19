@@ -92,8 +92,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-maestro-example-app
-          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/
+          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
           retention-days: 1
+          compression-level: 9
   web:
     runs-on: ubuntu-latest
     # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
