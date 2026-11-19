@@ -5,17 +5,15 @@ appId: ${APP_ID}
 - tapOn:
     text: "Wait"
     optional: true
-- tapOn:
-    text: "QA tools (Maestro regression)"
-    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Maestro Ready"
     timeout: 240000
 - extendedWaitUntil:
-    visible: "Run Visual Regression (Maestro)"
+    visible:
+      id: "maestro-run-visual-regression"
     timeout: 240000
 - tapOn:
-    text: "Run Visual Regression (Maestro)"
+    id: "maestro-run-visual-regression"
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Visual regression ready"

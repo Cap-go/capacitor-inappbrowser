@@ -8,6 +8,7 @@ const flowDirs = [path.join(rootDir, ".maestro"), path.join(exampleDir, ".maestr
 
 const sourceFiles = [
   path.join(exampleDir, "src/index.html"),
+  path.join(exampleDir, "src/visual-regression-probe.html"),
   path.join(exampleDir, "src/js/capacitor-welcome.js"),
   path.join(exampleDir, "src/js/feature-smoke.js"),
   path.join(exampleDir, "src/js/keyboard-regression.js"),
