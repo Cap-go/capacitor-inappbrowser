@@ -86,14 +86,6 @@ jobs:
       - name: Verify packed package in example app (iOS)
         shell: bash
         run: bash ./.github/scripts/verify-packed-example.sh ios
-      - name: Build iOS example app for Maestro
-        run: bash ./scripts/build-ios-maestro-simulator-app-ci.sh
-      - name: Upload iOS Maestro app artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-maestro-example-app
-          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/
-          retention-days: 1
   web:
     runs-on: ubuntu-latest
     # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
@@ -173,11 +165,20 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v7
-      - name: Download iOS Maestro app artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ios-maestro-example-app
-          path: maestro-artifacts
+      - uses: oven-sh/setup-bun@v2
+      - name: Select iOS Simulator and start boot
+        run: |
+          IOS_SIMULATOR_UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          if [ -z "$IOS_SIMULATOR_UDID" ]; then
+            echo "No available iPhone simulator found"
+            exit 1
+          fi
+          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$IOS_SIMULATOR_UDID" 2>/dev/null || true
+      - name: Install root dependencies
+        run: bun i
+      - name: Build plugin for example app
+        run: bun run build
       - name: Cache Maestro CLI
         uses: actions/cache@v4
         id: maestro-cache
@@ -191,17 +192,11 @@ jobs:
           curl -fsSL "https://get.maestro.mobile.dev" | bash
       - name: Add Maestro to PATH
         run: echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      - name: Select iOS Simulator
-        run: |
-          IOS_SIMULATOR_UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
-          if [ -z "$IOS_SIMULATOR_UDID" ]; then
-            echo "No available iPhone simulator found"
-            exit 1
-          fi
-          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+      - name: Build iOS example app for Maestro
+        run: bash ./scripts/build-ios-maestro-simulator-app-ci.sh
       - name: Install iOS example app on simulator
         run: bash ./scripts/install-ios-maestro-example-app-ci.sh
       - name: Run Maestro deep link prevented (iOS)
         run: |
-          export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 MAESTRO_CLI_NO_ANALYTICS=1
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000 MAESTRO_CLI_NO_ANALYTICS=1
           sh ./scripts/run-ios-maestro-deep-link-prevented.sh

@@ -5,6 +5,11 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root/example-app"
 
+if [ ! -d "$repo_root/dist" ]; then
+  echo "Plugin dist/ is missing; run bun run build at the repository root first."
+  exit 1
+fi
+
 bun install --frozen-lockfile --ignore-scripts
 bun run build
 bunx cap sync ios

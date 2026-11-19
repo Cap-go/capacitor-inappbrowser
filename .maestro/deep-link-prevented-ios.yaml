@@ -2,13 +2,13 @@ appId: app.capgo.inappbrowser
 ---
 - launchApp
 - extendedWaitUntil:
-    visible: 'Run Deep Link Prevented (Maestro)'
-    timeout: 240000
+    visible: 'Maestro Ready'
+    timeout: 120000
 - tapOn:
     id: 'maestro-run-deep-link-prevented'
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: 'Event OK: capgo-maestro-deeplink://blocked'
-    timeout: 180000
+    timeout: 120000
 - assertVisible: 'Event OK: capgo-maestro-deeplink://blocked'
 - assertVisible: 'Negative OK: https produced no deepLinkPrevented'
