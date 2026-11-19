@@ -4,13 +4,40 @@ import { openQaToolsPanel } from "./qa-tools.js";
 const CUSTOM_SCHEME_URL = "capgo-maestro-deeplink://blocked";
 const HTTPS_URL = "https://example.com/";
 const RUN_TIMEOUT_MS = 60_000;
+const EVENT_OK_STATUS = "Event OK: capgo-maestro-deeplink://blocked";
 
 let harnessAttached = false;
 let harnessAttachPending = false;
 let activeRegressionGeneration = 0;
 
-function sleep(ms) {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+async function waitUntil(predicate, timeoutMs, intervalMs = 50) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Timed out waiting for condition");
+}
+
+async function waitForStableCount(readCount, stableMs, timeoutMs) {
+  let lastCount = readCount();
+  let stableSince = Date.now();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 50));
+    const current = readCount();
+    if (current !== lastCount) {
+      lastCount = current;
+      stableSince = Date.now();
+      continue;
+    }
+    if (Date.now() - stableSince >= stableMs) {
+      return lastCount;
+    }
+  }
+  return lastCount;
 }
 
 function withMaestroNativeHarness(callback) {
@@ -132,36 +159,25 @@ export function attachDeepLinkPreventedRegressionHarness() {
       });
       webViewId = id;
 
-      await new Promise((resolve) => {
-        let settled = false;
-        const finish = () => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          resolve();
-        };
-        InAppBrowser.addListener("browserPageLoaded", (event) => {
-          if (event.id && webViewId && event.id !== webViewId) {
-            return;
-          }
-          finish();
-        }).catch(() => finish());
-        globalThis.setTimeout(finish, 3000);
+      let regressionPageLoaded = false;
+      const pageLoadedListener = await InAppBrowser.addListener("browserPageLoaded", (event) => {
+        if (event.id && webViewId && event.id !== webViewId) {
+          return;
+        }
+        regressionPageLoaded = true;
       });
-      await sleep(400);
+      await waitUntil(() => regressionPageLoaded, 15_000);
+      await pageLoadedListener.remove().catch(() => {});
 
       await InAppBrowser.executeScript({
         id: webViewId,
         code: "document.getElementById('deeplink-link').click();",
       });
 
-      await sleep(1200);
-
-      const customSchemeEvent = preventedEvents.find((event) => event.url === CUSTOM_SCHEME_URL);
-      if (!customSchemeEvent) {
-        throw new Error(`Expected deepLinkPrevented for ${CUSTOM_SCHEME_URL}`);
-      }
+      await waitUntil(
+        () => preventedEvents.some((event) => event.url === CUSTOM_SCHEME_URL),
+        15_000,
+      );
 
       const eventCountBeforeHttps = preventedEvents.length;
 
@@ -170,9 +186,8 @@ export function attachDeepLinkPreventedRegressionHarness() {
         code: "document.getElementById('https-link').click();",
       });
 
-      await sleep(1500);
-
-      if (preventedEvents.length !== eventCountBeforeHttps) {
+      const stableCount = await waitForStableCount(() => preventedEvents.length, 500, 12_000);
+      if (stableCount !== eventCountBeforeHttps) {
         throw new Error("deepLinkPrevented fired for ordinary https navigation");
       }
 
@@ -184,10 +199,10 @@ export function attachDeepLinkPreventedRegressionHarness() {
       }
 
       const successDetails = [
-        `Event OK: ${CUSTOM_SCHEME_URL}`,
+        "Deep link prevented regression passed",
         "Negative OK: https produced no deepLinkPrevented",
       ].join("\n");
-      setStatus(`Deep link prevented regression passed (${CUSTOM_SCHEME_URL})`, successDetails);
+      setStatus(EVENT_OK_STATUS, successDetails);
     };
 
     try {

@@ -8,6 +8,10 @@ on:
     branches: [ main ]
   workflow_call:  # Allow this workflow to be called by other workflows
 
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   guard_swiftpm_version:
     runs-on: ubuntu-latest
@@ -167,16 +171,21 @@ jobs:
           node-version: 24.x
       - name: Install root dependencies
         run: bun i
+      - name: Cache Maestro CLI
+        uses: actions/cache@v4
+        id: maestro-cache
+        with:
+          path: ~/.maestro
+          key: maestro-cli-1.39.0-${{ runner.os }}
       - name: Install Maestro CLI
+        if: steps.maestro-cache.outputs.cache-hit != 'true'
         run: |
           export MAESTRO_VERSION=1.39.0
           curl -fsSL "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-      - name: Build example app for iOS
-        run: bun run example-app:prepare:ios
+      - name: Add Maestro to PATH
+        run: echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       - name: Select iOS Simulator
         run: |
-          xcrun simctl shutdown all || true
           IOS_SIMULATOR_UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
           if [ -z "$IOS_SIMULATOR_UDID" ]; then
             echo "No available iPhone simulator found"
@@ -184,18 +193,7 @@ jobs:
           fi
           echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Build and install iOS example app
-        run: |
-          open -a Simulator --args -CurrentDeviceUDID "$IOS_SIMULATOR_UDID"
-          xcrun simctl boot "$IOS_SIMULATOR_UDID" || true
-          xcrun simctl bootstatus "$IOS_SIMULATOR_UDID" -b
-          xcodebuild \
-            -project example-app/ios/App/App.xcodeproj \
-            -scheme App \
-            -destination "id=$IOS_SIMULATOR_UDID" \
-            -derivedDataPath example-app/ios/DerivedData \
-            build
-          xcrun simctl install "$IOS_SIMULATOR_UDID" example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
-          xcrun simctl launch "$IOS_SIMULATOR_UDID" app.capgo.inappbrowser || true
+        run: bash ./scripts/build-ios-maestro-example-app.sh
       - name: Run Maestro deep link prevented (iOS)
         run: |
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000

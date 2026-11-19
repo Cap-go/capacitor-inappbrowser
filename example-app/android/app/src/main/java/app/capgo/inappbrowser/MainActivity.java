@@ -283,73 +283,82 @@ public class MainActivity extends BridgeActivity {
         );
     }
 
-    private void triggerMaestroDeepLinkPrevented() {
-        if (!maestroReady) {
-            maestroPendingDeepLinkRun = true;
-            updateMaestroStatus("Waiting for Maestro readiness", "Queued deep link prevented regression");
-            return;
-        }
-
+    private void evaluateMaestroOnWebView(String javascript, @Nullable android.webkit.ValueCallback<String> callback) {
         if (bridge == null || bridge.getWebView() == null) {
             return;
         }
+        WebView webView = bridge.getWebView();
+        webView.post(() -> webView.evaluateJavascript(javascript, callback));
+    }
 
+    private void triggerMaestroRegression(
+        boolean clearPendingWhenReady,
+        Runnable queueWhenNotReady,
+        String queueDetails,
+        String triggerJavascript
+    ) {
+        if (!maestroReady) {
+            queueWhenNotReady.run();
+            updateMaestroStatus("Waiting for Maestro readiness", queueDetails);
+            return;
+        }
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+        if (clearPendingWhenReady) {
+            maestroPendingRun = false;
+        }
         updateMaestroRunning(true);
-        bridge
-            .getWebView()
-            .post(() ->
-                bridge
-                    .getWebView()
-                    .evaluateJavascript(
-                        "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return true;}var button=document.getElementById('maestro-run-deep-link-prevented');if(button){button.click();return true;}return false;})()",
-                        null
-                    )
-            );
+        evaluateMaestroOnWebView(triggerJavascript, null);
+    }
+
+    private void triggerMaestroDeepLinkPrevented() {
+        triggerMaestroRegression(
+            false,
+            () -> maestroPendingDeepLinkRun = true,
+            "Queued deep link prevented regression",
+            "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return true;}var button=document.getElementById('maestro-run-deep-link-prevented');if(button){button.click();return true;}return false;})()"
+        );
     }
 
     private void triggerMaestroProxyRegression() {
-        if (!maestroReady) {
-            maestroPendingRun = true;
-            updateMaestroStatus("Waiting for Maestro readiness", "Queued proxy regression run");
-            return;
-        }
-
-        if (bridge == null || bridge.getWebView() == null) {
-            return;
-        }
-
-        maestroPendingRun = false;
-        updateMaestroRunning(true);
-        bridge
-            .getWebView()
-            .post(() ->
-                bridge
-                    .getWebView()
-                    .evaluateJavascript(
-                        "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return true;}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button){button.click();return true;}return false;})()",
-                        null
-                    )
-            );
+        triggerMaestroRegression(
+            true,
+            () -> maestroPendingRun = true,
+            "Queued proxy regression run",
+            "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return true;}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button){button.click();return true;}return false;})()"
+        );
     }
 
-    private void maybeRunQueuedMaestroProxyRegression() {
-        if (!maestroPendingRun || maestroRunning || bridge == null || bridge.getWebView() == null) {
+    private void maybeRunQueuedMaestroRegression(
+        boolean pending,
+        Runnable clearPending,
+        String pollJavascript,
+        Runnable retryRunnable
+    ) {
+        if (!pending || maestroRunning || bridge == null || bridge.getWebView() == null) {
             return;
         }
 
         WebView webView = bridge.getWebView();
         webView.post(() ->
-            webView.evaluateJavascript(
-                "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return 'started';}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
-                value -> {
-                    if ("\"started\"".equals(value)) {
-                        maestroPendingRun = false;
-                        updateMaestroRunning(true);
-                        return;
-                    }
-                    webView.postDelayed(this::maybeRunQueuedMaestroProxyRegression, MAESTRO_AUTORUN_RETRY_DELAY_MS);
+            webView.evaluateJavascript(pollJavascript, value -> {
+                if ("\"started\"".equals(value)) {
+                    clearPending.run();
+                    updateMaestroRunning(true);
+                    return;
                 }
-            )
+                webView.postDelayed(retryRunnable, MAESTRO_AUTORUN_RETRY_DELAY_MS);
+            })
+        );
+    }
+
+    private void maybeRunQueuedMaestroProxyRegression() {
+        maybeRunQueuedMaestroRegression(
+            maestroPendingRun,
+            () -> maestroPendingRun = false,
+            "(function(){if(window.__capgoRunMaestroProxy){window.__capgoRunMaestroProxy();return 'started';}var button=document.getElementById('maestro-run-proxy')||document.getElementById('run-proxy-regression');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
+            this::maybeRunQueuedMaestroProxyRegression
         );
     }
 
@@ -380,23 +389,11 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void maybeRunQueuedMaestroDeepLinkPrevented() {
-        if (!maestroPendingDeepLinkRun || maestroRunning || bridge == null || bridge.getWebView() == null) {
-            return;
-        }
-
-        WebView webView = bridge.getWebView();
-        webView.post(() ->
-            webView.evaluateJavascript(
-                "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return 'started';}var button=document.getElementById('maestro-run-deep-link-prevented');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
-                value -> {
-                    if ("\"started\"".equals(value)) {
-                        maestroPendingDeepLinkRun = false;
-                        updateMaestroRunning(true);
-                        return;
-                    }
-                    webView.postDelayed(this::maybeRunQueuedMaestroDeepLinkPrevented, MAESTRO_AUTORUN_RETRY_DELAY_MS);
-                }
-            )
+        maybeRunQueuedMaestroRegression(
+            maestroPendingDeepLinkRun,
+            () -> maestroPendingDeepLinkRun = false,
+            "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return 'started';}var button=document.getElementById('maestro-run-deep-link-prevented');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
+            this::maybeRunQueuedMaestroDeepLinkPrevented
         );
     }
 
