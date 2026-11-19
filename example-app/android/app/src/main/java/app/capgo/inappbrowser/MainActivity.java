@@ -40,6 +40,7 @@ public class MainActivity extends BridgeActivity {
     private boolean maestroReady;
     private boolean maestroRunning;
     private boolean maestroPendingRun;
+    private boolean maestroPendingDeepLinkRun;
     private boolean maestroHarnessInstalled;
     private boolean maestroHarnessBridgeInjected;
     private int maestroHarnessRetryCount;
@@ -284,6 +285,7 @@ public class MainActivity extends BridgeActivity {
 
     private void triggerMaestroDeepLinkPrevented() {
         if (!maestroReady) {
+            maestroPendingDeepLinkRun = true;
             updateMaestroStatus("Waiting for Maestro readiness", "Queued deep link prevented regression");
             return;
         }
@@ -372,6 +374,30 @@ public class MainActivity extends BridgeActivity {
         if (ready && maestroPendingRun && !maestroRunning) {
             maybeRunQueuedMaestroProxyRegression();
         }
+        if (ready && maestroPendingDeepLinkRun && !maestroRunning) {
+            maybeRunQueuedMaestroDeepLinkPrevented();
+        }
+    }
+
+    private void maybeRunQueuedMaestroDeepLinkPrevented() {
+        if (!maestroPendingDeepLinkRun || maestroRunning || bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+
+        WebView webView = bridge.getWebView();
+        webView.post(() ->
+            webView.evaluateJavascript(
+                "(function(){if(window.__capgoRunMaestroDeepLinkPrevented){window.__capgoRunMaestroDeepLinkPrevented();return 'started';}var button=document.getElementById('maestro-run-deep-link-prevented');if(button&&!button.disabled){button.click();return 'started';}return 'waiting';})()",
+                value -> {
+                    if ("\"started\"".equals(value)) {
+                        maestroPendingDeepLinkRun = false;
+                        updateMaestroRunning(true);
+                        return;
+                    }
+                    webView.postDelayed(this::maybeRunQueuedMaestroDeepLinkPrevented, MAESTRO_AUTORUN_RETRY_DELAY_MS);
+                }
+            )
+        );
     }
 
     private void updateMaestroRunning(boolean running) {

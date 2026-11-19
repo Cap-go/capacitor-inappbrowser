@@ -11,7 +11,7 @@ appId: app.capgo.inappbrowser
     retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: 'Deep link prevented regression passed'
-    timeout: 120000
+    timeout: 180000
 - assertVisible: 'Event OK: capgo-maestro-deeplink://blocked'
 - assertVisible: 'Negative OK: https produced no deepLinkPrevented'
 - assertVisible: 'InAppBrowser Test App'

@@ -11,7 +11,6 @@ run_flow() {
   set +e
   "$maestro_bin" test -e "APP_ID=${app_id}" "$flow_path" >"$log_file" 2>&1
   status=$?
-  set -e
   cat "$log_file"
   return $status
 }
