@@ -1,12 +1,9 @@
 appId: app.capgo.inappbrowser
 ---
 - launchApp
-- tapOn:
-    text: 'QA tools (Maestro regression)'
-    optional: true
 - extendedWaitUntil:
-    visible: 'Run Deep Link Prevented (Maestro)'
-    timeout: 180000
+    visible: 'Maestro Ready'
+    timeout: 240000
 - tapOn:
     id: 'maestro-run-deep-link-prevented'
     retryTapIfNoChange: true
