@@ -5,14 +5,18 @@ import static org.junit.Assert.assertTrue;
 
 import android.webkit.WebView;
 import androidx.activity.ComponentActivity;
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.TimeUnit;
+import com.getcapacitor.JSObject;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,13 +31,14 @@ import org.robolectric.shadows.ShadowLooper;
 public class BlobDownloadBridgeTokenRobolectricTest {
 
     private WebViewDialog dialog;
+    private Options options;
     private Object javascriptInterface;
 
     @Before
     public void setUp() throws Exception {
         ComponentActivity activity = Robolectric.buildActivity(ComponentActivity.class).setup().get();
 
-        Options options = new Options();
+        options = new Options();
         options.setHandleDownloads(true);
         options.setJavascriptBridgeOriginPolicy(
             JavascriptBridgeOriginPolicy.fromAllowlist(Collections.singletonList("https://app.example.com"))
@@ -113,16 +118,26 @@ public class BlobDownloadBridgeTokenRobolectricTest {
 
     @Test
     public void finishBlobDownloadRequiresToken() throws Exception {
+        DownloadFailureTracker failureTracker = new DownloadFailureTracker();
+        options.setCallbacks(failureTracker);
+
         String token = blobDownloadToken();
         callBridge("startBlobDownload", startPayload(token));
         callBridge("appendBlobDownloadChunk", chunkPayload(token));
 
+        File outputFile = sessionOutputFile("session-1");
+
         callBridge("finishBlobDownload", new JSONObject().put("sessionId", "session-1"));
         callBridge("finishBlobDownload", new JSONObject().put("token", "not-the-token").put("sessionId", "session-1"));
         assertTrue("finish without a valid token must not touch the session", blobDownloadSessions().containsKey("session-1"));
+        assertEquals(0, failureTracker.failedCount);
 
         callBridge("finishBlobDownload", new JSONObject().put("token", token).put("sessionId", "session-1"));
+        ShadowLooper.idleMainLooper();
         assertEquals(0, blobDownloadSessions().size());
+        assertEquals(0, failureTracker.failedCount);
+        assertTrue(outputFile.exists());
+        assertEquals("hi", new String(Files.readAllBytes(outputFile.toPath()), StandardCharsets.UTF_8));
     }
 
     private JSONObject legacyPayload(String token) throws Exception {
@@ -146,6 +161,13 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         Field field = session.getClass().getDeclaredField("bytesWritten");
         field.setAccessible(true);
         return field.getLong(session);
+    }
+
+    private File sessionOutputFile(String sessionId) throws Exception {
+        Object session = blobDownloadSessions().get(sessionId);
+        Field field = session.getClass().getDeclaredField("outputFile");
+        field.setAccessible(true);
+        return (File) field.get(session);
     }
 
     private JSONObject startPayload(String token) throws Exception {
@@ -183,6 +205,72 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         Field field = WebViewDialog.class.getDeclaredField(name);
         field.setAccessible(true);
         field.set(dialog, value);
+    }
+
+    private static final class DownloadFailureTracker implements WebViewCallbacks {
+
+        int failedCount;
+
+        @Override
+        public void urlChangeEvent(String url) {}
+
+        @Override
+        public void closeEvent(String url) {}
+
+        @Override
+        public void hideEvent(String url, JSObject screenshot) {}
+
+        @Override
+        public void pageLoaded() {}
+
+        @Override
+        public void pageLoadStart() {}
+
+        @Override
+        public void pageLoadProgress(double progress) {}
+
+        @Override
+        public void pageLoadError() {}
+
+        @Override
+        public void customSchemeIntercepted(String url, boolean opened) {}
+
+        @Override
+        public void javascriptCallback(String message) {}
+
+        @Override
+        public void consoleMessage(String level, String message, String source, Integer line, Integer column) {}
+
+        @Override
+        public void buttonNearDoneClicked() {}
+
+        @Override
+        public void confirmBtnClicked(String url) {}
+
+        @Override
+        public void screenshotTaken(JSObject screenshot) {}
+
+        @Override
+        public void downloadCompleted(String sourceUrl, String fileName, String mimeType, String path, String localUrl, String handledBy) {}
+
+        @Override
+        public void downloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+            failedCount++;
+        }
+
+        @Override
+        public void proxyRequestEvent(
+            String requestId,
+            String phase,
+            String url,
+            String method,
+            String headersJson,
+            String body,
+            Integer status,
+            String responseHeadersJson,
+            String responseBody,
+            String webviewId
+        ) {}
     }
 
     // Counts tasks instead of running them, so the legacy download never touches the file system.
