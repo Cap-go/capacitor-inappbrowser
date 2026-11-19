@@ -1,0 +1,16 @@
+appId: app.capgo.inappbrowser
+---
+- tapOn:
+    text: 'Wait'
+    optional: true
+    label: 'Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness'
+- extendedWaitUntil:
+    visible: 'Maestro Ready'
+    timeout: 240000
+- tapOn:
+    text: "Run Deep Link Prevented \\(Maestro\\)"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Event OK: capgo-maestro-deeplink://blocked'
+    timeout: 180000
+- assertVisible: 'Event OK: capgo-maestro-deeplink://blocked'

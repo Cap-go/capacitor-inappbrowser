@@ -12,6 +12,8 @@ const sourceFiles = [
   path.join(exampleDir, "src/js/feature-smoke.js"),
   path.join(exampleDir, "src/js/keyboard-regression.js"),
   path.join(exampleDir, "src/js/proxy-regression.js"),
+  path.join(exampleDir, "src/js/deep-link-prevented-regression.js"),
+  path.join(exampleDir, "android/app/src/main/java/app/capgo/inappbrowser/MainActivity.java"),
 ];
 
 const NATIVE_IDS = new Set(["app.capgo.inappbrowser:id/closeButton"]);

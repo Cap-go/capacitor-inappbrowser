@@ -19,6 +19,8 @@ public interface WebViewCallbacks {
 
     public void customSchemeIntercepted(String url, boolean opened);
 
+    public void deepLinkPrevented(String url);
+
     public void javascriptCallback(String message);
 
     public void consoleMessage(String level, String message, String source, Integer line, Integer column);

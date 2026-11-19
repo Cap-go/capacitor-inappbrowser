@@ -8,6 +8,10 @@ on:
     branches: [ main ]
   workflow_call:  # Allow this workflow to be called by other workflows
 
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   guard_swiftpm_version:
     runs-on: ubuntu-latest
@@ -82,6 +86,15 @@ jobs:
       - name: Verify packed package in example app (iOS)
         shell: bash
         run: bash ./.github/scripts/verify-packed-example.sh ios
+      - name: Build iOS example app for Maestro
+        run: bash ./scripts/build-ios-maestro-simulator-app-ci.sh
+      - name: Upload iOS Maestro app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-maestro-example-app
+          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          retention-days: 1
+          compression-level: 9
   web:
     runs-on: ubuntu-latest
     # Keep this job capped at 10 minutes; never raise it unless explicitly asked.
@@ -106,6 +119,90 @@ jobs:
       - name: Verify packed package in example app (Web)
         shell: bash
         run: bash ./.github/scripts/verify-packed-example.sh web
+      - name: Verify Maestro selectors
+        run: node example-app/scripts/verify-maestro-selectors.mjs
       - name: Verify
         id: verify_code
         run: bun run verify:web
+
+  maestro_android_deep_link_prevented:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Android Maestro deep link prevented
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+      - name: Install root dependencies
+        run: bun i
+      - name: Setup java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "21"
+      - name: Install Maestro CLI
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Build example app for Android
+        run: bun run example-app:prepare:android
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Maestro deep link prevented (Android)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: sh ./scripts/run-android-maestro-with-retry.sh maestro:test:android:deep-link-prevented
+
+  maestro_ios_deep_link_prevented:
+    needs: [build_ios]
+    runs-on: macOS-latest
+    timeout-minutes: 10
+    name: iOS Maestro deep link prevented
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+      - name: Download iOS Maestro app artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-maestro-example-app
+          path: maestro-artifacts
+      - name: Cache Maestro CLI
+        uses: actions/cache@v4
+        id: maestro-cache
+        with:
+          path: ~/.maestro
+          key: maestro-cli-1.39.0-${{ runner.os }}
+      - name: Install Maestro CLI
+        if: steps.maestro-cache.outputs.cache-hit != 'true'
+        run: |
+          export MAESTRO_VERSION=1.39.0
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+      - name: Add Maestro to PATH
+        run: echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Select iOS Simulator
+        run: |
+          IOS_SIMULATOR_UDID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          if [ -z "$IOS_SIMULATOR_UDID" ]; then
+            echo "No available iPhone simulator found"
+            exit 1
+          fi
+          echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
+      - name: Install iOS example app on simulator
+        run: bash ./scripts/install-ios-maestro-example-app-ci.sh
+      - name: Run Maestro deep link prevented (iOS)
+        run: |
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=120000 MAESTRO_CLI_NO_ANALYTICS=1
+          sh ./scripts/run-ios-maestro-deep-link-prevented.sh
