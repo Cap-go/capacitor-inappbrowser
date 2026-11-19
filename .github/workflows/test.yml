@@ -92,7 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-maestro-example-app
-          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/App.app
+          path: example-app/ios/DerivedData/Build/Products/Debug-iphonesimulator/
           retention-days: 1
   web:
     runs-on: ubuntu-latest
@@ -200,7 +200,7 @@ jobs:
           fi
           echo "IOS_SIMULATOR_UDID=$IOS_SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Install iOS example app on simulator
-        run: bash ./scripts/install-ios-maestro-example-app-ci.sh maestro-artifacts/App.app
+        run: bash ./scripts/install-ios-maestro-example-app-ci.sh
       - name: Run Maestro deep link prevented (iOS)
         run: |
           export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000 MAESTRO_CLI_NO_ANALYTICS=1

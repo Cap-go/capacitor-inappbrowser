@@ -7,9 +7,16 @@ if [ -z "${IOS_SIMULATOR_UDID:-}" ]; then
   exit 1
 fi
 
-app_bundle="${1:-maestro-artifacts/App.app}"
-if [ ! -d "$app_bundle" ]; then
-  echo "Simulator app bundle not found: $app_bundle"
+app_bundle="${1:-}"
+if [ -z "$app_bundle" ]; then
+  if [ -d maestro-artifacts/App.app ]; then
+    app_bundle="maestro-artifacts/App.app"
+  else
+    app_bundle="$(find maestro-artifacts -maxdepth 3 -type d -name '*.app' | head -n 1 || true)"
+  fi
+fi
+if [ -z "$app_bundle" ] || [ ! -d "$app_bundle" ]; then
+  echo "Simulator app bundle not found (searched maestro-artifacts)"
   exit 1
 fi
 
