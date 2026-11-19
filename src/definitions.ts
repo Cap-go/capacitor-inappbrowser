@@ -1316,7 +1316,8 @@ export interface OpenWebViewOptions {
    * personal data, since it allows a man-in-the-middle attacker to intercept and tamper with
    * that traffic. Both platforms log a warning on first use (`Log.w("InAppBrowser", ...)` on
    * Android — logged once per host per WebView instance, not on every subsequent accepted
-   * error for that same host; `print("[InAppBrowser] WARNING: ...")` on iOS) when this option
+   * error for that same host; `print("[InAppBrowser] WARNING: ...")` on iOS — also once per
+   * host per WebView controller instance) when this option
    * actually causes a failed certificate trust evaluation to be accepted, so it is visible in
    * the device log if left enabled unintentionally.
    * @since 6.1.0

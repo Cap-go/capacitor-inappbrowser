@@ -498,6 +498,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
     private var closeModalURLRegex: NSRegularExpression?
     open var ignoreUntrustedSSLError = false
+    private var untrustedSslWarnedHosts = Set<String>()
     open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
@@ -3857,21 +3858,27 @@ extension WKWebViewController: WKNavigationDelegate {
                 completionHandler(.useCredential, nil)
                 return
             }
-            // Only warn when this is actually a server-trust challenge whose trust
-            // evaluation genuinely failed — SecTrustEvaluateWithError returning true
-            // means the certificate is in fact valid/trusted, in which case accepting
-            // it here isn't bypassing anything and shouldn't be logged as if it were.
-            let isServerTrustChallenge = challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
-            let trustEvaluationFailed = !SecTrustEvaluateWithError(serverTrust, nil)
-            if isServerTrustChallenge && trustEvaluationFailed {
-                print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
-                      "certificate for \(challenge.protectionSpace.host). This option is intended for known, " +
-                      "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
-                      "page load and should never be enabled for a production flow handling sensitive data " +
-                      "(login, payments, personal data).")
-            }
             let credential = URLCredential(trust: serverTrust)
-            completionHandler(.useCredential, credential)
+            let isServerTrustChallenge = challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
+            if isServerTrustChallenge {
+                SecTrustEvaluateAsyncWithError(serverTrust, DispatchQueue.global(qos: .userInitiated)) { _, trusted, _ in
+                    DispatchQueue.main.async {
+                        if !trusted {
+                            let host = challenge.protectionSpace.host
+                            if self.untrustedSslWarnedHosts.insert(host).inserted {
+                                print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
+                                      "certificate for \(host). This option is intended for known, " +
+                                      "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
+                                      "page load and should never be enabled for a production flow handling sensitive data " +
+                                      "(login, payments, personal data).")
+                            }
+                        }
+                        completionHandler(.useCredential, credential)
+                    }
+                }
+            } else {
+                completionHandler(.useCredential, credential)
+            }
         }
         self.injectJavaScriptInterface()
     }
