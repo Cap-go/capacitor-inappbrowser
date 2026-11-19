@@ -83,13 +83,9 @@
         if (!panel) {
           return;
         }
-        const openForHarness = () => {
-          if (window.MaestroNativeHarness !== undefined) {
-            panel.setAttribute("open", "");
-          }
-        };
-        openForHarness();
-        window.addEventListener("load", openForHarness);
+        const openPanel = () => panel.setAttribute("open", "");
+        openPanel();
+        window.addEventListener("load", openPanel);
       })();
     </script>
   </body>
