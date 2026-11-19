@@ -12,15 +12,15 @@ describe('visual regression CI wiring (issue #722)', () => {
     expect(workflow).toContain('maestro_android_visual_regression:');
     expect(workflow).toContain('maestro_ios_visual_regression:');
     expect(workflow).toContain('maestro:test:android:visual-regression');
-    expect(workflow).toContain('run-ios-maestro-visual-regression.sh');
+    expect(workflow).toContain('run-maestro-visual-regression.sh');
   });
 
   it('ships Maestro flows and committed screenshot baselines', () => {
     const requiredPaths = [
-      '.maestro/visual-regression-android.yaml',
-      '.maestro/visual-regression-ios.yaml',
-      '.maestro/visual-regression-record-android.yaml',
-      '.maestro/visual-regression-record-ios.yaml',
+      '.maestro/visual-regression-assert.yaml',
+      '.maestro/visual-regression-record.yaml',
+      'example-app/src/visual-regression-probe.html',
+      'example-app/src/js/maestro-native-harness.js',
       '.maestro/visual-regression/baselines/android/blank-toolbar-layout.png',
       '.maestro/visual-regression/baselines/ios/blank-toolbar-layout.png',
       'example-app/src/js/visual-regression.js',
@@ -39,10 +39,8 @@ describe('visual regression CI wiring (issue #722)', () => {
     };
 
     expect(packageJson.scripts?.['maestro:test:android:visual-regression']).toContain(
-      'run-android-maestro-visual-regression.sh',
+      'prepare-maestro-visual-regression',
     );
-    expect(packageJson.scripts?.['maestro:test:ios:visual-regression']).toContain(
-      'run-ios-maestro-visual-regression.sh',
-    );
+    expect(packageJson.scripts?.['maestro:test:ios:visual-regression']).toContain('run-maestro-visual-regression.sh');
   });
 });

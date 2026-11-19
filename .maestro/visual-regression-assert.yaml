@@ -5,5 +5,5 @@ env:
 ---
 - runFlow: visual-regression/open-layout-probe.yaml
 - assertScreenshot:
-    path: visual-regression/baselines/android/blank-toolbar-layout.png
+    path: ${BASELINE_PATH}
     thresholdPercentage: ${THRESHOLD_PERCENTAGE}

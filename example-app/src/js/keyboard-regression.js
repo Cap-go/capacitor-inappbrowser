@@ -1,4 +1,9 @@
 import { InAppBrowser, ToolBarType, BackgroundColor } from "@capgo/capacitor-inappbrowser";
+import {
+  scheduleHarnessAttach,
+  syncMaestroNativeRunning,
+  syncMaestroNativeStatus,
+} from "./maestro-native-harness.js";
 
 const KEYBOARD_OPEN_THRESHOLD_PX = 120;
 const KEYBOARD_RESTORE_TOLERANCE_PX = 32;
@@ -6,54 +11,10 @@ const FINAL_MEASUREMENT_DELAY_MS = 800;
 const VIEWPORT_POLL_INTERVAL_MS = 100;
 const RUN_TIMEOUT_MS = 20_000;
 
-let harnessAttached = false;
-let harnessAttachPending = false;
-
-function scheduleHarnessAttachRetry() {
-  if (harnessAttachPending) {
-    return;
-  }
-
-  harnessAttachPending = true;
-  const retry = () => {
-    harnessAttachPending = false;
-    attachKeyboardRegressionHarness();
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", retry, { once: true });
-    return;
-  }
-
-  window.requestAnimationFrame(retry);
-}
-
-function withMaestroNativeHarness(callback) {
-  const harness = window.MaestroNativeHarness;
-  if (!harness || typeof callback !== "function") {
-    return;
-  }
-
-  try {
-    callback(harness);
-  } catch (_error) {}
-}
-
-function syncMaestroNativeRunning(running) {
-  withMaestroNativeHarness((harness) => {
-    if (typeof harness.setRunning === "function") {
-      harness.setRunning(Boolean(running));
-    }
-  });
-}
-
-function syncMaestroNativeStatus(message, details = "") {
-  withMaestroNativeHarness((harness) => {
-    if (typeof harness.setStatus === "function") {
-      harness.setStatus(message, details);
-    }
-  });
-}
+const harnessState = {
+  attached: false,
+  pending: false,
+};
 
 function getViewportMetrics() {
   const visualViewport = window.visualViewport;
@@ -269,7 +230,7 @@ function buildKeyboardRegressionUrl() {
 }
 
 export function attachKeyboardRegressionHarness() {
-  if (harnessAttached) {
+  if (harnessState.attached) {
     return;
   }
 
@@ -279,11 +240,11 @@ export function attachKeyboardRegressionHarness() {
   const details = document.getElementById("maestro-keyboard-details");
 
   if (!readyBanner || !runButton || !status || !details) {
-    scheduleHarnessAttachRetry();
+    scheduleHarnessAttach(attachKeyboardRegressionHarness, () => harnessState);
     return;
   }
 
-  harnessAttached = true;
+  harnessState.attached = true;
 
   let currentRun = null;
 

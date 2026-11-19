@@ -1,4 +1,0 @@
-appId: ${APP_ID}
----
-- runFlow: visual-regression/open-layout-probe.yaml
-- takeScreenshot: visual-regression/baselines/ios/blank-toolbar-layout.png

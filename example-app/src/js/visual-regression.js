@@ -1,163 +1,25 @@
 import { BackgroundColor, InAppBrowser, ToolBarType } from "@capgo/capacitor-inappbrowser";
+import {
+  scheduleHarnessAttach,
+  syncMaestroNativeRunning,
+  syncMaestroNativeStatus,
+} from "./maestro-native-harness.js";
 
-let harnessAttached = false;
-let harnessAttachPending = false;
+const harnessState = {
+  attached: false,
+  pending: false,
+};
 
-function scheduleHarnessAttachRetry() {
-  if (harnessAttachPending) {
-    return;
-  }
-
-  harnessAttachPending = true;
-  const retry = () => {
-    harnessAttachPending = false;
-    attachVisualRegressionHarness();
-  };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", retry, { once: true });
-    return;
-  }
-
-  window.requestAnimationFrame(retry);
-}
-
-function withMaestroNativeHarness(callback) {
-  const harness = window.MaestroNativeHarness;
-  if (!harness || typeof callback !== "function") {
-    return;
-  }
-
+function resolveVisualRegressionProbeUrl() {
   try {
-    callback(harness);
-  } catch (_error) {}
-}
-
-function syncMaestroNativeRunning(running) {
-  withMaestroNativeHarness((harness) => {
-    if (typeof harness.setRunning === "function") {
-      harness.setRunning(Boolean(running));
-    }
-  });
-}
-
-function syncMaestroNativeStatus(message, details = "") {
-  withMaestroNativeHarness((harness) => {
-    if (typeof harness.setStatus === "function") {
-      harness.setStatus(message, details);
-    }
-  });
-}
-
-function buildVisualRegressionUrl() {
-  const html = String.raw`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Visual Layout Probe</title>
-    <style>
-      :root {
-        color-scheme: light;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-      }
-
-      body {
-        display: flex;
-        flex-direction: column;
-        background: #f8fafc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      #visual-regression-probe {
-        display: flex;
-        flex: 1;
-        flex-direction: column;
-        min-height: 100%;
-      }
-
-      .stripe-top {
-        height: 56px;
-        background: #2563eb;
-        flex-shrink: 0;
-      }
-
-      .stripe-bottom {
-        height: 48px;
-        background: #dc2626;
-        flex-shrink: 0;
-      }
-
-      main {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #22c55e;
-        padding: 24px;
-      }
-
-      h1 {
-        margin: 0;
-        font-size: 28px;
-        color: #052e16;
-        text-align: center;
-      }
-
-      p {
-        margin: 12px 0 0;
-        color: #14532d;
-        text-align: center;
-        font-size: 16px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="visual-regression-probe">
-      <div class="stripe-top" aria-hidden="true"></div>
-      <main>
-        <div>
-          <h1>Layout probe</h1>
-          <p id="visual-regression-ready-label">Visual regression ready</p>
-        </div>
-      </main>
-      <div class="stripe-bottom" aria-hidden="true"></div>
-    </div>
-    <script>
-      (function () {
-        const postReady = () => {
-          if (window.mobileApp && typeof window.mobileApp.postMessage === "function") {
-            window.mobileApp.postMessage({
-              detail: {
-                type: "visualRegressionReady",
-                probeHeight: document.getElementById("visual-regression-probe")?.offsetHeight ?? null,
-              },
-            });
-          }
-        };
-
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(postReady);
-        });
-      })();
-    </script>
-  </body>
-</html>`;
-
-  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+    return new URL("visual-regression-probe.html", window.location.href).href;
+  } catch (_error) {
+    return "visual-regression-probe.html";
+  }
 }
 
 export function attachVisualRegressionHarness() {
-  if (harnessAttached) {
+  if (harnessState.attached) {
     return;
   }
 
@@ -167,11 +29,11 @@ export function attachVisualRegressionHarness() {
   const details = document.getElementById("maestro-visual-regression-details");
 
   if (!readyBanner || !runButton || !status || !details) {
-    scheduleHarnessAttachRetry();
+    scheduleHarnessAttach(attachVisualRegressionHarness, () => harnessState);
     return;
   }
 
-  harnessAttached = true;
+  harnessState.attached = true;
   let currentRun = null;
 
   const setStatus = (text, detailText = "") => {
@@ -248,7 +110,7 @@ export function attachVisualRegressionHarness() {
       });
 
       await InAppBrowser.openWebView({
-        url: buildVisualRegressionUrl(),
+        url: resolveVisualRegressionProbeUrl(),
         toolbarType: ToolBarType.BLANK,
         backgroundColor: BackgroundColor.WHITE,
         enabledSafeTopMargin: true,

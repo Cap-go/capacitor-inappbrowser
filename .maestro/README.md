@@ -12,9 +12,9 @@ This folder contains Maestro coverage for the example app.
 
 ### Visual regression (CI)
 
-`visual-regression-android.yaml` and `visual-regression-ios.yaml` open a blank-toolbar layout probe in the example app and compare emulator or simulator screenshots against baselines in `visual-regression/baselines/`. CI runs both flows in `.github/workflows/test.yml` with animations disabled and a fixed status bar.
+`visual-regression-assert.yaml` opens a blank-toolbar layout probe in the example app and compares emulator or simulator screenshots against baselines in `visual-regression/baselines/` (set `BASELINE_PATH` per platform). CI runs Android and iOS jobs in `.github/workflows/test.yml` with animations disabled and a fixed status bar.
 
-Record new baselines locally with `visual-regression-record-android.yaml` or `visual-regression-record-ios.yaml` after intentional UI changes.
+Record new baselines locally with `visual-regression-record.yaml` after intentional UI changes.
 
 ### Run locally
 

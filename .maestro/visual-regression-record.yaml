@@ -2,4 +2,4 @@ appId: ${APP_ID}
 androidWebViewHierarchy: devtools
 ---
 - runFlow: visual-regression/open-layout-probe.yaml
-- takeScreenshot: visual-regression/baselines/android/blank-toolbar-layout.png
+- takeScreenshot: ${BASELINE_PATH}

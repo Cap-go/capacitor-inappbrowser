@@ -1,8 +1,0 @@
-appId: ${APP_ID}
-env:
-  THRESHOLD_PERCENTAGE: 97
----
-- runFlow: visual-regression/open-layout-probe.yaml
-- assertScreenshot:
-    path: visual-regression/baselines/ios/blank-toolbar-layout.png
-    thresholdPercentage: ${THRESHOLD_PERCENTAGE}

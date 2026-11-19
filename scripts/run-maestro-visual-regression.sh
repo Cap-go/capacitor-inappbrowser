@@ -7,13 +7,9 @@ mode="${2:-assert}"
 
 case "$platform" in
   android)
-    flow_path=".maestro/visual-regression-android.yaml"
-    record_flow_path=".maestro/visual-regression-record-android.yaml"
     baseline_path=".maestro/visual-regression/baselines/android/blank-toolbar-layout.png"
     ;;
   ios)
-    flow_path=".maestro/visual-regression-ios.yaml"
-    record_flow_path=".maestro/visual-regression-record-ios.yaml"
     baseline_path=".maestro/visual-regression/baselines/ios/blank-toolbar-layout.png"
     ;;
   *)
@@ -21,6 +17,9 @@ case "$platform" in
     exit 1
     ;;
 esac
+
+flow_path=".maestro/visual-regression-assert.yaml"
+record_flow_path=".maestro/visual-regression-record.yaml"
 
 maestro_bin="${HOME}/.maestro/bin/maestro"
 app_id="${APP_ID:-app.capgo.inappbrowser}"
@@ -37,7 +36,7 @@ fi
 
 run_flow() {
   set +e
-  "$maestro_bin" test -e "APP_ID=${app_id}" "$flow_path" >"$log_file" 2>&1
+  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_path}" "$flow_path" >"$log_file" 2>&1
   status=$?
   cat "$log_file"
   return "$status"
@@ -50,7 +49,7 @@ fi
 
 if [ "$mode" = "record" ] || [ ! -f "$baseline_path" ] || [ "$baseline_bytes" -lt 500 ]; then
   echo "Recording baseline at $baseline_path"
-  "$maestro_bin" test -e "APP_ID=${app_id}" "$record_flow_path" >"$log_file" 2>&1 || {
+  "$maestro_bin" test -e "APP_ID=${app_id}" -e "BASELINE_PATH=${baseline_path}" "$record_flow_path" >"$log_file" 2>&1 || {
     cat "$log_file"
     exit 1
   }
