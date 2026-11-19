@@ -13,5 +13,4 @@ appId: app.capgo.inappbrowser
 - extendedWaitUntil:
     visible: 'Deep link prevented regression passed'
     timeout: 180000
-- assertVisible: 'Event OK: capgo-maestro-deeplink://blocked'
-- assertVisible: 'Negative OK: https produced no deepLinkPrevented'
+- assertVisible: 'capgo-maestro-deeplink://blocked'

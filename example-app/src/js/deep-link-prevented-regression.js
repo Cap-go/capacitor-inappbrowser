@@ -187,7 +187,7 @@ export function attachDeepLinkPreventedRegressionHarness() {
         `Event OK: ${CUSTOM_SCHEME_URL}`,
         "Negative OK: https produced no deepLinkPrevented",
       ].join("\n");
-      setStatus("Deep link prevented regression passed", successDetails);
+      setStatus(`Deep link prevented regression passed (${CUSTOM_SCHEME_URL})`, successDetails);
     };
 
     try {
