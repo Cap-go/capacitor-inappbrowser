@@ -6,8 +6,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root/example-app"
 
 if [ ! -d "$repo_root/dist" ]; then
-  echo "Plugin dist/ is missing; run bun run build at the repository root first."
-  exit 1
+  (cd "$repo_root" && bun run build)
+elif [ ! -f "$repo_root/dist/esm/index.js" ]; then
+  (cd "$repo_root" && bun run build)
 fi
 
 bun install --frozen-lockfile --ignore-scripts
