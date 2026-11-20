@@ -1324,6 +1324,20 @@ export interface OpenWebViewOptions {
   showArrow?: boolean;
   /**
    * ignoreUntrustedSSLError: if true, the webview will ignore untrusted SSL errors allowing the user to view the website.
+   *
+   * ⚠️ Security warning: this disables certificate validation for the page load. On Android, it
+   * also applies to downloads through this WebView (specifically, untrusted-issuer failures on
+   * an otherwise currently-valid certificate chain — expired or not-yet-valid certificates are
+   * still rejected), whether or not a client certificate identity is configured.
+   * Only enable this for known, trusted endpoints you control (e.g. a self-signed internal/dev
+   * server) — never for a production flow handling sensitive data such as login, payments, or
+   * personal data, since it allows a man-in-the-middle attacker to intercept and tamper with
+   * that traffic. Both platforms log when this option actually causes a failed certificate trust
+   * evaluation to be accepted. On Android page loads (`Log.w("InAppBrowser", ...)`), the message
+   * is logged once per host per WebView instance; Android download trust bypasses log on each
+   * bypassed check (no per-host deduplication). On iOS (`print("[InAppBrowser] WARNING: ...")`),
+   * once per host per WebView controller instance, so it is visible in the device log if left
+   * enabled unintentionally.
    * @since 6.1.0
    * @default false
    */

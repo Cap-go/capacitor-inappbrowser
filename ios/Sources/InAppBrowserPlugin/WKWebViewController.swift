@@ -10,6 +10,7 @@ import UIKit
 import PassKit
 import QuickLook
 import WebKit
+import Security
 
 private let estimatedProgressKeyPath = "estimatedProgress"
 private let titleKeyPath = "title"
@@ -497,6 +498,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
     private var closeModalURLRegex: NSRegularExpression?
     open var ignoreUntrustedSSLError = false
+    private var untrustedSslWarnedHosts = Set<String>()
     open var enableGooglePaySupport = false
     var viewWasPresented = false
     var preventDeeplink: Bool = false
@@ -3888,7 +3890,35 @@ extension WKWebViewController: WKNavigationDelegate {
                 return
             }
             let credential = URLCredential(trust: serverTrust)
-            completionHandler(.useCredential, credential)
+            let isServerTrustChallenge = challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust
+            if isServerTrustChallenge {
+                let evaluateQueue = DispatchQueue.global(qos: .userInitiated)
+                evaluateQueue.async {
+                    let status = SecTrustEvaluateAsyncWithError(serverTrust, evaluateQueue) { _, trusted, _ in
+                        DispatchQueue.main.async {
+                            if !trusted {
+                                let host = challenge.protectionSpace.host
+                                if self.untrustedSslWarnedHosts.insert(host).inserted {
+                                    print("[InAppBrowser] WARNING: ignoreUntrustedSSLError is enabled — accepting an untrusted " +
+                                          "certificate for \(host). This option is intended for known, " +
+                                          "trusted self-signed/internal endpoints only; it disables certificate validation for this " +
+                                          "page load and should never be enabled for a production flow handling sensitive data " +
+                                          "(login, payments, personal data).")
+                                }
+                            }
+                            completionHandler(.useCredential, credential)
+                        }
+                    }
+                    // errSecSuccess schedules the callback; any other status must complete here.
+                    if status != errSecSuccess {
+                        DispatchQueue.main.async {
+                            completionHandler(.useCredential, credential)
+                        }
+                    }
+                }
+            } else {
+                completionHandler(.useCredential, credential)
+            }
         }
         self.injectJavaScriptInterface()
     }
