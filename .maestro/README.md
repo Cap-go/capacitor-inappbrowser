@@ -10,6 +10,12 @@ This folder contains Maestro coverage for the example app.
 
 `download-handling-android.yaml` opens the example app's auto-download demo and verifies that the downloaded blob file is rendered back inside the in-app browser.
 
+### Visual regression (CI)
+
+`visual-regression-assert.yaml` opens a blank-toolbar layout probe in the example app and compares emulator or simulator screenshots against baselines in `visual-regression/baselines/` (set `BASELINE_PATH` per platform). CI runs Android and iOS jobs in `.github/workflows/test.yml` with animations disabled and a fixed status bar.
+
+Record new baselines locally with `visual-regression-record.yaml` after intentional UI changes.
+
 ### Deep link prevented smoke test
 
 `deep-link-prevented-android.yaml` and `deep-link-prevented-ios.yaml` run the example app regression harness: a custom scheme must emit `deepLinkPrevented`, and a normal `https://` navigation must not.

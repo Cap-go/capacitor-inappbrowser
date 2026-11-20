@@ -236,6 +236,9 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         public void customSchemeIntercepted(String url, boolean opened) {}
 
         @Override
+        public void deepLinkPrevented(String url) {}
+
+        @Override
         public void javascriptCallback(String message) {}
 
         @Override

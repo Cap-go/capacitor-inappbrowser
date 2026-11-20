@@ -8,10 +8,12 @@ const flowDirs = [path.join(rootDir, ".maestro"), path.join(exampleDir, ".maestr
 
 const sourceFiles = [
   path.join(exampleDir, "src/index.html"),
+  path.join(exampleDir, "src/visual-regression-probe.html"),
   path.join(exampleDir, "src/js/capacitor-welcome.js"),
   path.join(exampleDir, "src/js/feature-smoke.js"),
   path.join(exampleDir, "src/js/keyboard-regression.js"),
   path.join(exampleDir, "src/js/proxy-regression.js"),
+  path.join(exampleDir, "src/js/visual-regression.js"),
   path.join(exampleDir, "src/js/deep-link-prevented-regression.js"),
   path.join(exampleDir, "android/app/src/main/java/app/capgo/inappbrowser/MainActivity.java"),
 ];

@@ -1,0 +1,5 @@
+appId: ${APP_ID}
+androidWebViewHierarchy: devtools
+---
+- runFlow: visual-regression/open-layout-probe.yaml
+- takeScreenshot: ${BASELINE_PATH}

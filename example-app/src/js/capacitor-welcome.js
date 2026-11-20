@@ -11,6 +11,7 @@ import {
 import { setupProxyDemoButtons } from './proxy-demo.js';
 import { setupProxyRegression } from './proxy-regression.js';
 import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
+import { attachVisualRegressionHarness } from './visual-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
 import { attachDeepLinkPreventedRegressionHarness } from './deep-link-prevented-regression.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
@@ -412,6 +413,7 @@ window.customElements.define(
       const self = this;
 
       attachKeyboardRegressionHarness();
+      attachVisualRegressionHarness();
       attachFeatureSmokeHarness();
       attachDeepLinkPreventedRegressionHarness();
 

@@ -1,0 +1,9 @@
+appId: ${APP_ID}
+androidWebViewHierarchy: devtools
+env:
+  THRESHOLD_PERCENTAGE: 97
+---
+- runFlow: visual-regression/open-layout-probe.yaml
+- assertScreenshot:
+    path: ${BASELINE_PATH}
+    thresholdPercentage: ${THRESHOLD_PERCENTAGE}
