@@ -382,19 +382,19 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                     @Override
                     public void onToolbarDisplayed() {
                         if (attachToolbarNativeUIProjection(webViewId, dialog)) {
-                            notifyToolbarNativeUIShown();
-                            notifyToolbarNativeUIAppearanceChanged();
+                            notifyToolbarNativeUIShown(webViewId);
+                            notifyToolbarNativeUIAppearanceChanged(webViewId);
                         }
                     }
 
                     @Override
                     public void onToolbarAppearanceChanged() {
-                        notifyToolbarNativeUIAppearanceChanged();
+                        notifyToolbarNativeUIAppearanceChanged(webViewId);
                     }
 
                     @Override
                     public void onToolbarHidden() {
-                        notifyToolbarNativeUIHidden();
+                        notifyToolbarNativeUIHidden(webViewId);
                     }
                 }
             );
@@ -2280,9 +2280,13 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     @Override
     public void notifyListeners(String eventName, JSObject data, boolean retainUntilConsumed) {
-        if (!toolbarNativeUIProjections.isEmpty()) {
-            for (WebViewToolbarNativeUIProjection projection : toolbarNativeUIProjections.values()) {
-                projection.receive(eventName, data);
+        if (!toolbarNativeUIProjections.isEmpty() && data != null) {
+            String webViewId = data.optString("id", null);
+            if (webViewId != null) {
+                WebViewToolbarNativeUIProjection projection = toolbarNativeUIProjections.get(webViewId);
+                if (projection != null) {
+                    projection.receive(eventName, data);
+                }
             }
         }
         super.notifyListeners(eventName, data, retainUntilConsumed);
@@ -2317,7 +2321,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         WebViewToolbarNativeUIProjection projection = WebViewToolbarNativeUIProjection.tryCreate(
             this,
             options,
-            dialog.getToolbarForNativeUI()
+            dialog.getToolbarForNativeUI(),
+            dialog
         );
         if (projection != null) {
             toolbarNativeUIProjections.put(webViewId, projection);
@@ -2329,21 +2334,22 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     void destroyToolbarNativeUIProjection(String webViewId) {
         WebViewToolbarNativeUIProjection projection = toolbarNativeUIProjections.remove(webViewId);
         if (projection != null) {
-            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_WEB_PROJECTION, new JSObject());
-            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, new JSObject());
+            JSObject payload = new JSObject().put("id", webViewId);
+            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_WEB_PROJECTION, payload);
+            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, payload);
             projection.close();
         }
     }
 
-    private void notifyToolbarNativeUIAppearanceChanged() {
-        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_APPEARANCE_CHANGED, new JSObject());
+    private void notifyToolbarNativeUIAppearanceChanged(String webViewId) {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_APPEARANCE_CHANGED, new JSObject().put("id", webViewId));
     }
 
-    private void notifyToolbarNativeUIShown() {
-        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_NATIVE_SHOWN, new JSObject());
+    private void notifyToolbarNativeUIShown(String webViewId) {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_NATIVE_SHOWN, new JSObject().put("id", webViewId));
     }
 
-    private void notifyToolbarNativeUIHidden() {
-        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, new JSObject());
+    private void notifyToolbarNativeUIHidden(String webViewId) {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, new JSObject().put("id", webViewId));
     }
 }

@@ -624,9 +624,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func releaseToolbarNativeUIEngineState(webViewId: String) {
-        if ToolbarNativeUIEngineBridge.hasActiveProjections {
-            notifyListeners(ToolbarNativeUIEngineSupport.webProjectionEvent, data: [:])
-            notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: [:])
+        let payload: [String: Any] = ["id": webViewId]
+        if ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) {
+            notifyListeners(ToolbarNativeUIEngineSupport.webProjectionEvent, data: payload)
+            notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: payload)
         }
         ToolbarNativeUIEngineBridge.destroy(webViewId: webViewId)
     }

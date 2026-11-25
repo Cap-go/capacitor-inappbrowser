@@ -11,6 +11,10 @@ enum ToolbarNativeUIEngineBridge {
         !projections.isEmpty
     }
 
+    static func hasProjection(webViewId: String) -> Bool {
+        projections[webViewId] != nil
+    }
+
     @discardableResult
     static func start(
         webViewId: String,
@@ -32,8 +36,9 @@ enum ToolbarNativeUIEngineBridge {
                 view: { [weak navigationBar] in navigationBar }
             )
             projections[webViewId] = projection
-            notify(ToolbarNativeUIEngineSupport.nativeShownEvent, [:])
-            notify(ToolbarNativeUIEngineSupport.appearanceChangedEvent, [:])
+            let payload: [String: Any] = ["id": webViewId]
+            notify(ToolbarNativeUIEngineSupport.nativeShownEvent, payload)
+            notify(ToolbarNativeUIEngineSupport.appearanceChangedEvent, payload)
             return true
         } catch {
             CAPLog.print("[InAppBrowser] Native UI toolbar projection unavailable: \(error)")
@@ -48,14 +53,19 @@ enum ToolbarNativeUIEngineBridge {
     }
 
     static func forward(eventName: String, data: [String: Any]?) {
-        for projection in projections.values {
-            projection.receive(eventName, data: data)
+        guard let webViewId = data?["id"] as? String, let projection = projections[webViewId] else {
+            return
         }
+        projection.receive(eventName, data: data)
     }
 }
 #else
 enum ToolbarNativeUIEngineBridge {
     static var hasActiveProjections: Bool {
+        false
+    }
+
+    static func hasProjection(webViewId: String) -> Bool {
         false
     }
 

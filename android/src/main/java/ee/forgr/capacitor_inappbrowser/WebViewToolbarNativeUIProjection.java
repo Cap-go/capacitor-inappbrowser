@@ -22,14 +22,22 @@ public final class WebViewToolbarNativeUIProjection {
         this.projection = projection;
     }
 
-    public static WebViewToolbarNativeUIProjection tryCreate(Plugin plugin, Options options, View toolbarView) {
+    public static WebViewToolbarNativeUIProjection tryCreate(
+        Plugin plugin,
+        Options options,
+        View toolbarView,
+        WebViewDialog dialog
+    ) {
         if (!ToolbarNativeUIEngineSupport.shouldRegister(options.isEnableNativeUIEngine(), options.getToolbarType())) {
             return null;
         }
         if (toolbarView == null) {
             return null;
         }
-        Window window = plugin.getActivity().getWindow();
+        Window window = dialog != null ? dialog.getWindow() : null;
+        if (window == null && plugin.getActivity() != null) {
+            window = plugin.getActivity().getWindow();
+        }
         WebView bridgeWebView = plugin.getBridge().getWebView();
         String selector = options.getNativeUIProjectionSelector();
         try {
