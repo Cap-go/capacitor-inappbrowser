@@ -1,5 +1,8 @@
 import Foundation
+
+#if canImport(WebViewNativeUIEngine)
 import WebViewNativeUIEngine
+#endif
 
 enum ToolbarNativeUIEngineSupport {
     static let appearanceChangedEvent = "inAppBrowserToolbarAppearanceChanged"
@@ -28,6 +31,7 @@ enum ToolbarNativeUIEngineSupport {
         return nil
     }
 
+    #if canImport(WebViewNativeUIEngine)
     static func receiveListeners() -> NativeUIProjection.ReceiveListeners {
         NativeUIProjection.ReceiveListeners(
             update: [appearanceChangedEvent],
@@ -38,4 +42,5 @@ enum ToolbarNativeUIEngineSupport {
             )
         )
     }
+    #endif
 }

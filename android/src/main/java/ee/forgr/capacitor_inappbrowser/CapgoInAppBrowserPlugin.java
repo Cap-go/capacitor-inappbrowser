@@ -122,6 +122,9 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             new ActivityResultContracts.RequestMultiplePermissions(),
             this::handleWebPermissionResult
         );
+        if (Boolean.TRUE.equals(getConfig().getBoolean("preInstallNativeUIEngineChannel", false))) {
+            ensureToolbarNativeUIChannel();
+        }
     }
 
     private List<NativeProxyRule> parseProxyRules(JSArray rawRules, String optionName, PluginCall call) {
@@ -1307,6 +1310,12 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         options.setEnableNativeUIEngine(enableNativeUIEngine);
         if (nativeUIProjectionSelector != null) {
             options.setNativeUIProjectionSelector(nativeUIProjectionSelector.trim());
+        }
+        if (enableNativeUIEngine && !ensureToolbarNativeUIChannel()) {
+            call.reject(
+                "Native UI Engine channel is not available. Install it before the host WebView navigates, or set plugins.CapgoInAppBrowser.preInstallNativeUIEngineChannel to true in capacitor.config."
+            );
+            return;
         }
 
         // Validate shareDisclaimer requires shareSubject

@@ -14,7 +14,6 @@ Pod::Spec.new do |s|
   s.resources = ['ios/Sources/InAppBrowserPlugin/Resources/proxy-bridge.js']
   s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
-  s.dependency 'WebViewNativeUIEngine', '1.0.11'
   s.swift_version = '5.1'
   # cap sync rewrites this block. Default compiles the stub.
   # App Store guideline 2.5.2 can reject method_exchangeImplementations even

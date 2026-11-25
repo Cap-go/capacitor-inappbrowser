@@ -51,6 +51,8 @@ end
 
 See the Engine [Capacitor guide](https://github.com/webview-native-ui/engine/blob/v1.0.11/docs/getting-started/capacitor.md) for Ionic overlay helpers and version alignment.
 
+**Android:** the Engine channel must exist before the host Capacitor WebView navigates. If your app loads web content before any `openWebView` with this flag, set `preInstallNativeUIEngineChannel: true` under `plugins.CapgoInAppBrowser` in `capacitor.config` so the plugin installs the channel at startup.
+
 ## Key features
 
 - **Two browser modes**: `open()` uses SFSafariViewController on iOS and Chrome Custom Tabs on Android, `openWebView()` opens a WebView with your own toolbar, title, colors and buttons.
