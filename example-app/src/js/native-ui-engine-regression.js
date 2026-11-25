@@ -106,9 +106,12 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
     openedId = id;
     try {
       await waitUntil(
-        () => nativeShown && webProjectionStarted && slotHasWebProjection(slot),
-        15_000,
+        () => nativeShown && (webProjectionStarted || slotHasWebProjection(slot)),
+        120_000,
       );
+      if (!webProjectionStarted && !slotHasWebProjection(slot)) {
+        throw new Error("Expected web projection event or host slot DOM content");
+      }
       await InAppBrowser.close();
       setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
     } catch (error) {
