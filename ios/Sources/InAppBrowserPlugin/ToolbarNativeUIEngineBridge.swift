@@ -37,7 +37,11 @@ enum ToolbarNativeUIEngineBridge {
             )
             projections[webViewId] = projection
             let payload: [String: Any] = ["id": webViewId]
-            notify(ToolbarNativeUIEngineSupport.nativeShownEvent, payload)
+            if initiallyVisible {
+                notify(ToolbarNativeUIEngineSupport.nativeShownEvent, payload)
+            } else {
+                notify(ToolbarNativeUIEngineSupport.hiddenEvent, payload)
+            }
             notify(ToolbarNativeUIEngineSupport.appearanceChangedEvent, payload)
             return true
         } catch {
@@ -76,7 +80,8 @@ enum ToolbarNativeUIEngineBridge {
         webView: WKWebView?,
         navigationBar: UINavigationBar,
         selector: String,
-        notify: (String, [String: Any]?) -> Void
+        notify: (String, [String: Any]?) -> Void,
+        initiallyVisible: Bool = true
     ) -> Bool {
         false
     }

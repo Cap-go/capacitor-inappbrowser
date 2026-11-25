@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
@@ -112,7 +113,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     private PluginCall openSecureWindowSavedCall;
     private String openSecureWindowRedirectUri;
-    private final Map<String, WebViewToolbarNativeUIProjection> toolbarNativeUIProjections = new HashMap<>();
+    private final Map<String, WebViewToolbarNativeUIProjection> toolbarNativeUIProjections = new ConcurrentHashMap<>();
     private boolean toolbarNativeUIChannelInstalled = false;
 
     @Override

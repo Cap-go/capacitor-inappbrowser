@@ -561,7 +561,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var authSession: ASWebAuthenticationSession?
     private var pendingToolbarNativeUIProjectionSelectors: [String: String] = [:]
 
-    private func startToolbarNativeUIProjectionIfNeeded(webViewId: String) {
+    private func startToolbarNativeUIProjectionIfNeeded(webViewId: String, initiallyVisible: Bool = true) {
         guard let selector = pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: webViewId),
               let navigationController = navigationControllers[webViewId] else {
             return
@@ -574,7 +574,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             selector: selector,
             notify: { [weak self] eventName, payload in
                 self?.notifyListeners(eventName, data: payload)
-            }
+            },
+            initiallyVisible: initiallyVisible
         )
     }
 
@@ -2017,7 +2018,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             if enableNativeUIEngine, let projectionSelector = nativeUIProjectionSelector {
                 self.pendingToolbarNativeUIProjectionSelectors[webViewId] = projectionSelector
                 if hidden {
-                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId)
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId, initiallyVisible: false)
                 }
             }
             call.resolve(["id": webViewId])
