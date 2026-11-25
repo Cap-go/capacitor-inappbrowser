@@ -6,6 +6,7 @@ import WebViewNativeUIEngine
 
 enum ToolbarNativeUIEngineBridge {
     private static var projections: [String: NativeUIProjection] = [:]
+    private static var savedExperimentalInPlaceFiltering: Bool?
 
     static var hasActiveProjections: Bool {
         !projections.isEmpty
@@ -29,7 +30,10 @@ enum ToolbarNativeUIEngineBridge {
             return false
         }
         do {
-            NativeUICoveredSnapshots.experimentalInPlaceFilteringEnabled = false
+            if projections.isEmpty {
+                savedExperimentalInPlaceFiltering = NativeUICoveredSnapshots.experimentalInPlaceFilteringEnabled
+                NativeUICoveredSnapshots.experimentalInPlaceFilteringEnabled = false
+            }
             let projection = try NativeUIProjection(
                 webView: webView,
                 plugin: pluginJsName,
@@ -55,6 +59,10 @@ enum ToolbarNativeUIEngineBridge {
     static func destroy(webViewId: String) {
         if let projection = projections.removeValue(forKey: webViewId) {
             projection.destroy()
+        }
+        if projections.isEmpty, let savedExperimentalInPlaceFiltering {
+            NativeUICoveredSnapshots.experimentalInPlaceFilteringEnabled = savedExperimentalInPlaceFiltering
+            self.savedExperimentalInPlaceFiltering = nil
         }
     }
 

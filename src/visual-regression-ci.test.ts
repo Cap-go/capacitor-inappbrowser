@@ -107,6 +107,10 @@ describe('visual regression CI wiring (issue #722)', () => {
       '.maestro/visual-regression/open-layout-probe.yaml',
       'example-app/.maestro/native-ui-engine-off-android.yaml',
       'example-app/.maestro/native-ui-engine-off-ios.yaml',
+      'example-app/.maestro/native-ui-engine-on-android.yaml',
+      'example-app/.maestro/native-ui-engine-on-ios.yaml',
+      'example-app/.maestro/native-ui-engine-fail-android.yaml',
+      'example-app/.maestro/native-ui-engine-fail-ios.yaml',
     ];
 
     for (const relativePath of requiredPaths) {
