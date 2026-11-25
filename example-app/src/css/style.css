@@ -131,7 +131,8 @@ body {
 }
 
 .maestro-btn-visual,
-.maestro-btn-deep-link-prevented {
+.maestro-btn-deep-link-prevented,
+.maestro-btn-native-ui-engine {
   background: #7c3aed;
 }
 

@@ -7,6 +7,8 @@ public interface WebViewCallbacks {
 
     public void closeEvent(String url);
 
+    public void webViewDialogDismissed();
+
     public void hideEvent(String url, JSObject screenshot);
 
     public void pageLoaded();

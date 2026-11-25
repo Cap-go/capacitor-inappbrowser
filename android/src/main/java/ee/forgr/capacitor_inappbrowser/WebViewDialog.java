@@ -616,6 +616,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private boolean cachedTitleIconResolved;
     private boolean isHiddenModeActive = false;
     private boolean toolbarHideInProgress = false;
+    private ToolbarNativeUIEngineListener toolbarNativeUIEngineListener;
     private int injectedSafeAreaTop = Integer.MIN_VALUE;
     private int injectedSafeAreaBottom = Integer.MIN_VALUE;
     private int injectedSafeAreaLeft = Integer.MIN_VALUE;
@@ -744,6 +745,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         // Dialog.show() calls onStart() before mShowing = true, so the sync in onStart() always
         // leaves the back callback disabled; re-sync now that the dialog is actually showing.
         syncBackNavigationHandlers();
+        notifyToolbarNativeDisplayed();
     }
 
     @Override
@@ -3680,6 +3682,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         isHiddenModeActive = true;
         syncBackNavigationHandlers();
+        notifyToolbarNativeHidden();
     }
 
     private void restoreVisibleMode() {
@@ -3718,6 +3721,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
         syncBackNavigationHandlers();
+        notifyToolbarNativeDisplayed();
     }
 
     public void setHidden(boolean hidden) {
@@ -5765,6 +5769,39 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             textView.setText("");
         }
         applyTitleTextOptions(textView);
+        notifyToolbarNativeAppearanceChanged();
+    }
+
+    public void setToolbarNativeUIEngineListener(ToolbarNativeUIEngineListener listener) {
+        this.toolbarNativeUIEngineListener = listener;
+    }
+
+    public View getToolbarForNativeUI() {
+        return _toolbar;
+    }
+
+    private void notifyToolbarNativeDisplayed() {
+        if (
+            toolbarNativeUIEngineListener == null ||
+            _options == null ||
+            isHiddenModeActive ||
+            !ToolbarNativeUIEngineSupport.shouldRegister(_options.isEnableNativeUIEngine(), _options.getToolbarType())
+        ) {
+            return;
+        }
+        toolbarNativeUIEngineListener.onToolbarDisplayed();
+    }
+
+    private void notifyToolbarNativeAppearanceChanged() {
+        if (toolbarNativeUIEngineListener != null) {
+            toolbarNativeUIEngineListener.onToolbarAppearanceChanged();
+        }
+    }
+
+    private void notifyToolbarNativeHidden() {
+        if (toolbarNativeUIEngineListener != null) {
+            toolbarNativeUIEngineListener.onToolbarHidden();
+        }
     }
 
     private void performToolbarCloseAction(String currentUrl) {
@@ -6123,6 +6160,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             // Status bar color is already set at the top of this method, no need to set again
         } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
             _toolbar.setVisibility(View.GONE);
+            notifyToolbarNativeHidden();
             configureBlankToolbarLayout();
             requestSafeAreaInsets();
 
@@ -7577,6 +7615,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     @Override
     public void dismiss() {
+        if (_options != null && _options.getCallbacks() != null) {
+            _options.getCallbacks().webViewDialogDismissed();
+        }
         if (backCloseConfirmDialog != null) {
             backCloseConfirmDialog.dismiss();
             backCloseConfirmDialog = null;

@@ -10,6 +10,9 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: false,
     },
+    CapgoInAppBrowser: {
+      preInstallNativeUIEngineChannel: true,
+    },
     CapacitorUpdater: {
       appId: 'app.capgo.inappbrowser',
       autoUpdate: true,

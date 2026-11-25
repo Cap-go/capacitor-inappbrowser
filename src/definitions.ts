@@ -1314,6 +1314,24 @@ export interface OpenWebViewOptions {
    */
   toolbarTextColor?: string;
   /**
+   * When true, registers the openWebView custom toolbar with
+   * {@link https://github.com/webview-native-ui/engine | WebView Native UI Engine} so host Web UI can
+   * layer above the native toolbar or keep it aligned with DOM scroll. Ignored for `open()` (system sheet).
+   * Rejected when `toolbarType` is `blank`.
+   *
+   * @default false
+   * @since 8.28.0
+   */
+  enableNativeUIEngine?: boolean;
+  /**
+   * CSS selector for the host Capacitor WebView DOM slot that receives the toolbar projection.
+   * Required when `enableNativeUIEngine` is true.
+   *
+   * @example "#in-app-browser-toolbar-slot"
+   * @since 8.28.0
+   */
+  nativeUIProjectionSelector?: string;
+  /**
    * showArrow: if true an arrow would be shown instead of cross for closing the window
    * @since 1.2.5
    * @default false
@@ -1760,6 +1778,23 @@ export interface DimensionOptions {
    * Y position from the top edge in pixels
    */
   y?: number;
+}
+
+/**
+ * Capacitor plugin configuration for `plugins.CapgoInAppBrowser` in `capacitor.config`.
+ *
+ * @since 8.28.0
+ */
+export interface CapgoInAppBrowserPluginConfig {
+  /**
+   * When `true`, Android installs the Native UI Engine channel at plugin load so it exists
+   * before the host Capacitor WebView navigates. Leave `false` (default) when you only enable
+   * the engine on `openWebView` and open that webview before the host web layer loads.
+   *
+   * @since 8.28.0
+   * @default false
+   */
+  preInstallNativeUIEngineChannel?: boolean;
 }
 
 export interface InAppBrowserPlugin {

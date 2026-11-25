@@ -218,6 +218,9 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         public void closeEvent(String url) {}
 
         @Override
+        public void webViewDialogDismissed() {}
+
+        @Override
         public void hideEvent(String url, JSObject screenshot) {}
 
         @Override

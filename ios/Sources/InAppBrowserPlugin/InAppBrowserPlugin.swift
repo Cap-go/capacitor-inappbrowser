@@ -559,6 +559,25 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var safariOpenedUrl: String?
     private var openSecureWindowCall: CAPPluginCall?
     private var authSession: ASWebAuthenticationSession?
+    private var pendingToolbarNativeUIProjectionSelectors: [String: String] = [:]
+
+    private func startToolbarNativeUIProjectionIfNeeded(webViewId: String, initiallyVisible: Bool = true) {
+        guard let selector = pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: webViewId),
+              let navigationController = navigationControllers[webViewId] else {
+            return
+        }
+        ToolbarNativeUIEngineBridge.start(
+            webViewId: webViewId,
+            pluginJsName: jsName,
+            webView: bridge?.webView,
+            navigationBar: navigationController.navigationBar,
+            selector: selector,
+            notify: { [weak self] eventName, payload in
+                self?.notifyListeners(eventName, data: payload)
+            },
+            initiallyVisible: initiallyVisible
+        )
+    }
 
     private func setup() {
         self.isSetupDone = true
@@ -605,7 +624,39 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         navigationController.dismiss(animated: false, completion: completion)
     }
 
+    private func notifyToolbarNativeUIShownIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.nativeShownEvent, data: ["id": webViewId])
+    }
+
+    private func notifyToolbarNativeUIHiddenIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: ["id": webViewId])
+    }
+
+    func notifyToolbarNativeUIAppearanceChangedIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.appearanceChangedEvent, data: ["id": webViewId])
+    }
+
+    private func releaseToolbarNativeUIEngineState(webViewId: String) {
+        let payload: [String: Any] = ["id": webViewId]
+        if ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) {
+            notifyListeners(ToolbarNativeUIEngineSupport.webProjectionEvent, data: payload)
+            notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: payload)
+        }
+        ToolbarNativeUIEngineBridge.destroy(webViewId: webViewId)
+    }
+
     private func unregisterWebView(id: String) {
+        pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: id)
+        releaseToolbarNativeUIEngineState(webViewId: id)
         webViewControllers[id]?.setBrowserFullscreen(false)
         detachFramedOverlayWebView(id: id)
         detachLayeredWebView(id: id)
@@ -857,6 +908,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.currentPluginCall?.reject("Failed to send webview to back")
                 return false
             }
+            self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
             return true
         }
 
@@ -865,6 +917,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
            webViewController.shouldPresentAsFramedOverlay {
             dismissActiveKeyboard()
             if presentNavigationControllerAsFramedOverlay(id: resolvedId) {
+                self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
                 // openWebView resolves with the webView id; do not resolve here.
                 return true
             }
@@ -886,6 +939,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                    navigationController.presentedViewController == nil,
                    !navigationController.isBeingDismissed {
                     self.setActiveWebView(id: resolvedId, webView: controller, navigationController: navigationController)
+                }
+                if let resolvedId {
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
                 }
             } else {
                 // openWebView already resolves with the webView id on success.
@@ -1517,6 +1573,27 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let toolbarType = call.getString("toolbarType", "")
+        let enableNativeUIEngine = call.getBool("enableNativeUIEngine", false)
+        let nativeUIProjectionSelector = call.getString("nativeUIProjectionSelector")
+        if let validation = ToolbarNativeUIEngineSupport.validateOptions(
+            enabled: enableNativeUIEngine,
+            projectionSelector: nativeUIProjectionSelector
+        ) {
+            call.reject(validation)
+            return
+        }
+        if enableNativeUIEngine && !ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: toolbarType) {
+            call.reject("enableNativeUIEngine requires a visible openWebView toolbar (toolbarType must not be blank)")
+            return
+        }
+        #if !canImport(WebViewNativeUIEngine)
+        if enableNativeUIEngine {
+            call.reject(
+                "enableNativeUIEngine requires WebViewNativeUIEngine. Add pod 'WebViewNativeUIEngine', :path => '../../node_modules/@webview-native-ui/engine' in the App Podfile, run cap sync ios, and reinstall the app."
+            )
+            return
+        }
+        #endif
         let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
 
         // Don't null out shareDisclaimer regardless of toolbarType
@@ -1944,6 +2021,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
+            if enableNativeUIEngine, let projectionSelector = nativeUIProjectionSelector {
+                self.pendingToolbarNativeUIProjectionSelectors[webViewId] = projectionSelector
+            }
+
             if hidden {
                 guard let webView = webViewController.capableWebView else {
                     call.reject("Failed to get webview for hidden mode")
@@ -1953,6 +2034,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if !self.attachWebViewToWindow(webView) {
                     call.reject("Failed to get active window for hidden webview")
                     return
+                }
+                if enableNativeUIEngine, nativeUIProjectionSelector != nil {
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId, initiallyVisible: false)
                 }
             } else if !self.isPresentAfterPageLoad {
                 guard self.presentView(webViewId: webViewId, isAnimated: isAnimated) else {
@@ -2042,6 +2126,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let resolvedId {
                     self.detachFramedOverlayWebView(id: resolvedId)
                     self.detachLayeredWebView(id: resolvedId)
+                    self.notifyToolbarNativeUIHiddenIfProjected(webViewId: resolvedId)
                 }
                 if !self.attachWebViewToWindow(webView) {
                     call?.reject("Failed to get active window for hidden webview")
@@ -2059,6 +2144,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                         if let navController = navigationController {
                             self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
                         }
+                        self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
                         call?.resolve()
                     } else {
                         call?.reject("Failed to send webview to back")
@@ -2077,6 +2163,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                                 animated: true
                             ) { presented in
                                 if presented {
+                                    self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
                                     call?.resolve()
                                 } else {
                                     call?.reject("Failed to present webview")
@@ -2088,6 +2175,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                         let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
                         self.presentNavigationControllerSafely(navController, from: presenter, animated: true) { presented in
                             if presented {
+                                if let resolvedId {
+                                    self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
+                                }
                                 call?.resolve()
                             } else {
                                 call?.reject("Failed to present webview")
@@ -2098,6 +2188,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
+            if !hidden, let resolvedId {
+                self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
+            }
             call?.resolve()
         }
     }
@@ -2923,6 +3016,13 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Failed to start authentication session")
             }
         }
+    }
+
+    public override func notifyListeners(_ eventName: String, data: [String: Any]?, retainUntilConsumed: Bool = false) {
+        if ToolbarNativeUIEngineBridge.hasActiveProjections {
+            ToolbarNativeUIEngineBridge.forward(eventName: eventName, data: data)
+        }
+        super.notifyListeners(eventName, data: data, retainUntilConsumed: retainUntilConsumed)
     }
 }
 
