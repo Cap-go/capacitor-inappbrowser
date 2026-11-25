@@ -7609,6 +7609,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     @Override
     public void dismiss() {
+        if (_options != null && _options.getCallbacks() != null) {
+            _options.getCallbacks().webViewDialogDismissed();
+        }
         if (backCloseConfirmDialog != null) {
             backCloseConfirmDialog.dismiss();
             backCloseConfirmDialog = null;

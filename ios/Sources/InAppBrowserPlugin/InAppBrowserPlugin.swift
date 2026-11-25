@@ -623,10 +623,17 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         navigationController.dismiss(animated: false, completion: completion)
     }
 
+    private func releaseToolbarNativeUIEngineState(webViewId: String) {
+        if ToolbarNativeUIEngineBridge.hasActiveProjections {
+            notifyListeners(ToolbarNativeUIEngineSupport.webProjectionEvent, data: [:])
+            notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: [:])
+        }
+        ToolbarNativeUIEngineBridge.destroy(webViewId: webViewId)
+    }
+
     private func unregisterWebView(id: String) {
         pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: id)
-        pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: id)
-        ToolbarNativeUIEngineBridge.destroy(webViewId: id)
+        releaseToolbarNativeUIEngineState(webViewId: id)
         webViewControllers[id]?.setBrowserFullscreen(false)
         detachFramedOverlayWebView(id: id)
         detachLayeredWebView(id: id)

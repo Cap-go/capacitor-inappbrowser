@@ -6,6 +6,8 @@ import PackageDescription
 // App Store guideline 2.5.2 can reject a binary that contains
 // method_exchangeImplementations even when the app never enables proxy.
 // plugins.CapgoInAppBrowser.httpProxySwizzle: true compiles the swizzle instead.
+// WebViewNativeUIEngine 1.0.11 does not use method_exchangeImplementations.
+// It hooks UIWindow.sendEvent only after enableNativeUIEngine registers a projection.
 let package = Package(
     name: "CapgoCapacitorInappbrowser",
     platforms: [.iOS(.v15)],

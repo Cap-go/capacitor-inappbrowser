@@ -963,8 +963,8 @@ public class Options {
         copy.setInvisibilityMode(invisibilityMode);
         copy.setPopupWindowMode(true);
         copy.setHiddenPopupWindow(hiddenPopupWindow);
-        copy.setEnableNativeUIEngine(enableNativeUIEngine);
-        copy.setNativeUIProjectionSelector(nativeUIProjectionSelector);
+        copy.setEnableNativeUIEngine(false);
+        copy.setNativeUIProjectionSelector(null);
         return copy;
     }
 }

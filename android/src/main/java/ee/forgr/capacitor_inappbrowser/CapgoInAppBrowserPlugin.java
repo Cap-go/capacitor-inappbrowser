@@ -176,6 +176,11 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             }
 
             @Override
+            public void webViewDialogDismissed() {
+                destroyToolbarNativeUIProjection(webViewId);
+            }
+
+            @Override
             public void hideEvent(String url, JSObject screenshot) {
                 JSObject event = new JSObject().put("id", webViewId).put("url", url);
                 if (screenshot != null) {
@@ -378,6 +383,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                     public void onToolbarDisplayed() {
                         if (attachToolbarNativeUIProjection(webViewId, dialog)) {
                             notifyToolbarNativeUIShown();
+                            notifyToolbarNativeUIAppearanceChanged();
                         }
                     }
 
@@ -2085,6 +2091,10 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     @Override
     protected void handleOnDestroy() {
+        for (String webViewId : new ArrayList<>(toolbarNativeUIProjections.keySet())) {
+            destroyToolbarNativeUIProjection(webViewId);
+        }
+        toolbarNativeUIProjections.clear();
         for (WebViewDialog dialog : webViewDialogs.values()) {
             try {
                 dialog.dismiss();
@@ -2316,9 +2326,11 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         return false;
     }
 
-    private void destroyToolbarNativeUIProjection(String webViewId) {
+    void destroyToolbarNativeUIProjection(String webViewId) {
         WebViewToolbarNativeUIProjection projection = toolbarNativeUIProjections.remove(webViewId);
         if (projection != null) {
+            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_WEB_PROJECTION, new JSObject());
+            notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, new JSObject());
             projection.close();
         }
     }
