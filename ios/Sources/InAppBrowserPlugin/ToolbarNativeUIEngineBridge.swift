@@ -22,7 +22,8 @@ enum ToolbarNativeUIEngineBridge {
         webView: WKWebView?,
         navigationBar: UINavigationBar,
         selector: String,
-        notify: (String, [String: Any]?) -> Void
+        notify: (String, [String: Any]?) -> Void,
+        initiallyVisible: Bool = true
     ) -> Bool {
         guard let webView else {
             return false
