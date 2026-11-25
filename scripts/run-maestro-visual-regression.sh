@@ -89,12 +89,6 @@ run_flow
 first_status=$?
 set -e
 
-repo_root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
-native_ui_flow="${repo_root}/example-app/.maestro/native-ui-engine-off-${platform}.yaml"
-if [ "$first_status" -eq 0 ] && [ -f "$native_ui_flow" ]; then
-  sh "$(CDPATH= cd -- "$(dirname "$0")" && pwd)/run-maestro-native-ui-engine.sh" "$platform"
-fi
-
 if [ "$platform" != "ios" ] || [ "$first_status" -eq 0 ]; then
   exit "$first_status"
 fi
@@ -109,7 +103,4 @@ set +e
 run_flow
 retry_status=$?
 set -e
-if [ "$retry_status" -eq 0 ] && [ -f "$native_ui_flow" ]; then
-  sh "$(CDPATH= cd -- "$(dirname "$0")" && pwd)/run-maestro-native-ui-engine.sh" "$platform"
-fi
 exit "$retry_status"
