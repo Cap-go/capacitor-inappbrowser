@@ -2188,7 +2188,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
-            if let resolvedId {
+            if !hidden, let resolvedId {
                 self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
             }
             call?.resolve()

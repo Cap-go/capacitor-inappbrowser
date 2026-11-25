@@ -1783,7 +1783,7 @@ export interface DimensionOptions {
 /**
  * Capacitor plugin configuration for `plugins.CapgoInAppBrowser` in `capacitor.config`.
  *
- * @since 8.27.9
+ * @since 8.28.0
  */
 export interface CapgoInAppBrowserPluginConfig {
   /**
@@ -1791,7 +1791,7 @@ export interface CapgoInAppBrowserPluginConfig {
    * before the host Capacitor WebView navigates. Leave `false` (default) when you only enable
    * the engine on `openWebView` and open that webview before the host web layer loads.
    *
-   * @since 8.27.9
+   * @since 8.28.0
    * @default false
    */
   preInstallNativeUIEngineChannel?: boolean;

@@ -3,7 +3,6 @@ import { openQaToolsPanel } from "./qa-tools.js";
 
 const SLOT_ID = "in-app-browser-toolbar-slot";
 const NATIVE_SHOWN_EVENT = "inAppBrowserToolbarNativeShown";
-const WEB_PROJECTION_EVENT = "inAppBrowserToolbarWebProjectionStarted";
 const PASS_OFF = "Native UI engine off passed";
 const PASS_ON = "Native UI engine on passed";
 const PASS_FAIL = "Native UI engine validation failed as expected";
@@ -80,17 +79,22 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
   setStatus(statusEl, detailsEl, "Running engine-on flow", "");
   await closeIfNeeded();
   let nativeShown = false;
-  let webProjectionStarted = false;
   let openedId = null;
-  const nativeListener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, (event) => {
-    if (event?.id === openedId) {
+  const pendingNativeShownIds = new Set();
+  const recordNativeShown = (eventId) => {
+    if (!eventId) {
+      return;
+    }
+    if (openedId === null) {
+      pendingNativeShownIds.add(eventId);
+      return;
+    }
+    if (eventId === openedId) {
       nativeShown = true;
     }
-  });
-  const webListener = await InAppBrowser.addListener(WEB_PROJECTION_EVENT, (event) => {
-    if (event?.id === openedId) {
-      webProjectionStarted = true;
-    }
+  };
+  const nativeListener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, (event) => {
+    recordNativeShown(event?.id);
   });
   try {
     const { id } = await InAppBrowser.openWebView({
@@ -104,14 +108,11 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
       throw new Error("openWebView did not return an id");
     }
     openedId = id;
+    if (pendingNativeShownIds.has(id)) {
+      nativeShown = true;
+    }
     try {
-      await waitUntil(
-        () => nativeShown && (webProjectionStarted || slotHasWebProjection(slot)),
-        120_000,
-      );
-      if (!webProjectionStarted && !slotHasWebProjection(slot)) {
-        throw new Error("Expected web projection event or host slot DOM content");
-      }
+      await waitUntil(() => nativeShown && slotHasWebProjection(slot), 120_000);
       await InAppBrowser.close();
       setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
     } catch (error) {
@@ -120,7 +121,6 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
     }
   } finally {
     await nativeListener.remove();
-    await webListener.remove();
   }
 }
 
