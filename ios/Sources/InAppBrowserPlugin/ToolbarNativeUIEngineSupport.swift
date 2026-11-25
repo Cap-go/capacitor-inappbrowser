@@ -32,14 +32,15 @@ enum ToolbarNativeUIEngineSupport {
     }
 
     #if canImport(WebViewNativeUIEngine)
-    static func receiveListeners() -> NativeUIProjection.ReceiveListeners {
+    static func receiveListeners(webViewId: String) -> NativeUIProjection.ReceiveListeners {
         NativeUIProjection.ReceiveListeners(
             update: [appearanceChangedEvent],
             projection: .init(
                 native: [nativeShownEvent],
                 web: [webProjectionEvent],
                 none: [hiddenEvent]
-            )
+            ),
+            match: ["id": webViewId]
         )
     }
     #endif

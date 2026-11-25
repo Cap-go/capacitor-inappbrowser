@@ -79,9 +79,14 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
       throw new Error("openWebView did not return an id");
     }
     openedId = id;
-    await waitUntil(() => nativeShown, 15_000);
-    await InAppBrowser.close();
-    setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
+    try {
+      await waitUntil(() => nativeShown, 15_000);
+      await InAppBrowser.close();
+      setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
+    } catch (error) {
+      await closeIfNeeded();
+      throw error;
+    }
   } finally {
     await listener.remove();
   }

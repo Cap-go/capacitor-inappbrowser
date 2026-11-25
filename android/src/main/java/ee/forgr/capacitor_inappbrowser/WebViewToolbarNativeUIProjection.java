@@ -41,7 +41,7 @@ public final class WebViewToolbarNativeUIProjection {
                 bridgeWebView,
                 plugin.getPluginHandle().getId(),
                 selector,
-                ToolbarNativeUIEngineSupport.receiveListeners(),
+                ToolbarNativeUIEngineSupport.receiveListeners(dialog != null ? dialog.getInstanceId() : ""),
                 () -> toolbarView
             );
             return new WebViewToolbarNativeUIProjection(projection);

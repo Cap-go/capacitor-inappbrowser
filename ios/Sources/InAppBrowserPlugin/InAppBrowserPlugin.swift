@@ -624,6 +624,13 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         navigationController.dismiss(animated: false, completion: completion)
     }
 
+    private func notifyToolbarNativeUIShownIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.nativeShownEvent, data: ["id": webViewId])
+    }
+
     private func releaseToolbarNativeUIEngineState(webViewId: String) {
         let payload: [String: Any] = ["id": webViewId]
         if ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) {
@@ -2140,6 +2147,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                                 animated: true
                             ) { presented in
                                 if presented {
+                                    if let resolvedId {
+                                        self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
+                                    }
                                     call?.resolve()
                                 } else {
                                     call?.reject("Failed to present webview")
@@ -2151,6 +2161,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                         let presenter = self.bridge?.viewController?.presentedViewController ?? self.bridge?.viewController
                         self.presentNavigationControllerSafely(navController, from: presenter, animated: true) { presented in
                             if presented {
+                                if let resolvedId {
+                                    self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
+                                }
                                 call?.resolve()
                             } else {
                                 call?.reject("Failed to present webview")
@@ -2161,6 +2174,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
 
+            if let resolvedId {
+                self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
+            }
             call?.resolve()
         }
     }

@@ -5781,9 +5781,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void notifyToolbarNativeDisplayed() {
-        if (toolbarNativeUIEngineListener != null && _toolbar != null && _toolbar.getVisibility() == View.VISIBLE) {
-            toolbarNativeUIEngineListener.onToolbarDisplayed();
+        if (
+            toolbarNativeUIEngineListener == null ||
+            _options == null ||
+            isHiddenModeActive ||
+            !ToolbarNativeUIEngineSupport.shouldRegister(_options.isEnableNativeUIEngine(), _options.getToolbarType())
+        ) {
+            return;
         }
+        toolbarNativeUIEngineListener.onToolbarDisplayed();
     }
 
     private void notifyToolbarNativeAppearanceChanged() {

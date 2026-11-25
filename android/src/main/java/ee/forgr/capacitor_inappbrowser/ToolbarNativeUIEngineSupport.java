@@ -3,6 +3,7 @@ package ee.forgr.capacitor_inappbrowser;
 import android.text.TextUtils;
 import io.github.webview_native_ui.engine.NativeUIProjection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,13 +40,17 @@ public final class ToolbarNativeUIEngineSupport {
         return null;
     }
 
-    public static NativeUIProjection.ReceiveListeners receiveListeners() {
+    public static NativeUIProjection.ReceiveListeners receiveListeners(String instanceId) {
         List<String> update = Collections.singletonList(EVENT_TOOLBAR_APPEARANCE_CHANGED);
         NativeUIProjection.ReceiveListeners.Projection projection = new NativeUIProjection.ReceiveListeners.Projection(
             Collections.singletonList(EVENT_TOOLBAR_NATIVE_SHOWN),
             Collections.singletonList(EVENT_TOOLBAR_WEB_PROJECTION),
             Collections.singletonList(EVENT_TOOLBAR_HIDDEN)
         );
-        return new NativeUIProjection.ReceiveListeners(update, projection, Collections.<String, Object>emptyMap());
+        Map<String, Object> match = new HashMap<>();
+        if (!TextUtils.isEmpty(instanceId)) {
+            match.put("id", instanceId);
+        }
+        return new NativeUIProjection.ReceiveListeners(update, projection, match);
     }
 }

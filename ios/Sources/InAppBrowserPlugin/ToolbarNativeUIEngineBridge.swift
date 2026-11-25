@@ -33,7 +33,7 @@ enum ToolbarNativeUIEngineBridge {
                 webView: webView,
                 plugin: pluginJsName,
                 projectionSelector: selector,
-                receiveListeners: ToolbarNativeUIEngineSupport.receiveListeners(),
+                receiveListeners: ToolbarNativeUIEngineSupport.receiveListeners(webViewId: webViewId),
                 view: { [weak navigationBar] in navigationBar }
             )
             projections[webViewId] = projection

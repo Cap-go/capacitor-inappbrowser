@@ -14,6 +14,8 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
@@ -51,8 +53,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import org.json.JSONException;
@@ -114,6 +118,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     private PluginCall openSecureWindowSavedCall;
     private String openSecureWindowRedirectUri;
     private final Map<String, WebViewToolbarNativeUIProjection> toolbarNativeUIProjections = new ConcurrentHashMap<>();
+    private final Object toolbarNativeUIChannelLock = new Object();
     private boolean toolbarNativeUIChannelInstalled = false;
 
     @Override
@@ -2297,10 +2302,38 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         if (toolbarNativeUIChannelInstalled) {
             return true;
         }
-        WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
-        if (bridgeWebView == null) {
-            return false;
+        synchronized (toolbarNativeUIChannelLock) {
+            if (toolbarNativeUIChannelInstalled) {
+                return true;
+            }
+            WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
+            if (bridgeWebView == null) {
+                return false;
+            }
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                return installToolbarNativeUIChannelOnMainThread(bridgeWebView);
+            }
+            CountDownLatch latch = new CountDownLatch(1);
+            final boolean[] installed = { false };
+            new Handler(Looper.getMainLooper()).post(() -> {
+                installed[0] = installToolbarNativeUIChannelOnMainThread(bridgeWebView);
+                latch.countDown();
+            });
+            try {
+                if (!latch.await(30, TimeUnit.SECONDS)) {
+                    Log.e("InAppBrowser", "Native UI Engine channel install timed out");
+                    return false;
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                Log.e("InAppBrowser", "Native UI Engine channel install interrupted", error);
+                return false;
+            }
+            return installed[0];
         }
+    }
+
+    private boolean installToolbarNativeUIChannelOnMainThread(WebView bridgeWebView) {
         try {
             NativeUIProjection.install(bridgeWebView);
             toolbarNativeUIChannelInstalled = true;
