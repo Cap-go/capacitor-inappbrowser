@@ -11,6 +11,7 @@ final class ToolbarNativeUIEngineSupportTests: XCTestCase {
     }
 
     func testAcceptsNavigationToolbar() {
+        XCTAssertTrue(ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: ""))
         XCTAssertTrue(ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: "navigation"))
     }
 
@@ -20,10 +21,7 @@ final class ToolbarNativeUIEngineSupportTests: XCTestCase {
             ToolbarNativeUIEngineSupport.validateOptions(enabled: true, projectionSelector: nil),
             "nativeUIProjectionSelector is required when enableNativeUIEngine is true"
         )
-        XCTAssertEqual(
-            ToolbarNativeUIEngineSupport.validateOptions(enabled: true, projectionSelector: "slot"),
-            "nativeUIProjectionSelector must be a CSS selector"
-        )
+        XCTAssertNil(ToolbarNativeUIEngineSupport.validateOptions(enabled: true, projectionSelector: "slot"))
         XCTAssertNil(ToolbarNativeUIEngineSupport.validateOptions(enabled: true, projectionSelector: "#slot"))
     }
 }

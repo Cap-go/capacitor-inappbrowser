@@ -376,8 +376,9 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                 new ToolbarNativeUIEngineListener() {
                     @Override
                     public void onToolbarDisplayed() {
-                        attachToolbarNativeUIProjection(webViewId, dialog);
-                        notifyToolbarNativeUIShown();
+                        if (attachToolbarNativeUIProjection(webViewId, dialog)) {
+                            notifyToolbarNativeUIShown();
+                        }
                     }
 
                     @Override
@@ -2295,13 +2296,13 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         }
     }
 
-    private void attachToolbarNativeUIProjection(String webViewId, WebViewDialog dialog) {
+    private boolean attachToolbarNativeUIProjection(String webViewId, WebViewDialog dialog) {
         if (!ensureToolbarNativeUIChannel()) {
-            return;
+            return false;
         }
         Options options = dialog.getOptions();
         if (options == null) {
-            return;
+            return false;
         }
         WebViewToolbarNativeUIProjection projection = WebViewToolbarNativeUIProjection.tryCreate(
             this,
@@ -2310,7 +2311,9 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
         );
         if (projection != null) {
             toolbarNativeUIProjections.put(webViewId, projection);
+            return true;
         }
+        return false;
     }
 
     private void destroyToolbarNativeUIProjection(String webViewId) {

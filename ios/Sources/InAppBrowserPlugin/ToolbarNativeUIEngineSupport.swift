@@ -14,7 +14,11 @@ enum ToolbarNativeUIEngineSupport {
         guard enabled else {
             return false
         }
-        return toolbarType.lowercased() != "blank"
+        let trimmedType = toolbarType.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedType.isEmpty {
+            return true
+        }
+        return trimmedType != "blank"
     }
 
     static func validateOptions(enabled: Bool, projectionSelector: String?) -> String? {
@@ -23,10 +27,6 @@ enum ToolbarNativeUIEngineSupport {
         }
         guard let projectionSelector, !projectionSelector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return "nativeUIProjectionSelector is required when enableNativeUIEngine is true"
-        }
-        let trimmed = projectionSelector.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("#") || trimmed.hasPrefix(".") || trimmed.hasPrefix("[") else {
-            return "nativeUIProjectionSelector must be a CSS selector"
         }
         return nil
     }

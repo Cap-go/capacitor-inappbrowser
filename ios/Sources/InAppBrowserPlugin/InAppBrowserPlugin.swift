@@ -559,6 +559,25 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var safariOpenedUrl: String?
     private var openSecureWindowCall: CAPPluginCall?
     private var authSession: ASWebAuthenticationSession?
+    private var pendingToolbarNativeUIProjectionSelectors: [String: String] = [:]
+
+    private func startToolbarNativeUIProjectionIfNeeded(webViewId: String) {
+        guard let selector = pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: webViewId),
+              let navigationController = navigationControllers[webViewId] else {
+            return
+        }
+        ToolbarNativeUIEngineBridge.start(
+            webViewId: webViewId,
+            pluginJsName: jsName,
+            webView: bridge?.webView,
+            navigationBar: navigationController.navigationBar,
+            selector: selector,
+            notify: { [weak self] eventName, payload in
+                self?.notifyListeners(eventName, data: payload)
+            }
+        )
+    }
+
     private func setup() {
         self.isSetupDone = true
 
@@ -605,6 +624,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func unregisterWebView(id: String) {
+        pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: id)
+        pendingToolbarNativeUIProjectionSelectors.removeValue(forKey: id)
         ToolbarNativeUIEngineBridge.destroy(webViewId: id)
         webViewControllers[id]?.setBrowserFullscreen(false)
         detachFramedOverlayWebView(id: id)
@@ -857,6 +878,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.currentPluginCall?.reject("Failed to send webview to back")
                 return false
             }
+            self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
             return true
         }
 
@@ -865,6 +887,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
            webViewController.shouldPresentAsFramedOverlay {
             dismissActiveKeyboard()
             if presentNavigationControllerAsFramedOverlay(id: resolvedId) {
+                self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
                 // openWebView resolves with the webView id; do not resolve here.
                 return true
             }
@@ -886,6 +909,9 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                    navigationController.presentedViewController == nil,
                    !navigationController.isBeingDismissed {
                     self.setActiveWebView(id: resolvedId, webView: controller, navigationController: navigationController)
+                }
+                if let resolvedId {
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: resolvedId)
                 }
             } else {
                 // openWebView already resolves with the webView id on success.
@@ -1980,19 +2006,11 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
             }
-            if enableNativeUIEngine,
-               let projectionSelector = nativeUIProjectionSelector,
-               let navigationController = self.navigationControllers[webViewId] {
-                ToolbarNativeUIEngineBridge.start(
-                    webViewId: webViewId,
-                    pluginJsName: self.jsName,
-                    webView: self.bridge?.webView,
-                    navigationBar: navigationController.navigationBar,
-                    selector: projectionSelector,
-                    notify: { [weak self] eventName, payload in
-                        self?.notifyListeners(eventName, data: payload)
-                    }
-                )
+            if enableNativeUIEngine, let projectionSelector = nativeUIProjectionSelector {
+                self.pendingToolbarNativeUIProjectionSelectors[webViewId] = projectionSelector
+                if hidden {
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId)
+                }
             }
             call.resolve(["id": webViewId])
             // Only clear if this call still owns the slot (overlapping openWebView races).

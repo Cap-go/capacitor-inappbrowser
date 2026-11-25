@@ -26,7 +26,7 @@ public final class ToolbarNativeUIEngineSupport {
         if (toolbarType == null || toolbarType.trim().isEmpty()) {
             return true;
         }
-        return !"blank".equalsIgnoreCase(toolbarType.trim());
+        return !"blank".equals(toolbarType);
     }
 
     public static String validateOptions(boolean enabled, String projectionSelector) {
@@ -35,11 +35,6 @@ public final class ToolbarNativeUIEngineSupport {
         }
         if (TextUtils.isEmpty(projectionSelector) || projectionSelector.trim().isEmpty()) {
             return "nativeUIProjectionSelector is required when enableNativeUIEngine is true";
-        }
-        String trimmed = projectionSelector.trim();
-        char first = trimmed.charAt(0);
-        if (first != '#' && first != '.' && first != '[') {
-            return "nativeUIProjectionSelector must be a CSS selector";
         }
         return null;
     }

@@ -23,6 +23,7 @@ public class ToolbarNativeUIEngineSupportTest {
     @Test
     public void rejectsBlankToolbar() {
         assertFalse(ToolbarNativeUIEngineSupport.shouldRegister(true, "blank"));
+        assertTrue(ToolbarNativeUIEngineSupport.shouldRegister(true, "BLANK"));
     }
 
     @Test
@@ -38,10 +39,7 @@ public class ToolbarNativeUIEngineSupportTest {
             "nativeUIProjectionSelector is required when enableNativeUIEngine is true",
             ToolbarNativeUIEngineSupport.validateOptions(true, null)
         );
-        assertEquals(
-            "nativeUIProjectionSelector must be a CSS selector",
-            ToolbarNativeUIEngineSupport.validateOptions(true, "toolbar-slot")
-        );
+        assertNull(ToolbarNativeUIEngineSupport.validateOptions(true, "toolbar-slot"));
         assertNull(ToolbarNativeUIEngineSupport.validateOptions(true, "#toolbar-slot"));
     }
 }

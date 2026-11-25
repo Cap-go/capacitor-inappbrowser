@@ -1316,8 +1316,8 @@ export interface OpenWebViewOptions {
   /**
    * When true, registers the openWebView custom toolbar with
    * {@link https://github.com/webview-native-ui/engine | WebView Native UI Engine} so host Web UI can
-   * layer above the native toolbar or keep it aligned with DOM scroll. Ignored for `open()` (system sheet)
-   * and when `toolbarType` is `blank`.
+   * layer above the native toolbar or keep it aligned with DOM scroll. Ignored for `open()` (system sheet).
+   * Rejected when `toolbarType` is `blank`.
    *
    * @default false
    * @since 8.28.0

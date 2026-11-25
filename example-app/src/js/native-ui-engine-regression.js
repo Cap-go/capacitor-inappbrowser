@@ -2,6 +2,7 @@ import { InAppBrowser, BackgroundColor } from "@capgo/capacitor-inappbrowser";
 import { openQaToolsPanel } from "./qa-tools.js";
 
 const SLOT_ID = "in-app-browser-toolbar-slot";
+const NATIVE_SHOWN_EVENT = "inAppBrowserToolbarNativeShown";
 const PASS_OFF = "Native UI engine off passed";
 const PASS_ON = "Native UI engine on passed";
 const PASS_FAIL = "Native UI engine validation failed as expected";
@@ -21,6 +22,17 @@ async function closeIfNeeded() {
   try {
     await InAppBrowser.close();
   } catch (_error) {}
+}
+
+async function waitUntil(predicate, timeoutMs, intervalMs = 50) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Timed out waiting for condition");
 }
 
 export async function runNativeUIEngineOffRegression(statusEl, detailsEl) {
@@ -48,18 +60,27 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
   }
   setStatus(statusEl, detailsEl, "Running engine-on flow", "");
   await closeIfNeeded();
-  const { id } = await InAppBrowser.openWebView({
-    url: "https://example.com/",
-    title: "Engine On",
-    backgroundColor: BackgroundColor.WHITE,
-    enableNativeUIEngine: true,
-    nativeUIProjectionSelector: `#${SLOT_ID}`,
+  let nativeShown = false;
+  const listener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, () => {
+    nativeShown = true;
   });
-  if (!id) {
-    throw new Error("openWebView did not return an id");
+  try {
+    const { id } = await InAppBrowser.openWebView({
+      url: "https://example.com/",
+      title: "Engine On",
+      backgroundColor: BackgroundColor.WHITE,
+      enableNativeUIEngine: true,
+      nativeUIProjectionSelector: `#${SLOT_ID}`,
+    });
+    if (!id) {
+      throw new Error("openWebView did not return an id");
+    }
+    await waitUntil(() => nativeShown, 15_000);
+    await InAppBrowser.close();
+    setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
+  } finally {
+    await listener.remove();
   }
-  await InAppBrowser.close();
-  setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
 }
 
 export async function runNativeUIEngineValidationRegression(statusEl, detailsEl) {
@@ -70,6 +91,7 @@ export async function runNativeUIEngineValidationRegression(statusEl, detailsEl)
       url: "https://example.com/",
       enableNativeUIEngine: true,
     });
+    await closeIfNeeded();
     throw new Error("openWebView should reject when selector is missing");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -107,10 +129,15 @@ export function attachNativeUIEngineRegressionHarness() {
       return;
     }
     button.addEventListener("click", () => {
-      runner(status, details).catch((error) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setStatus(status, details, "Native UI engine regression failed", message);
-      });
+      button.disabled = true;
+      runner(status, details)
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          setStatus(status, details, "Native UI engine regression failed", message);
+        })
+        .finally(() => {
+          button.disabled = false;
+        });
     });
   };
 

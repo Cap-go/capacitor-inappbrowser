@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: Native UI Engine off keeps default openWebView toolbar
+name: Native UI Engine off openWebView smoke
 androidWebViewHierarchy: devtools
 ---
 - launchApp:

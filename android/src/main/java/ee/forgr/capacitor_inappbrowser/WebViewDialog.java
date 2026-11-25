@@ -745,6 +745,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         // Dialog.show() calls onStart() before mShowing = true, so the sync in onStart() always
         // leaves the back callback disabled; re-sync now that the dialog is actually showing.
         syncBackNavigationHandlers();
+        notifyToolbarNativeDisplayed();
     }
 
     @Override
@@ -3681,6 +3682,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         isHiddenModeActive = true;
         syncBackNavigationHandlers();
+        notifyToolbarNativeHidden();
     }
 
     private void restoreVisibleMode() {
@@ -3719,6 +3721,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         previousWebViewVisibility = View.VISIBLE;
         isHiddenModeActive = false;
         syncBackNavigationHandlers();
+        notifyToolbarNativeDisplayed();
     }
 
     public void setHidden(boolean hidden) {
@@ -6335,7 +6338,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
             }
         }
-        notifyToolbarNativeDisplayed();
     }
 
     /**

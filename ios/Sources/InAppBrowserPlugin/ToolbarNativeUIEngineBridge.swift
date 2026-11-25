@@ -11,6 +11,7 @@ enum ToolbarNativeUIEngineBridge {
         !projections.isEmpty
     }
 
+    @discardableResult
     static func start(
         webViewId: String,
         pluginJsName: String,
@@ -18,9 +19,9 @@ enum ToolbarNativeUIEngineBridge {
         navigationBar: UINavigationBar,
         selector: String,
         notify: (String, [String: Any]?) -> Void
-    ) {
+    ) -> Bool {
         guard let webView else {
-            return
+            return false
         }
         do {
             let projection = try NativeUIProjection(
@@ -33,8 +34,10 @@ enum ToolbarNativeUIEngineBridge {
             projections[webViewId] = projection
             notify(ToolbarNativeUIEngineSupport.nativeShownEvent, [:])
             notify(ToolbarNativeUIEngineSupport.appearanceChangedEvent, [:])
+            return true
         } catch {
             CAPLog.print("[InAppBrowser] Native UI toolbar projection unavailable: \(error)")
+            return false
         }
     }
 
@@ -56,6 +59,7 @@ enum ToolbarNativeUIEngineBridge {
         false
     }
 
+  @discardableResult
     static func start(
         webViewId: String,
         pluginJsName: String,
@@ -63,7 +67,9 @@ enum ToolbarNativeUIEngineBridge {
         navigationBar: UINavigationBar,
         selector: String,
         notify: (String, [String: Any]?) -> Void
-    ) {}
+    ) -> Bool {
+        false
+    }
 
     static func destroy(webViewId: String) {}
 
