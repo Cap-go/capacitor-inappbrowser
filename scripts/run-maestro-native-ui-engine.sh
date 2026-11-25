@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+# Chained after visual-regression / iOS deep-link Maestro scripts in CI.
 
 set -eu
 
