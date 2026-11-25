@@ -9,10 +9,7 @@ export function shouldRegisterNativeUIEngineToolbar(enabled: boolean, toolbarTyp
   return trimmed !== 'blank';
 }
 
-export function validateNativeUIEngineOptions(
-  enabled: boolean,
-  projectionSelector?: string | null,
-): string | null {
+export function validateNativeUIEngineOptions(enabled: boolean, projectionSelector?: string | null): string | null {
   if (!enabled) {
     return null;
   }

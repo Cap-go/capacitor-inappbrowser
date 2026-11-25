@@ -61,8 +61,11 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
   setStatus(statusEl, detailsEl, "Running engine-on flow", "");
   await closeIfNeeded();
   let nativeShown = false;
-  const listener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, () => {
-    nativeShown = true;
+  let openedId = null;
+  const listener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, (event) => {
+    if (event?.id === openedId) {
+      nativeShown = true;
+    }
   });
   try {
     const { id } = await InAppBrowser.openWebView({
@@ -75,6 +78,7 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
     if (!id) {
       throw new Error("openWebView did not return an id");
     }
+    openedId = id;
     await waitUntil(() => nativeShown, 15_000);
     await InAppBrowser.close();
     setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);

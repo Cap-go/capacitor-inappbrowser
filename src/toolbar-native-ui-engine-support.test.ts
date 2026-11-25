@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  shouldRegisterNativeUIEngineToolbar,
-  validateNativeUIEngineOptions,
-} from './toolbar-native-ui-engine-support';
+
+import { shouldRegisterNativeUIEngineToolbar, validateNativeUIEngineOptions } from './toolbar-native-ui-engine-support';
 
 describe('toolbar native ui engine gating', () => {
   test('off path does not register', () => {

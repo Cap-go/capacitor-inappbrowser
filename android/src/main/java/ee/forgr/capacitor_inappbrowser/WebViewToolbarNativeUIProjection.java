@@ -22,12 +22,7 @@ public final class WebViewToolbarNativeUIProjection {
         this.projection = projection;
     }
 
-    public static WebViewToolbarNativeUIProjection tryCreate(
-        Plugin plugin,
-        Options options,
-        View toolbarView,
-        WebViewDialog dialog
-    ) {
+    public static WebViewToolbarNativeUIProjection tryCreate(Plugin plugin, Options options, View toolbarView, WebViewDialog dialog) {
         if (!ToolbarNativeUIEngineSupport.shouldRegister(options.isEnableNativeUIEngine(), options.getToolbarType())) {
             return null;
         }

@@ -2000,6 +2000,10 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             // We don't use the toolbar anymore, always hide it
             self.navigationWebViewController?.setToolbarHidden(true, animated: false)
 
+            if enableNativeUIEngine, let projectionSelector = nativeUIProjectionSelector {
+                self.pendingToolbarNativeUIProjectionSelectors[webViewId] = projectionSelector
+            }
+
             if hidden {
                 guard let webView = webViewController.capableWebView else {
                     call.reject("Failed to get webview for hidden mode")
@@ -2010,15 +2014,12 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.reject("Failed to get active window for hidden webview")
                     return
                 }
+                if enableNativeUIEngine, nativeUIProjectionSelector != nil {
+                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId, initiallyVisible: false)
+                }
             } else if !self.isPresentAfterPageLoad {
                 guard self.presentView(webViewId: webViewId, isAnimated: isAnimated) else {
                     return
-                }
-            }
-            if enableNativeUIEngine, let projectionSelector = nativeUIProjectionSelector {
-                self.pendingToolbarNativeUIProjectionSelectors[webViewId] = projectionSelector
-                if hidden {
-                    self.startToolbarNativeUIProjectionIfNeeded(webViewId: webViewId, initiallyVisible: false)
                 }
             }
             call.resolve(["id": webViewId])
