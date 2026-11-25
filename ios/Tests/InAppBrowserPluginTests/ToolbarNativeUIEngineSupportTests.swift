@@ -8,6 +8,7 @@ final class ToolbarNativeUIEngineSupportTests: XCTestCase {
 
     func testRejectsBlankToolbar() {
         XCTAssertFalse(ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: "blank"))
+        XCTAssertFalse(ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: "BLANK"))
     }
 
     func testAcceptsNavigationToolbar() {

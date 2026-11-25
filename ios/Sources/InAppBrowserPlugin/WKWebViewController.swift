@@ -1638,6 +1638,9 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         stackView.addArrangedSubview(label)
         navigationItem.titleView = stackView
+        if !instanceId.isEmpty {
+            capBrowserPlugin?.notifyToolbarNativeUIAppearanceChangedIfProjected(webViewId: instanceId)
+        }
     }
 
     override open func viewDidLayoutSubviews() {

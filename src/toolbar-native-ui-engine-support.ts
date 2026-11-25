@@ -6,7 +6,7 @@ export function shouldRegisterNativeUIEngineToolbar(enabled: boolean, toolbarTyp
   if (trimmed.length === 0) {
     return true;
   }
-  return trimmed !== 'blank';
+  return trimmed.toLowerCase() !== 'blank';
 }
 
 export function validateNativeUIEngineOptions(enabled: boolean, projectionSelector?: string | null): string | null {

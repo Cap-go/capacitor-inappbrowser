@@ -1,5 +1,5 @@
 import XCTest
-@testable import InAppBrowserPlugin
+@testable import InappbrowserPlugin
 
 final class JavascriptBridgeOriginPolicyTests: XCTestCase {
     private enum Fixture {

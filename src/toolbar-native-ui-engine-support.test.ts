@@ -10,7 +10,7 @@ describe('toolbar native ui engine gating', () => {
 
   test('blank toolbar never registers', () => {
     expect(shouldRegisterNativeUIEngineToolbar(true, 'blank')).toBe(false);
-    expect(shouldRegisterNativeUIEngineToolbar(true, 'BLANK')).toBe(true);
+    expect(shouldRegisterNativeUIEngineToolbar(true, 'BLANK')).toBe(false);
   });
 
   test('selector required when on', () => {

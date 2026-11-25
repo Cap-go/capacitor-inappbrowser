@@ -631,6 +631,20 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         notifyListeners(ToolbarNativeUIEngineSupport.nativeShownEvent, data: ["id": webViewId])
     }
 
+    private func notifyToolbarNativeUIHiddenIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.hiddenEvent, data: ["id": webViewId])
+    }
+
+    func notifyToolbarNativeUIAppearanceChangedIfProjected(webViewId: String) {
+        guard ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) else {
+            return
+        }
+        notifyListeners(ToolbarNativeUIEngineSupport.appearanceChangedEvent, data: ["id": webViewId])
+    }
+
     private func releaseToolbarNativeUIEngineState(webViewId: String) {
         let payload: [String: Any] = ["id": webViewId]
         if ToolbarNativeUIEngineBridge.hasProjection(webViewId: webViewId) {
@@ -2112,6 +2126,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 if let resolvedId {
                     self.detachFramedOverlayWebView(id: resolvedId)
                     self.detachLayeredWebView(id: resolvedId)
+                    self.notifyToolbarNativeUIHiddenIfProjected(webViewId: resolvedId)
                 }
                 if !self.attachWebViewToWindow(webView) {
                     call?.reject("Failed to get active window for hidden webview")
@@ -2129,6 +2144,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                         if let navController = navigationController {
                             self.setActiveWebView(id: resolvedId, webView: webViewController, navigationController: navController)
                         }
+                        self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
                         call?.resolve()
                     } else {
                         call?.reject("Failed to send webview to back")
@@ -2147,9 +2163,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                                 animated: true
                             ) { presented in
                                 if presented {
-                                    if let resolvedId {
-                                        self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
-                                    }
+                                    self.notifyToolbarNativeUIShownIfProjected(webViewId: resolvedId)
                                     call?.resolve()
                                 } else {
                                     call?.reject("Failed to present webview")

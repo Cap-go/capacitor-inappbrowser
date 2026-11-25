@@ -21,6 +21,7 @@ first_status=$?
 set -e
 
 if [ "$first_status" -eq 0 ]; then
+  sh "$(CDPATH= cd -- "$(dirname "$0")" && pwd)/run-maestro-native-ui-engine.sh" ios
   exit 0
 fi
 
@@ -34,4 +35,7 @@ set +e
 run_flow
 retry_status=$?
 set -e
+if [ "$retry_status" -eq 0 ]; then
+  sh "$(CDPATH= cd -- "$(dirname "$0")" && pwd)/run-maestro-native-ui-engine.sh" ios
+fi
 exit "$retry_status"

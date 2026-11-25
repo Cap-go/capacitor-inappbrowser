@@ -1780,6 +1780,23 @@ export interface DimensionOptions {
   y?: number;
 }
 
+/**
+ * Capacitor plugin configuration for `plugins.CapgoInAppBrowser` in `capacitor.config`.
+ *
+ * @since 8.27.9
+ */
+export interface CapgoInAppBrowserPluginConfig {
+  /**
+   * When `true`, Android installs the Native UI Engine channel at plugin load so it exists
+   * before the host Capacitor WebView navigates. Leave `false` (default) when you only enable
+   * the engine on `openWebView` and open that webview before the host web layer loads.
+   *
+   * @since 8.27.9
+   * @default false
+   */
+  preInstallNativeUIEngineChannel?: boolean;
+}
+
 export interface InAppBrowserPlugin {
   /**
    * Navigates back in the WebView's history if possible

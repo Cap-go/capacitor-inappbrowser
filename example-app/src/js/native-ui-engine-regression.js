@@ -3,6 +3,7 @@ import { openQaToolsPanel } from "./qa-tools.js";
 
 const SLOT_ID = "in-app-browser-toolbar-slot";
 const NATIVE_SHOWN_EVENT = "inAppBrowserToolbarNativeShown";
+const WEB_PROJECTION_EVENT = "inAppBrowserToolbarWebProjectionStarted";
 const PASS_OFF = "Native UI engine off passed";
 const PASS_ON = "Native UI engine on passed";
 const PASS_FAIL = "Native UI engine validation failed as expected";
@@ -35,21 +36,39 @@ async function waitUntil(predicate, timeoutMs, intervalMs = 50) {
   throw new Error("Timed out waiting for condition");
 }
 
+function slotHasWebProjection(slot) {
+  return slot.childElementCount > 0;
+}
+
 export async function runNativeUIEngineOffRegression(statusEl, detailsEl) {
   openQaToolsPanel();
   setStatus(statusEl, detailsEl, "Running engine-off flow", "");
   await closeIfNeeded();
-  const { id } = await InAppBrowser.openWebView({
-    url: "https://example.com/",
-    title: "Engine Off",
-    backgroundColor: BackgroundColor.WHITE,
-    enableNativeUIEngine: false,
+  let spuriousNativeShown = false;
+  const listener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, () => {
+    spuriousNativeShown = true;
   });
-  if (!id) {
-    throw new Error("openWebView did not return an id");
+  try {
+    const { id } = await InAppBrowser.openWebView({
+      url: "https://example.com/",
+      title: "Engine Off",
+      backgroundColor: BackgroundColor.WHITE,
+      enableNativeUIEngine: false,
+    });
+    if (!id) {
+      throw new Error("openWebView did not return an id");
+    }
+    if (spuriousNativeShown) {
+      throw new Error(`${NATIVE_SHOWN_EVENT} fired while enableNativeUIEngine is false`);
+    }
+    await InAppBrowser.close();
+    if (spuriousNativeShown) {
+      throw new Error(`${NATIVE_SHOWN_EVENT} fired while enableNativeUIEngine is false`);
+    }
+    setStatus(statusEl, detailsEl, PASS_OFF, `webview id ${id}`);
+  } finally {
+    await listener.remove();
   }
-  await InAppBrowser.close();
-  setStatus(statusEl, detailsEl, PASS_OFF, `webview id ${id}`);
 }
 
 export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
@@ -61,10 +80,16 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
   setStatus(statusEl, detailsEl, "Running engine-on flow", "");
   await closeIfNeeded();
   let nativeShown = false;
+  let webProjectionStarted = false;
   let openedId = null;
-  const listener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, (event) => {
+  const nativeListener = await InAppBrowser.addListener(NATIVE_SHOWN_EVENT, (event) => {
     if (event?.id === openedId) {
       nativeShown = true;
+    }
+  });
+  const webListener = await InAppBrowser.addListener(WEB_PROJECTION_EVENT, (event) => {
+    if (event?.id === openedId) {
+      webProjectionStarted = true;
     }
   });
   try {
@@ -80,7 +105,10 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
     }
     openedId = id;
     try {
-      await waitUntil(() => nativeShown, 15_000);
+      await waitUntil(
+        () => nativeShown && webProjectionStarted && slotHasWebProjection(slot),
+        15_000,
+      );
       await InAppBrowser.close();
       setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
     } catch (error) {
@@ -88,7 +116,8 @@ export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
       throw error;
     }
   } finally {
-    await listener.remove();
+    await nativeListener.remove();
+    await webListener.remove();
   }
 }
 

@@ -23,7 +23,7 @@ public class ToolbarNativeUIEngineSupportTest {
     @Test
     public void rejectsBlankToolbar() {
         assertFalse(ToolbarNativeUIEngineSupport.shouldRegister(true, "blank"));
-        assertTrue(ToolbarNativeUIEngineSupport.shouldRegister(true, "BLANK"));
+        assertFalse(ToolbarNativeUIEngineSupport.shouldRegister(true, "BLANK"));
     }
 
     @Test

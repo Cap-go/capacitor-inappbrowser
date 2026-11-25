@@ -18,7 +18,7 @@ enum ToolbarNativeUIEngineSupport {
         if trimmedType.isEmpty {
             return true
         }
-        return trimmedType != "blank"
+        return trimmedType.lowercased() != "blank"
     }
 
     static func validateOptions(enabled: Bool, projectionSelector: String?) -> String? {

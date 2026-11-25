@@ -27,7 +27,7 @@ public final class ToolbarNativeUIEngineSupport {
         if (toolbarType == null || toolbarType.trim().isEmpty()) {
             return true;
         }
-        return !"blank".equals(toolbarType);
+        return !"blank".equalsIgnoreCase(toolbarType.trim());
     }
 
     public static String validateOptions(boolean enabled, String projectionSelector) {

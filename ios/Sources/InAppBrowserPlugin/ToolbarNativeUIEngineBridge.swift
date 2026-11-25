@@ -29,6 +29,7 @@ enum ToolbarNativeUIEngineBridge {
             return false
         }
         do {
+            NativeUICoveredSnapshots.experimentalInPlaceFilteringEnabled = false
             let projection = try NativeUIProjection(
                 webView: webView,
                 plugin: pluginJsName,
