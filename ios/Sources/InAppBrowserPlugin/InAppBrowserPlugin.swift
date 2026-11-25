@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import Capacitor
 import WebKit
+import WebViewNativeUIEngine
 import AuthenticationServices
 import SafariServices
 
@@ -559,6 +560,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var safariOpenedUrl: String?
     private var openSecureWindowCall: CAPPluginCall?
     private var authSession: ASWebAuthenticationSession?
+    private var toolbarNativeUIProjections: [String: NativeUIProjection] = [:]
 
     private func setup() {
         self.isSetupDone = true
@@ -606,6 +608,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func unregisterWebView(id: String) {
+        destroyToolbarNativeUIProjection(webViewId: id)
         webViewControllers[id]?.setBrowserFullscreen(false)
         detachFramedOverlayWebView(id: id)
         detachLayeredWebView(id: id)
@@ -1517,6 +1520,19 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let toolbarType = call.getString("toolbarType", "")
+        let enableNativeUIEngine = call.getBool("enableNativeUIEngine", false)
+        let nativeUIProjectionSelector = call.getString("nativeUIProjectionSelector")
+        if let validation = ToolbarNativeUIEngineSupport.validateOptions(
+            enabled: enableNativeUIEngine,
+            projectionSelector: nativeUIProjectionSelector
+        ) {
+            call.reject(validation)
+            return
+        }
+        if enableNativeUIEngine && !ToolbarNativeUIEngineSupport.shouldRegister(enabled: true, toolbarType: toolbarType) {
+            call.reject("enableNativeUIEngine requires a visible openWebView toolbar (toolbarType must not be blank)")
+            return
+        }
         let backgroundColor = call.getString("backgroundColor", "black") == "white" ? UIColor.white : UIColor.black
 
         // Don't null out shareDisclaimer regardless of toolbarType
@@ -1958,6 +1974,15 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 guard self.presentView(webViewId: webViewId, isAnimated: isAnimated) else {
                     return
                 }
+            }
+            if enableNativeUIEngine,
+               let projectionSelector = nativeUIProjectionSelector,
+               let navigationController = self.navigationControllers[webViewId] {
+                self.startToolbarNativeUIProjection(
+                    webViewId: webViewId,
+                    navigationBar: navigationController.navigationBar,
+                    selector: projectionSelector
+                )
             }
             call.resolve(["id": webViewId])
             // Only clear if this call still owns the slot (overlapping openWebView races).
@@ -2922,6 +2947,39 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 self.openSecureWindowCall = nil
                 call.reject("Failed to start authentication session")
             }
+        }
+    }
+
+    public override func notifyListeners(_ eventName: String, data: [String: Any]?, retainUntilConsumed: Bool = false) {
+        for projection in toolbarNativeUIProjections.values {
+            projection.receive(eventName, data: data)
+        }
+        super.notifyListeners(eventName, data: data, retainUntilConsumed: retainUntilConsumed)
+    }
+
+    private func startToolbarNativeUIProjection(webViewId: String, navigationBar: UINavigationBar, selector: String) {
+        guard let webView = bridge?.webView else {
+            return
+        }
+        do {
+            let projection = try NativeUIProjection(
+                webView: webView,
+                plugin: jsName,
+                projectionSelector: selector,
+                receiveListeners: ToolbarNativeUIEngineSupport.receiveListeners(),
+                view: { [weak navigationBar] in navigationBar }
+            )
+            toolbarNativeUIProjections[webViewId] = projection
+            notifyListeners(ToolbarNativeUIEngineSupport.nativeShownEvent, data: [:])
+            notifyListeners(ToolbarNativeUIEngineSupport.appearanceChangedEvent, data: [:])
+        } catch {
+            CAPLog.print("[InAppBrowser] Native UI toolbar projection unavailable: \(error)")
+        }
+    }
+
+    private func destroyToolbarNativeUIProjection(webViewId: String) {
+        if let projection = toolbarNativeUIProjections.removeValue(forKey: webViewId) {
+            projection.destroy()
         }
     }
 }

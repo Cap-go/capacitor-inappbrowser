@@ -39,6 +39,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import io.github.webview_native_ui.engine.NativeUIProjection;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -111,6 +112,8 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
 
     private PluginCall openSecureWindowSavedCall;
     private String openSecureWindowRedirectUri;
+    private final Map<String, WebViewToolbarNativeUIProjection> toolbarNativeUIProjections = new HashMap<>();
+    private boolean toolbarNativeUIChannelInstalled = false;
 
     @Override
     public void load() {
@@ -365,6 +368,27 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             dialog.preserveBundledAssetNavigationIntent(options.getUrl(), true);
         }
         dialog.bindToHostActivity();
+        if (options.isEnableNativeUIEngine()) {
+            dialog.setToolbarNativeUIEngineListener(
+                new ToolbarNativeUIEngineListener() {
+                    @Override
+                    public void onToolbarDisplayed() {
+                        attachToolbarNativeUIProjection(webViewId, dialog);
+                        notifyToolbarNativeUIShown();
+                    }
+
+                    @Override
+                    public void onToolbarAppearanceChanged() {
+                        notifyToolbarNativeUIAppearanceChanged();
+                    }
+
+                    @Override
+                    public void onToolbarHidden() {
+                        notifyToolbarNativeUIHidden();
+                    }
+                }
+            );
+        }
         registerWebView(webViewId, dialog, makeActive);
         return dialog;
     }
@@ -462,6 +486,7 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
     }
 
     private void unregisterWebView(String id) {
+        destroyToolbarNativeUIProjection(id);
         webViewDialogs.remove(id);
         webViewStack.remove(id);
         activeWebViewId = webViewStack.peekLast();
@@ -1266,6 +1291,22 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                 return;
             }
             options.setCloseModal(false);
+        }
+
+        boolean enableNativeUIEngine = Boolean.TRUE.equals(call.getBoolean("enableNativeUIEngine", false));
+        String nativeUIProjectionSelector = call.getString("nativeUIProjectionSelector");
+        String nativeUIValidation = ToolbarNativeUIEngineSupport.validateOptions(enableNativeUIEngine, nativeUIProjectionSelector);
+        if (nativeUIValidation != null) {
+            call.reject(nativeUIValidation);
+            return;
+        }
+        if (enableNativeUIEngine && !ToolbarNativeUIEngineSupport.shouldRegister(true, options.getToolbarType())) {
+            call.reject("enableNativeUIEngine requires a visible openWebView toolbar (toolbarType must not be blank)");
+            return;
+        }
+        options.setEnableNativeUIEngine(enableNativeUIEngine);
+        if (nativeUIProjectionSelector != null) {
+            options.setNativeUIProjectionSelector(nativeUIProjectionSelector.trim());
         }
 
         // Validate shareDisclaimer requires shareSubject
@@ -2215,5 +2256,70 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                 openSecureWindowSavedCall = null;
             }
         }
+    }
+
+    @Override
+    public void notifyListeners(String eventName, JSObject data, boolean retainUntilConsumed) {
+        if (!toolbarNativeUIProjections.isEmpty()) {
+            for (WebViewToolbarNativeUIProjection projection : toolbarNativeUIProjections.values()) {
+                projection.receive(eventName, data);
+            }
+        }
+        super.notifyListeners(eventName, data, retainUntilConsumed);
+    }
+
+    private boolean ensureToolbarNativeUIChannel() {
+        if (toolbarNativeUIChannelInstalled) {
+            return true;
+        }
+        WebView bridgeWebView = getBridge() != null ? getBridge().getWebView() : null;
+        if (bridgeWebView == null) {
+            return false;
+        }
+        try {
+            NativeUIProjection.install(bridgeWebView);
+            toolbarNativeUIChannelInstalled = true;
+            return true;
+        } catch (Exception error) {
+            Log.e("InAppBrowser", "Native UI Engine channel install failed", error);
+            return false;
+        }
+    }
+
+    private void attachToolbarNativeUIProjection(String webViewId, WebViewDialog dialog) {
+        if (!ensureToolbarNativeUIChannel()) {
+            return;
+        }
+        Options options = dialog.getOptions();
+        if (options == null) {
+            return;
+        }
+        WebViewToolbarNativeUIProjection projection = WebViewToolbarNativeUIProjection.tryCreate(
+            this,
+            options,
+            dialog.getToolbarForNativeUI()
+        );
+        if (projection != null) {
+            toolbarNativeUIProjections.put(webViewId, projection);
+        }
+    }
+
+    private void destroyToolbarNativeUIProjection(String webViewId) {
+        WebViewToolbarNativeUIProjection projection = toolbarNativeUIProjections.remove(webViewId);
+        if (projection != null) {
+            projection.close();
+        }
+    }
+
+    private void notifyToolbarNativeUIAppearanceChanged() {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_APPEARANCE_CHANGED, new JSObject());
+    }
+
+    private void notifyToolbarNativeUIShown() {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_NATIVE_SHOWN, new JSObject());
+    }
+
+    private void notifyToolbarNativeUIHidden() {
+        notifyListeners(ToolbarNativeUIEngineSupport.EVENT_TOOLBAR_HIDDEN, new JSObject());
     }
 }

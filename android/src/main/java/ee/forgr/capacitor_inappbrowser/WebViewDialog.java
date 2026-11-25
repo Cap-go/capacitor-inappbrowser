@@ -616,6 +616,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private boolean cachedTitleIconResolved;
     private boolean isHiddenModeActive = false;
     private boolean toolbarHideInProgress = false;
+    private ToolbarNativeUIEngineListener toolbarNativeUIEngineListener;
     private int injectedSafeAreaTop = Integer.MIN_VALUE;
     private int injectedSafeAreaBottom = Integer.MIN_VALUE;
     private int injectedSafeAreaLeft = Integer.MIN_VALUE;
@@ -5765,6 +5766,33 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             textView.setText("");
         }
         applyTitleTextOptions(textView);
+        notifyToolbarNativeAppearanceChanged();
+    }
+
+    public void setToolbarNativeUIEngineListener(ToolbarNativeUIEngineListener listener) {
+        this.toolbarNativeUIEngineListener = listener;
+    }
+
+    public View getToolbarForNativeUI() {
+        return _toolbar;
+    }
+
+    private void notifyToolbarNativeDisplayed() {
+        if (toolbarNativeUIEngineListener != null && _toolbar != null && _toolbar.getVisibility() == View.VISIBLE) {
+            toolbarNativeUIEngineListener.onToolbarDisplayed();
+        }
+    }
+
+    private void notifyToolbarNativeAppearanceChanged() {
+        if (toolbarNativeUIEngineListener != null) {
+            toolbarNativeUIEngineListener.onToolbarAppearanceChanged();
+        }
+    }
+
+    private void notifyToolbarNativeHidden() {
+        if (toolbarNativeUIEngineListener != null) {
+            toolbarNativeUIEngineListener.onToolbarHidden();
+        }
     }
 
     private void performToolbarCloseAction(String currentUrl) {
@@ -6123,6 +6151,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             // Status bar color is already set at the top of this method, no need to set again
         } else if (TextUtils.equals(_options.getToolbarType(), "blank")) {
             _toolbar.setVisibility(View.GONE);
+            notifyToolbarNativeHidden();
             configureBlankToolbarLayout();
             requestSafeAreaInsets();
 
@@ -6306,6 +6335,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 }
             }
         }
+        notifyToolbarNativeDisplayed();
     }
 
     /**

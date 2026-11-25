@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: Native UI Engine rejects missing projection selector
+androidWebViewHierarchy: devtools
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 120000
+- tapOn:
+    id: "maestro-run-native-ui-engine-fail"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Native UI engine validation failed as expected"
+    timeout: 120000

@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "@capgo/capacitor-inappbrowser",
+      "dependencies": {
+        "@webview-native-ui/engine": "1.0.11",
+      },
       "devDependencies": {
         "@capacitor/android": "^8.0.0",
         "@capacitor/cli": "^8.0.0",
@@ -166,6 +169,8 @@
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g=="],
 
+    "@rdlabo/ionic-theme-utils": ["@rdlabo/ionic-theme-utils@0.1.5", "", { "peerDependencies": { "@ionic/core": ">=8.8.1 <10" }, "optionalPeers": ["@ionic/core"], "bin": { "rdlabo-check-esm": "scripts/check-esm.mjs", "rdlabo-build-theme": "scripts/build-theme.mjs", "rdlabo-copy-structured-list": "scripts/copy-structured-list.mjs" } }, "sha512-LTf+GQ3S786xF1R6ITs9PtfDfSZxPcWJqzIzk046X9dvwgS+9+cCmdA5ENXYbo2Xbdv4KnxS/LKvm4fPL9THGQ=="],
+
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.60.1", "", { "os": "android", "cpu": "arm" }, "sha512-d6FinEBLdIiK+1uACUttJKfgZREXrF0Qc2SmLII7W2AD8FfiZ9Wjd+rD/iRuf5s5dWrr1GgwXCvPqOuDquOowA=="],
 
     "@rollup/rollup-android-arm64": ["@rollup/rollup-android-arm64@4.60.1", "", { "os": "android", "cpu": "arm64" }, "sha512-YjG/EwIDvvYI1YvYbHvDz/BYHtkY4ygUIXHnTdLhG+hKIQFBiosfWiACWortsKPKU/+dUwQQCKQM3qrDe8c9BA=="],
@@ -297,6 +302,8 @@
     "@unrs/resolver-binding-win32-ia32-msvc": ["@unrs/resolver-binding-win32-ia32-msvc@1.12.2", "", { "os": "win32", "cpu": "ia32" }, "sha512-WD9sY00OfpHVGfsnHZoA8jVT+esS/Bg8z8jzxp5BnDCjjwsuKsPQrzswwpFy4J1AUJbXPRfkpcX0mXrzeXW79g=="],
 
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.12.2", "", { "os": "win32", "cpu": "x64" }, "sha512-nAB74NfSNKknqQ1RrYj6uz8FcXEomu/MATJZxh/x+BArzN2U3JbOYC0APYzUIGhVY3m5hRxA8VPNdPBoG8txlA=="],
+
+    "@webview-native-ui/engine": ["@webview-native-ui/engine@1.0.11", "", { "dependencies": { "@rdlabo/ionic-theme-utils": "0.1.5" }, "peerDependencies": { "@capacitor/core": ">=8.0.0 <9", "@ionic/core": ">=8.8.1 <10" }, "optionalPeers": ["@capacitor/core", "@ionic/core"] }, "sha512-+gSA43PpzOflopNNpR0jyDYvnw39eMcy77vhziWOug6nLpEwj14WZschM8c6k4OUNT9iJpUxRpDsrYBV6HMQJg=="],
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.12", "", {}, "sha512-9k/gHF6n/pAi/9tqr3m3aqkuiNosYTurLLUtc7xQ9sxB/wm7WPygCv8GYa6mS0fLJEHhqMC1ATYhz++U/lRHqg=="],
 

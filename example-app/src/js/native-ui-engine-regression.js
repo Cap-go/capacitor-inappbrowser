@@ -1,0 +1,123 @@
+import { InAppBrowser, BackgroundColor } from "@capgo/capacitor-inappbrowser";
+import { openQaToolsPanel } from "./qa-tools.js";
+
+const SLOT_ID = "in-app-browser-toolbar-slot";
+const PASS_OFF = "Native UI engine off passed";
+const PASS_ON = "Native UI engine on passed";
+const PASS_FAIL = "Native UI engine validation failed as expected";
+
+let harnessAttached = false;
+
+function setStatus(statusEl, detailsEl, status, details = "") {
+  if (statusEl) {
+    statusEl.textContent = status;
+  }
+  if (detailsEl) {
+    detailsEl.textContent = details;
+  }
+}
+
+async function closeIfNeeded() {
+  try {
+    await InAppBrowser.close();
+  } catch (_error) {}
+}
+
+export async function runNativeUIEngineOffRegression(statusEl, detailsEl) {
+  openQaToolsPanel();
+  setStatus(statusEl, detailsEl, "Running engine-off flow", "");
+  await closeIfNeeded();
+  const { id } = await InAppBrowser.openWebView({
+    url: "https://example.com/",
+    title: "Engine Off",
+    backgroundColor: BackgroundColor.WHITE,
+    enableNativeUIEngine: false,
+  });
+  if (!id) {
+    throw new Error("openWebView did not return an id");
+  }
+  await InAppBrowser.close();
+  setStatus(statusEl, detailsEl, PASS_OFF, `webview id ${id}`);
+}
+
+export async function runNativeUIEngineOnRegression(statusEl, detailsEl) {
+  openQaToolsPanel();
+  const slot = document.getElementById(SLOT_ID);
+  if (!slot) {
+    throw new Error(`Missing host slot #${SLOT_ID}`);
+  }
+  setStatus(statusEl, detailsEl, "Running engine-on flow", "");
+  await closeIfNeeded();
+  const { id } = await InAppBrowser.openWebView({
+    url: "https://example.com/",
+    title: "Engine On",
+    backgroundColor: BackgroundColor.WHITE,
+    enableNativeUIEngine: true,
+    nativeUIProjectionSelector: `#${SLOT_ID}`,
+  });
+  if (!id) {
+    throw new Error("openWebView did not return an id");
+  }
+  await InAppBrowser.close();
+  setStatus(statusEl, detailsEl, PASS_ON, `webview id ${id}`);
+}
+
+export async function runNativeUIEngineValidationRegression(statusEl, detailsEl) {
+  openQaToolsPanel();
+  setStatus(statusEl, detailsEl, "Running validation failure flow", "");
+  try {
+    await InAppBrowser.openWebView({
+      url: "https://example.com/",
+      enableNativeUIEngine: true,
+    });
+    throw new Error("openWebView should reject when selector is missing");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("nativeUIProjectionSelector")) {
+      throw error;
+    }
+    setStatus(statusEl, detailsEl, PASS_FAIL, message);
+  }
+}
+
+export function attachNativeUIEngineRegressionHarness() {
+  if (harnessAttached) {
+    return;
+  }
+  const runOff = document.getElementById("maestro-run-native-ui-engine-off");
+  const runOn = document.getElementById("maestro-run-native-ui-engine-on");
+  const runFail = document.getElementById("maestro-run-native-ui-engine-fail");
+  const status = document.getElementById("maestro-native-ui-engine-status");
+  const details = document.getElementById("maestro-native-ui-engine-details");
+  const banner = document.getElementById("maestro-ready-banner");
+
+  const markReady = () => {
+    if (banner) {
+      banner.textContent = "Maestro Ready";
+    }
+    [runOff, runOn, runFail].forEach((button) => {
+      if (button) {
+        button.disabled = false;
+      }
+    });
+  };
+
+  const wire = (button, runner) => {
+    if (!button) {
+      return;
+    }
+    button.addEventListener("click", () => {
+      runner(status, details).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setStatus(status, details, "Native UI engine regression failed", message);
+      });
+    });
+  };
+
+  wire(runOff, runNativeUIEngineOffRegression);
+  wire(runOn, runNativeUIEngineOnRegression);
+  wire(runFail, runNativeUIEngineValidationRegression);
+
+  harnessAttached = true;
+  markReady();
+}

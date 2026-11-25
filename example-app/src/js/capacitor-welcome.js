@@ -14,6 +14,7 @@ import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachVisualRegressionHarness } from './visual-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
 import { attachDeepLinkPreventedRegressionHarness } from './deep-link-prevented-regression.js';
+import { attachNativeUIEngineRegressionHarness } from './native-ui-engine-regression.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
 import { openQaToolsPanel } from './qa-tools.js';
@@ -416,6 +417,7 @@ window.customElements.define(
       attachVisualRegressionHarness();
       attachFeatureSmokeHarness();
       attachDeepLinkPreventedRegressionHarness();
+      attachNativeUIEngineRegressionHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {
@@ -915,6 +917,7 @@ window.customElements.define(
         }
         openQaToolsPanel();
         attachDeepLinkPreventedRegressionHarness();
+      attachNativeUIEngineRegressionHarness();
         syncMaestroNativeReady(true);
       } else if (maestroReadyBanner) {
         const deepLinkRunButton = document.getElementById('maestro-run-deep-link-prevented');

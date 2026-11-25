@@ -201,6 +201,24 @@ public class Options {
     private boolean toBack = false;
     private boolean transparentBackground = true;
     private boolean fullscreen = false;
+    private boolean enableNativeUIEngine = false;
+    private String nativeUIProjectionSelector;
+
+    public boolean isEnableNativeUIEngine() {
+        return enableNativeUIEngine;
+    }
+
+    public void setEnableNativeUIEngine(boolean enableNativeUIEngine) {
+        this.enableNativeUIEngine = enableNativeUIEngine;
+    }
+
+    public String getNativeUIProjectionSelector() {
+        return nativeUIProjectionSelector;
+    }
+
+    public void setNativeUIProjectionSelector(String nativeUIProjectionSelector) {
+        this.nativeUIProjectionSelector = nativeUIProjectionSelector;
+    }
 
     public boolean isFullscreen() {
         return fullscreen;
@@ -945,6 +963,8 @@ public class Options {
         copy.setInvisibilityMode(invisibilityMode);
         copy.setPopupWindowMode(true);
         copy.setHiddenPopupWindow(hiddenPopupWindow);
+        copy.setEnableNativeUIEngine(enableNativeUIEngine);
+        copy.setNativeUIProjectionSelector(nativeUIProjectionSelector);
         return copy;
     }
 }

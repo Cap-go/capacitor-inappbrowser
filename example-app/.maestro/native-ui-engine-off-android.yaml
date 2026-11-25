@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: Native UI Engine off keeps default openWebView toolbar
+androidWebViewHierarchy: devtools
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Maestro Ready"
+    timeout: 120000
+- tapOn:
+    id: "maestro-run-native-ui-engine-off"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Native UI engine off passed"
+    timeout: 120000
