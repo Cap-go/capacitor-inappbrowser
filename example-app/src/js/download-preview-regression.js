@@ -1,8 +1,6 @@
 import { InAppBrowser, ToolBarType, BackgroundColor } from "@capgo/capacitor-inappbrowser";
 
 const RUN_TIMEOUT_MS = 90_000;
-const NONE_OK_PREFIX = "Event OK: download-preview-none";
-const INVALID_OK_PREFIX = "Event OK: downloadPreview rejected";
 
 let harnessAttached = false;
 let harnessAttachPending = false;
@@ -223,7 +221,7 @@ export function attachDownloadPreviewRegressionHarness() {
         return;
       }
       setStatus(
-        `${NONE_OK_PREFIX} handledBy=${handledBy.join(",")} files=${names}`,
+        `Event OK: download-preview-none handledBy=${handledBy.join(",")} files=${names}`,
         `Page heartbeats after downloads: ${alive.length - beatsAtCompletion}, same page load: yes`,
       );
     };
@@ -291,7 +289,7 @@ export function attachDownloadPreviewRegressionHarness() {
       );
       if (isActive()) {
         setStatus(
-          `${INVALID_OK_PREFIX} with and without handleDownloads`,
+          "Event OK: downloadPreview rejected with and without handleDownloads",
           `${withDownloads} | ${withoutDownloads}`,
         );
       }

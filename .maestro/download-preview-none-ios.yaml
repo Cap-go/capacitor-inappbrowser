@@ -7,10 +7,10 @@ appId: app.capgo.inappbrowser
     timeout: 240000
 - scrollUntilVisible:
     element:
-      text: 'Run Download Preview None \(Maestro\)'
+      text: "Run Download Preview None \\(Maestro\\)"
     timeout: 20000
 - tapOn:
-    text: 'Run Download Preview None \(Maestro\)'
+    text: "Run Download Preview None \\(Maestro\\)"
     retryTapIfNoChange: true
 # Plugin result: both downloads completed, handledBy none, shown inside the page.
 - extendedWaitUntil:
@@ -24,14 +24,14 @@ appId: app.capgo.inappbrowser
 - assertVisible: 'RESULT download completed handledBy=none,none.*'
 - tapOn: 'Finish test'
 - extendedWaitUntil:
-    visible: 'Event OK: download-preview-none handledBy=none,none files=preview-none.*'
+    visible: 'Event OK: download-preview-none handledBy=none,none files=preview-none.*\.txt'
     timeout: 60000
 - scrollUntilVisible:
     element:
-      text: 'Run Download Preview Invalid \(Maestro\)'
+      text: "Run Download Preview Invalid \\(Maestro\\)"
     timeout: 20000
 - tapOn:
-    text: 'Run Download Preview Invalid \(Maestro\)'
+    text: "Run Download Preview Invalid \\(Maestro\\)"
     retryTapIfNoChange: true
 # Failure case: an invalid value rejects with the plugin's own message, with and without handleDownloads.
 - extendedWaitUntil:
