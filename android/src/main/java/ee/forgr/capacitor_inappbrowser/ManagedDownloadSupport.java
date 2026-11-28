@@ -20,6 +20,16 @@ public final class ManagedDownloadSupport {
         return lastEmitMs <= 0L || nowMs - lastEmitMs >= PROGRESS_MIN_INTERVAL_MS;
     }
 
+    /** Normalizes a reported content length: any negative value means the size is unknown (-1). */
+    public static long resolveBytesExpected(long contentLength) {
+        return contentLength >= 0L ? contentLength : -1L;
+    }
+
+    /** True when the server announced a length and the stream ended before delivering all of it. */
+    public static boolean isTruncated(long bytesReceived, long bytesExpected) {
+        return bytesExpected >= 0L && bytesReceived < bytesExpected;
+    }
+
     public static final class EndingGuard {
 
         private final AtomicInteger state = new AtomicInteger(EndingKind.NONE.ordinal());

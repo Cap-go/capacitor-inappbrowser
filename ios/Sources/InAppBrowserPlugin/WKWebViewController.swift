@@ -600,7 +600,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func attachProgressObserver(to download: WKDownload, record: ManagedDownloadRecord) {
-        record.progressObservation = download.progress.observe(\.fractionCompleted, options: [.new]) { [weak self] progress, _ in
+        // Observe the byte count, not fractionCompleted: the fraction never moves when the server sends no length.
+        record.progressObservation = download.progress.observe(\.completedUnitCount, options: [.new]) { [weak self] progress, _ in
             guard let self else {
                 return
             }
@@ -610,7 +611,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             record.lastProgressEmit = now
             let bytesReceived = progress.completedUnitCount
-            let bytesExpected = progress.totalUnitCount > 0 ? progress.totalUnitCount : -1
+            let bytesExpected = ManagedDownloadSupport.resolvedBytesExpected(progress.totalUnitCount)
             emitDownloadProgress(
                 downloadId: record.downloadId,
                 bytesReceived: bytesReceived,
@@ -623,7 +624,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     func cancelManagedDownload(downloadId: String) -> Bool {
         if let record = downloadRecordsById[downloadId] {
             record.cancelRequested = true
-            record.wkDownload?.cancel(nil)
+            // WebKit does not call didFailWithError after an explicit cancel, so finish the record here.
+            if let download = record.wkDownload {
+                download.cancel { [weak self] _ in
+                    DispatchQueue.main.async {
+                        self?.finishCancelledDownload(record, download: download)
+                    }
+                }
+            } else {
+                finishCancelledDownload(record, download: nil)
+            }
             return true
         }
         if let entry = blobDownloadSessions.first(where: { $0.value.downloadId == downloadId }) {
@@ -631,12 +641,29 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             session.cancelRequested = true
             blobDownloadSessions[entry.key] = session
             abortBlobDownloadSession(sessionId: entry.key, deleteFile: true)
+            // Stop the page-side producer and remember the id so its late finish or abort is ignored.
+            signalBlobDownloadRejected(sessionId: entry.key, reason: "Blob download cancelled")
             if session.endingGuard.trySetEnding("cancelled") {
                 emitDownloadCancelled(downloadId: downloadId, sourceURL: session.sourceURL)
             }
             return true
         }
         return false
+    }
+
+    private func finishCancelledDownload(_ record: ManagedDownloadRecord, download: WKDownload?) {
+        if let download {
+            downloadRecords.removeValue(forKey: ObjectIdentifier(download))
+        }
+        downloadRecordsById.removeValue(forKey: record.downloadId)
+        record.progressObservation?.invalidate()
+        releaseDownloadDestination(record.destinationURL)
+        if let destinationURL = record.destinationURL {
+            try? FileManager.default.removeItem(at: destinationURL)
+        }
+        if record.endingGuard.trySetEnding("cancelled") {
+            emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
+        }
     }
 
     private func cancelAllManagedDownloadsOnClose() {
@@ -1315,10 +1342,24 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let sessionId = jsonPayload?["sessionId"] as? String ?? ""
         let session = abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
         let reason = jsonPayload?["reason"] as? String ?? "Blob download aborted"
-        let downloadId = session?.downloadId
-        if let session, session.endingGuard.trySetEnding("failed") {
+        guard let session else {
+            // A cancelled session is already reported; ignore the producer's late abort for it.
+            if !sessionId.isEmpty, rejectedBlobDownloadSessionIds.remove(sessionId) != nil {
+                return
+            }
+            // The page failed before the native session existed (for example a revoked blob URL).
             emitDownloadFailed(
-                downloadId: downloadId,
+                downloadId: nil,
+                sourceURL: jsonPayload?["sourceUrl"] as? String,
+                fileName: jsonPayload?["fileName"] as? String,
+                mimeType: jsonPayload?["mimeType"] as? String,
+                error: reason
+            )
+            return
+        }
+        if session.endingGuard.trySetEnding("failed") {
+            emitDownloadFailed(
+                downloadId: session.downloadId,
                 sourceURL: session.sourceURL ?? jsonPayload?["sourceUrl"] as? String,
                 fileName: session.destinationURL.lastPathComponent,
                 mimeType: session.mimeType ?? jsonPayload?["mimeType"] as? String,
@@ -4365,6 +4406,14 @@ extension WKWebViewController: WKDownloadDelegate {
         }
 
         if record.endingGuard.trySetEnding("completed") {
+            // The throttle can drop the last sample, so report the final byte count before the terminal event.
+            let progress = download.progress
+            emitDownloadProgress(
+                downloadId: record.downloadId,
+                bytesReceived: progress.completedUnitCount,
+                bytesExpected: ManagedDownloadSupport.resolvedBytesExpected(progress.totalUnitCount),
+                fileName: record.fileName ?? destinationURL.lastPathComponent
+            )
             previewDownloadedFile(
                 destinationURL,
                 mimeType: record.mimeType,

@@ -63,6 +63,15 @@
             Run Deep Link Prevented (Maestro)
           </button>
         </div>
+        <!-- Download lifecycle harness (issue #794). Kept on one short row and first in the status list so
+             the iOS simulator can read it without scrolling and the older status lines keep their place. -->
+        <div class="maestro-button-row">
+          <button id="maestro-run-download-lifecycle-complete" class="maestro-btn maestro-btn-download" disabled>DL Complete</button>
+          <button id="maestro-run-download-lifecycle-cancel" class="maestro-btn maestro-btn-download" disabled>DL Cancel</button>
+          <button id="maestro-run-download-lifecycle-fail" class="maestro-btn maestro-btn-download" disabled>DL Net Fail</button>
+          <button id="maestro-run-download-lifecycle-kill" class="maestro-btn maestro-btn-download" disabled>DL Kill</button>
+        </div>
+        <div id="maestro-download-lifecycle-status" class="maestro-status-line">Download lifecycle not started</div>
         <div id="maestro-proxy-status" class="maestro-status-line">Not started</div>
         <div id="maestro-proxy-details" class="maestro-status-details"></div>
         <div id="maestro-keyboard-status" class="maestro-status-line">Not started</div>

@@ -468,7 +468,7 @@ export interface DownloadFailedEvent {
 /**
  * Event emitted when managed download handling begins.
  *
- * @since 8.6.18
+ * @since 8.28.0
  */
 export interface DownloadStartedEvent {
   /**
@@ -489,14 +489,20 @@ export interface DownloadStartedEvent {
  * Event emitted while a managed download is in progress.
  * Native runtimes throttle this to at most four events per second per download.
  *
- * @since 8.6.18
+ * @since 8.28.0
  */
 export interface DownloadProgressEvent {
   /**
    * Source webview instance id.
    */
   id?: string;
+  /**
+   * Same id as the matching `downloadStarted` event.
+   */
   downloadId: string;
+  /**
+   * Bytes saved so far. The last event before `downloadCompleted` carries the final byte count.
+   */
   bytesReceived: number;
   /**
    * Total size when known; `-1` when the server did not report a length.
@@ -511,18 +517,32 @@ export interface DownloadProgressEvent {
 /**
  * Event emitted when a managed download is cancelled before it finishes.
  *
- * @since 8.6.18
+ * @since 8.28.0
  */
 export interface DownloadCancelledEvent {
   /**
    * Source webview instance id.
    */
   id?: string;
+  /**
+   * Same id as the matching `downloadStarted` event.
+   */
   downloadId: string;
+  /**
+   * Original URL that triggered the download when available.
+   */
   sourceUrl?: string;
 }
 
+/**
+ * Options for `cancelDownload`.
+ *
+ * @since 8.28.0
+ */
 export interface CancelDownloadOptions {
+  /**
+   * The `downloadId` from `downloadStarted` or `downloadProgress`.
+   */
   downloadId: string;
 }
 
@@ -2119,7 +2139,7 @@ export interface InAppBrowserPlugin {
    * Will be triggered when native download handling starts.
    * Enable this with `handleDownloads: true` when opening the webview.
    *
-   * @since 8.6.18
+   * @since 8.28.0
    */
   addListener(
     eventName: 'downloadStarted',
@@ -2129,17 +2149,17 @@ export interface InAppBrowserPlugin {
    * Will be triggered while a managed download is in progress (throttled on native).
    * Enable this with `handleDownloads: true` when opening the webview.
    *
-   * @since 8.6.18
+   * @since 8.28.0
    */
   addListener(
     eventName: 'downloadProgress',
     listenerFunc: (event: DownloadProgressEvent) => void,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when a managed download is cancelled.
+   * Will be triggered when a managed download is cancelled, either by `cancelDownload` or because the webview closed mid-transfer.
    * Enable this with `handleDownloads: true` when opening the webview.
    *
-   * @since 8.6.18
+   * @since 8.28.0
    */
   addListener(
     eventName: 'downloadCancelled',
@@ -2149,7 +2169,7 @@ export interface InAppBrowserPlugin {
    * Ends a running managed download. The download then emits `downloadCancelled`.
    * Resolves whether or not the download was still running.
    *
-   * @since 8.6.18
+   * @since 8.28.0
    */
   cancelDownload(options: CancelDownloadOptions): Promise<void>;
   /**

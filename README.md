@@ -34,6 +34,7 @@ We build, improve and fix our plugins with heavy use of AI, so issues usually ge
 - **Two-way messaging**: `postMessage()` and the `messageFromWebview` event, plus `executeScript()` to run code in the page.
 - **Navigation events**: `urlChangeEvent`, `browserPageLoaded`, `pageLoadError`, `closeEvent`, downloads and popups.
 - **`deepLinkPrevented`**: when `preventDeeplink: true` blocks a link that would leave the in-app browser, listen for `{ url, id? }` on Android and iOS (not on web).
+- **Download progress and cancel**: with `handleDownloads: true`, track each file with `downloadStarted`, throttled `downloadProgress`, and one ending event (`downloadCompleted`, `downloadFailed` or `downloadCancelled`), and stop it with `cancelDownload({ downloadId })` on Android and iOS.
 - **Layout control**: `updateDimensions()`, fullscreen, safe-area margins, `hide()`, `show()` and `sendToBack()` to place the browser behind your Ionic UI.
 - **Session data**: `getCookies()`, `clearCookies()`, `clearCache()` and `clearAllBrowsingData()`.
 - **OAuth**: `openSecureWindow()` runs an auth flow with ASWebAuthenticationSession on iOS and Custom Tabs on Android, and a popup on web.
@@ -258,6 +259,49 @@ Use proxy rules and `handleDownloads` for web apps that need request control, fi
 #### Download progress and cancel (Android and iOS)
 
 With `handleDownloads: true`, managed downloads emit `downloadStarted`, throttled `downloadProgress` (at most four events per second per download), and a single terminal event: `downloadCompleted`, `downloadFailed`, or `downloadCancelled`. Each started transfer shares the same `downloadId` across those events. Call `cancelDownload({ downloadId })` to stop a running download; closing the in-app browser while a download is active cancels it and emits `downloadCancelled`.
+
+The last `downloadProgress` before `downloadCompleted` always carries the final byte count, so a progress bar can reach 100%. `bytesExpected` is `-1` when the server sends no length. A connection that drops mid-transfer emits `downloadFailed`.
+
+```ts
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
+
+const progress = new Map<string, number>();
+
+const listeners = await Promise.all([
+  InAppBrowser.addListener('downloadStarted', ({ downloadId, sourceUrl }) => {
+    progress.set(downloadId, 0);
+    console.log('download started', downloadId, sourceUrl);
+  }),
+  InAppBrowser.addListener('downloadProgress', ({ downloadId, bytesReceived, bytesExpected }) => {
+    if (bytesExpected > 0) {
+      progress.set(downloadId, bytesReceived / bytesExpected);
+    }
+  }),
+  InAppBrowser.addListener('downloadCompleted', ({ downloadId, fileName }) => {
+    progress.delete(downloadId ?? '');
+    console.log('saved', fileName);
+  }),
+  InAppBrowser.addListener('downloadFailed', ({ downloadId, error }) => {
+    progress.delete(downloadId ?? '');
+    console.warn('download failed', error);
+  }),
+  InAppBrowser.addListener('downloadCancelled', ({ downloadId }) => {
+    progress.delete(downloadId);
+  }),
+]);
+
+await InAppBrowser.openWebView({ url: 'https://example.com/files', handleDownloads: true });
+
+// Later, for example from a Cancel button:
+for (const downloadId of progress.keys()) {
+  await InAppBrowser.cancelDownload({ downloadId });
+}
+
+// When the browser session ends:
+await Promise.all(listeners.map((listener) => listener.remove()));
+```
+
+Guide: [Download progress and cancel](https://capgo.app/docs/plugins/inappbrowser/download-events/).
 
 ### Customize Chrome Custom Tab Appearance (Android)
 
@@ -1481,7 +1525,7 @@ Enable this with `handleDownloads: true` when opening the webview.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
-**Since:** 8.6.18
+**Since:** 8.28.0
 
 --------------------
 
@@ -1502,7 +1546,7 @@ Enable this with `handleDownloads: true` when opening the webview.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
-**Since:** 8.6.18
+**Since:** 8.28.0
 
 --------------------
 
@@ -1513,7 +1557,7 @@ Enable this with `handleDownloads: true` when opening the webview.
 addListener(eventName: 'downloadCancelled', listenerFunc: (event: DownloadCancelledEvent) => void) => Promise<PluginListenerHandle>
 ```
 
-Will be triggered when a managed download is cancelled.
+Will be triggered when a managed download is cancelled, either by `cancelDownload` or because the webview closed mid-transfer.
 Enable this with `handleDownloads: true` when opening the webview.
 
 | Param              | Type                                                                                          |
@@ -1523,7 +1567,7 @@ Enable this with `handleDownloads: true` when opening the webview.
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
-**Since:** 8.6.18
+**Since:** 8.28.0
 
 --------------------
 
@@ -1541,7 +1585,7 @@ Resolves whether or not the download was still running.
 | ------------- | ----------------------------------------------------------------------- |
 | **`options`** | <code><a href="#canceldownloadoptions">CancelDownloadOptions</a></code> |
 
-**Since:** 8.6.18
+**Since:** 8.28.0
 
 --------------------
 
@@ -2131,31 +2175,33 @@ Event emitted when managed download handling begins.
 Event emitted while a managed download is in progress.
 Native runtimes throttle this to at most four events per second per download.
 
-| Prop                | Type                | Description                                                          |
-| ------------------- | ------------------- | -------------------------------------------------------------------- |
-| **`id`**            | <code>string</code> | Source webview instance id.                                          |
-| **`downloadId`**    | <code>string</code> |                                                                      |
-| **`bytesReceived`** | <code>number</code> |                                                                      |
-| **`bytesExpected`** | <code>number</code> | Total size when known; `-1` when the server did not report a length. |
-| **`fileName`**      | <code>string</code> | Saved filename once known.                                           |
+| Prop                | Type                | Description                                                                                 |
+| ------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| **`id`**            | <code>string</code> | Source webview instance id.                                                                 |
+| **`downloadId`**    | <code>string</code> | Same id as the matching `downloadStarted` event.                                            |
+| **`bytesReceived`** | <code>number</code> | Bytes saved so far. The last event before `downloadCompleted` carries the final byte count. |
+| **`bytesExpected`** | <code>number</code> | Total size when known; `-1` when the server did not report a length.                        |
+| **`fileName`**      | <code>string</code> | Saved filename once known.                                                                  |
 
 
 #### DownloadCancelledEvent
 
 Event emitted when a managed download is cancelled before it finishes.
 
-| Prop             | Type                | Description                 |
-| ---------------- | ------------------- | --------------------------- |
-| **`id`**         | <code>string</code> | Source webview instance id. |
-| **`downloadId`** | <code>string</code> |                             |
-| **`sourceUrl`**  | <code>string</code> |                             |
+| Prop             | Type                | Description                                              |
+| ---------------- | ------------------- | -------------------------------------------------------- |
+| **`id`**         | <code>string</code> | Source webview instance id.                              |
+| **`downloadId`** | <code>string</code> | Same id as the matching `downloadStarted` event.         |
+| **`sourceUrl`**  | <code>string</code> | Original URL that triggered the download when available. |
 
 
 #### CancelDownloadOptions
 
-| Prop             | Type                |
-| ---------------- | ------------------- |
-| **`downloadId`** | <code>string</code> |
+Options for `cancelDownload`.
+
+| Prop             | Type                | Description                                                    |
+| ---------------- | ------------------- | -------------------------------------------------------------- |
+| **`downloadId`** | <code>string</code> | The `downloadId` from `downloadStarted` or `downloadProgress`. |
 
 
 #### PopupWindowEvent
@@ -2291,7 +2337,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -2305,7 +2353,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
