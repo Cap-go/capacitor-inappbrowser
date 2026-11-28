@@ -2227,7 +2227,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 return;
             }
 
-            if (DownloadPreviewSupport.usesInAppBrowserPreview(downloadPreview) && isTextPreviewMimeType(mimeType) && _webView != null) {
+            if (isTextPreviewMimeType(mimeType) && _webView != null) {
                 previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
                 return;
             }
