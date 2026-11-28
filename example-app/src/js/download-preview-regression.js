@@ -137,11 +137,13 @@ export function attachDownloadPreviewRegressionHarness() {
     const alive = [];
     let finishRequested = false;
     let webViewId = null;
+    let runCancelled = false;
     const listeners = [];
     let timeoutId = null;
 
     const timeoutPromise = new Promise((_, reject) => {
       timeoutId = globalThis.setTimeout(() => {
+        runCancelled = true;
         reject(new Error("Download preview none run timed out"));
       }, RUN_TIMEOUT_MS);
     });
@@ -171,9 +173,16 @@ export function attachDownloadPreviewRegressionHarness() {
         handleDownloads: true,
         downloadPreview: "none",
       });
+      if (runCancelled || !isActive()) {
+        await InAppBrowser.close({ id }).catch(() => {});
+        return;
+      }
       webViewId = id;
 
       await waitUntil(() => alive.length > 0, 20_000, "the first page heartbeat");
+      if (runCancelled || !isActive()) {
+        return;
+      }
       const loadId = alive[0].loadId;
 
       await InAppBrowser.executeScript({
