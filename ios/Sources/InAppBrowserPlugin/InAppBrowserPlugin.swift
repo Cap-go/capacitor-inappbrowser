@@ -1648,7 +1648,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             webViewController.setAuthorizedAppLinks(authorizedAppLinks: authorizedAppLinks)
             webViewController.documentStartUserScripts = self.documentStartUserScripts(
                 authorizedAppLinks: authorizedAppLinks,
-                openBlankTargetInWebView: openBlankTargetInWebView
+                openBlankTargetInWebView: openBlankTargetInWebView,
+                handleDownloads: handleDownloads
             )
             self.applyBundledAssetSettings(to: webViewController)
             webViewController.enableReloadGesture = enableReloadGesture
@@ -2488,13 +2489,17 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private func documentStartUserScripts(
         authorizedAppLinks: [String],
-        openBlankTargetInWebView: Bool
+        openBlankTargetInWebView: Bool,
+        handleDownloads: Bool
     ) -> [String] {
-        guard openBlankTargetInWebView else {
-            return []
+        var scripts: [String] = []
+        if openBlankTargetInWebView {
+            scripts.append(blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks))
         }
-
-        return [blankTargetInWebViewScript(authorizedAppLinks: authorizedAppLinks)]
+        if handleDownloads {
+            scripts.append(BlobDownloadFilenameCaptureSupport.captureScript)
+        }
+        return scripts
     }
 
     func isHexColorCode(_ input: String) -> Bool {
