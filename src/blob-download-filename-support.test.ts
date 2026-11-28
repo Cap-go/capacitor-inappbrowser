@@ -3,12 +3,7 @@ import { resolveBlobDownloadFileName } from './blob-download-filename-support';
 
 test('resolveBlobDownloadFileName prefers recorded detached link name', () => {
   const blobUrl = 'blob:https://example.com/abc-123';
-  const fileName = resolveBlobDownloadFileName(
-    blobUrl,
-    { [blobUrl]: 'report-2026.pdf' },
-    [],
-    'downloadfile.pdf',
-  );
+  const fileName = resolveBlobDownloadFileName(blobUrl, { [blobUrl]: 'report-2026.pdf' }, [], 'downloadfile.pdf');
   expect(fileName).toBe('report-2026.pdf');
 });
 
@@ -24,11 +19,6 @@ test('resolveBlobDownloadFileName uses in-document link when no recording', () =
 });
 
 test('resolveBlobDownloadFileName falls back when link is missing', () => {
-  const fileName = resolveBlobDownloadFileName(
-    'blob:https://example.com/missing',
-    undefined,
-    [],
-    'downloadfile.pdf',
-  );
+  const fileName = resolveBlobDownloadFileName('blob:https://example.com/missing', undefined, [], 'downloadfile.pdf');
   expect(fileName).toBe('downloadfile.pdf');
 });

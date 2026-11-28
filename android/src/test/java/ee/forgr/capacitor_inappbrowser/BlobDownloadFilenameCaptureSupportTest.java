@@ -40,8 +40,6 @@ public class BlobDownloadFilenameCaptureSupportTest {
 
     @Test
     public void mainSourcesDoNotUseStringFormattedOnBlobSupport() {
-        assertFalse(
-            BlobDownloadFilenameCaptureSupport.createBlobDownloadFilenameCaptureScript().contains(".formatted(")
-        );
+        assertFalse(BlobDownloadFilenameCaptureSupport.createBlobDownloadFilenameCaptureScript().contains(".formatted("));
     }
 }
