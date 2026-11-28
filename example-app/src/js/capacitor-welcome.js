@@ -474,13 +474,10 @@ window.customElements.define(
     <script>
       const status = document.getElementById("status");
       const blob = new Blob([${JSON.stringify(content)}], { type: "text/plain" });
-      const downloadUrl = URL.createObjectURL(blob);
       const downloadLink = document.createElement("a");
-      downloadLink.href = downloadUrl;
+      downloadLink.href = URL.createObjectURL(blob);
       downloadLink.download = "capgo-download-demo.txt";
-      downloadLink.textContent = "Download sample file";
-      document.body.appendChild(downloadLink);
-      status.textContent = "Starting download...";
+      status.textContent = "Starting detached link download (FileSaver pattern)...";
       window.setTimeout(() => downloadLink.click(), 300);
     </script>
   </body>

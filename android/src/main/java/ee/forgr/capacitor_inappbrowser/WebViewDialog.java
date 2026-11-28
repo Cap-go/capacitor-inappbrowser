@@ -2484,7 +2484,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 const response = await fetch(blobUrl);
                 const blob = await response.blob();
-                fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+                fileName = %s(blobUrl, matchingLink, fallbackFileName);
 
                 if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
                   bridge.startBlobDownload(JSON.stringify({
@@ -2536,7 +2536,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             JSONObject.quote(fallbackFileName),
             MAX_LEGACY_BLOB_DOWNLOAD_BYTES,
             BLOB_DOWNLOAD_CHUNK_BYTES,
-            JSONObject.quote(blobDownloadToken)
+            JSONObject.quote(blobDownloadToken),
+            BlobDownloadFilenameCaptureSupport.FILE_NAME_RESOLUTION_JS
         );
 
         final WebView webView = _webView;
@@ -4686,6 +4687,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                             injectFileInputCaptureHookScript();
                         }
                         injectBlankTargetInCurrentWebViewScript();
+                        injectBlobDownloadFilenameCaptureScript();
                     } catch (Exception e) {
                         Log.e("InAppBrowser", "Error injecting JavaScript interface: " + e.getMessage());
                     }
@@ -4707,6 +4709,17 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         return FileInputCaptureChooserSupport.createFileInputCaptureHookScript();
     }
 
+    private String createBlobDownloadFilenameCaptureScript() {
+        return BlobDownloadFilenameCaptureSupport.createBlobDownloadFilenameCaptureScript();
+    }
+
+    private void injectBlobDownloadFilenameCaptureScript() {
+        if (_webView == null || !_options.getHandleDownloads()) {
+            return;
+        }
+        _webView.evaluateJavascript(createBlobDownloadFilenameCaptureScript(), null);
+    }
+
     private void injectDocumentStartJavaScriptInterface() {
         if (_webView == null) {
             Log.w("InAppBrowser", "Cannot inject document-start JavaScript interface - WebView is null");
@@ -4722,6 +4735,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 injectDocumentStartPostMessageBridge();
                 WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureHookScript(), Collections.singleton("*"));
                 WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
+            }
+            if (_options.getHandleDownloads()) {
+                WebViewCompat.addDocumentStartJavaScript(_webView, createBlobDownloadFilenameCaptureScript(), Collections.singleton("*"));
             }
             // Honor preShowScriptInjectionTime: "documentStart" (matches iOS WKUserScript
             // .atDocumentStart). Runs before page scripts and persists across navigations,
