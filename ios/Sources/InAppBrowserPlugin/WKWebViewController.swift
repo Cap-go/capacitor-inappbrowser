@@ -1469,7 +1469,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             const response = await fetch(blobUrl);
             const blob = await response.blob();
-            fileName = (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+            fileName = \(BlobDownloadFilenameCaptureSupport.fileNameResolutionJS)(blobUrl, matchingLink, fallbackFileName);
 
             if (bridge.startBlobDownload && bridge.appendBlobDownloadChunk && bridge.finishBlobDownload) {
               bridge.startBlobDownload(JSON.stringify({
