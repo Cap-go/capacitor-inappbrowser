@@ -6,6 +6,10 @@ let harnessAttached = false;
 let harnessAttachPending = false;
 let activeRunGeneration = 0;
 
+const warnCleanup = (what) => (error) => {
+  console.warn(`[download-preview-regression] ${what} failed during cleanup:`, error);
+};
+
 async function waitUntil(predicate, timeoutMs, label, intervalMs = 50) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -172,7 +176,7 @@ export function attachDownloadPreviewRegressionHarness() {
         downloadPreview: "none",
       });
       if (runCancelled || !isActive()) {
-        await InAppBrowser.close({ id }).catch(() => {});
+        await InAppBrowser.close({ id }).catch(warnCleanup("close after cancelled run"));
         return;
       }
       webViewId = id;
@@ -243,7 +247,7 @@ export function attachDownloadPreviewRegressionHarness() {
         setStatus("Download preview none failed", message);
       }
       if (webViewId) {
-        await InAppBrowser.close({ id: webViewId }).catch(() => {});
+        await InAppBrowser.close({ id: webViewId }).catch(warnCleanup("close after failed run"));
       }
       throw error;
     } finally {
@@ -251,7 +255,7 @@ export function attachDownloadPreviewRegressionHarness() {
         globalThis.clearTimeout(timeoutId);
       }
       for (const listener of listeners) {
-        await listener.remove().catch(() => {});
+        await listener.remove().catch(warnCleanup("listener removal"));
       }
       if (isActive()) {
         noneButton.disabled = false;
@@ -273,7 +277,7 @@ export function attachDownloadPreviewRegressionHarness() {
       return message;
     }
     if (opened && opened.id) {
-      await InAppBrowser.close({ id: opened.id }).catch(() => {});
+      await InAppBrowser.close({ id: opened.id }).catch(warnCleanup("close of unexpectedly opened webview"));
     }
     throw new Error(`${label}: openWebView resolved instead of rejecting`);
   };
