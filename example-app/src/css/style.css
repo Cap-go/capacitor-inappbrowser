@@ -135,6 +135,11 @@ body {
   background: #7c3aed;
 }
 
+.maestro-btn-download-preview-none,
+.maestro-btn-download-preview-invalid {
+  background: #0f766e;
+}
+
 .maestro-status-line {
   margin-top: 8px;
   font-size: 14px;
