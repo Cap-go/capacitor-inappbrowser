@@ -1421,6 +1421,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         cleanupBlobDownloadSession(session, true);
                         throw new IOException("Blob download session already exists");
                     }
+                    // The page-replacement sweep may have incremented the generation and copied the
+                    // map before this putIfAbsent. If this snapshot is already stale, drop the session
+                    // (no start event) rather than leave an orphan producer from the old document.
+                    if (session.producerGeneration != blobProducerGeneration.get()) {
+                        blobDownloadSessions.remove(sessionId, session);
+                        cleanupBlobDownloadSession(session, true);
+                        return;
+                    }
                     session.endingGuard.markStarted();
                     notifyDownloadStarted(downloadId, sourceUrl);
                 }
