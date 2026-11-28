@@ -2221,7 +2221,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
     private void finalizeDownload(File outputFile, String mimeType, String sourceUrl) {
         mainHandler.post(() -> {
-            if (isTextPreviewMimeType(mimeType) && _webView != null) {
+            String downloadPreview = _options != null ? _options.getDownloadPreview() : DownloadPreviewSupport.DEFAULT_MODE;
+            if (DownloadPreviewSupport.skipsPreview(downloadPreview)) {
+                notifyDownloadCompleted(outputFile, mimeType, sourceUrl, "none");
+                return;
+            }
+
+            if (DownloadPreviewSupport.usesInAppBrowserPreview(downloadPreview) && isTextPreviewMimeType(mimeType) && _webView != null) {
                 previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
                 return;
             }

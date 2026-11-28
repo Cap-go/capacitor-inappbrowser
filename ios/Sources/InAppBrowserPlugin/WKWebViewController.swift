@@ -805,6 +805,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
         DispatchQueue.main.async {
+            if DownloadPreviewSupport.skipsPreview(self.downloadPreview) {
+                self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "none")
+                return
+            }
+
             if self.openWalletPasses &&
                 WalletPassSupport.isWalletPass(mimeType: mimeType, fileURL: fileURL) &&
                 self.presentWalletPass(fileURL, sourceURL: sourceURL) {

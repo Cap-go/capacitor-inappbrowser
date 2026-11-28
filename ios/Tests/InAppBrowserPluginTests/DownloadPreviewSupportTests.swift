@@ -9,6 +9,7 @@ final class DownloadPreviewSupportTests: XCTestCase {
     func testNormalizesSupportedModes() {
         XCTAssertEqual(DownloadPreviewSupport.normalizedMode("inAppBrowser"), "inAppBrowser")
         XCTAssertEqual(DownloadPreviewSupport.normalizedMode("SYSTEMPREVIEW"), "systemPreview")
+        XCTAssertEqual(DownloadPreviewSupport.normalizedMode("NONE"), "none")
     }
 
     func testRejectsUnknownModes() {
@@ -27,5 +28,12 @@ final class DownloadPreviewSupportTests: XCTestCase {
     func testUsesInAppBrowserPreview() {
         XCTAssertTrue(DownloadPreviewSupport.usesInAppBrowserPreview("inAppBrowser"))
         XCTAssertFalse(DownloadPreviewSupport.usesInAppBrowserPreview("systemPreview"))
+        XCTAssertFalse(DownloadPreviewSupport.usesInAppBrowserPreview("none"))
+    }
+
+    func testSkipsPreviewOnlyForNone() {
+        XCTAssertTrue(DownloadPreviewSupport.skipsPreview("none"))
+        XCTAssertFalse(DownloadPreviewSupport.skipsPreview("inAppBrowser"))
+        XCTAssertFalse(DownloadPreviewSupport.skipsPreview("systemPreview"))
     }
 }

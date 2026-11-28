@@ -384,14 +384,14 @@ export interface ConsoleMessageEvent {
  *
  * @since 8.6.0
  */
-export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external' | 'wallet';
+export type DownloadHandledBy = 'inAppBrowser' | 'systemPreview' | 'external' | 'wallet' | 'none';
 
 /**
  * Where managed downloads are previewed after saving.
  *
  * @since 8.19.0
  */
-export type DownloadPreview = 'inAppBrowser' | 'systemPreview';
+export type DownloadPreview = 'inAppBrowser' | 'systemPreview' | 'none';
 
 /**
  * Event emitted after a managed download is saved locally.
@@ -995,6 +995,7 @@ export interface OpenWebViewOptions {
    *
    * - `'inAppBrowser'` (default): Reopens previewable files (PDF, images, text, JSON) inside the same webview.
    * - `'systemPreview'`: Opens the system Quick Look preview with share and Save to Files actions. iOS only; ignored on Android.
+   * - `'none'`: Saves the file and emits `downloadCompleted` with `handledBy: 'none'` without previewing or opening a system viewer.
    *
    * Requires `handleDownloads: true`.
    *
