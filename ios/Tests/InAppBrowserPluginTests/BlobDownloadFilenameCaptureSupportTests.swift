@@ -27,6 +27,15 @@ final class BlobDownloadFilenameCaptureSupportTests: XCTestCase {
         XCTAssertTrue(resolver.contains(BlobDownloadFilenameCaptureSupport.blobDownloadNamesGlobal))
         XCTAssertTrue(resolver.contains("recorded"))
         XCTAssertTrue(resolver.contains("getAttribute('download')"))
+        XCTAssertTrue(resolver.contains("hasAttribute('download')"))
         XCTAssertTrue(resolver.contains("fallbackFileName"))
+    }
+
+    func testCaptureScriptRefreshesNamesAfterClickAndClearsEmptyDownload() {
+        let script = BlobDownloadFilenameCaptureSupport.captureScript
+
+        XCTAssertTrue(script.contains("recordBlobDownloadName(this)"))
+        XCTAssertTrue(script.contains("delete window.\(BlobDownloadFilenameCaptureSupport.blobDownloadNamesGlobal)"))
+        XCTAssertTrue(script.contains("}, false)"))
     }
 }

@@ -12,14 +12,16 @@ export function resolveBlobDownloadFileName(
   documentLinks: BlobDownloadLink[],
   fallbackFileName: string,
 ): string {
+  const matchingLink = documentLinks.find((link) => link.href === blobUrl);
+  if (matchingLink && matchingLink.download !== null) {
+    if (matchingLink.download) {
+      return matchingLink.download;
+    }
+    return fallbackFileName;
+  }
   const recorded = recordedNames?.[blobUrl];
   if (recorded) {
     return recorded;
-  }
-  const matchingLink = documentLinks.find((link) => link.href === blobUrl);
-  const fromAttribute = matchingLink?.download;
-  if (fromAttribute) {
-    return fromAttribute;
   }
   return fallbackFileName;
 }

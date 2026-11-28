@@ -11,8 +11,12 @@ final class BlobDownloadFilenameCaptureSupport {
         """
         (function(blobUrl, matchingLink, fallbackFileName) {
           var names = window.%s;
+          if (matchingLink && matchingLink.href === blobUrl && matchingLink.hasAttribute('download')) {
+            var linkName = matchingLink.getAttribute('download');
+            return linkName || fallbackFileName;
+          }
           var recorded = names && names[blobUrl];
-          return recorded || (matchingLink && matchingLink.getAttribute('download')) || fallbackFileName;
+          return recorded || fallbackFileName;
         })
         """,
         BLOB_DOWNLOAD_NAMES_GLOBAL
@@ -43,20 +47,28 @@ final class BlobDownloadFilenameCaptureSupport {
                 var name = anchor.getAttribute('download');
                 if (name) {
                   window.%s[href] = name;
+                } else {
+                  delete window.%s[href];
                 }
               };
               var anchorPrototype = HTMLAnchorElement.prototype;
               var originalClick = anchorPrototype.click;
               anchorPrototype.click = function() {
                 recordBlobDownloadName(this);
-                return originalClick.call(this);
+                var result = originalClick.call(this);
+                recordBlobDownloadName(this);
+                return result;
               };
               var originalDispatchEvent = anchorPrototype.dispatchEvent;
               anchorPrototype.dispatchEvent = function(event) {
                 if (event && event.type === 'click') {
                   recordBlobDownloadName(this);
                 }
-                return originalDispatchEvent.call(this, event);
+                var result = originalDispatchEvent.call(this, event);
+                if (event && event.type === 'click') {
+                  recordBlobDownloadName(this);
+                }
+                return result;
               };
               var registerClickCapture = function(doc) {
                 if (!doc || doc.__capgoBlobDownloadFilenameCaptureRegistered) {
@@ -70,6 +82,13 @@ final class BlobDownloadFilenameCaptureSupport {
                     recordBlobDownloadName(anchor);
                   }
                 }, true);
+                doc.addEventListener('click', function(event) {
+                  var target = event.target;
+                  var anchor = target && target.closest ? target.closest('a[download]') : null;
+                  if (anchor) {
+                    recordBlobDownloadName(anchor);
+                  }
+                }, false);
               };
               registerClickCapture(document);
               window.addEventListener('load', function(event) {
@@ -82,6 +101,7 @@ final class BlobDownloadFilenameCaptureSupport {
               }, true);
             })();
             """,
+            BLOB_DOWNLOAD_NAMES_GLOBAL,
             BLOB_DOWNLOAD_NAMES_GLOBAL,
             BLOB_DOWNLOAD_NAMES_GLOBAL,
             BLOB_DOWNLOAD_NAMES_GLOBAL

@@ -35,7 +35,17 @@ public class BlobDownloadFilenameCaptureSupportTest {
         assertTrue(resolver.contains(BlobDownloadFilenameCaptureSupport.BLOB_DOWNLOAD_NAMES_GLOBAL));
         assertTrue(resolver.contains("recorded"));
         assertTrue(resolver.contains("getAttribute('download')"));
+        assertTrue(resolver.contains("hasAttribute('download')"));
         assertTrue(resolver.contains("fallbackFileName"));
+    }
+
+    @Test
+    public void captureScriptRefreshesNamesAfterClickAndClearsEmptyDownload() {
+        String script = BlobDownloadFilenameCaptureSupport.createBlobDownloadFilenameCaptureScript();
+
+        assertTrue(script.contains("recordBlobDownloadName(this)"));
+        assertTrue(script.contains("delete window." + BlobDownloadFilenameCaptureSupport.BLOB_DOWNLOAD_NAMES_GLOBAL));
+        assertTrue(script.contains("}, false)"));
     }
 
     @Test
