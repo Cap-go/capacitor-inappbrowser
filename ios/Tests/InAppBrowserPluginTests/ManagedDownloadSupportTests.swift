@@ -3,10 +3,12 @@ import XCTest
 
 final class ManagedDownloadSupportTests: XCTestCase {
     func testProgressThrottleAllowsAtMostFourPerSecond() {
+        // Independent literals: four samples per second means one every 250 ms.
         let base: TimeInterval = 10
         XCTAssertTrue(ManagedDownloadSupport.shouldEmitProgress(lastEmit: 0, now: base))
-        XCTAssertFalse(ManagedDownloadSupport.shouldEmitProgress(lastEmit: base, now: base + ManagedDownloadSupport.progressMinInterval - 0.01))
-        XCTAssertTrue(ManagedDownloadSupport.shouldEmitProgress(lastEmit: base, now: base + ManagedDownloadSupport.progressMinInterval))
+        XCTAssertFalse(ManagedDownloadSupport.shouldEmitProgress(lastEmit: base, now: base + 0.249))
+        XCTAssertTrue(ManagedDownloadSupport.shouldEmitProgress(lastEmit: base, now: base + 0.25))
+        XCTAssertTrue(ManagedDownloadSupport.shouldEmitProgress(lastEmit: base, now: base + 1))
     }
 
     func testUnknownTotalBecomesMinusOne() {

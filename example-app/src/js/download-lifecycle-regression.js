@@ -19,7 +19,7 @@ export const DOWNLOAD_LIFECYCLE_STATUS = {
   killArmed: "Lifecycle OK: kill armed",
 };
 
-const state = { attached: false, pending: false };
+const state = { attached: false, pending: false, webViewId: null };
 let activeRun = 0;
 
 function serverBaseUrl() {
@@ -79,6 +79,12 @@ function firstStarted(events, webViewId) {
   return events.find((entry) => entry.type === "started" && (!entry.event.id || entry.event.id === webViewId));
 }
 
+function startedDownloadId(events, webViewId) {
+  const { downloadId } = firstStarted(events, webViewId).event;
+  assert(typeof downloadId === "string" && downloadId.length > 0, "downloadStarted has no downloadId");
+  return downloadId;
+}
+
 function assertSingleTerminal(events, downloadId, expectedType) {
   const terminals = terminalEvents(events, downloadId);
   assert(terminals.length === 1, `expected one terminal event, got ${terminals.map((entry) => entry.type).join(",") || "none"}`);
@@ -104,17 +110,19 @@ async function openDownloadPage(kind) {
     anyLoad = true;
     loadedId = event.id ?? loadedId;
   });
-  const { id } = await InAppBrowser.openWebView({
-    url: `${serverBaseUrl()}/page/${kind}`,
-    title: `Download Lifecycle ${kind}`,
-    toolbarType: ToolBarType.NAVIGATION,
-    backgroundColor: BackgroundColor.WHITE,
-    // Hidden so the harness status stays on screen for Maestro while the transfer runs.
-    hidden: true,
-    invisibilityMode: InvisibilityMode.FAKE_VISIBLE,
-    handleDownloads: true,
-  });
+  let id;
   try {
+    ({ id } = await InAppBrowser.openWebView({
+      url: `${serverBaseUrl()}/page/${kind}`,
+      title: `Download Lifecycle ${kind}`,
+      toolbarType: ToolBarType.NAVIGATION,
+      backgroundColor: BackgroundColor.WHITE,
+      // Hidden so the harness status stays on screen for Maestro while the transfer runs.
+      hidden: true,
+      invisibilityMode: InvisibilityMode.FAKE_VISIBLE,
+      handleDownloads: true,
+    }));
+    state.webViewId = id;
     await waitUntil(() => anyLoad && (!loadedId || loadedId === id), 20_000, `${kind} page load`);
   } finally {
     await pageLoaded.remove().catch(() => {});
@@ -128,7 +136,7 @@ const scenarios = {
   async completed(recorder) {
     const webViewId = await openDownloadPage("complete");
     await waitUntil(() => firstStarted(recorder.events, webViewId), 20_000, "downloadStarted");
-    const { downloadId } = firstStarted(recorder.events, webViewId).event;
+    const downloadId = startedDownloadId(recorder.events, webViewId);
     assert(typeof downloadId === "string" && downloadId.length > 0, "downloadStarted has no downloadId");
     await waitUntil(() => terminalEvents(recorder.events, downloadId).length > 0, 30_000, "terminal event");
     await sleep(QUIET_WINDOW_MS);
@@ -154,7 +162,7 @@ const scenarios = {
   async cancelled(recorder) {
     const webViewId = await openDownloadPage("cancel");
     await waitUntil(() => firstStarted(recorder.events, webViewId), 20_000, "downloadStarted");
-    const { downloadId } = firstStarted(recorder.events, webViewId).event;
+    const downloadId = startedDownloadId(recorder.events, webViewId);
     await waitUntil(
       () => eventsFor(recorder.events, downloadId).some((entry) => entry.type === "progress" && entry.event.bytesReceived > 0),
       20_000,
@@ -175,7 +183,7 @@ const scenarios = {
   async failed(recorder) {
     const webViewId = await openDownloadPage("fail");
     await waitUntil(() => firstStarted(recorder.events, webViewId), 20_000, "downloadStarted");
-    const { downloadId } = firstStarted(recorder.events, webViewId).event;
+    const downloadId = startedDownloadId(recorder.events, webViewId);
     await waitUntil(() => terminalEvents(recorder.events, downloadId).length > 0, 30_000, "downloadFailed");
     await sleep(QUIET_WINDOW_MS);
 
@@ -190,7 +198,7 @@ const scenarios = {
   async killArmed(recorder) {
     const webViewId = await openDownloadPage("kill");
     await waitUntil(() => firstStarted(recorder.events, webViewId), 20_000, "downloadStarted");
-    const { downloadId } = firstStarted(recorder.events, webViewId).event;
+    const downloadId = startedDownloadId(recorder.events, webViewId);
     await waitUntil(
       () => eventsFor(recorder.events, downloadId).some((entry) => entry.type === "progress" && entry.event.bytesReceived > 0),
       20_000,
@@ -281,6 +289,11 @@ export function attachDownloadLifecycleRegressionHarness() {
       // The kill scenario keeps its listeners so events keep landing until the process dies.
       if (recorder && name !== "killArmed") {
         await recorder.remove();
+        // A failed scenario must not leave its hidden browser (and transfer) behind.
+        if (state.webViewId) {
+          await InAppBrowser.close({ id: state.webViewId }).catch(() => {});
+        }
+        state.webViewId = null;
       }
       if (runId === activeRun) {
         setButtonsDisabled(false);

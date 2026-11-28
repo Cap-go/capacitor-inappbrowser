@@ -102,7 +102,7 @@ private struct BlobDownloadSession {
     let fileHandle: FileHandle
     let expectedSize: Int64?
     var bytesWritten: Int64 = 0
-    var lastProgressEmit: CFAbsoluteTime = 0
+    var lastProgressEmit: TimeInterval = 0
     var cancelRequested = false
     let endingGuard = ManagedDownloadEndingGuard()
 }
@@ -601,11 +601,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func attachProgressObserver(to download: WKDownload, record: ManagedDownloadRecord) {
         // Observe the byte count, not fractionCompleted: the fraction never moves when the server sends no length.
-        record.progressObservation = download.progress.observe(\.completedUnitCount, options: [.new]) { [weak self] progress, _ in
-            guard let self else {
+        // The record owns the observation, so the closure must not own the record.
+        record.progressObservation = download.progress.observe(\.completedUnitCount, options: [.new]) { [weak self, weak record] progress, _ in
+            guard let self, let record else {
                 return
             }
-            let now = CFAbsoluteTimeGetCurrent()
+            // Monotonic clock: a wall clock that moves back must not silence progress.
+            let now = ProcessInfo.processInfo.systemUptime
             guard ManagedDownloadSupport.shouldEmitProgress(lastEmit: record.lastProgressEmit, now: now) else {
                 return
             }
@@ -673,6 +675,12 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             }
             record.cancelRequested = true
             record.wkDownload?.cancel(nil)
+            record.progressObservation?.invalidate()
+            // Late delegate callbacks find no record, so release the reserved path and drop the partial file here.
+            releaseDownloadDestination(record.destinationURL)
+            if let destinationURL = record.destinationURL {
+                try? FileManager.default.removeItem(at: destinationURL)
+            }
             if record.endingGuard.trySetEnding("cancelled") {
                 emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
             }
@@ -1149,7 +1157,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             let destinationURL = try uniqueDownloadDestination(for: fileName)
             try data.write(to: destinationURL, options: .atomic)
-            emitDownloadProgress(downloadId: downloadId, bytesReceived: Int64(data.count), bytesExpected: decodedSize, fileName: fileName)
+            // The saved file is the truth: report its real size, not the base64 based estimate.
+            emitDownloadProgress(downloadId: downloadId, bytesReceived: Int64(data.count), bytesExpected: Int64(data.count), fileName: fileName)
             if endingGuard.trySetEnding("completed") {
                 previewDownloadedFile(destinationURL, mimeType: mimeType, sourceURL: sourceURL, downloadId: downloadId)
             }
@@ -1262,7 +1271,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             try session.fileHandle.write(contentsOf: data)
             session.bytesWritten += Int64(data.count)
-            let now = CFAbsoluteTimeGetCurrent()
+            let now = ProcessInfo.processInfo.systemUptime
             if ManagedDownloadSupport.shouldEmitProgress(lastEmit: session.lastProgressEmit, now: now) {
                 session.lastProgressEmit = now
                 let bytesExpected = session.expectedSize ?? -1
@@ -1324,6 +1333,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         releaseDownloadDestination(session.destinationURL)
         if session.endingGuard.trySetEnding("completed") {
+            // The throttle can hold back the last chunk, and an empty blob has no chunk at all.
+            emitDownloadProgress(
+                downloadId: session.downloadId,
+                bytesReceived: session.bytesWritten,
+                bytesExpected: session.expectedSize ?? -1,
+                fileName: session.destinationURL.lastPathComponent
+            )
             previewDownloadedFile(
                 session.destinationURL,
                 mimeType: session.mimeType,
@@ -4372,6 +4388,7 @@ extension WKWebViewController: WKDownloadDelegate {
             print("[InAppBrowser] Failed to prepare download destination: \(error)")
             downloadRecords.removeValue(forKey: identifier)
             downloadRecordsById.removeValue(forKey: record.downloadId)
+            record.progressObservation?.invalidate()
             if record.endingGuard.trySetEnding("failed") {
                 emitDownloadFailed(
                     downloadId: record.downloadId,
@@ -4388,6 +4405,11 @@ extension WKWebViewController: WKDownloadDelegate {
     public func downloadDidFinish(_ download: WKDownload) {
         let identifier = ObjectIdentifier(download)
         guard let record = downloadRecords.removeValue(forKey: identifier) else {
+            return
+        }
+        if record.cancelRequested {
+            // A cancel was requested but its completion has not run yet: the cancel owns the terminal state.
+            finishCancelledDownload(record, download: download)
             return
         }
         downloadRecordsById.removeValue(forKey: record.downloadId)

@@ -1297,6 +1297,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 String mimeType = null;
                 String fileName = null;
                 try {
+                    // Start first so every validation failure below is reported as started then failed.
+                    endingGuard.markStarted();
+                    notifyDownloadStarted(downloadId, sourceUrl);
+
                     String base64 = jsonPayload.optString("base64", "");
                     if (TextUtils.isEmpty(base64)) {
                         throw new IOException("Blob download payload is empty");
@@ -1311,8 +1315,6 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                     fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
                     mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
-                    notifyDownloadStarted(downloadId, sourceUrl);
-                    endingGuard.markStarted();
 
                     File outputFile = null;
                     try {
@@ -1382,30 +1384,34 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     expectedSize
                 );
 
-                BlobDownloadSession existingSession = blobDownloadSessions.putIfAbsent(sessionId, session);
-                if (existingSession != null) {
-                    cleanupBlobDownloadSession(session, true);
-                    throw new IOException("Blob download session already exists");
+                // Hold the session lock until it is started so a browser close can never see it while
+                // it is still in the NONE state (it could not cancel it) or cancel it before downloadStarted.
+                synchronized (session) {
+                    BlobDownloadSession existingSession = blobDownloadSessions.putIfAbsent(sessionId, session);
+                    if (existingSession != null) {
+                        cleanupBlobDownloadSession(session, true);
+                        throw new IOException("Blob download session already exists");
+                    }
+                    session.endingGuard.markStarted();
+                    notifyDownloadStarted(downloadId, sourceUrl);
                 }
-                notifyDownloadStarted(downloadId, sourceUrl);
-                session.endingGuard.markStarted();
             } catch (Exception exception) {
                 showDownloadError("Failed to start blob download", exception, null, null, null, null);
             }
         }
 
         @JavascriptInterface
-        public void appendBlobDownloadChunk(String payload) {
+        public boolean appendBlobDownloadChunk(String payload) {
             if (!isJavascriptBridgeAllowedForMainFrame()) {
                 logBlockedJavascriptBridgeCall("appendBlobDownloadChunk");
-                return;
+                return false;
             }
             if (_options == null || !_options.getHandleDownloads()) {
-                return;
+                return false;
             }
             JSONObject jsonPayload = parseTrustedBlobDownloadPayload(payload, "appendBlobDownloadChunk");
             if (jsonPayload == null) {
-                return;
+                return false;
             }
 
             String sessionId = null;
@@ -1417,13 +1423,13 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                 String base64 = jsonPayload.optString("base64", "");
                 if (TextUtils.isEmpty(base64)) {
-                    return;
+                    return true;
                 }
 
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 if (session == null) {
                     Log.w("InAppBrowser", "Ignoring chunk for missing or aborted blob session: " + sessionId);
-                    return;
+                    return false;
                 }
                 if (session.cancelRequested) {
                     throw new InterruptedIOException("Blob download cancelled");
@@ -1438,6 +1444,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     }
                 }
                 maybeEmitBlobDownloadProgress(session);
+                return true;
             } catch (InterruptedIOException cancelled) {
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 if (session != null && session.endingGuard.tryCancel()) {
@@ -1458,6 +1465,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     );
                 }
             }
+            return false;
         }
 
         @JavascriptInterface
@@ -1947,12 +1955,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (_options == null || _options.getCallbacks() == null || session == null) {
             return;
         }
-        long now = System.currentTimeMillis();
-        if (!ManagedDownloadSupport.shouldEmitProgress(session.lastProgressEmitMs, now)) {
-            return;
+        synchronized (session) {
+            if (session.cancelRequested || session.endingGuard.hasEnded()) {
+                return;
+            }
+            // Monotonic clock: a wall clock that moves back must not silence progress.
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (!ManagedDownloadSupport.shouldEmitProgress(session.lastProgressEmitMs, now)) {
+                return;
+            }
+            session.lastProgressEmitMs = now;
+            _options.getCallbacks().downloadProgress(session.downloadId, session.bytesReceived, session.bytesExpected, session.fileName);
         }
-        session.lastProgressEmitMs = now;
-        _options.getCallbacks().downloadProgress(session.downloadId, session.bytesReceived, session.bytesExpected, session.fileName);
     }
 
     private void emitFinalDownloadProgress(ManagedHttpDownloadSession session) {
@@ -1960,7 +1974,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             return;
         }
         // The throttle can drop the last sample, so report the final byte count before the terminal event.
-        session.lastProgressEmitMs = System.currentTimeMillis();
+        session.lastProgressEmitMs = android.os.SystemClock.elapsedRealtime();
         _options.getCallbacks().downloadProgress(session.downloadId, session.bytesReceived, session.bytesExpected, session.fileName);
     }
 
@@ -1968,11 +1982,25 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         if (_options == null || _options.getCallbacks() == null || session == null) {
             return;
         }
-        long now = System.currentTimeMillis();
-        if (!ManagedDownloadSupport.shouldEmitProgress(session.lastProgressEmitMs, now)) {
+        synchronized (session) {
+            if (session.cancelRequested || session.endingGuard.hasEnded()) {
+                return;
+            }
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (!ManagedDownloadSupport.shouldEmitProgress(session.lastProgressEmitMs, now)) {
+                return;
+            }
+            session.lastProgressEmitMs = now;
+            long bytesExpected = session.expectedSize >= 0L ? session.expectedSize : -1L;
+            _options.getCallbacks().downloadProgress(session.downloadId, session.bytesWritten, bytesExpected, session.outputFile.getName());
+        }
+    }
+
+    private void emitFinalBlobDownloadProgress(BlobDownloadSession session) {
+        if (_options == null || _options.getCallbacks() == null || session == null) {
             return;
         }
-        session.lastProgressEmitMs = now;
+        // The throttle can hold back the last chunk (or there may be no chunk at all for an empty blob).
         long bytesExpected = session.expectedSize >= 0L ? session.expectedSize : -1L;
         _options.getCallbacks().downloadProgress(session.downloadId, session.bytesWritten, bytesExpected, session.outputFile.getName());
     }
@@ -2035,12 +2063,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void abortBlobDownloadSessionForCancel(String sessionId, BlobDownloadSession session) {
-        if (session == null || !session.endingGuard.tryCancel()) {
+        if (session == null) {
             return;
         }
-        cancelledBlobSessionIds.add(sessionId);
-        abortBlobDownloadSession(sessionId, true);
-        notifyDownloadCancelled(session.downloadId, session.sourceUrl);
+        // Same lock as progress emission and registration: no progress can follow downloadCancelled.
+        synchronized (session) {
+            if (!session.endingGuard.tryCancel()) {
+                return;
+            }
+            cancelledBlobSessionIds.add(sessionId);
+            abortBlobDownloadSession(sessionId, true);
+            notifyDownloadCancelled(session.downloadId, session.sourceUrl);
+        }
     }
 
     private void requestManagedHttpCancel(ManagedHttpDownloadSession session) {
@@ -2064,8 +2098,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 continue;
             }
             requestManagedHttpCancel(session);
-            if (session.endingGuard.tryCancel()) {
-                notifyDownloadCancelled(session.downloadId, session.sourceUrl);
+            synchronized (session) {
+                if (session.endingGuard.tryCancel()) {
+                    notifyDownloadCancelled(session.downloadId, session.sourceUrl);
+                }
             }
         }
         managedHttpDownloads.clear();
@@ -2449,8 +2485,14 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void finalizeBlobDownload(String sessionId, BlobDownloadSession session) {
-        if (session == null || !session.endingGuard.tryComplete()) {
+        if (session == null) {
             return;
+        }
+        synchronized (session) {
+            if (!session.endingGuard.tryComplete()) {
+                return;
+            }
+            emitFinalBlobDownloadProgress(session);
         }
         blobDownloadSessions.remove(sessionId);
         finalizeDownload(session.downloadId, session.outputFile, session.mimeType, session.sourceUrl);
@@ -2584,6 +2626,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     }
                     connection = openManagedDownloadConnection(currentUrl, userAgent, pageUrl);
                     trackedSession.connection = connection;
+                    // A cancel that landed before the connection was published saw nothing to disconnect.
+                    if (trackedSession.cancelRequested) {
+                        throw new InterruptedIOException("Download cancelled");
+                    }
                     connection.connect();
 
                     int responseCode = connection.getResponseCode();
@@ -2772,7 +2818,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                   }));
                   for (let offset = 0; offset < blob.size; offset += chunkSize) {
                     const base64 = await readChunkAsBase64(blob.slice(offset, offset + chunkSize));
-                    bridge.appendBlobDownloadChunk(JSON.stringify({ token, sessionId, base64 }));
+                    // A false answer means the session was cancelled or aborted natively: stop producing chunks.
+                    if (bridge.appendBlobDownloadChunk(JSON.stringify({ token, sessionId, base64 })) === false) {
+                      throw new Error('Blob download cancelled');
+                    }
                   }
                   bridge.finishBlobDownload(JSON.stringify({ token, sessionId }));
                   return;

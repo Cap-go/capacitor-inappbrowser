@@ -15,7 +15,8 @@ case "$platform" in
     ;;
 esac
 
-port="${DOWNLOAD_LIFECYCLE_PORT:-8787}"
+# The example app harness (SERVER_PORT in download-lifecycle-regression.js) is built with this port, so it is fixed.
+port=8787
 app_id="${APP_ID:-app.capgo.inappbrowser}"
 maestro_bin="${MAESTRO_BIN:-${HOME}/.maestro/bin/maestro}"
 artifacts_dir="${MAESTRO_ARTIFACTS_DIR:-maestro-artifacts}/download-lifecycle-${platform}"

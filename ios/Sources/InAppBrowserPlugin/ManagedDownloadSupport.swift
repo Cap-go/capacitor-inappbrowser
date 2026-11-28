@@ -47,7 +47,7 @@ final class ManagedDownloadRecord {
     var sourceURL: String?
     var fileName: String?
     var progressObservation: NSKeyValueObservation?
-    var lastProgressEmit: CFAbsoluteTime = 0
+    var lastProgressEmit: TimeInterval = 0
     var cancelRequested = false
     let endingGuard = ManagedDownloadEndingGuard()
 

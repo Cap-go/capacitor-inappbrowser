@@ -1,4 +1,4 @@
-appId: app.capgo.inappbrowser
+appId: ${APP_ID}
 ---
 # Download lifecycle events (issue #794). Every "Lifecycle OK" line is written by
 # example-app/src/js/download-lifecycle-regression.js only after it checked the real plugin events.

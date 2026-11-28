@@ -10,9 +10,11 @@ public class ManagedDownloadSupportTest {
 
     @Test
     public void throttlesProgressToAtMostFourPerSecond() {
+        // Independent literals: four samples per second means one every 250 ms.
         assertTrue(ManagedDownloadSupport.shouldEmitProgress(0L, 1000L));
-        assertFalse(ManagedDownloadSupport.shouldEmitProgress(1000L, 1000L + ManagedDownloadSupport.PROGRESS_MIN_INTERVAL_MS - 1L));
-        assertTrue(ManagedDownloadSupport.shouldEmitProgress(0L, 0L + ManagedDownloadSupport.PROGRESS_MIN_INTERVAL_MS));
+        assertFalse(ManagedDownloadSupport.shouldEmitProgress(1000L, 1249L));
+        assertTrue(ManagedDownloadSupport.shouldEmitProgress(1000L, 1250L));
+        assertTrue(ManagedDownloadSupport.shouldEmitProgress(1000L, 2000L));
     }
 
     @Test
