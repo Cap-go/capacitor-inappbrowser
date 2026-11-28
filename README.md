@@ -33,6 +33,7 @@ We build, improve and fix our plugins with heavy use of AI, so issues usually ge
 - **Two browser modes**: `open()` uses SFSafariViewController on iOS and Chrome Custom Tabs on Android, `openWebView()` opens a WebView with your own toolbar, title, colors and buttons.
 - **Two-way messaging**: `postMessage()` and the `messageFromWebview` event, plus `executeScript()` to run code in the page.
 - **Navigation events**: `urlChangeEvent`, `browserPageLoaded`, `pageLoadError`, `closeEvent`, downloads and popups.
+- **Save downloads without a preview**: `downloadPreview: 'none'` saves the file, emits `downloadCompleted` with `handledBy: 'none'`, and shows nothing, so your app can import or upload it ([guide](https://capgo.app/docs/plugins/inappbrowser/download-preview/)).
 - **`deepLinkPrevented`**: when `preventDeeplink: true` blocks a link that would leave the in-app browser, listen for `{ url, id? }` on Android and iOS (not on web).
 - **Layout control**: `updateDimensions()`, fullscreen, safe-area margins, `hide()`, `show()` and `sendToBack()` to place the browser behind your Ionic UI.
 - **Session data**: `getCookies()`, `clearCookies()`, `clearCache()` and `clearAllBrowsingData()`.
@@ -255,7 +256,28 @@ For iOS, `titleFontFamily` must match a registered font family name and `titleIc
 
 Use proxy rules and `handleDownloads` for web apps that need request control, file uploads, downloads, or controlled popup behavior inside the managed browser. Typical examples include document portals, support desks, payment pages, Google Pay flows on Android, and apps that need to keep `_blank` links inside the same managed WebView.
 
-When your app should save downloads and handle the file itself (import, upload, parse), set `downloadPreview: 'none'` so the webview stays on the current page and `downloadCompleted` reports `handledBy: 'none'`.
+#### Save a download without previewing it
+
+Set `downloadPreview: 'none'` with `handleDownloads: true` when your app wants the file for itself, for example to import it, upload it, or open it in your own viewer. The plugin saves the file, emits `downloadCompleted` with `handledBy: 'none'`, and leaves the page as it was. Nothing opens: no in-app preview, no Quick Look, no Android "Open with" sheet. Works on Android and iOS, and the default stays `'inAppBrowser'`.
+
+```ts
+import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
+
+await InAppBrowser.addListener('downloadCompleted', (event) => {
+  if (event.handledBy === 'none') {
+    // The file is saved at event.path. Import, upload, or parse it here.
+    console.log('Saved', event.fileName, event.path, event.mimeType);
+  }
+});
+
+await InAppBrowser.openWebView({
+  url: 'https://example.com/reports',
+  handleDownloads: true,
+  downloadPreview: 'none',
+});
+```
+
+See the [download preview guide](https://capgo.app/docs/plugins/inappbrowser/download-preview/) for the three preview modes and the full example.
 
 ### Customize Chrome Custom Tab Appearance (Android)
 
@@ -2159,7 +2181,9 @@ Construct a type with the properties of T except for those in type K.
 
 From T, pick a set of properties whose keys are in the union K
 
-<code>{ [P in K]: T[P]; }</code>
+<code>{
+ [P in K]: T[P];
+ }</code>
 
 
 #### Exclude
@@ -2173,7 +2197,9 @@ From T, pick a set of properties whose keys are in the union K
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### GetCookieOptions
