@@ -142,6 +142,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
@@ -257,6 +258,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         private final String mimeType;
         private final FileOutputStream outputStream;
         private final long expectedSize;
+        private final int producerGeneration;
         private final ManagedDownloadSupport.EndingGuard endingGuard = new ManagedDownloadSupport.EndingGuard();
         private volatile boolean cancelRequested;
         private volatile long lastProgressEmitMs;
@@ -268,7 +270,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             String sourceUrl,
             String mimeType,
             FileOutputStream outputStream,
-            long expectedSize
+            long expectedSize,
+            int producerGeneration
         ) {
             this.downloadId = downloadId;
             this.outputFile = outputFile;
@@ -276,6 +279,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             this.mimeType = mimeType;
             this.outputStream = outputStream;
             this.expectedSize = expectedSize;
+            this.producerGeneration = producerGeneration;
             this.bytesWritten = 0L;
         }
     }
@@ -636,6 +640,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private final AtomicBoolean cookieFlushScheduled = new AtomicBoolean(false);
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
     private final Map<String, ManagedHttpDownloadSession> managedHttpDownloads = new ConcurrentHashMap<>();
+    // Incremented when the main document is replaced so in-flight blob producers from the old page can be cancelled.
+    private final AtomicInteger blobProducerGeneration = new AtomicInteger();
     // Blob sessions that were cancelled natively; late abort calls from the page producer are ignored for them.
     private final java.util.Set<String> cancelledBlobSessionIds = ConcurrentHashMap.newKeySet();
     // Only the blob download script injected into the main frame knows this token. Iframes can call
@@ -1332,7 +1338,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         }
                         legacySession.bytesExpected = decodedSize;
                         legacySession.bytesReceived = decoded.length;
-                        legacySession.fileName = fileName;
+                        // createDownloadFile may suffix the name when the path is already taken.
+                        legacySession.fileName = outputFile.getName();
                         maybeEmitDownloadProgress(legacySession);
                         if (legacySession.cancelRequested) {
                             throw new InterruptedIOException("Download cancelled");
@@ -1402,7 +1409,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     sourceUrl,
                     mimeType,
                     new FileOutputStream(outputFile),
-                    expectedSize
+                    expectedSize,
+                    blobProducerGeneration.get()
                 );
 
                 // Hold the session lock until it is started so a browser close can never see it while
@@ -2071,6 +2079,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         ManagedHttpDownloadSession httpSession = managedHttpDownloads.get(downloadId);
         if (httpSession != null) {
             requestManagedHttpCancel(httpSession);
+            // Claim the terminal state here so the worker cannot also tryComplete after this returns.
+            synchronized (httpSession) {
+                if (httpSession.endingGuard.tryCancel()) {
+                    notifyDownloadCancelled(httpSession.downloadId, httpSession.sourceUrl);
+                }
+            }
             return true;
         }
 
@@ -2115,6 +2129,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 activeConnection.disconnect();
             } catch (Exception ignored) {}
         });
+    }
+
+    private void cancelBlobDownloadsFromReplacedDocument() {
+        int generation = blobProducerGeneration.incrementAndGet();
+        for (Map.Entry<String, BlobDownloadSession> entry : new java.util.ArrayList<>(blobDownloadSessions.entrySet())) {
+            BlobDownloadSession session = entry.getValue();
+            if (session == null || session.endingGuard.hasEnded() || session.producerGeneration >= generation) {
+                continue;
+            }
+            session.cancelRequested = true;
+            abortBlobDownloadSessionForCancel(entry.getKey(), session);
+        }
     }
 
     private void cancelAllManagedDownloadsOnClose() {
@@ -2656,6 +2682,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         throw new InterruptedIOException("Download cancelled");
                     }
                     connection.connect();
+                    // A cancel that landed while connect() was creating the HTTP engine had no connection to
+                    // disconnect. Check again so we do not wait on the read timeout in getResponseCode().
+                    if (trackedSession.cancelRequested) {
+                        throw new InterruptedIOException("Download cancelled");
+                    }
 
                     int responseCode = connection.getResponseCode();
                     persistManagedDownloadResponseCookies(connection, currentUrl);
@@ -2701,7 +2732,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 String fileName = URLUtil.guessFileName(connection.getURL().toString(), resolvedDisposition, provisionalMimeType);
                 String resolvedMimeType = normalizeMimeType(provisionalMimeType, fileName);
                 outputFile = createDownloadFile(fileName);
-                trackedSession.fileName = fileName;
+                trackedSession.fileName = outputFile.getName();
                 trackedSession.bytesExpected = ManagedDownloadSupport.resolveBytesExpected(connection.getContentLengthLong());
                 trackedSession.bytesReceived = 0L;
                 maybeEmitDownloadProgress(trackedSession);
@@ -2720,17 +2751,22 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     }
                 }
 
-                if (trackedSession.cancelRequested) {
-                    throw new InterruptedIOException("Download cancelled");
-                }
-                if (ManagedDownloadSupport.isTruncated(trackedSession.bytesReceived, trackedSession.bytesExpected)) {
-                    throw new IOException(
-                        "Download ended early: received " + trackedSession.bytesReceived + " of " + trackedSession.bytesExpected + " bytes"
-                    );
-                }
-
-                if (!trackedSession.endingGuard.tryComplete()) {
-                    return;
+                synchronized (trackedSession) {
+                    if (trackedSession.cancelRequested) {
+                        throw new InterruptedIOException("Download cancelled");
+                    }
+                    if (ManagedDownloadSupport.isTruncated(trackedSession.bytesReceived, trackedSession.bytesExpected)) {
+                        throw new IOException(
+                            "Download ended early: received " +
+                                trackedSession.bytesReceived +
+                                " of " +
+                                trackedSession.bytesExpected +
+                                " bytes"
+                        );
+                    }
+                    if (!trackedSession.endingGuard.tryComplete()) {
+                        return;
+                    }
                 }
                 emitFinalDownloadProgress(trackedSession);
                 finalizeDownload(downloadId, outputFile, resolvedMimeType, url);
@@ -7686,6 +7722,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         return;
                     }
                     pendingCrossDocumentNavigation = true;
+                    // The page-side blob producer dies with the old document, so finish or abort never arrive.
+                    cancelBlobDownloadsFromReplacedDocument();
                     if (_options.getCallbacks() != null) {
                         _options.getCallbacks().pageLoadStart();
                     }

@@ -554,8 +554,12 @@ window.customElements.define(
             });
           }),
           InAppBrowser.addListener('downloadCancelled', (event) => {
+            closeOnNextDownloadEvent = false;
             setDownloadListenerButtonLabel('Event Cancelled');
             setMaestroDownloadStatus('Event Cancelled');
+            if (maestroRunDownloadButton) {
+              maestroRunDownloadButton.disabled = false;
+            }
             setDownloadStatus(`Download cancelled: ${event.downloadId}`, {
               backgroundColor: '#fef9c3',
               color: '#854d0e',

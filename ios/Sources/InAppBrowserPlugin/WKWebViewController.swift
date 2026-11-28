@@ -1161,7 +1161,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             let destinationURL = try uniqueDownloadDestination(for: fileName)
             try data.write(to: destinationURL, options: .atomic)
             // The saved file is the truth: report its real size, not the base64 based estimate.
-            emitDownloadProgress(downloadId: downloadId, bytesReceived: Int64(data.count), bytesExpected: Int64(data.count), fileName: fileName)
+            emitDownloadProgress(downloadId: downloadId, bytesReceived: Int64(data.count), bytesExpected: Int64(data.count), fileName: destinationURL.lastPathComponent)
             if endingGuard.trySetEnding("completed") {
                 previewDownloadedFile(destinationURL, mimeType: mimeType, sourceURL: sourceURL, downloadId: downloadId)
             }
@@ -4384,7 +4384,8 @@ extension WKWebViewController: WKDownloadDelegate {
             let destinationURL = try uniqueDownloadDestination(for: suggestedFilename)
             record.destinationURL = destinationURL
             record.mimeType = response.mimeType ?? record.mimeType
-            record.fileName = suggestedFilename
+            // uniqueDownloadDestination may suffix the name when the path is already reserved.
+            record.fileName = destinationURL.lastPathComponent
             record.sourceURL = sourceURL
             completionHandler(destinationURL)
         } catch {
