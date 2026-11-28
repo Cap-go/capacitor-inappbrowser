@@ -605,6 +605,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean cookieFlushScheduled = new AtomicBoolean(false);
     private final Map<String, BlobDownloadSession> blobDownloadSessions = new ConcurrentHashMap<>();
+    private ManagedDownloadCoordinator managedDownloadCoordinator;
     // Only the blob download script injected into the main frame knows this token. Iframes can call
     // the same @JavascriptInterface methods, and the main-frame origin check does not stop them.
     private final String blobDownloadToken = UUID.randomUUID().toString();
@@ -1258,11 +1259,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             }
 
             executorService.execute(() -> {
+                String downloadId = null;
                 try {
                     String base64 = jsonPayload.optString("base64", "");
                     if (TextUtils.isEmpty(base64)) {
                         throw new IOException("Blob download payload is empty");
                     }
+
+                    String sourceUrl = jsonPayload.optString("sourceUrl", null);
+                    downloadId = managedDownloads().begin(sourceUrl);
 
                     long declaredSize = jsonPayload.optLong("size", -1L);
                     long estimatedSize = estimateDecodedByteCount(base64);
@@ -1272,17 +1277,20 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     }
 
                     String fileName = sanitizeFileName(jsonPayload.optString("fileName", "download"));
-                    String sourceUrl = jsonPayload.optString("sourceUrl", null);
                     String mimeType = normalizeMimeType(jsonPayload.optString("mimeType", null), fileName);
                     File outputFile = null;
+                    managedDownloads().setBytesExpected(downloadId, decodedSize);
+                    managedDownloads().setFileName(downloadId, fileName);
 
                     try {
                         outputFile = createDownloadFile(fileName);
                         try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
-                            outputStream.write(Base64.decode(base64, Base64.DEFAULT));
+                            byte[] decodedBytes = Base64.decode(base64, Base64.DEFAULT);
+                            outputStream.write(decodedBytes);
+                            managedDownloads().reportBytesReceived(downloadId, decodedBytes.length);
                         }
 
-                        finalizeDownload(outputFile, mimeType, sourceUrl);
+                        finalizeDownload(outputFile, mimeType, sourceUrl, downloadId);
                     } catch (Exception innerException) {
                         if (outputFile != null && outputFile.exists() && !outputFile.delete()) {
                             outputFile.deleteOnExit();
@@ -1290,7 +1298,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         throw innerException;
                     }
                 } catch (Exception exception) {
-                    showDownloadError("Failed to save blob download", exception);
+                    showDownloadError("Failed to save blob download", exception, null, null, null, downloadId);
                 }
             });
         }
@@ -1336,6 +1344,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     cleanupBlobDownloadSession(session, true);
                     throw new IOException("Blob download session already exists");
                 }
+                managedDownloads().registerExisting(sessionId, sourceUrl);
+                managedDownloads().setBytesExpected(sessionId, expectedSize);
+                managedDownloads().setFileName(sessionId, fileName);
             } catch (Exception exception) {
                 showDownloadError("Failed to start blob download", exception);
             }
@@ -1381,9 +1392,10 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         throw new IOException("Blob download exceeded expected size");
                     }
                 }
+                managedDownloads().reportBytesReceived(sessionId, session.bytesWritten);
             } catch (Exception exception) {
                 abortBlobDownloadSession(sessionId, true);
-                showDownloadError("Failed to save blob download", exception);
+                showDownloadError("Failed to save blob download", exception, null, null, null, sessionId);
             }
         }
 
@@ -1429,11 +1441,11 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                     );
                 }
 
-                finalizeDownload(session.outputFile, session.mimeType, session.sourceUrl);
+                finalizeDownload(session.outputFile, session.mimeType, session.sourceUrl, sessionId);
                 blobDownloadSessions.remove(sessionId);
             } catch (Exception exception) {
                 abortBlobDownloadSession(sessionId, true);
-                showDownloadError("Failed to finalize blob download", exception);
+                showDownloadError("Failed to finalize blob download", exception, null, null, null, sessionId);
             }
         }
 
@@ -1461,11 +1473,15 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             String mimeType = jsonPayload.optString("mimeType", null);
 
             BlobDownloadSession session = abortBlobDownloadSession(sessionId, true);
+            if (!TextUtils.isEmpty(sessionId)) {
+                managedDownloads().markTerminal(sessionId);
+            }
             notifyDownloadFailed(
                 session != null ? session.sourceUrl : sourceUrl,
                 session != null ? session.outputFile.getName() : fileName,
                 session != null ? session.mimeType : mimeType,
-                reason
+                reason,
+                TextUtils.isEmpty(sessionId) ? null : sessionId
             );
             Log.w("InAppBrowser", reason);
         }
@@ -1852,22 +1868,71 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         );
     }
 
-    private void notifyDownloadCompleted(File file, String mimeType, String sourceUrl, String handledBy) {
+    private ManagedDownloadCoordinator managedDownloads() {
+        if (managedDownloadCoordinator == null) {
+            managedDownloadCoordinator = new ManagedDownloadCoordinator(
+                new ManagedDownloadCoordinator.Callbacks() {
+                    @Override
+                    public void downloadStarted(String downloadId, String sourceUrl) {
+                        if (_options != null && _options.getCallbacks() != null) {
+                            _options.getCallbacks().downloadStarted(downloadId, sourceUrl);
+                        }
+                    }
+
+                    @Override
+                    public void downloadProgress(String downloadId, long bytesReceived, long bytesExpected, String fileName) {
+                        if (_options != null && _options.getCallbacks() != null) {
+                            _options.getCallbacks().downloadProgress(downloadId, bytesReceived, bytesExpected, fileName);
+                        }
+                    }
+
+                    @Override
+                    public void downloadCancelled(String downloadId, String sourceUrl) {
+                        if (_options != null && _options.getCallbacks() != null) {
+                            _options.getCallbacks().downloadCancelled(downloadId, sourceUrl);
+                        }
+                    }
+                }
+            );
+        }
+        return managedDownloadCoordinator;
+    }
+
+    public void cancelManagedDownload(String downloadId) {
+        if (TextUtils.isEmpty(downloadId)) {
+            return;
+        }
+        managedDownloads().requestCancel(downloadId);
+    }
+
+    private void notifyDownloadCompleted(File file, String mimeType, String sourceUrl, String handledBy, String downloadId) {
         if (_options == null || _options.getCallbacks() == null) {
             return;
         }
 
         _options
             .getCallbacks()
-            .downloadCompleted(sourceUrl, file.getName(), mimeType, file.getAbsolutePath(), Uri.fromFile(file).toString(), handledBy);
+            .downloadCompleted(
+                sourceUrl,
+                file.getName(),
+                mimeType,
+                file.getAbsolutePath(),
+                Uri.fromFile(file).toString(),
+                handledBy,
+                downloadId
+            );
     }
 
-    private void notifyDownloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+    private void notifyDownloadFailed(String sourceUrl, String fileName, String mimeType, String error, String downloadId) {
         if (_options == null || _options.getCallbacks() == null) {
             return;
         }
 
-        _options.getCallbacks().downloadFailed(sourceUrl, fileName, mimeType, error);
+        _options.getCallbacks().downloadFailed(sourceUrl, fileName, mimeType, error, downloadId);
+    }
+
+    private void notifyDownloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+        notifyDownloadFailed(sourceUrl, fileName, mimeType, error, null);
     }
 
     private String downloadErrorMessage(String message, Exception exception) {
@@ -2168,21 +2233,21 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         return false;
     }
 
-    private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl) {
+    private void previewDownloadedFileInWebView(File file, String mimeType, String sourceUrl, String downloadId) {
         WebView webView = _webView;
         if (webView == null || isDismissing) {
-            openDownloadedFile(file, mimeType, sourceUrl);
+            openDownloadedFile(file, mimeType, sourceUrl, downloadId);
             return;
         }
 
         if (!isTextPreviewMimeType(mimeType)) {
-            openDownloadedFile(file, mimeType, sourceUrl);
+            openDownloadedFile(file, mimeType, sourceUrl, downloadId);
             return;
         }
 
         if (file.length() > MAX_INLINE_TEXT_PREVIEW_BYTES) {
             Log.i("InAppBrowser", "Opening large text download externally: " + file.getName());
-            openDownloadedFile(file, mimeType, sourceUrl);
+            openDownloadedFile(file, mimeType, sourceUrl, downloadId);
             return;
         }
 
@@ -2191,52 +2256,86 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 String previewHtml = textPreviewHtml(file, readUtf8File(file));
                 mainHandler.post(() -> {
                     if (isDismissing || _webView == null || _webView != webView) {
-                        openDownloadedFile(file, mimeType, sourceUrl);
+                        openDownloadedFile(file, mimeType, sourceUrl, downloadId);
                         return;
                     }
 
                     webView.loadDataWithBaseURL("https://download-preview.local/", previewHtml, "text/html", "utf-8", null);
-                    notifyDownloadCompleted(file, mimeType, sourceUrl, "inAppBrowser");
+                    completeManagedDownload(file, mimeType, sourceUrl, "inAppBrowser", downloadId);
                 });
             } catch (IOException ioException) {
-                showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType);
+                showDownloadError("Failed to preview downloaded text file", ioException, sourceUrl, file.getName(), mimeType, downloadId);
             }
         });
     }
 
-    private void openDownloadedFile(File file, String mimeType, String sourceUrl) {
+    private void openDownloadedFile(File file, String mimeType, String sourceUrl, String downloadId) {
         try {
             Uri fileUri = FileProvider.getUriForFile(_context, _context.getPackageName() + ".fileprovider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW);
             intent.setDataAndType(fileUri, mimeType);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             _context.startActivity(intent);
-            notifyDownloadCompleted(file, mimeType, sourceUrl, "external");
+            completeManagedDownload(file, mimeType, sourceUrl, "external", downloadId);
         } catch (ActivityNotFoundException activityNotFoundException) {
-            showDownloadError("No app can open " + file.getName(), activityNotFoundException, sourceUrl, file.getName(), mimeType);
+            showDownloadError(
+                "No app can open " + file.getName(),
+                activityNotFoundException,
+                sourceUrl,
+                file.getName(),
+                mimeType,
+                downloadId
+            );
         } catch (Exception exception) {
-            showDownloadError("Failed to open " + file.getName(), exception, sourceUrl, file.getName(), mimeType);
+            showDownloadError("Failed to open " + file.getName(), exception, sourceUrl, file.getName(), mimeType, downloadId);
         }
     }
 
-    private void finalizeDownload(File outputFile, String mimeType, String sourceUrl) {
+    private void completeManagedDownload(File file, String mimeType, String sourceUrl, String handledBy, String downloadId) {
+        if (!TextUtils.isEmpty(downloadId)) {
+            managedDownloads().emitFinalProgress(downloadId);
+            managedDownloads().markTerminal(downloadId);
+        }
+        notifyDownloadCompleted(file, mimeType, sourceUrl, handledBy, downloadId);
+    }
+
+    private void finalizeDownload(File outputFile, String mimeType, String sourceUrl, String downloadId) {
         mainHandler.post(() -> {
             if (isTextPreviewMimeType(mimeType) && _webView != null) {
-                previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl);
+                previewDownloadedFileInWebView(outputFile, mimeType, sourceUrl, downloadId);
                 return;
             }
 
-            openDownloadedFile(outputFile, mimeType, sourceUrl);
+            openDownloadedFile(outputFile, mimeType, sourceUrl, downloadId);
         });
     }
 
     private void showDownloadError(String message, Exception exception) {
-        showDownloadError(message, exception, null, null, null);
+        showDownloadError(message, exception, null, null, null, null);
     }
 
     private void showDownloadError(String message, Exception exception, String sourceUrl, String fileName, String mimeType) {
+        showDownloadError(message, exception, sourceUrl, fileName, mimeType, null);
+    }
+
+    private void showDownloadError(
+        String message,
+        Exception exception,
+        String sourceUrl,
+        String fileName,
+        String mimeType,
+        String downloadId
+    ) {
         Log.e("InAppBrowser", message, exception);
-        notifyDownloadFailed(sourceUrl, fileName, mimeType, downloadErrorMessage(message, exception));
+        if (!TextUtils.isEmpty(downloadId)) {
+            ManagedDownloadCoordinator.ManagedDownload active = managedDownloads().get(downloadId);
+            if (active == null || active.cancelRequested.get()) {
+                mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
+                return;
+            }
+            managedDownloads().markTerminal(downloadId);
+        }
+        notifyDownloadFailed(sourceUrl, fileName, mimeType, downloadErrorMessage(message, exception), downloadId);
         mainHandler.post(() -> Toast.makeText(_context, message, Toast.LENGTH_SHORT).show());
     }
 
@@ -2328,6 +2427,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             InputStream inputStream = null;
             File outputFile = null;
             boolean downloadSucceeded = false;
+            String downloadId = managedDownloads().begin(url);
 
             try {
                 String currentUrl = url;
@@ -2384,20 +2484,37 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 String fileName = URLUtil.guessFileName(connection.getURL().toString(), resolvedDisposition, provisionalMimeType);
                 String resolvedMimeType = normalizeMimeType(provisionalMimeType, fileName);
                 outputFile = createDownloadFile(fileName);
+                long bytesExpected = ManagedDownloadCoordinator.resolveBytesExpected(connection.getContentLengthLong());
+                managedDownloads().setBytesExpected(downloadId, bytesExpected);
+                managedDownloads().setFileName(downloadId, fileName);
 
                 inputStream = connection.getInputStream();
                 try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
                     byte[] buffer = new byte[8192];
                     int bytesRead;
+                    long bytesReceived = 0L;
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        ManagedDownloadCoordinator.ManagedDownload active = managedDownloads().get(downloadId);
+                        if (active == null || active.cancelRequested.get()) {
+                            throw new IOException("Download cancelled");
+                        }
                         outputStream.write(buffer, 0, bytesRead);
+                        bytesReceived += bytesRead;
+                        managedDownloads().reportBytesReceived(downloadId, bytesReceived);
                     }
                 }
 
-                finalizeDownload(outputFile, resolvedMimeType, url);
+                finalizeDownload(outputFile, resolvedMimeType, url, downloadId);
                 downloadSucceeded = true;
             } catch (Exception exception) {
-                showDownloadError("Failed to download file", exception, url, null, mimeType);
+                ManagedDownloadCoordinator.ManagedDownload active = managedDownloads().get(downloadId);
+                if (active != null && active.cancelRequested.get()) {
+                    downloadSucceeded = false;
+                } else if (active == null && !downloadSucceeded && downloadId != null) {
+                    downloadSucceeded = false;
+                } else {
+                    showDownloadError("Failed to download file", exception, url, null, mimeType, downloadId);
+                }
             } finally {
                 if (inputStream != null) {
                     try {
@@ -7705,6 +7822,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
         }
         blobDownloadSessions.clear();
         clientCertificateIdentities.clear();
+        managedDownloads().cancelAll();
 
         // Shutdown executor service asynchronously to avoid blocking UI thread
         shutdownExecutorServiceAsync();

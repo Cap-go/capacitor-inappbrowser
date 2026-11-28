@@ -315,6 +315,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.reject(this.unimplemented('Screenshots are not supported on web.'));
   }
 
+  cancelDownload(_options: { downloadId: string }): Promise<void> {
+    return Promise.resolve();
+  }
+
   goBack(): Promise<any> {
     console.log('goBack');
     return Promise.resolve();

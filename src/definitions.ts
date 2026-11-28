@@ -398,11 +398,56 @@ export type DownloadPreview = 'inAppBrowser' | 'systemPreview';
  *
  * @since 8.6.0
  */
+export interface DownloadStartedEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  /**
+   * Identifies this download in every later event about it.
+   */
+  downloadId: string;
+  /**
+   * Original URL that triggered the download when available.
+   */
+  sourceUrl?: string;
+}
+
+export interface DownloadProgressEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  downloadId: string;
+  bytesReceived: number;
+  /**
+   * Total bytes when known; `-1` when the server did not report a length.
+   */
+  bytesExpected: number;
+  /**
+   * Saved filename once it is known.
+   */
+  fileName?: string;
+}
+
+export interface DownloadCancelledEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  downloadId: string;
+  sourceUrl?: string;
+}
+
 export interface DownloadCompletedEvent {
   /**
    * Source webview instance id.
    */
   id?: string;
+  /**
+   * Correlates this terminal event with `downloadStarted` when managed lifecycle events are enabled.
+   */
+  downloadId?: string;
   /**
    * Original URL that triggered the download when available.
    */
@@ -439,6 +484,10 @@ export interface DownloadFailedEvent {
    * Source webview instance id.
    */
   id?: string;
+  /**
+   * Correlates this terminal event with `downloadStarted` when managed lifecycle events are enabled.
+   */
+  downloadId?: string;
   /**
    * Original URL that triggered the download when available.
    */
@@ -971,7 +1020,8 @@ export interface OpenWebViewOptions {
    * - `blob:` downloads are also captured when the platform supports them.
    * - Previewable files reopen inside the in-app browser when possible (see `downloadPreview`).
    * - Other files are handed off to the native preview or viewer flow.
-   * - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.
+   * - `downloadStarted`, `downloadProgress`, `downloadCompleted`, `downloadFailed`, and `downloadCancelled`
+   *   events describe the managed download lifecycle (`cancelDownload` stops an in-flight download).
    *
    * @default false
    * @since 8.6.0
@@ -2032,6 +2082,26 @@ export interface InAppBrowserPlugin {
    * @since 8.6.0
    */
   addListener(
+    eventName: 'downloadStarted',
+    listenerFunc: (event: DownloadStartedEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered while a managed download is in progress (throttled to about four updates per second per download).
+   * Enable this with `handleDownloads: true` when opening the webview.
+   */
+  addListener(
+    eventName: 'downloadProgress',
+    listenerFunc: (event: DownloadProgressEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when a managed download is cancelled via `cancelDownload` or native teardown.
+   * Enable this with `handleDownloads: true` when opening the webview.
+   */
+  addListener(
+    eventName: 'downloadCancelled',
+    listenerFunc: (event: DownloadCancelledEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
     eventName: 'downloadCompleted',
     listenerFunc: (event: DownloadCompletedEvent) => void,
   ): Promise<PluginListenerHandle>;
@@ -2045,6 +2115,11 @@ export interface InAppBrowserPlugin {
     eventName: 'downloadFailed',
     listenerFunc: (event: DownloadFailedEvent) => void,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Stops a managed download started with `handleDownloads: true`.
+   * Resolves whether or not the download was still running; a running download emits `downloadCancelled`.
+   */
+  cancelDownload(options: { downloadId: string }): Promise<void>;
   /**
    * Will be triggered whenever a page opens a popup/new window.
    * Use the returned popup id with `executeScript`, `postMessage`, `show`, `hide`, and `close`.
