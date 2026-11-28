@@ -4708,7 +4708,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
     }
 
     private void injectBlobDownloadFilenameCaptureScript() {
-        if (_webView == null || !_options.isHandleDownloads()) {
+        if (_webView == null || !_options.getHandleDownloads()) {
             return;
         }
         _webView.evaluateJavascript(createBlobDownloadFilenameCaptureScript(), null);
@@ -4730,7 +4730,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 WebViewCompat.addDocumentStartJavaScript(_webView, createFileInputCaptureHookScript(), Collections.singleton("*"));
                 WebViewCompat.addDocumentStartJavaScript(_webView, createMobileAppBridgeScript(), Collections.singleton("*"));
             }
-            if (_options.isHandleDownloads()) {
+            if (_options.getHandleDownloads()) {
                 WebViewCompat.addDocumentStartJavaScript(_webView, createBlobDownloadFilenameCaptureScript(), Collections.singleton("*"));
             }
             // Honor preShowScriptInjectionTime: "documentStart" (matches iOS WKUserScript
