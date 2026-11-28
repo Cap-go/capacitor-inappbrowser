@@ -658,14 +658,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             downloadRecords.removeValue(forKey: ObjectIdentifier(download))
         }
         downloadRecordsById.removeValue(forKey: record.downloadId)
+        // Claim the terminal state first: only the first caller may touch the reserved path, a stale second
+        // call (finish callback plus cancel completion) must not delete a file another download now owns.
+        guard record.endingGuard.trySetEnding("cancelled") else {
+            return
+        }
         record.progressObservation?.invalidate()
         releaseDownloadDestination(record.destinationURL)
         if let destinationURL = record.destinationURL {
             try? FileManager.default.removeItem(at: destinationURL)
         }
-        if record.endingGuard.trySetEnding("cancelled") {
-            emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
-        }
+        emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
     }
 
     private func cancelAllManagedDownloadsOnClose() {
@@ -677,11 +680,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             record.wkDownload?.cancel(nil)
             record.progressObservation?.invalidate()
             // Late delegate callbacks find no record, so release the reserved path and drop the partial file here.
-            releaseDownloadDestination(record.destinationURL)
-            if let destinationURL = record.destinationURL {
-                try? FileManager.default.removeItem(at: destinationURL)
-            }
             if record.endingGuard.trySetEnding("cancelled") {
+                releaseDownloadDestination(record.destinationURL)
+                if let destinationURL = record.destinationURL {
+                    try? FileManager.default.removeItem(at: destinationURL)
+                }
                 emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
             }
         }

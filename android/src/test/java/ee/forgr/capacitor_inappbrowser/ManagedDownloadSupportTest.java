@@ -25,6 +25,7 @@ public class ManagedDownloadSupportTest {
         assertFalse(guard.tryFail());
         assertFalse(guard.tryCancel());
         assertTrue(guard.hasEnded());
+        assertTrue(guard.isCompleted());
     }
 
     @Test

@@ -50,6 +50,10 @@ public final class ManagedDownloadSupport {
             return state.compareAndSet(EndingKind.STARTED.ordinal(), EndingKind.CANCELLED.ordinal());
         }
 
+        public boolean isCompleted() {
+            return state.get() == EndingKind.COMPLETED.ordinal();
+        }
+
         public boolean hasEnded() {
             int value = state.get();
             return (

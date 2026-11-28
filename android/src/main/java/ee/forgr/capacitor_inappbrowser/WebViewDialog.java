@@ -1292,8 +1292,12 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
             executorService.execute(() -> {
                 String downloadId = UUID.randomUUID().toString();
-                ManagedDownloadSupport.EndingGuard endingGuard = new ManagedDownloadSupport.EndingGuard();
                 String sourceUrl = jsonPayload.optString("sourceUrl", null);
+                // Track the legacy download like an HTTP one so cancelDownload and a browser close can find it.
+                final ManagedHttpDownloadSession legacySession = new ManagedHttpDownloadSession(downloadId);
+                legacySession.sourceUrl = sourceUrl;
+                ManagedDownloadSupport.EndingGuard endingGuard = legacySession.endingGuard;
+                managedHttpDownloads.put(downloadId, legacySession);
                 String mimeType = null;
                 String fileName = null;
                 try {
@@ -1318,17 +1322,26 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
                     File outputFile = null;
                     try {
+                        if (legacySession.cancelRequested) {
+                            throw new InterruptedIOException("Download cancelled");
+                        }
                         outputFile = createDownloadFile(fileName);
                         byte[] decoded = Base64.decode(base64, Base64.DEFAULT);
                         try (FileOutputStream outputStream = new FileOutputStream(outputFile)) {
                             outputStream.write(decoded);
                         }
-                        ManagedHttpDownloadSession progressSession = new ManagedHttpDownloadSession(downloadId);
-                        progressSession.bytesExpected = decodedSize;
-                        progressSession.bytesReceived = decoded.length;
-                        progressSession.fileName = fileName;
-                        maybeEmitDownloadProgress(progressSession);
+                        legacySession.bytesExpected = decodedSize;
+                        legacySession.bytesReceived = decoded.length;
+                        legacySession.fileName = fileName;
+                        maybeEmitDownloadProgress(legacySession);
+                        if (legacySession.cancelRequested) {
+                            throw new InterruptedIOException("Download cancelled");
+                        }
                         if (!endingGuard.tryComplete()) {
+                            // Ended by a browser close while the file was being written.
+                            if (outputFile.exists() && !outputFile.delete()) {
+                                outputFile.deleteOnExit();
+                            }
                             return;
                         }
                         finalizeDownload(downloadId, outputFile, mimeType, sourceUrl);
@@ -1338,10 +1351,18 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                         }
                         throw innerException;
                     }
+                } catch (InterruptedIOException cancelled) {
+                    synchronized (legacySession) {
+                        if (endingGuard.tryCancel()) {
+                            notifyDownloadCancelled(downloadId, sourceUrl);
+                        }
+                    }
                 } catch (Exception exception) {
                     if (endingGuard.tryFail()) {
                         showDownloadError("Failed to save blob download", exception, sourceUrl, fileName, mimeType, downloadId);
                     }
+                } finally {
+                    managedHttpDownloads.remove(downloadId);
                 }
             });
         }
@@ -1448,6 +1469,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
             } catch (InterruptedIOException cancelled) {
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 if (session != null && session.endingGuard.tryCancel()) {
+                    cancelledBlobSessionIds.add(sessionId);
                     abortBlobDownloadSession(sessionId, true);
                     notifyDownloadCancelled(session.downloadId, session.sourceUrl);
                 }
@@ -1455,6 +1477,8 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 abortBlobDownloadSession(sessionId, true);
                 if (session != null && session.endingGuard.tryFail()) {
+                    // The failure is reported here; the producer's late abort must not report it again.
+                    cancelledBlobSessionIds.add(sessionId);
                     showDownloadError(
                         "Failed to save blob download",
                         exception,
@@ -1515,6 +1539,7 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
                 BlobDownloadSession session = blobDownloadSessions.get(sessionId);
                 abortBlobDownloadSession(sessionId, true);
                 if (session != null && session.endingGuard.tryFail()) {
+                    cancelledBlobSessionIds.add(sessionId);
                     showDownloadError(
                         "Failed to finalize blob download",
                         exception,
@@ -8049,7 +8074,9 @@ public class WebViewDialog extends ComponentDialog implements ProxyResponseRouti
 
         cancelAllManagedDownloadsOnClose();
         for (BlobDownloadSession session : new java.util.ArrayList<>(blobDownloadSessions.values())) {
-            cleanupBlobDownloadSession(session, true);
+            // A session that already completed keeps its file: the finalizer is about to hand it off.
+            boolean completed = session != null && session.endingGuard.isCompleted();
+            cleanupBlobDownloadSession(session, !completed);
         }
         blobDownloadSessions.clear();
         clientCertificateIdentities.clear();
