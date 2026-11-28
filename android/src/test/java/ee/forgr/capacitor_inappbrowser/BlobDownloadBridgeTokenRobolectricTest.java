@@ -254,10 +254,27 @@ public class BlobDownloadBridgeTokenRobolectricTest {
         public void screenshotTaken(JSObject screenshot) {}
 
         @Override
-        public void downloadCompleted(String sourceUrl, String fileName, String mimeType, String path, String localUrl, String handledBy) {}
+        public void downloadStarted(String downloadId, String sourceUrl) {}
 
         @Override
-        public void downloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+        public void downloadProgress(String downloadId, long bytesReceived, long bytesExpected, String fileName) {}
+
+        @Override
+        public void downloadCancelled(String downloadId, String sourceUrl) {}
+
+        @Override
+        public void downloadCompleted(
+            String downloadId,
+            String sourceUrl,
+            String fileName,
+            String mimeType,
+            String path,
+            String localUrl,
+            String handledBy
+        ) {}
+
+        @Override
+        public void downloadFailed(String downloadId, String sourceUrl, String fileName, String mimeType, String error) {
             failedCount++;
         }
 

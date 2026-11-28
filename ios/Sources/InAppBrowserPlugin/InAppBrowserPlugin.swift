@@ -525,7 +525,8 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setEnabledSafeBottomMargin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "openSecureWindow", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "handleProxyRequest", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelDownload", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var navigationControllers: [String: UINavigationController] = [:]
@@ -2664,6 +2665,22 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             proxyHandler.handleResponse(requestId: requestId, phase: phase, responseData: responseDict)
         }
         call.resolve()
+    }
+
+    @objc func cancelDownload(_ call: CAPPluginCall) {
+        guard let downloadId = call.getString("downloadId"), !downloadId.isEmpty else {
+            call.reject("downloadId is required")
+            return
+        }
+
+        DispatchQueue.main.async {
+            for controller in self.webViewControllers.values {
+                if controller.cancelManagedDownload(downloadId: downloadId) {
+                    break
+                }
+            }
+            call.resolve()
+        }
     }
 
     @objc func close(_ call: CAPPluginCall) {

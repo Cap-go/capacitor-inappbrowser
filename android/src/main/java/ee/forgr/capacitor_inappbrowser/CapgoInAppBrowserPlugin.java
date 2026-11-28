@@ -231,7 +231,43 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             }
 
             @Override
+            public void downloadStarted(String downloadId, String sourceUrl) {
+                JSObject event = new JSObject();
+                event.put("id", webViewId);
+                event.put("downloadId", downloadId);
+                if (sourceUrl != null) {
+                    event.put("sourceUrl", sourceUrl);
+                }
+                notifyListeners("downloadStarted", event);
+            }
+
+            @Override
+            public void downloadProgress(String downloadId, long bytesReceived, long bytesExpected, String fileName) {
+                JSObject event = new JSObject();
+                event.put("id", webViewId);
+                event.put("downloadId", downloadId);
+                event.put("bytesReceived", bytesReceived);
+                event.put("bytesExpected", bytesExpected);
+                if (fileName != null) {
+                    event.put("fileName", fileName);
+                }
+                notifyListeners("downloadProgress", event);
+            }
+
+            @Override
+            public void downloadCancelled(String downloadId, String sourceUrl) {
+                JSObject event = new JSObject();
+                event.put("id", webViewId);
+                event.put("downloadId", downloadId);
+                if (sourceUrl != null) {
+                    event.put("sourceUrl", sourceUrl);
+                }
+                notifyListeners("downloadCancelled", event);
+            }
+
+            @Override
             public void downloadCompleted(
+                String downloadId,
                 String sourceUrl,
                 String fileName,
                 String mimeType,
@@ -241,6 +277,9 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             ) {
                 JSObject event = new JSObject();
                 event.put("id", webViewId);
+                if (downloadId != null) {
+                    event.put("downloadId", downloadId);
+                }
                 if (sourceUrl != null) {
                     event.put("sourceUrl", sourceUrl);
                 }
@@ -255,9 +294,12 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
             }
 
             @Override
-            public void downloadFailed(String sourceUrl, String fileName, String mimeType, String error) {
+            public void downloadFailed(String downloadId, String sourceUrl, String fileName, String mimeType, String error) {
                 JSObject event = new JSObject();
                 event.put("id", webViewId);
+                if (downloadId != null) {
+                    event.put("downloadId", downloadId);
+                }
                 if (sourceUrl != null) {
                     event.put("sourceUrl", sourceUrl);
                 }
@@ -1650,6 +1692,29 @@ public class CapgoInAppBrowserPlugin extends Plugin implements WebViewDialog.Per
                     dialog.bringToFrontLayer();
                     if (dialog.getInstanceId() != null) {
                         setActiveWebView(dialog.getInstanceId(), dialog);
+                    }
+                    call.resolve();
+                }
+            }
+        );
+    }
+
+    @PluginMethod
+    public void cancelDownload(PluginCall call) {
+        String downloadId = call.getString("downloadId");
+        if (TextUtils.isEmpty(downloadId)) {
+            call.reject("downloadId is required");
+            return;
+        }
+
+        getActivity().runOnUiThread(
+            new Runnable() {
+                @Override
+                public void run() {
+                    for (WebViewDialog dialog : webViewDialogs.values()) {
+                        if (dialog.cancelManagedDownload(downloadId)) {
+                            break;
+                        }
                     }
                     call.resolve();
                 }

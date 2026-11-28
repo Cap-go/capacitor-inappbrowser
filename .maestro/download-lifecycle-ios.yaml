@@ -1,0 +1,58 @@
+appId: ${APP_ID}
+---
+# Download lifecycle events (issue #794). Every "Lifecycle OK" line is written by
+# example-app/src/js/download-lifecycle-regression.js only after it checked the real plugin events.
+# Needs example-app/scripts/download-lifecycle-server.mjs on the host (the simulator reaches it at 127.0.0.1:8787).
+- launchApp
+- extendedWaitUntil:
+    visible: 'Download lifecycle ready'
+    timeout: 240000
+# Good path: started, at least two progress events, final byte count, one downloadCompleted.
+- scrollUntilVisible:
+    element:
+      text: 'DL Complete'
+    timeout: 20000
+- tapOn:
+    text: 'DL Complete'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Lifecycle OK: completed'
+    timeout: 90000
+# Cancel mid-transfer: cancelDownload after the first progress, then exactly one downloadCancelled.
+- tapOn:
+    text: 'DL Cancel'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Lifecycle OK: cancelled'
+    timeout: 90000
+# Network failure: the server drops the connection mid-body, so exactly one downloadFailed.
+- tapOn:
+    text: 'DL Net Fail'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Lifecycle OK: failed'
+    timeout: 90000
+# App kill during download: kill the process while bytes are flowing, relaunch, and the plugin must work again.
+- tapOn:
+    text: 'DL Kill'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Lifecycle OK: kill armed'
+    timeout: 90000
+- killApp
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: 'Download lifecycle ready'
+    timeout: 240000
+- assertNotVisible: 'Lifecycle OK: kill armed'
+- scrollUntilVisible:
+    element:
+      text: 'DL Complete'
+    timeout: 20000
+- tapOn:
+    text: 'DL Complete'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: 'Lifecycle OK: completed'
+    timeout: 90000

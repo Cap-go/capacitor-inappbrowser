@@ -14,6 +14,7 @@ import { attachKeyboardRegressionHarness } from './keyboard-regression.js';
 import { attachVisualRegressionHarness } from './visual-regression.js';
 import { attachFeatureSmokeHarness } from './feature-smoke.js';
 import { attachDeepLinkPreventedRegressionHarness } from './deep-link-prevented-regression.js';
+import { attachDownloadLifecycleRegressionHarness } from './download-lifecycle-regression.js';
 import { setupFullscreenDemo } from './fullscreen-demo.js';
 import { url as configuredTestWebappUrl } from './url.js';
 import { openQaToolsPanel } from './qa-tools.js';
@@ -416,6 +417,7 @@ window.customElements.define(
       attachVisualRegressionHarness();
       attachFeatureSmokeHarness();
       attachDeepLinkPreventedRegressionHarness();
+      attachDownloadLifecycleRegressionHarness();
 
       // Helper function to validate URL
       function isValidUrl(string) {
@@ -534,6 +536,35 @@ window.customElements.define(
         }
 
         downloadListenerHandles = await Promise.all([
+          InAppBrowser.addListener('downloadStarted', (event) => {
+            const label = event.sourceUrl ? `Started: ${event.downloadId}` : `Started download ${event.downloadId}`;
+            setDownloadStatus(label, {
+              backgroundColor: '#e0f2fe',
+              color: '#075985',
+            });
+          }),
+          InAppBrowser.addListener('downloadProgress', (event) => {
+            const expected =
+              event.bytesExpected >= 0
+                ? ` / ${event.bytesExpected}`
+                : '';
+            setDownloadStatus(`Progress: ${event.bytesReceived}${expected} bytes`, {
+              backgroundColor: '#e0f2fe',
+              color: '#075985',
+            });
+          }),
+          InAppBrowser.addListener('downloadCancelled', (event) => {
+            closeOnNextDownloadEvent = false;
+            setDownloadListenerButtonLabel('Event Cancelled');
+            setMaestroDownloadStatus('Event Cancelled');
+            if (maestroRunDownloadButton) {
+              maestroRunDownloadButton.disabled = false;
+            }
+            setDownloadStatus(`Download cancelled: ${event.downloadId}`, {
+              backgroundColor: '#fef9c3',
+              color: '#854d0e',
+            });
+          }),
           InAppBrowser.addListener('downloadCompleted', (event) => {
             const successLabel = `Event OK: ${event.fileName}`;
             setDownloadListenerButtonLabel(successLabel);
