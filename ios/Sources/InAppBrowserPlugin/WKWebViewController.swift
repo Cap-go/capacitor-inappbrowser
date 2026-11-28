@@ -35,8 +35,8 @@ private struct UrlsHandledByApp {
 private struct WKDownloadState {
     let downloadId: String
     var destinationURL: URL?
-    let mimeType: String?
-    let sourceURL: String?
+    var mimeType: String?
+    var sourceURL: String?
     weak var download: WKDownload?
 }
 

@@ -30,6 +30,11 @@ public final class ManagedDownloadCoordinator {
         volatile long bytesExpected = -1L;
         volatile String fileName;
         volatile long lastProgressEmitMs;
+
+        ManagedDownload(String downloadId, String sourceUrl) {
+            this.downloadId = downloadId;
+            this.sourceUrl = sourceUrl;
+        }
     }
 
     private final Callbacks callbacks;
@@ -49,19 +54,13 @@ public final class ManagedDownloadCoordinator {
 
     public String begin(String sourceUrl) {
         String downloadId = UUID.randomUUID().toString();
-        ManagedDownload download = new ManagedDownload();
-        download.downloadId = downloadId;
-        download.sourceUrl = sourceUrl;
-        downloads.put(downloadId, download);
+        downloads.put(downloadId, new ManagedDownload(downloadId, sourceUrl));
         callbacks.downloadStarted(downloadId, sourceUrl);
         return downloadId;
     }
 
     public void registerExisting(String downloadId, String sourceUrl) {
-        ManagedDownload download = new ManagedDownload();
-        download.downloadId = downloadId;
-        download.sourceUrl = sourceUrl;
-        downloads.put(downloadId, download);
+        downloads.put(downloadId, new ManagedDownload(downloadId, sourceUrl));
         callbacks.downloadStarted(downloadId, sourceUrl);
     }
 
