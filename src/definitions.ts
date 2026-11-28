@@ -404,6 +404,10 @@ export interface DownloadCompletedEvent {
    */
   id?: string;
   /**
+   * Identifies this download when `downloadStarted` was emitted for the same transfer.
+   */
+  downloadId?: string;
+  /**
    * Original URL that triggered the download when available.
    */
   sourceUrl?: string;
@@ -440,6 +444,10 @@ export interface DownloadFailedEvent {
    */
   id?: string;
   /**
+   * Identifies this download when `downloadStarted` was emitted for the same transfer.
+   */
+  downloadId?: string;
+  /**
    * Original URL that triggered the download when available.
    */
   sourceUrl?: string;
@@ -455,6 +463,67 @@ export interface DownloadFailedEvent {
    * Native error message.
    */
   error: string;
+}
+
+/**
+ * Event emitted when managed download handling begins.
+ *
+ * @since 8.6.18
+ */
+export interface DownloadStartedEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  /**
+   * Identifies this download in every later event about it.
+   */
+  downloadId: string;
+  /**
+   * Original URL that triggered the download when available.
+   */
+  sourceUrl?: string;
+}
+
+/**
+ * Event emitted while a managed download is in progress.
+ * Native runtimes throttle this to at most four events per second per download.
+ *
+ * @since 8.6.18
+ */
+export interface DownloadProgressEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  downloadId: string;
+  bytesReceived: number;
+  /**
+   * Total size when known; `-1` when the server did not report a length.
+   */
+  bytesExpected: number;
+  /**
+   * Saved filename once known.
+   */
+  fileName?: string;
+}
+
+/**
+ * Event emitted when a managed download is cancelled before it finishes.
+ *
+ * @since 8.6.18
+ */
+export interface DownloadCancelledEvent {
+  /**
+   * Source webview instance id.
+   */
+  id?: string;
+  downloadId: string;
+  sourceUrl?: string;
+}
+
+export interface CancelDownloadOptions {
+  downloadId: string;
 }
 
 /**
@@ -971,7 +1040,8 @@ export interface OpenWebViewOptions {
    * - `blob:` downloads are also captured when the platform supports them.
    * - Previewable files reopen inside the in-app browser when possible (see `downloadPreview`).
    * - Other files are handed off to the native preview or viewer flow.
-   * - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.
+   * - `downloadStarted`, throttled `downloadProgress`, `downloadCompleted`, `downloadFailed`, and `downloadCancelled` events notify the host app.
+   * - Use `cancelDownload({ downloadId })` to stop a running managed download.
    *
    * @default false
    * @since 8.6.0
@@ -2045,6 +2115,43 @@ export interface InAppBrowserPlugin {
     eventName: 'downloadFailed',
     listenerFunc: (event: DownloadFailedEvent) => void,
   ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when native download handling starts.
+   * Enable this with `handleDownloads: true` when opening the webview.
+   *
+   * @since 8.6.18
+   */
+  addListener(
+    eventName: 'downloadStarted',
+    listenerFunc: (event: DownloadStartedEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered while a managed download is in progress (throttled on native).
+   * Enable this with `handleDownloads: true` when opening the webview.
+   *
+   * @since 8.6.18
+   */
+  addListener(
+    eventName: 'downloadProgress',
+    listenerFunc: (event: DownloadProgressEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Will be triggered when a managed download is cancelled.
+   * Enable this with `handleDownloads: true` when opening the webview.
+   *
+   * @since 8.6.18
+   */
+  addListener(
+    eventName: 'downloadCancelled',
+    listenerFunc: (event: DownloadCancelledEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  /**
+   * Ends a running managed download. The download then emits `downloadCancelled`.
+   * Resolves whether or not the download was still running.
+   *
+   * @since 8.6.18
+   */
+  cancelDownload(options: CancelDownloadOptions): Promise<void>;
   /**
    * Will be triggered whenever a page opens a popup/new window.
    * Use the returned popup id with `executeScript`, `postMessage`, `show`, `hide`, and `close`.

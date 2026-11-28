@@ -255,6 +255,10 @@ For iOS, `titleFontFamily` must match a registered font family name and `titleIc
 
 Use proxy rules and `handleDownloads` for web apps that need request control, file uploads, downloads, or controlled popup behavior inside the managed browser. Typical examples include document portals, support desks, payment pages, Google Pay flows on Android, and apps that need to keep `_blank` links inside the same managed WebView.
 
+#### Download progress and cancel (Android and iOS)
+
+With `handleDownloads: true`, managed downloads emit `downloadStarted`, throttled `downloadProgress` (at most four events per second per download), and a single terminal event: `downloadCompleted`, `downloadFailed`, or `downloadCancelled`. Each started transfer shares the same `downloadId` across those events. Call `cancelDownload({ downloadId })` to stop a running download; closing the in-app browser while a download is active cancels it and emits `downloadCancelled`.
+
 ### Customize Chrome Custom Tab Appearance (Android)
 
 The `open()` method launches a Chrome Custom Tab on Android. You can customize its appearance to blend with your app:
@@ -761,6 +765,10 @@ await InAppBrowser.openWebView({
 * [`addListener('deepLinkPrevented', ...)`](#addlistenerdeeplinkprevented-)
 * [`addListener('downloadCompleted', ...)`](#addlistenerdownloadcompleted-)
 * [`addListener('downloadFailed', ...)`](#addlistenerdownloadfailed-)
+* [`addListener('downloadStarted', ...)`](#addlistenerdownloadstarted-)
+* [`addListener('downloadProgress', ...)`](#addlistenerdownloadprogress-)
+* [`addListener('downloadCancelled', ...)`](#addlistenerdownloadcancelled-)
+* [`cancelDownload(...)`](#canceldownload)
 * [`addListener('popupWindowOpened', ...)`](#addlistenerpopupwindowopened-)
 * [`addListener('proxyRequest', ...)`](#addlistenerproxyrequest-)
 * [`addListener('consoleMessage', ...)`](#addlistenerconsolemessage-)
@@ -1457,6 +1465,87 @@ Enable this with `handleDownloads: true` when opening the webview.
 --------------------
 
 
+### addListener('downloadStarted', ...)
+
+```typescript
+addListener(eventName: 'downloadStarted', listenerFunc: (event: DownloadStartedEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when native download handling starts.
+Enable this with `handleDownloads: true` when opening the webview.
+
+| Param              | Type                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadStarted'</code>                                                            |
+| **`listenerFunc`** | <code>(event: <a href="#downloadstartedevent">DownloadStartedEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.18
+
+--------------------
+
+
+### addListener('downloadProgress', ...)
+
+```typescript
+addListener(eventName: 'downloadProgress', listenerFunc: (event: DownloadProgressEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered while a managed download is in progress (throttled on native).
+Enable this with `handleDownloads: true` when opening the webview.
+
+| Param              | Type                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadProgress'</code>                                                             |
+| **`listenerFunc`** | <code>(event: <a href="#downloadprogressevent">DownloadProgressEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.18
+
+--------------------
+
+
+### addListener('downloadCancelled', ...)
+
+```typescript
+addListener(eventName: 'downloadCancelled', listenerFunc: (event: DownloadCancelledEvent) => void) => Promise<PluginListenerHandle>
+```
+
+Will be triggered when a managed download is cancelled.
+Enable this with `handleDownloads: true` when opening the webview.
+
+| Param              | Type                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'downloadCancelled'</code>                                                              |
+| **`listenerFunc`** | <code>(event: <a href="#downloadcancelledevent">DownloadCancelledEvent</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+**Since:** 8.6.18
+
+--------------------
+
+
+### cancelDownload(...)
+
+```typescript
+cancelDownload(options: CancelDownloadOptions) => Promise<void>
+```
+
+Ends a running managed download. The download then emits `downloadCancelled`.
+Resolves whether or not the download was still running.
+
+| Param         | Type                                                                    |
+| ------------- | ----------------------------------------------------------------------- |
+| **`options`** | <code><a href="#canceldownloadoptions">CancelDownloadOptions</a></code> |
+
+**Since:** 8.6.18
+
+--------------------
+
+
 ### addListener('popupWindowOpened', ...)
 
 ```typescript
@@ -1797,7 +1886,7 @@ See the README section "openSecureWindow (OAuth)" for full setup examples.
 | **`useSharedDataStore`**               | <code>boolean</code>                                                                                                                                                   | Share the host Capacitor WebView's website data store (cookies, local storage, etc.). On iOS 17+, InAppBrowser uses an isolated plugin-owned `WKWebsiteDataStore` by default so host and browser data stay separate. Set this to `true` to use `WKWebsiteDataStore.default()` instead, which shares session cookies with the Capacitor host WebView. Useful for SSO / OIDC silent login when the IdP session was established in the main app WebView. Requires `persistWebViewData: true` (the default). When `persistWebViewData` is false, a non-persistent store is used and this option has no effect. On Android this is a no-op: cookies are already process-global via `CookieManager`. On Web this is a no-op. Warning: clearing cookies/cache for a webview opened with this flag can affect the host WebView on iOS, because both share the same store. `clearAllBrowsingData()` still skips the host store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | <code>false</code>                                            | 8.13.6 |
 | **`clientCertificate`**                | <code>'none' \| 'prompt'</code>                                                                                                                                        | Controls Android TLS client certificate prompts during HTTPS handshakes. Use `prompt` to show the system certificate picker; omit or use `none` to cancel silently (default).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | <code>"none"</code>                                           | 8.7.5  |
 | **`clientCertificatePrompt`**          | <code>boolean</code>                                                                                                                                                   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |                                                               |        |
-| **`handleDownloads`**                  | <code>boolean</code>                                                                                                                                                   | Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge. When enabled: - Standard attachment responses are written to a temporary file. - `blob:` downloads are also captured when the platform supports them. - Previewable files reopen inside the in-app browser when possible (see `downloadPreview`). - Other files are handed off to the native preview or viewer flow. - `downloadCompleted` and `downloadFailed` events notify the host app about the saved file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | <code>false</code>                                            | 8.6.0  |
+| **`handleDownloads`**                  | <code>boolean</code>                                                                                                                                                   | Automatically handles downloads triggered inside the webview without requiring a custom JavaScript bridge. When enabled: - Standard attachment responses are written to a temporary file. - `blob:` downloads are also captured when the platform supports them. - Previewable files reopen inside the in-app browser when possible (see `downloadPreview`). - Other files are handed off to the native preview or viewer flow. - `downloadStarted`, throttled `downloadProgress`, `downloadCompleted`, `downloadFailed`, and `downloadCancelled` events notify the host app. - Use `cancelDownload({ downloadId })` to stop a running managed download.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | <code>false</code>                                            | 8.6.0  |
 | **`openWalletPasses`**                 | <code>boolean</code>                                                                                                                                                   | Opens managed Apple Wallet pass downloads (`.pkpass`) in the Wallet add-pass sheet instead of the download preview. Falls back to the regular download preview when the device can't add passes. An invalid pass emits `downloadFailed`. A shown sheet emits `downloadCompleted` with `handledBy: 'wallet'`. Requires `handleDownloads: true`. iOS only; ignored on Android.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | <code>false</code>                                            | 8.21.0 |
 | **`downloadPreview`**                  | <code><a href="#downloadpreview">DownloadPreview</a></code>                                                                                                            | Controls where managed downloads are previewed after saving. - `'inAppBrowser'` (default): Reopens previewable files (PDF, images, text, JSON) inside the same webview. - `'systemPreview'`: Opens the system Quick Look preview with share and Save to Files actions. iOS only; ignored on Android. Requires `handleDownloads: true`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | <code>"inAppBrowser"</code>                                   | 8.19.0 |
 | **`shareDisclaimer`**                  | <code><a href="#disclaimeroptions">DisclaimerOptions</a></code>                                                                                                        | Share options for the webview. When provided, shows a disclaimer dialog before sharing content. This is useful for: - Warning users about sharing sensitive information - Getting user consent before sharing - Explaining what will be shared - Complying with privacy regulations Note: shareSubject is required when using shareDisclaimer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                               | 0.1.0  |
@@ -2000,28 +2089,73 @@ Event emitted when `preventDeeplink` blocks a link that would otherwise leave th
 
 Event emitted after a managed download is saved locally.
 
-| Prop            | Type                                                            | Description                                              |
-| --------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
-| **`id`**        | <code>string</code>                                             | Source webview instance id.                              |
-| **`sourceUrl`** | <code>string</code>                                             | Original URL that triggered the download when available. |
-| **`fileName`**  | <code>string</code>                                             | Saved filename.                                          |
-| **`mimeType`**  | <code>string</code>                                             | Resolved MIME type when available.                       |
-| **`path`**      | <code>string</code>                                             | Absolute native filesystem path to the saved file.       |
-| **`localUrl`**  | <code>string</code>                                             | `file://` URL pointing at the saved file.                |
-| **`handledBy`** | <code><a href="#downloadhandledby">DownloadHandledBy</a></code> | How native handled the downloaded file after saving it.  |
+| Prop             | Type                                                            | Description                                                                        |
+| ---------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **`id`**         | <code>string</code>                                             | Source webview instance id.                                                        |
+| **`downloadId`** | <code>string</code>                                             | Identifies this download when `downloadStarted` was emitted for the same transfer. |
+| **`sourceUrl`**  | <code>string</code>                                             | Original URL that triggered the download when available.                           |
+| **`fileName`**   | <code>string</code>                                             | Saved filename.                                                                    |
+| **`mimeType`**   | <code>string</code>                                             | Resolved MIME type when available.                                                 |
+| **`path`**       | <code>string</code>                                             | Absolute native filesystem path to the saved file.                                 |
+| **`localUrl`**   | <code>string</code>                                             | `file://` URL pointing at the saved file.                                          |
+| **`handledBy`**  | <code><a href="#downloadhandledby">DownloadHandledBy</a></code> | How native handled the downloaded file after saving it.                            |
 
 
 #### DownloadFailedEvent
 
 Event emitted when managed download handling fails.
 
-| Prop            | Type                | Description                                              |
-| --------------- | ------------------- | -------------------------------------------------------- |
-| **`id`**        | <code>string</code> | Source webview instance id.                              |
-| **`sourceUrl`** | <code>string</code> | Original URL that triggered the download when available. |
-| **`fileName`**  | <code>string</code> | Intended filename when known.                            |
-| **`mimeType`**  | <code>string</code> | Resolved MIME type when available.                       |
-| **`error`**     | <code>string</code> | Native error message.                                    |
+| Prop             | Type                | Description                                                                        |
+| ---------------- | ------------------- | ---------------------------------------------------------------------------------- |
+| **`id`**         | <code>string</code> | Source webview instance id.                                                        |
+| **`downloadId`** | <code>string</code> | Identifies this download when `downloadStarted` was emitted for the same transfer. |
+| **`sourceUrl`**  | <code>string</code> | Original URL that triggered the download when available.                           |
+| **`fileName`**   | <code>string</code> | Intended filename when known.                                                      |
+| **`mimeType`**   | <code>string</code> | Resolved MIME type when available.                                                 |
+| **`error`**      | <code>string</code> | Native error message.                                                              |
+
+
+#### DownloadStartedEvent
+
+Event emitted when managed download handling begins.
+
+| Prop             | Type                | Description                                              |
+| ---------------- | ------------------- | -------------------------------------------------------- |
+| **`id`**         | <code>string</code> | Source webview instance id.                              |
+| **`downloadId`** | <code>string</code> | Identifies this download in every later event about it.  |
+| **`sourceUrl`**  | <code>string</code> | Original URL that triggered the download when available. |
+
+
+#### DownloadProgressEvent
+
+Event emitted while a managed download is in progress.
+Native runtimes throttle this to at most four events per second per download.
+
+| Prop                | Type                | Description                                                          |
+| ------------------- | ------------------- | -------------------------------------------------------------------- |
+| **`id`**            | <code>string</code> | Source webview instance id.                                          |
+| **`downloadId`**    | <code>string</code> |                                                                      |
+| **`bytesReceived`** | <code>number</code> |                                                                      |
+| **`bytesExpected`** | <code>number</code> | Total size when known; `-1` when the server did not report a length. |
+| **`fileName`**      | <code>string</code> | Saved filename once known.                                           |
+
+
+#### DownloadCancelledEvent
+
+Event emitted when a managed download is cancelled before it finishes.
+
+| Prop             | Type                | Description                 |
+| ---------------- | ------------------- | --------------------------- |
+| **`id`**         | <code>string</code> | Source webview instance id. |
+| **`downloadId`** | <code>string</code> |                             |
+| **`sourceUrl`**  | <code>string</code> |                             |
+
+
+#### CancelDownloadOptions
+
+| Prop             | Type                |
+| ---------------- | ------------------- |
+| **`downloadId`** | <code>string</code> |
 
 
 #### PopupWindowEvent

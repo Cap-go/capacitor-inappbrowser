@@ -329,6 +329,10 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return Promise.resolve();
   }
 
+  cancelDownload(_options: { downloadId: string }): Promise<void> {
+    return Promise.resolve();
+  }
+
   handleProxyRequest(options: Parameters<InAppBrowserPlugin['handleProxyRequest']>[0]): Promise<void> {
     console.log('handleProxyRequest not supported on web', options);
     return Promise.resolve();

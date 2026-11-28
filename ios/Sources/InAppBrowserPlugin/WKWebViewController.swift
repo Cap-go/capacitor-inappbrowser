@@ -32,12 +32,6 @@ private struct UrlsHandledByApp {
     static var schemes = CustomSchemeInterceptSupport.standardHandledSchemes
 }
 
-private struct WKDownloadState {
-    let destinationURL: URL?
-    let mimeType: String?
-    let sourceURL: String?
-}
-
 private enum DownloadReservationStore {
     static var paths: Set<String> = []
     static let lock = NSLock()
@@ -101,12 +95,16 @@ enum ScriptMessageHandlerSupport {
 }
 
 private struct BlobDownloadSession {
+    let downloadId: String
     let destinationURL: URL
     let sourceURL: String?
     let mimeType: String?
     let fileHandle: FileHandle
     let expectedSize: Int64?
     var bytesWritten: Int64 = 0
+    var lastProgressEmit: CFAbsoluteTime = 0
+    var cancelRequested = false
+    let endingGuard = ManagedDownloadEndingGuard()
 }
 
 public struct WKWebViewCredentials {
@@ -557,7 +555,8 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private var lastInjectedSafeAreaInsets: InjectedSafeAreaInsets?
-    private var downloadStates: [ObjectIdentifier: WKDownloadState] = [:]
+    private var downloadRecords: [ObjectIdentifier: ManagedDownloadRecord] = [:]
+    private var downloadRecordsById: [String: ManagedDownloadRecord] = [:]
     private var blobDownloadSessions: [String: BlobDownloadSession] = [:]
     private var rejectedBlobDownloadSessionIds: Set<String> = []
     private var previewItemURL: URL?
@@ -587,12 +586,72 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func register(download: WKDownload, response: URLResponse?, sourceURL: String? = nil) {
+        let downloadId = UUID().uuidString
+        let resolvedSourceURL = sourceURL ?? response?.url?.absoluteString
+        let record = ManagedDownloadRecord(downloadId: downloadId, sourceURL: resolvedSourceURL, mimeType: response?.mimeType)
+        record.wkDownload = download
         download.delegate = self
-        downloadStates[ObjectIdentifier(download)] = WKDownloadState(
-            destinationURL: nil,
-            mimeType: response?.mimeType,
-            sourceURL: sourceURL ?? response?.url?.absoluteString
-        )
+        let identifier = ObjectIdentifier(download)
+        downloadRecords[identifier] = record
+        downloadRecordsById[downloadId] = record
+        emitDownloadStarted(downloadId: downloadId, sourceURL: resolvedSourceURL)
+        record.endingGuard.markStarted()
+        attachProgressObserver(to: download, record: record)
+    }
+
+    private func attachProgressObserver(to download: WKDownload, record: ManagedDownloadRecord) {
+        record.progressObservation = download.progress.observe(\.fractionCompleted, options: [.new]) { [weak self] progress, _ in
+            guard let self else {
+                return
+            }
+            let now = CFAbsoluteTimeGetCurrent()
+            guard ManagedDownloadSupport.shouldEmitProgress(lastEmit: record.lastProgressEmit, now: now) else {
+                return
+            }
+            record.lastProgressEmit = now
+            let bytesReceived = progress.completedUnitCount
+            let bytesExpected = progress.totalUnitCount > 0 ? progress.totalUnitCount : -1
+            emitDownloadProgress(
+                downloadId: record.downloadId,
+                bytesReceived: bytesReceived,
+                bytesExpected: bytesExpected,
+                fileName: record.fileName ?? record.destinationURL?.lastPathComponent
+            )
+        }
+    }
+
+    func cancelManagedDownload(downloadId: String) -> Bool {
+        if let record = downloadRecordsById[downloadId] {
+            record.cancelRequested = true
+            record.wkDownload?.cancel(nil)
+            return true
+        }
+        if let entry = blobDownloadSessions.first(where: { $0.value.downloadId == downloadId }) {
+            var session = entry.value
+            session.cancelRequested = true
+            blobDownloadSessions[entry.key] = session
+            abortBlobDownloadSession(sessionId: entry.key, deleteFile: true)
+            if session.endingGuard.trySetEnding("cancelled") {
+                emitDownloadCancelled(downloadId: downloadId, sourceURL: session.sourceURL)
+            }
+            return true
+        }
+        return false
+    }
+
+    private func cancelAllManagedDownloadsOnClose() {
+        for record in downloadRecordsById.values {
+            guard !record.endingGuard.hasEnded() else {
+                continue
+            }
+            record.cancelRequested = true
+            record.wkDownload?.cancel(nil)
+            if record.endingGuard.trySetEnding("cancelled") {
+                emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
+            }
+        }
+        downloadRecords.removeAll()
+        downloadRecordsById.removeAll()
     }
 
     private func attachmentDisposition(_ response: URLResponse) -> String? {
@@ -773,13 +832,50 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             normalizedMimeType.starts(with: "image/")
     }
 
-    private func emitDownloadCompleted(_ fileURL: URL, mimeType: String?, sourceURL: String?, handledBy: String) {
+    private func emitDownloadStarted(downloadId: String, sourceURL: String?) {
+        var data: [String: Any] = ["downloadId": downloadId]
+        if let sourceURL {
+            data["sourceUrl"] = sourceURL
+        }
+        emit("downloadStarted", data: data)
+    }
+
+    private func emitDownloadProgress(downloadId: String, bytesReceived: Int64, bytesExpected: Int64, fileName: String?) {
+        var data: [String: Any] = [
+            "downloadId": downloadId,
+            "bytesReceived": bytesReceived,
+            "bytesExpected": bytesExpected
+        ]
+        if let fileName {
+            data["fileName"] = fileName
+        }
+        emit("downloadProgress", data: data)
+    }
+
+    private func emitDownloadCancelled(downloadId: String, sourceURL: String?) {
+        var data: [String: Any] = ["downloadId": downloadId]
+        if let sourceURL {
+            data["sourceUrl"] = sourceURL
+        }
+        emit("downloadCancelled", data: data)
+    }
+
+    private func emitDownloadCompleted(
+        downloadId: String?,
+        fileURL: URL,
+        mimeType: String?,
+        sourceURL: String?,
+        handledBy: String
+    ) {
         var data: [String: Any] = [
             "fileName": fileURL.lastPathComponent,
             "path": fileURL.path,
             "localUrl": fileURL.absoluteString,
             "handledBy": handledBy
         ]
+        if let downloadId {
+            data["downloadId"] = downloadId
+        }
         if let sourceURL {
             data["sourceUrl"] = sourceURL
         }
@@ -789,8 +885,17 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         emit("downloadCompleted", data: data)
     }
 
-    private func emitDownloadFailed(sourceURL: String?, fileName: String? = nil, mimeType: String? = nil, error: String) {
+    private func emitDownloadFailed(
+        downloadId: String?,
+        sourceURL: String?,
+        fileName: String? = nil,
+        mimeType: String? = nil,
+        error: String
+    ) {
         var data: [String: Any] = ["error": error]
+        if let downloadId {
+            data["downloadId"] = downloadId
+        }
         if let sourceURL {
             data["sourceUrl"] = sourceURL
         }
@@ -803,11 +908,11 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         emit("downloadFailed", data: data)
     }
 
-    private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?) {
+    private func previewDownloadedFile(_ fileURL: URL, mimeType: String?, sourceURL: String?, downloadId: String?) {
         DispatchQueue.main.async {
             if self.openWalletPasses &&
                 WalletPassSupport.isWalletPass(mimeType: mimeType, fileURL: fileURL) &&
-                self.presentWalletPass(fileURL, sourceURL: sourceURL) {
+                self.presentWalletPass(fileURL, sourceURL: sourceURL, downloadId: downloadId) {
                 return
             }
 
@@ -816,7 +921,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
                 let accessURL = fileURL.deletingLastPathComponent()
                 self.source = .file(fileURL, access: accessURL)
                 self.load(file: fileURL, access: accessURL)
-                self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "inAppBrowser")
+                self.emitDownloadCompleted(
+                    downloadId: downloadId,
+                    fileURL: fileURL,
+                    mimeType: mimeType,
+                    sourceURL: sourceURL,
+                    handledBy: "inAppBrowser"
+                )
                 return
             }
 
@@ -825,13 +936,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             previewController.dataSource = self
             previewController.delegate = self
             self.present(previewController, animated: true)
-            self.emitDownloadCompleted(fileURL, mimeType: mimeType, sourceURL: sourceURL, handledBy: "systemPreview")
+            self.emitDownloadCompleted(
+                downloadId: downloadId,
+                fileURL: fileURL,
+                mimeType: mimeType,
+                sourceURL: sourceURL,
+                handledBy: "systemPreview"
+            )
         }
     }
 
     /// Returns false when the device can't add passes or nothing can present the sheet,
     /// so the caller falls back to the regular download preview.
-    private func presentWalletPass(_ fileURL: URL, sourceURL: String?) -> Bool {
+    private func presentWalletPass(_ fileURL: URL, sourceURL: String?, downloadId: String?) -> Bool {
         guard PKAddPassesViewController.canAddPasses(), let presenter = walletPassPresenter() else {
             return false
         }
@@ -840,6 +957,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             pass = try PKPass(data: Data(contentsOf: fileURL))
         } catch {
             emitDownloadFailed(
+                downloadId: downloadId,
                 sourceURL: sourceURL,
                 fileName: fileURL.lastPathComponent,
                 mimeType: WalletPassSupport.mimeType,
@@ -851,7 +969,13 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             return false
         }
         presenter.present(addPassesViewController, animated: true) { [weak self] in
-            self?.emitDownloadCompleted(fileURL, mimeType: WalletPassSupport.mimeType, sourceURL: sourceURL, handledBy: "wallet")
+            self?.emitDownloadCompleted(
+                downloadId: downloadId,
+                fileURL: fileURL,
+                mimeType: WalletPassSupport.mimeType,
+                sourceURL: sourceURL,
+                handledBy: "wallet"
+            )
         }
         return true
     }
@@ -903,7 +1027,10 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
     }
 
     private func abortAllBlobDownloadSessions() {
-        for session in blobDownloadSessions.values {
+        for (sessionId, session) in blobDownloadSessions {
+            if !session.endingGuard.hasEnded(), session.endingGuard.trySetEnding("cancelled") {
+                emitDownloadCancelled(downloadId: session.downloadId, sourceURL: session.sourceURL)
+            }
             cleanupBlobDownloadSession(session, deleteFile: true)
         }
         blobDownloadSessions.removeAll()
@@ -956,47 +1083,59 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         }
 
         guard let jsonPayload = parseBlobBridgePayload(payload) else {
-            emitDownloadFailed(sourceURL: nil, error: "Blob download payload is missing")
+            emitDownloadFailed(downloadId: nil, sourceURL: nil, error: "Blob download payload is missing")
             return
         }
 
         let base64 = jsonPayload["base64"] as? String ?? ""
         guard !base64.isEmpty else {
-            emitDownloadFailed(sourceURL: jsonPayload["sourceUrl"] as? String, error: "Blob download payload is empty")
+            emitDownloadFailed(downloadId: nil, sourceURL: jsonPayload["sourceUrl"] as? String, error: "Blob download payload is empty")
             return
         }
 
         let declaredSize = (jsonPayload["size"] as? NSNumber)?.int64Value
         let estimatedSize = Int64((Double(base64.count) * 3.0 / 4.0).rounded(.up))
         let decodedSize = max(declaredSize ?? estimatedSize, estimatedSize)
+        let sourceURL = jsonPayload["sourceUrl"] as? String
+        let fileName = blobDownloadFileName(from: jsonPayload)
+        let mimeType = jsonPayload["mimeType"] as? String
         if decodedSize > Int64(BlobDownloadSupport.maxLegacyBytes) {
             emitDownloadFailed(
-                sourceURL: jsonPayload["sourceUrl"] as? String,
-                fileName: blobDownloadFileName(from: jsonPayload),
-                mimeType: jsonPayload["mimeType"] as? String,
+                downloadId: nil,
+                sourceURL: sourceURL,
+                fileName: fileName,
+                mimeType: mimeType,
                 error: "Blob download is too large for the legacy bridge"
             )
             return
         }
+
+        let downloadId = UUID().uuidString
+        let endingGuard = ManagedDownloadEndingGuard()
+        emitDownloadStarted(downloadId: downloadId, sourceURL: sourceURL)
+        endingGuard.markStarted()
 
         do {
             guard let data = Data(base64Encoded: base64) else {
                 throw NSError(domain: "InAppBrowser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Blob download payload is invalid"])
             }
 
-            let fileName = blobDownloadFileName(from: jsonPayload)
             let destinationURL = try uniqueDownloadDestination(for: fileName)
             try data.write(to: destinationURL, options: .atomic)
-            let mimeType = jsonPayload["mimeType"] as? String
-            let sourceURL = jsonPayload["sourceUrl"] as? String
-            previewDownloadedFile(destinationURL, mimeType: mimeType, sourceURL: sourceURL)
+            emitDownloadProgress(downloadId: downloadId, bytesReceived: Int64(data.count), bytesExpected: decodedSize, fileName: fileName)
+            if endingGuard.trySetEnding("completed") {
+                previewDownloadedFile(destinationURL, mimeType: mimeType, sourceURL: sourceURL, downloadId: downloadId)
+            }
         } catch {
-            emitDownloadFailed(
-                sourceURL: jsonPayload["sourceUrl"] as? String,
-                fileName: blobDownloadFileName(from: jsonPayload),
-                mimeType: jsonPayload["mimeType"] as? String,
-                error: "Failed to save blob download: \(error.localizedDescription)"
-            )
+            if endingGuard.trySetEnding("failed") {
+                emitDownloadFailed(
+                    downloadId: downloadId,
+                    sourceURL: sourceURL,
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    error: "Failed to save blob download: \(error.localizedDescription)"
+                )
+            }
         }
     }
 
@@ -1034,13 +1173,19 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             let destinationURL = try uniqueDownloadDestination(for: fileName)
             reservedDestinationURL = destinationURL
             let fileHandle = try BlobDownloadSupport.openWriteHandle(at: destinationURL)
-            blobDownloadSessions[sessionId] = BlobDownloadSession(
+            let downloadId = UUID().uuidString
+            let sourceURL = jsonPayload["sourceUrl"] as? String
+            var session = BlobDownloadSession(
+                downloadId: downloadId,
                 destinationURL: destinationURL,
-                sourceURL: jsonPayload["sourceUrl"] as? String,
+                sourceURL: sourceURL,
                 mimeType: jsonPayload["mimeType"] as? String,
                 fileHandle: fileHandle,
                 expectedSize: expectedSize
             )
+            blobDownloadSessions[sessionId] = session
+            emitDownloadStarted(downloadId: downloadId, sourceURL: sourceURL)
+            session.endingGuard.markStarted()
         } catch {
             let sessionId = (parseBlobBridgePayload(payload)?["sessionId"] as? String) ?? ""
             if let reservedDestinationURL {
@@ -1051,7 +1196,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             if !sessionId.isEmpty && shouldSignalRejection {
                 signalBlobDownloadRejected(sessionId: sessionId, reason: reason)
             }
-            emitDownloadFailed(sourceURL: nil, error: "Failed to start blob download: \(reason)")
+            emitDownloadFailed(downloadId: nil, sourceURL: nil, error: "Failed to start blob download: \(reason)")
         }
     }
 
@@ -1071,7 +1216,15 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         guard !base64.isEmpty, let data = Data(base64Encoded: base64) else {
             abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
             signalBlobDownloadRejected(sessionId: sessionId, reason: "Failed to save blob download")
-            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download")
+            emitDownloadFailed(downloadId: session.downloadId, sourceURL: session.sourceURL, error: "Failed to save blob download")
+            return
+        }
+
+        if session.cancelRequested {
+            abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
+            if session.endingGuard.trySetEnding("cancelled") {
+                emitDownloadCancelled(downloadId: session.downloadId, sourceURL: session.sourceURL)
+            }
             return
         }
 
@@ -1082,12 +1235,25 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
             try session.fileHandle.write(contentsOf: data)
             session.bytesWritten += Int64(data.count)
+            let now = CFAbsoluteTimeGetCurrent()
+            if ManagedDownloadSupport.shouldEmitProgress(lastEmit: session.lastProgressEmit, now: now) {
+                session.lastProgressEmit = now
+                let bytesExpected = session.expectedSize ?? -1
+                emitDownloadProgress(
+                    downloadId: session.downloadId,
+                    bytesReceived: session.bytesWritten,
+                    bytesExpected: bytesExpected,
+                    fileName: session.destinationURL.lastPathComponent
+                )
+            }
             blobDownloadSessions[sessionId] = session
         } catch {
             abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
             let reason = error.localizedDescription
             signalBlobDownloadRejected(sessionId: sessionId, reason: reason)
-            emitDownloadFailed(sourceURL: session.sourceURL, error: "Failed to save blob download: \(reason)")
+            if session.endingGuard.trySetEnding("failed") {
+                emitDownloadFailed(downloadId: session.downloadId, sourceURL: session.sourceURL, error: "Failed to save blob download: \(reason)")
+            }
         }
     }
 
@@ -1099,7 +1265,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         guard let jsonPayload = parseBlobBridgePayload(payload),
               let sessionId = jsonPayload["sessionId"] as? String,
               !sessionId.isEmpty else {
-            emitDownloadFailed(sourceURL: nil, error: "Blob download session was not initialized")
+            emitDownloadFailed(downloadId: nil, sourceURL: nil, error: "Blob download session was not initialized")
             return
         }
 
@@ -1107,7 +1273,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
             if rejectedBlobDownloadSessionIds.remove(sessionId) != nil {
                 return
             }
-            emitDownloadFailed(sourceURL: nil, error: "Blob download session was not initialized")
+            emitDownloadFailed(downloadId: nil, sourceURL: nil, error: "Blob download session was not initialized")
             return
         }
 
@@ -1117,17 +1283,27 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
         if let expectedSize = session.expectedSize, session.bytesWritten != expectedSize {
             cleanupBlobDownloadSession(session, deleteFile: true)
-            emitDownloadFailed(
-                sourceURL: session.sourceURL,
-                fileName: session.destinationURL.lastPathComponent,
-                mimeType: session.mimeType,
-                error: "Blob download size mismatch"
-            )
+            if session.endingGuard.trySetEnding("failed") {
+                emitDownloadFailed(
+                    downloadId: session.downloadId,
+                    sourceURL: session.sourceURL,
+                    fileName: session.destinationURL.lastPathComponent,
+                    mimeType: session.mimeType,
+                    error: "Blob download size mismatch"
+                )
+            }
             return
         }
 
         releaseDownloadDestination(session.destinationURL)
-        previewDownloadedFile(session.destinationURL, mimeType: session.mimeType, sourceURL: session.sourceURL)
+        if session.endingGuard.trySetEnding("completed") {
+            previewDownloadedFile(
+                session.destinationURL,
+                mimeType: session.mimeType,
+                sourceURL: session.sourceURL,
+                downloadId: session.downloadId
+            )
+        }
     }
 
     private func abortBlobDownloadPayload(_ payload: Any) {
@@ -1139,12 +1315,16 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         let sessionId = jsonPayload?["sessionId"] as? String ?? ""
         let session = abortBlobDownloadSession(sessionId: sessionId, deleteFile: true)
         let reason = jsonPayload?["reason"] as? String ?? "Blob download aborted"
-        emitDownloadFailed(
-            sourceURL: session?.sourceURL ?? jsonPayload?["sourceUrl"] as? String,
-            fileName: session?.destinationURL.lastPathComponent ?? jsonPayload?["fileName"] as? String,
-            mimeType: session?.mimeType ?? jsonPayload?["mimeType"] as? String,
-            error: reason
-        )
+        let downloadId = session?.downloadId
+        if let session, session.endingGuard.trySetEnding("failed") {
+            emitDownloadFailed(
+                downloadId: downloadId,
+                sourceURL: session.sourceURL ?? jsonPayload?["sourceUrl"] as? String,
+                fileName: session.destinationURL.lastPathComponent,
+                mimeType: session.mimeType ?? jsonPayload?["mimeType"] as? String,
+                error: reason
+            )
+        }
     }
 
     private func acknowledgeBlobDownloadRejectionPayload(_ payload: Any) {
@@ -1158,7 +1338,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     private func handleBlobDownloadFromPage(blobUrl: String, mimeType: String?, contentDisposition: String?) {
         guard handleDownloads, let webView else {
-            emitDownloadFailed(sourceURL: blobUrl, error: "Blob download requires an active WebView")
+            emitDownloadFailed(downloadId: nil, sourceURL: blobUrl, error: "Blob download requires an active WebView")
             return
         }
 
@@ -1180,7 +1360,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         guard JSONSerialization.isValidJSONObject(params),
               let paramsData = try? JSONSerialization.data(withJSONObject: params),
               let paramsJson = String(data: paramsData, encoding: .utf8) else {
-            emitDownloadFailed(sourceURL: blobUrl, error: "Failed to prepare blob download script")
+            emitDownloadFailed(downloadId: nil, sourceURL: blobUrl, error: "Failed to prepare blob download script")
             return
         }
 
@@ -1294,7 +1474,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
         DispatchQueue.main.async {
             webView.evaluateJavaScript(script) { _, error in
                 if let error {
-                    self.emitDownloadFailed(sourceURL: blobUrl, error: "Failed to capture blob download: \(error.localizedDescription)")
+                    self.emitDownloadFailed(downloadId: nil, sourceURL: blobUrl, error: "Failed to capture blob download: \(error.localizedDescription)")
                 }
             }
         }
@@ -2802,6 +2982,7 @@ public extension WKWebViewController {
 
     func cleanupWebView() {
         setBrowserFullscreen(false)
+        cancelAllManagedDownloadsOnClose()
         abortAllBlobDownloadSessions()
         guard let webView = self.webView else { return }
         webView.stopLoading()
@@ -4134,47 +4315,88 @@ extension WKWebViewController: WKNavigationDelegate {
 extension WKWebViewController: WKDownloadDelegate {
     public func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
         let identifier = ObjectIdentifier(download)
-        let sourceURL = downloadStates[identifier]?.sourceURL ?? response.url?.absoluteString
+        guard let record = downloadRecords[identifier] else {
+            completionHandler(nil)
+            return
+        }
+        let sourceURL = record.sourceURL ?? response.url?.absoluteString
         do {
             let destinationURL = try uniqueDownloadDestination(for: suggestedFilename)
-            downloadStates[identifier] = WKDownloadState(destinationURL: destinationURL, mimeType: response.mimeType, sourceURL: sourceURL)
+            record.destinationURL = destinationURL
+            record.mimeType = response.mimeType ?? record.mimeType
+            record.fileName = suggestedFilename
+            record.sourceURL = sourceURL
             completionHandler(destinationURL)
         } catch {
             print("[InAppBrowser] Failed to prepare download destination: \(error)")
-            downloadStates.removeValue(forKey: identifier)
-            emitDownloadFailed(
-                sourceURL: sourceURL,
-                fileName: suggestedFilename,
-                mimeType: response.mimeType,
-                error: "Failed to prepare download destination: \(error.localizedDescription)"
-            )
+            downloadRecords.removeValue(forKey: identifier)
+            downloadRecordsById.removeValue(forKey: record.downloadId)
+            if record.endingGuard.trySetEnding("failed") {
+                emitDownloadFailed(
+                    downloadId: record.downloadId,
+                    sourceURL: sourceURL,
+                    fileName: suggestedFilename,
+                    mimeType: response.mimeType,
+                    error: "Failed to prepare download destination: \(error.localizedDescription)"
+                )
+            }
             completionHandler(nil)
         }
     }
 
     public func downloadDidFinish(_ download: WKDownload) {
         let identifier = ObjectIdentifier(download)
-        guard let state = downloadStates.removeValue(forKey: identifier) else {
+        guard let record = downloadRecords.removeValue(forKey: identifier) else {
             return
         }
-        releaseDownloadDestination(state.destinationURL)
-        guard let destinationURL = state.destinationURL else {
-            emitDownloadFailed(sourceURL: state.sourceURL, mimeType: state.mimeType, error: "Download finished without a destination URL")
+        downloadRecordsById.removeValue(forKey: record.downloadId)
+        record.progressObservation?.invalidate()
+        releaseDownloadDestination(record.destinationURL)
+        guard let destinationURL = record.destinationURL else {
+            if record.endingGuard.trySetEnding("failed") {
+                emitDownloadFailed(
+                    downloadId: record.downloadId,
+                    sourceURL: record.sourceURL,
+                    mimeType: record.mimeType,
+                    error: "Download finished without a destination URL"
+                )
+            }
             return
         }
 
-        previewDownloadedFile(destinationURL, mimeType: state.mimeType, sourceURL: state.sourceURL)
+        if record.endingGuard.trySetEnding("completed") {
+            previewDownloadedFile(
+                destinationURL,
+                mimeType: record.mimeType,
+                sourceURL: record.sourceURL,
+                downloadId: record.downloadId
+            )
+        }
     }
 
     public func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        let state = downloadStates.removeValue(forKey: ObjectIdentifier(download))
-        releaseDownloadDestination(state?.destinationURL)
-        emitDownloadFailed(
-            sourceURL: state?.sourceURL,
-            fileName: state?.destinationURL?.lastPathComponent,
-            mimeType: state?.mimeType,
-            error: "Download failed: \(error.localizedDescription)"
-        )
+        let identifier = ObjectIdentifier(download)
+        guard let record = downloadRecords.removeValue(forKey: identifier) else {
+            return
+        }
+        downloadRecordsById.removeValue(forKey: record.downloadId)
+        record.progressObservation?.invalidate()
+        releaseDownloadDestination(record.destinationURL)
+        let nsError = error as NSError
+        let cancelled = record.cancelRequested || nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+        if cancelled {
+            if record.endingGuard.trySetEnding("cancelled") {
+                emitDownloadCancelled(downloadId: record.downloadId, sourceURL: record.sourceURL)
+            }
+        } else if record.endingGuard.trySetEnding("failed") {
+            emitDownloadFailed(
+                downloadId: record.downloadId,
+                sourceURL: record.sourceURL,
+                fileName: record.destinationURL?.lastPathComponent,
+                mimeType: record.mimeType,
+                error: "Download failed: \(error.localizedDescription)"
+            )
+        }
         print("[InAppBrowser] Download failed: \(error.localizedDescription)")
     }
 }

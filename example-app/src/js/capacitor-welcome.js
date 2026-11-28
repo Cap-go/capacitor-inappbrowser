@@ -537,6 +537,31 @@ window.customElements.define(
         }
 
         downloadListenerHandles = await Promise.all([
+          InAppBrowser.addListener('downloadStarted', (event) => {
+            const label = event.sourceUrl ? `Started: ${event.downloadId}` : `Started download ${event.downloadId}`;
+            setDownloadStatus(label, {
+              backgroundColor: '#e0f2fe',
+              color: '#075985',
+            });
+          }),
+          InAppBrowser.addListener('downloadProgress', (event) => {
+            const expected =
+              event.bytesExpected >= 0
+                ? ` / ${event.bytesExpected}`
+                : '';
+            setDownloadStatus(`Progress: ${event.bytesReceived}${expected} bytes`, {
+              backgroundColor: '#e0f2fe',
+              color: '#075985',
+            });
+          }),
+          InAppBrowser.addListener('downloadCancelled', (event) => {
+            setDownloadListenerButtonLabel('Event Cancelled');
+            setMaestroDownloadStatus('Event Cancelled');
+            setDownloadStatus(`Download cancelled: ${event.downloadId}`, {
+              backgroundColor: '#fef9c3',
+              color: '#854d0e',
+            });
+          }),
           InAppBrowser.addListener('downloadCompleted', (event) => {
             const successLabel = `Event OK: ${event.fileName}`;
             setDownloadListenerButtonLabel(successLabel);
