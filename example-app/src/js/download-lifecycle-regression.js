@@ -291,7 +291,7 @@ export function attachDownloadLifecycleRegressionHarness() {
 
   Object.entries(buttons).forEach(([name, button]) => {
     button.addEventListener("click", () => {
-      run(name);
+      run(name).catch((error) => console.error(`Download lifecycle ${name} crashed:`, error));
     });
     button.disabled = false;
   });

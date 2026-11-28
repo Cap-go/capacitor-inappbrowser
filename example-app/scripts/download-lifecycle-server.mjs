@@ -58,8 +58,10 @@ const server = createServer((req, res) => {
 
   const pageMatch = /^\/page\/(complete|cancel|kill|fail)$/.exec(url.pathname);
   if (pageMatch) {
+    // Only a key of the fixed scenario table reaches the HTML, never request text.
+    const pageKind = Object.keys(scenarios).find((key) => key === pageMatch[1]);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(pageHtml(pageMatch[1]));
+    res.end(pageHtml(pageKind));
     return;
   }
 
