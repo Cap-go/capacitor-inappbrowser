@@ -1448,7 +1448,7 @@ public class CapgoInAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let openWalletPasses = call.getBool("openWalletPasses", false)
         if let rawDownloadPreview = call.getString("downloadPreview"),
            DownloadPreviewSupport.normalizedMode(rawDownloadPreview) == nil {
-            call.reject("downloadPreview must be 'inAppBrowser' or 'systemPreview'")
+            call.reject("downloadPreview must be 'inAppBrowser', 'systemPreview', or 'none'")
             return
         }
         let downloadPreview = DownloadPreviewSupport.resolve(perOpenValue: call.getString("downloadPreview"))

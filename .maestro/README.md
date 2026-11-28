@@ -20,6 +20,10 @@ Record new baselines locally with `visual-regression-record.yaml` after intentio
 
 `deep-link-prevented-android.yaml` and `deep-link-prevented-ios.yaml` run the example app regression harness: a custom scheme must emit `deepLinkPrevented`, and a normal `https://` navigation must not.
 
+### Download preview none (`downloadPreview: 'none'`)
+
+`download-preview-none-android.yaml` and `download-preview-none-ios.yaml` run the example app harness in `example-app/src/js/download-preview-regression.js`. It opens a webview with `handleDownloads: true` and `downloadPreview: 'none'`, downloads a PDF and a text file, and checks the plugin's `downloadCompleted` events (`handledBy: 'none'`) plus that the same page instance keeps running. The flow then asserts the page is still on screen with no Open with sheet or Quick Look, and runs a failure case where an invalid `downloadPreview` rejects with and without `handleDownloads`. Run on Android with `bun run maestro:test:android:download-preview-none` and on iOS with `sh ./scripts/run-ios-maestro-download-preview-none.sh`.
+
 ### Run locally
 
 1. Start an Android emulator or connect a device with `adb`.

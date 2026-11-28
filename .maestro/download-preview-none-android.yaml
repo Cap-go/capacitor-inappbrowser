@@ -1,0 +1,48 @@
+appId: app.capgo.inappbrowser
+---
+# downloadPreview 'none' (Cap-go/capacitor-inappbrowser#793).
+# The harness (example-app/src/js/download-preview-regression.js) opens a webview with
+# handleDownloads: true and downloadPreview: 'none', clicks a PDF and a text download link,
+# and only prints the RESULT line once the plugin emitted downloadCompleted with
+# handledBy 'none' for both files and the same page instance kept sending heartbeats.
+- tapOn:
+    text: 'Wait'
+    optional: true
+    label: 'Dismiss the transient Pixel Launcher ANR dialog before waiting for the harness'
+- extendedWaitUntil:
+    visible: 'Maestro Ready'
+    timeout: 240000
+- scrollUntilVisible:
+    element:
+      text: "Run Download Preview None \\(Maestro\\)"
+    timeout: 20000
+- tapOn:
+    text: "Run Download Preview None \\(Maestro\\)"
+    retryTapIfNoChange: true
+# Plugin result: both downloads completed, handledBy none, shown inside the page.
+- extendedWaitUntil:
+    visible: 'RESULT download completed handledBy=none,none files=preview-none.*\.pdf,preview-none.*\.txt'
+    timeout: 90000
+# The page is still on screen, so no preview replaced it and no other app or sheet took over.
+- assertVisible: 'Download preview none page'
+- assertNotVisible: 'Open with'
+- assertNotVisible: 'Just once'
+- assertNotVisible: 'No app can open.*'
+- waitForAnimationToEnd:
+    timeout: 3000
+- assertVisible: 'RESULT download completed handledBy=none,none.*'
+- tapOn: 'Finish test'
+- extendedWaitUntil:
+    visible: 'Event OK: download-preview-none handledBy=none,none files=preview-none.*\.txt'
+    timeout: 60000
+- scrollUntilVisible:
+    element:
+      text: "Run Download Preview Invalid \\(Maestro\\)"
+    timeout: 20000
+- tapOn:
+    text: "Run Download Preview Invalid \\(Maestro\\)"
+    retryTapIfNoChange: true
+# Failure case: an invalid value rejects with the plugin's own message, with and without handleDownloads.
+- extendedWaitUntil:
+    visible: 'Event OK: downloadPreview rejected with and without handleDownloads'
+    timeout: 60000

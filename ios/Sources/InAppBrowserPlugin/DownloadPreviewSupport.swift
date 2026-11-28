@@ -10,9 +10,15 @@ enum DownloadPreviewSupport {
             return "inAppBrowser"
         case "systempreview":
             return "systemPreview"
+        case "none":
+            return "none"
         default:
             return nil
         }
+    }
+
+    static func skipsPreview(_ mode: String) -> Bool {
+        mode == "none"
     }
 
     static func resolve(perOpenValue: String?) -> String {

@@ -15,6 +15,7 @@ const sourceFiles = [
   path.join(exampleDir, "src/js/proxy-regression.js"),
   path.join(exampleDir, "src/js/visual-regression.js"),
   path.join(exampleDir, "src/js/deep-link-prevented-regression.js"),
+  path.join(exampleDir, "src/js/download-preview-regression.js"),
   path.join(exampleDir, "android/app/src/main/java/app/capgo/inappbrowser/MainActivity.java"),
 ];
 
